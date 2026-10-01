@@ -4,7 +4,7 @@ import { CONFIG } from './config';
 import { densityAt, lateralSpeedAt, speedAt } from './difficulty';
 import { InstancedField, wrap } from './field';
 import type { LivePalette } from './palette';
-import { Light, pickRoom, ROOM_IDS, ROOMS, roomLength, type RoomAPI, type RoomId } from './interior';
+import { Light, pickRoom, ROOM_IDS, ROOMS, roomLength, type RoomAPI, type RoomId, type RoomPlan } from './interior';
 import { BOULDER_HEIGHT, boulder, crystalCluster, mushroomTree, shuttle, spireTree } from './props';
 
 // The world ahead of the ship: obstacle pools plus the generator that lays
@@ -127,6 +127,11 @@ export class World {
   private roomHw = 0;
   private roomSide = 1;
   private roomOffset: number | null = null;
+  private roomH = 0;
+  private roomShift = 0; // sideways shift of the centre line through this room
+  private shiftLen = 0;
+  private shiftDone = 0;
+  private plan: RoomPlan | null = null; // split layout, mirrored to this room's side
   private framePending = false;
   private enclosure = 1; // eased towards the current room's enclosure
   private readonly roomLogD = new Float64Array(16).fill(-Infinity);
@@ -217,6 +222,8 @@ export class World {
     this.room = this.lastRoom = 'corridor';
     this.roomEnd = -Infinity;
     this.enclosure = 1;
+    this.plan = null;
+    this.roomShift = 0;
     // startScore > 0 (dev skip) places the run part-way along.
     this.runStart = run ? this.distance - startScore / CONFIG.score.pointsPerUnit : null;
     this.theme = 'land';
@@ -625,29 +632,68 @@ export class World {
     return (it.halfWidthStart - it.halfWidthMin) * Math.exp(-score / it.widthRampPoints) + it.halfWidthMin;
   }
 
-  private startRoom(id: RoomId, d: number, base: number, maxSlope: number): void {
+  private startRoom(id: RoomId, d: number, base: number, maxSlope: number, jog = true): void {
+    const it = TH.interior;
     const def = ROOMS[id];
-    const roomHw = Math.max(2.2, base + def.extraWidth(base));
-    const offset = def.laneOffset ? def.laneOffset(base) : null;
-    // Tapers long enough for the lane to get where it needs to: into a fixed
-    // offset, or back from its widest wander to the corridor before the exit.
-    const travel = offset !== null ? Math.abs(offset) : Math.min(Math.max(0, roomHw - base), TH.interior.wanderExtra);
-    const need = travel / (maxSlope * 0.7);
-    const taper = id === 'corridor' ? 0 : Math.max(TH.interior.taperMin, need);
-    const len = Math.max(roomLength(id), taper * 2 + 15);
-    if (id !== 'corridor' && d + len > this.themeEnd - TH.lane.beforeChange - 10) {
-      // No room for another room before the theme ends: corridor to the exit.
-      this.startRoom('corridor', d, base, maxSlope);
-      this.roomEnd = Infinity;
-      return;
+    const vary = def.vary !== false && id !== 'corridor';
+    // Split rooms bring their own layout, mirrored at random (but usually
+    // towards the side the lane is already on, so it has less to cross).
+    const plan = def.plan ? def.plan(base) : null;
+    const towards = this.lane >= this.cx ? 1 : -1;
+    const side = plan && Math.random() < 0.25 ? -towards : towards;
+    let roomHw: number;
+    if (plan) {
+      roomHw = plan.halfWidth;
+    } else {
+      const extra = def.extraWidth(base);
+      roomHw = Math.max(2.2, base + (vary && extra > 1 ? extra * range(it.sizeVariation) : extra));
+    }
+    const offset = plan ? plan.offset : def.laneOffset ? def.laneOffset(base) : null;
+
+    // Every room (and some corridors) shifts the centre line sideways: an S-bend.
+    const dir = Math.random() < 0.5 ? -1 : 1;
+    let shift = 0;
+    if (id !== 'corridor') shift = dir * range(it.roomShift);
+    else if (jog && Math.random() < it.corridorJogChance) shift = dir * range(it.corridorJog);
+
+    // Tapers long enough for the lane to follow the shift and reach its
+    // offset (or come back from its widest wander before the exit).
+    const reachOut = offset !== null ? Math.abs(offset) : Math.min(Math.max(0, roomHw - base), it.wanderExtra);
+    const need = (Math.abs(shift) + reachOut) / (maxSlope * 0.6);
+    const taper = id === 'corridor' ? 0 : Math.max(it.taperMin, need);
+    let len = Math.max(roomLength(id), taper * 2 + 15);
+    if (id === 'corridor') len = Math.max(len, Math.abs(shift) / (maxSlope * 0.6) + 6);
+    if (d + len > this.themeEnd - TH.lane.beforeChange - 10) {
+      if (id !== 'corridor' || shift !== 0) {
+        // No space left before the theme ends: a straight corridor to the exit.
+        this.startRoom('corridor', d, base, maxSlope, false);
+        this.roomEnd = Infinity;
+        return;
+      }
     }
     this.room = id;
     this.roomStart = d;
     this.roomEnd = d + len;
     this.roomTaper = taper;
     this.roomHw = roomHw;
-    this.roomSide = this.lane >= this.cx ? 1 : -1;
-    this.roomOffset = offset === null ? null : this.roomSide * offset;
+    this.roomH = def.height * (vary ? range(it.heightVariation) : 1);
+    this.roomSide = side;
+    this.roomShift = shift;
+    this.shiftLen = id === 'corridor' ? len : taper;
+    this.shiftDone = 0;
+    this.plan = plan
+      ? {
+          halfWidth: plan.halfWidth,
+          dividers: plan.dividers.map((v) => v * side),
+          dividerHalf: plan.dividerHalf,
+          branches: plan.branches.map((v) => v * side),
+          offset: plan.offset * side,
+        }
+      : null;
+    this.roomOffset = offset === null ? null : side * offset;
+    this.api.memo = 0;
+    this.api.memo2 = 0;
+    this.api.memoAt = d + taper;
     this.nextFeatureAt = d + taper + 4;
     this.framePending = true;
     this.logRoom(d, id);
@@ -666,7 +712,7 @@ export class World {
       this.hullBox(this.cx - door - wallT - fw / 2, 0, d - 1, fw, fh, 1.2, true);
       this.hullBox(this.cx + door + wallT + fw / 2, 0, d - 1, fw, fh, 1.2, true);
       this.hullBox(this.cx, it.wallHeight, d - 1, 2 * door + 2 * wallT, fh - it.wallHeight, 1.2, false);
-      this.startRoom('corridor', d, base, maxSlope);
+      this.startRoom('corridor', d, base, maxSlope, false);
     } else if (d >= this.roomEnd) {
       let next: RoomId = 'corridor';
       if (this.room === 'corridor') next = this.devRoom ?? pickRoom(sub, this.lastRoom);
@@ -678,28 +724,59 @@ export class World {
     const taper = this.roomTaper;
     const open = taper > 0 ? ease(Math.min((d - this.roomStart) / taper, (this.roomEnd - d) / taper)) : 1;
     const hw = lerp(base, this.room === 'corridor' ? base : this.roomHw, open);
-    const H = lerp(it.wallHeight, def.height, open);
-    this.steerCentre(d, maxSlope * it.centreSlopeFraction * def.wander);
+    const H = lerp(it.wallHeight, this.room === 'corridor' ? it.wallHeight : this.roomH, open);
 
-    // Lane: fixed offset in some rooms (around a core, down a branch),
-    // otherwise it wanders, and it heads back to the middle before the exit.
+    // Centre line: the room's sideways shift (an S-bend) first; winding only once it's done.
+    const s = this.shiftLen > 0 ? ease((d - this.roomStart) / this.shiftLen) : 1;
+    if (this.roomShift !== 0 && s < 1) {
+      this.cx += this.roomShift * (s - this.shiftDone);
+      this.shiftDone = s;
+      this.cxSlope = this.cxTargetSlope = 0;
+    } else {
+      if (this.shiftDone < 1 && this.roomShift !== 0) {
+        this.cx += this.roomShift * (1 - this.shiftDone);
+        this.shiftDone = 1;
+      }
+      this.steerCentre(d, maxSlope * it.centreSlopeFraction * def.wander);
+    }
+
+    const api = this.api;
+    api.d = d;
+    api.score = score;
+    api.sub = sub;
+    api.jitter = maxSlope * STEP * 0.5;
+    api.maxSlope = maxSlope;
+    api.cx = this.cx;
+    api.hw = hw;
+    api.H = H;
+    api.side = this.roomSide;
+    api.plan = this.plan;
+    api.progress = (d - this.roomStart - taper) / Math.max(1, this.roomEnd - this.roomStart - 2 * taper);
+
+    // Lane: fixed offset (around a core, down a branch), a swinging target
+    // (chicane), or free wander; always back to the middle before the exit.
     const margin = LANE + 0.3;
+    const exiting = this.roomEnd - d < taper + 8;
+    const swing = def.laneTarget && !exiting ? def.laneTarget(api) : null;
     if (this.roomOffset !== null) {
       this.moveLane(maxSlope, this.roomOffset * open, hw - margin);
+    } else if (swing !== null) {
+      this.moveLane(maxSlope, swing, hw - margin);
     } else {
       // In wide rooms the lane stays within a few units of the corridor line,
       // so the room around it fills with obstacles and the exit stays close.
-      const reach = Math.min(hw, base + TH.interior.wanderExtra) - margin;
-      if (this.roomEnd - d < taper + 8) this.laneTarget = 0;
+      const reach = Math.min(hw, base + it.wanderExtra) - margin;
+      if (exiting) this.laneTarget = 0;
       else this.retargetOffset(d, reach);
       this.moveLane(maxSlope, this.laneTarget, reach);
     }
+    api.lane = this.lane;
 
     // Shell
     const depth = STEP + 0.12;
     const span = 2 * hw + 2 * wallT;
-    for (let s = -1; s <= 1; s += 2) {
-      const wx = this.cx + s * (hw + wallT / 2);
+    for (let k = -1; k <= 1; k += 2) {
+      const wx = this.cx + k * (hw + wallT / 2);
       if (def.windows) {
         // Observation deck: low wall, window frames, open above.
         this.hullBox(wx, 0, d, wallT, 0.55, depth, true);
@@ -711,17 +788,17 @@ export class World {
     }
     if (def.ceiling) this.hullBox(this.cx, H, d, span, 0.35, depth, false);
     this.hullBox(this.cx, -0.14, d, span, 0.14, depth, false); // floor
-    if (def.ceiling) {
-      if (this.room === 'junction' && open > 0.97) {
-        const branch = base + CONFIG.themes.interior.rooms.junction.dividerHalf;
-        this.lightStrip(this.cx - branch, H - 0.05, d, def.light);
-        this.lightStrip(this.cx + branch, H - 0.05, d, def.light);
-      } else {
-        this.lightStrip(this.cx, H - 0.05, d, def.light);
-        if (hw > 6) {
-          this.lightStrip(this.cx - hw * 0.55, H - 0.05, d, def.light);
-          this.lightStrip(this.cx + hw * 0.55, H - 0.05, d, def.light);
-        }
+    const split = this.plan !== null && open > 0.97;
+    if (split) {
+      // Dividers between branches, a light down each branch.
+      const p = this.plan!;
+      for (const dv of p.dividers) this.hullBox(this.cx + dv, 0, d, p.dividerHalf * 2, H, depth, true);
+      if (def.ceiling) for (const br of p.branches) this.lightStrip(this.cx + br, H - 0.05, d, def.light);
+    } else if (def.ceiling) {
+      this.lightStrip(this.cx, H - 0.05, d, def.light);
+      if (hw > 6) {
+        this.lightStrip(this.cx - hw * 0.55, H - 0.05, d, def.light);
+        this.lightStrip(this.cx + hw * 0.55, H - 0.05, d, def.light);
       }
     } else {
       this.lightStrip(this.cx, 0.01, d, def.light); // deck: a line along the floor instead
@@ -736,23 +813,12 @@ export class World {
       for (const off of [0.6, 1.1]) this.light(this.cx, 0.01, d + off, hw * 2, 0.01, 0.22, Light.Amber, false);
     }
 
-    // Room contents
+    // Room contents (split rooms only once the dividers are up).
     if (!def.build || this.quiet(d)) return;
     if (d < this.roomStart + taper || d > this.roomEnd - taper) return;
-    const api = this.api;
-    api.d = d;
-    api.score = score;
-    api.sub = sub;
-    api.jitter = maxSlope * STEP * 0.5;
-    api.cx = this.cx;
-    api.hw = hw;
-    api.H = H;
-    api.lane = this.lane;
-    api.side = this.roomSide;
-    api.progress = (d - this.roomStart - taper) / Math.max(1, this.roomEnd - this.roomStart - 2 * taper);
+    if (this.plan && !split) return;
     def.build(api);
   }
-
   private makeApi(): RoomAPI {
     const w = this; // eslint-disable-line @typescript-eslint/no-this-alias
     return {
@@ -766,6 +832,11 @@ export class World {
       lane: 0,
       side: 1,
       progress: 0,
+      maxSlope: 0.2,
+      plan: null,
+      memo: 0,
+      memoAt: 0,
+      memo2: 0,
       due(spacing) {
         if (this.d < w.nextFeatureAt) return false;
         w.nextFeatureAt = this.d + range(spacing);
@@ -791,6 +862,11 @@ export class World {
       },
       light(x, y, d, width, h, depth, colour, solid = false) {
         w.light(x, y, d, width, h, depth, colour, solid);
+      },
+      tree(x, d, size) {
+        const field = Math.random() < 0.6 ? w.mushrooms : w.spires;
+        const hit = (field === w.mushrooms ? 0.2 : 0.16) * size;
+        field.spawn(x - w.shipX, 0.35, d, size, size, size, Math.random() * Math.PI * 2, true, false, hit, hit);
       },
       shuttle(x, d, flip) {
         const r = CONFIG.themes.interior.rooms.hangar.shuttleHalfWidth;
