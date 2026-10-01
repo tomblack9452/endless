@@ -1,0 +1,467 @@
+// Every tunable value lives here.
+
+export interface Palette {
+  name: string;
+  ground: string;
+  sky: string;
+  fog: string;
+  cubeLight: string; // top faces
+  cubeMid: string; // front faces (the face you see most)
+  cubeDark: string; // side faces
+  ship: string;
+  shipShade: string;
+  text: string;
+}
+
+// Hand-picked. Level n uses PALETTES[(n - 1) % PALETTES.length].
+// Only the first is in use for now; the rest are candidates for later levels.
+export const PALETTES: Palette[] = [
+  {
+    name: 'bone',
+    ground: '#e6e1d6',
+    sky: '#f1ede4',
+    fog: '#d8d2c4',
+    cubeLight: '#d9a27a',
+    cubeMid: '#c07a4f',
+    cubeDark: '#8a5236',
+    ship: '#2b2824',
+    shipShade: '#57514a',
+    text: '#2b2824',
+  },
+  {
+    name: 'tidewater',
+    ground: '#dadfdb',
+    sky: '#ecefeb',
+    fog: '#c9d1cd',
+    cubeLight: '#8fb0ac',
+    cubeMid: '#5f8784',
+    cubeDark: '#3d5d5b',
+    ship: '#1f2a2a',
+    shipShade: '#4a5857',
+    text: '#1f2a2a',
+  },
+  {
+    name: 'clay',
+    ground: '#d9cfc2',
+    sky: '#ebe4d9',
+    fog: '#c8bcad',
+    cubeLight: '#a39483',
+    cubeMid: '#73665a',
+    cubeDark: '#4a4038',
+    ship: '#2e2620',
+    shipShade: '#5c5148',
+    text: '#2e2620',
+  },
+  {
+    name: 'lichen',
+    ground: '#e1dfd0',
+    sky: '#efede2',
+    fog: '#d1cebb',
+    cubeLight: '#aaa982',
+    cubeMid: '#7f805a',
+    cubeDark: '#56583c',
+    ship: '#2a2b1e',
+    shipShade: '#55573f',
+    text: '#2a2b1e',
+  },
+  {
+    name: 'ink',
+    ground: '#1c1b19',
+    sky: '#2a2825',
+    fog: '#33302c',
+    cubeLight: '#ece5d5',
+    cubeMid: '#c6bdaa',
+    cubeDark: '#8c8476',
+    ship: '#ece5d5',
+    shipShade: '#9a9284',
+    text: '#e6dfd0',
+  },
+  {
+    name: 'ember',
+    ground: '#1f2325',
+    sky: '#2c3133',
+    fog: '#363d3f',
+    cubeLight: '#e3a679',
+    cubeMid: '#c28056',
+    cubeDark: '#87573b',
+    ship: '#e9e0d1',
+    shipShade: '#9b9286',
+    text: '#e9e0d1',
+  },
+];
+
+export const CONFIG = {
+  render: {
+    maxPixelRatio: 2,
+    // Widest play area as width / height. Wider screens (desktop, landscape)
+    // get a centred column so the game plays the same as on a phone.
+    maxAspect: 0.75,
+    antialias: true,
+  },
+
+  camera: {
+    // Horizontal FOV is held constant so every aspect ratio sees the same
+    // width of field; vertical FOV is derived and clamped.
+    hfov: 46, // degrees
+    minVfov: 48,
+    maxVfov: 84,
+    fovPerSpeed: 0.1, // extra horizontal degrees per unit of speed above base
+    maxFovBoost: 9,
+    horizonY: 0.36, // horizon position, fraction of screen height from the top
+    shipY: 0.8, // vertical FOV never gets so narrow that the ship drops below this
+    height: 2.0,
+    distanceBehind: 2.5,
+    maxRollDeg: 10,
+    rollEase: 6, // higher = snappier
+    near: 0.1,
+    far: 400,
+  },
+
+  // Ringed planet low in the sky (hidden inside the ship).
+  planet: {
+    x: -62,
+    y: 58,
+    z: -360,
+    radius: 24,
+    body: '#e4d8c4',
+    ring: '#cdbda4',
+    skyBlend: 0.5, // how much it takes on the sky colour
+    ringOpacity: 0.85,
+  },
+
+  fog: {
+    density: 0.0115, // FogExp2; cubes are invisible near spawnDepth
+  },
+
+  ship: {
+    halfWidth: 0.25,
+    length: 0.72,
+    height: 0.08, // ridge height
+    hoverY: 0.14,
+    maxBankDeg: 24,
+    // Hitbox is forgiving: a box narrower than the visual triangle.
+    hitHalfWidth: 0.16,
+    hitHalfDepth: 0.22,
+    shadowOpacity: 0.1,
+  },
+
+  steering: {
+    maxLateralSpeed: 17, // units / s at full steer, at base speed
+    // Steering gets faster with forward speed so dodging stays possible:
+    // lateral = maxLateralSpeed * (speed / base)^lateralSpeedExponent
+    lateralSpeedExponent: 0.6,
+    response: 9, // how fast lateral speed reaches its target
+    keyRamp: 7, // how fast keyboard steering ramps to full
+    dragRangeFraction: 0.14, // finger travel (fraction of screen width) for full steer
+  },
+
+  // Difficulty rises continuously with score and levels off at a cap:
+  //   value = start + (max - start) * (1 - e^(-score / rampPoints))
+  // So it climbs gently early, keeps creeping up, and can never pass max.
+  // Rough speed at the start of: L1 36, L5 45, L10 53, L20 63, L40 72, never above 75.
+  speed: {
+    base: 36, // units / s at score 0
+    max: 75, // hard cap
+    rampPoints: 16000, // larger = slower climb
+    titleDrift: 9,
+    ease: 0.6, // how fast speed follows its target (per s)
+  },
+
+  score: {
+    pointsPerUnit: 0.85,
+    levelLength: 1000, // levels count distance points only; bonuses don't skip levels
+    // Near miss: an obstacle (not a wall) passes within `gap` of the ship's
+    // hitbox. Each one in a chain is worth points * chain length, so a chain
+    // of 4 pays 25 + 50 + 75 + 100. The chain breaks after `comboWindow` s
+    // with no near miss.
+    nearMiss: {
+      gap: 0.8,
+      points: 25,
+      comboWindow: 2.5,
+      maxCombo: 10, // chain counting stops growing here
+      nudge: 0.05, // camera kick
+      nudgeMs: 110,
+    },
+    pickupPoints: 50,
+    boostBonus: 0.5, // extra fraction of distance points earned while boosting
+  },
+
+  field: {
+    cubeSize: 1.0, // footprint (width and depth)
+    // Block heights as multiples of cubeSize. Skewed so most are short and a
+    // few stand tall: height = min + (max - min) * random^heightBias.
+    minHeight: 0.6,
+    maxHeight: 2.4,
+    heightBias: 2.2,
+    halfWidth: 75, // field wraps laterally across [-halfWidth, halfWidth]
+    spawnDepth: 230, // cubes appear this far ahead
+    recycleBehind: 6, // cubes are freed this far behind the ship
+    rowSpacing: 2.2,
+    startClearance: 60, // empty runway in front of the ship when a run starts
+    // Instance pool sizes per kind.
+    maxBlocks: 2800,
+    maxHull: 2400,
+    maxRocks: 1800,
+    maxStrips: 1600,
+    maxObstacleRocks: 1400,
+    maxMushrooms: 1200,
+    maxSpires: 800,
+    maxCrystals: 700,
+    maxPickups: 16,
+    maxShuttles: 120,
+    // Cubes per 100 square units, on the same capped curve as speed.
+    // Rough density at the start of: L1 0.35, L5 0.52, L10 0.68, L20 0.87, cap 1.05.
+    densityStart: 0.35,
+    densityMax: 1.05,
+    densityRampPoints: 14000,
+  },
+
+  blocks: {
+    textured: true, // metal and pipe textures; false = flat faces
+    textureSize: 256, // pixels per block face (side atlas is 4x this wide)
+    anisotropy: 4, // keeps side faces sharp at grazing angles
+    // How much of the palette's hue reaches textured blocks. 0 = pure steel grey
+    // at the palette face's brightness, 1 = fully palette coloured.
+    tint: 0.22,
+    brightness: 1.55, // lifts textured faces; the texture itself darkens them
+
+  },
+
+  // Day to night. Time of day advances with score: each level moves one key
+  // further along, blending smoothly, and the cycle repeats every
+  // `keys.length` levels (10): day, through a blue night, back to day.
+  // Each key tints the level palette: sky/fog are blended towards the key's
+  // colours by `mix`, the ground is scaled by `light` and blocks by `blocks`
+  // (kept brighter than the ground so they stay visible at night). Light
+  // values are perceptual (0.5 looks half as bright). The ground also picks
+  // up the fog colour as it darkens (`groundFogTint`), which is what carries
+  // the blue into the night. Text and ship switch to light tones
+  // automatically when what's behind them gets dark.
+  atmosphere: {
+    enabled: true,
+    nightText: '#e8e6e0',
+    nightShip: '#dcdcd6',
+    groundFogTint: 0.55,
+    // Perceptual brightness range over which text/ship cross from dark to light.
+    flipFrom: 0.5, // text, measured against the sky
+    flipTo: 0.32,
+    shipFlipFrom: 0.66, // ship, measured against the ground (flips earlier)
+    shipFlipTo: 0.48,
+    keys: [
+      { name: 'day', sky: '#f1ede4', fog: '#d8d2c4', mix: 0, light: 1, blocks: 1 },
+      { name: 'late morning', sky: '#f0ebe0', fog: '#d6d1c6', mix: 0.3, light: 0.98, blocks: 1 },
+      { name: 'afternoon', sky: '#ecd8b8', fog: '#d8c5a8', mix: 0.55, light: 0.94, blocks: 0.96 },
+      { name: 'golden', sky: '#d9b393', fog: '#c2a48c', mix: 0.75, light: 0.84, blocks: 0.9 },
+      { name: 'blue hour', sky: '#8b9ab0', fog: '#8695a8', mix: 0.85, light: 0.7, blocks: 0.82 },
+      { name: 'night', sky: '#4a5a78', fog: '#56657e', mix: 0.95, light: 0.56, blocks: 0.74 },
+      { name: 'deep night', sky: '#3f4e6b', fog: '#4c5a74', mix: 1, light: 0.52, blocks: 0.72 },
+      { name: 'pre-dawn', sky: '#6f7f9c', fog: '#76849b', mix: 0.9, light: 0.62, blocks: 0.78 },
+      { name: 'dawn', sky: '#c6c9cf', fog: '#b3b6bb', mix: 0.75, light: 0.84, blocks: 0.9 },
+      { name: 'morning', sky: '#efe9dd', fog: '#d6d0c4', mix: 0.35, light: 0.96, blocks: 0.98 },
+    ],
+  },
+  // Themes come in groups of `levelsPerTheme` levels and loop forever:
+  // land (1-3), canyon (4-6), interior (7-9), land (10-12) ...
+  // Each theme's three levels get progressively harder patterns; overall
+  // difficulty keeps rising on the capped speed/density curves.
+  //
+  // Survivability: every pattern is built around a "safe lane", a clear path
+  // that wanders but never turns faster than `lane.slopeFraction` of what
+  // the ship can steer at that speed. Obstacles never cover the lane.
+  themes: {
+    levelsPerTheme: 3,
+    names: { land: 'open ground', canyon: 'canyon', interior: 'interior' },
+    fadeIn: 40, // units over which theme colours blend in after a boundary
+    fadeOut: 25, // ...and out before the next boundary
+    lane: {
+      halfWidth: 1.3, // kept clear either side of the lane centre
+      // Fraction of the ship's steering ability the lane may use. Low on
+      // purpose: it has to leave room for reaction time, not just physics.
+      slopeFraction: 0.35,
+      retargetMin: 25,
+      retargetMax: 60,
+      landWander: 22, // how far the lane drifts per retarget on open ground
+      // Clear distance either side of every theme change: no obstacles in the
+      // last `beforeChange` units of a theme or the first `afterChange` of the next.
+      beforeChange: 45,
+      afterChange: 50,
+    },
+    // Open ground is an alien landscape: mushroom trees and spire trees (only
+    // their thin trunks collide; you fly under the canopies), dark rocks and
+    // crystal clusters.
+    //   level 1: sparse scatter
+    //   level 2: denser, with rock clusters
+    //   level 3: forest path, a clear winding path through dense forest
+    land: {
+      mix: { mushroom: 0.4, spire: 0.2, rock: 0.28, crystal: 0.12 }, // relative chances
+      denseFactor: 1.4, // level 2 density multiplier
+      clusterSpacing: [30, 55], // level 2
+      clusterSize: [3, 6],
+      pathHalfStart: 4.2, // level 3 path half-width...
+      pathHalfMin: 3.0, // ...narrowing to this with score
+      pathRampPoints: 22000,
+      pathWander: 14, // gentler lane drift so the path winds smoothly
+      forestDensity: 2.6, // level 3 density multiplier outside the path
+      edgeChance: 0.75, // chance per row per side of a prop lining the path edge
+    },    // The canyon is about readable shapes, not random clutter: the walls wind,
+    // and obstacles are dark rocks that stand out from the sand.
+    //   level 1: winding path, a few lone boulders
+    //   level 2: rockfall bands across the path with one wide gap
+    //   level 3: pillar slalom plus occasional bands
+    canyon: {
+      ground: '#d2bea3',
+      rock: '#a88b70', // walls
+      obstacle: '#5e4a3c', // boulders and pillars: darker so they read early
+      halfWidthStart: 10, // path half-width on the first canyon
+      halfWidthMin: 6, // never narrower than this
+      widthRampPoints: 22000,
+      mouthHalfWidth: 34, // wide entrance that funnels down
+      mouth: 90, // funnel length
+      exit: 80, // funnel to the interior door at the end
+      centreSlopeFraction: 0.45, // walls wind at this fraction of the lane's max slope
+      loneBoulderSpacing: [40, 70], // level 1
+      bandSpacing: [38, 55], // level 2 (level 3 uses 2x)
+      bandGapWidth: 4.4,
+      pillarSpacing: [22, 32], // level 3
+      wallCrystals: 0.22, // chance per row per side of crystals on the canyon sides
+    },
+    // The ship interior is a chain of rooms joined by short corridors (see
+    // interior.ts). Each room is a reusable template; which ones can appear
+    // depends on the level within the theme (minSub 0 = from level 7,
+    // 1 = from level 8, 2 = level 9). `weight` is the relative chance.
+    interior: {
+      sky: '#4d5664',
+      fog: '#59636f',
+      light: 0.92, // block brightness inside, independent of time of day
+      strip: '#ece8de',
+      floorShade: 0.6, // floors/ceilings relative to the darkest block face
+      halfWidthStart: 3.6, // corridor half-width...
+      halfWidthMin: 2.8, // ...narrowing to this with score
+      widthRampPoints: 22000,
+      doorExtra: 0.8, // the entrance door is this much wider than the corridor
+      wallHeight: 3.4,
+      centreSlopeFraction: 0.5,
+      connectorLength: [14, 24], // corridor between rooms
+      taperMin: 12, // shortest width change into or out of a room
+      wanderExtra: 3, // how far beyond corridor width the lane may wander in wide rooms
+      lights: { amber: '#e3a35c', teal: '#7cc6bd', red: '#d46a5c' },
+      rooms: {
+        cargo: { weight: 3, minSub: 0, length: [60, 100], extraWidth: 3.8, height: 4.4, rowSpacing: [7, 10], pitch: 3.2, fill: 0.45, fillRampPoints: 40000 },
+        servers: { weight: 3, minSub: 0, length: [55, 90], extraWidth: 2.4, height: 3.8, rowSpacing: [9, 12], pitch: 2.9, rackLength: 4 },
+        deck: { weight: 2, minSub: 0, length: [60, 90], extraWidth: 2.6, height: 3.6, featureSpacing: [12, 18], enclosure: 0.3 },
+        shaft: { weight: 2, minSub: 1, length: [35, 55], extraWidth: -0.6, minHalfWidth: 2.4, height: 2.6, lightSpacing: [5, 8] },
+        junction: { weight: 2, minSub: 1, length: [60, 95], dividerHalf: 0.6, crates: 0.7 },
+        lasers: { weight: 3, minSub: 1, length: [50, 80], extraWidth: 0.9, gateSpacing: [11, 15], gapWidth: 2.9 },
+        reactor: { weight: 2, minSub: 1, length: [55, 80], extraWidth: 6, height: 6, coreHalf: 2.2, pylonSpacing: [14, 20] },
+        pistons: { weight: 3, minSub: 2, length: [55, 85], extraWidth: 1.6, spacing: [10, 14], travel: 0.1, motionMargin: 0.45 },
+        hangar: { weight: 2, minSub: 2, length: [70, 110], extraWidth: 9, height: 7, rowSpacing: [13, 18], pitch: 4.8, fill: 0.7, shuttleHalfWidth: 1.75 },
+      },
+    },
+  },
+
+  // Boost: a meter that fills slowly on its own and from pickups. Hold the
+  // boost control (or Shift / W / Up) to spend it for extra speed. Faster
+  // means more distance, so more points, at more risk.
+  boost: {
+    fillSeconds: 60, // empty to full with no pickups
+    drainSeconds: 3.5, // full to empty while boosting
+    minToStart: 0.08, // need at least this much to begin
+    speedMultiplier: 1.45,
+    easeIn: 5, // how fast boost speed ramps up (per s)
+    easeOut: 2.5,
+    fovKick: 10, // extra horizontal degrees at full boost
+    cameraPullBack: 0.8, // camera drops back so the ship surges ahead
+    cameraDrop: 0.18, // ...and slightly lower
+    shipPitchDeg: 4, // nose dips forward
+    vibration: 0.025, // fine camera jitter at full boost
+    speedLines: {
+      count: 44,
+      opacity: 0.55,
+      lengthPerSpeed: 0.11, // streak length in units per unit of speed
+      rushFactor: 1.6, // streaks move this much faster than the world
+      innerX: 0.55, // nearest a streak gets to the ship's centre line
+      outerX: 4.2,
+      minY: 0.1,
+      maxY: 2.4,
+    },
+    pickup: {
+      amount: 0.15, // meter gained per pickup
+      spacing: [260, 420], // distance between pickups (placed on the safe lane)
+      height: 0.8, // centre height; bobs around this
+      bob: 0.1,
+      size: 0.55,
+      color: '#e2b86b',
+      collectRadius: 1.0,
+      spinSpeed: 2.4, // radians per second
+    },
+  },
+  // Sound design. Everything is synthesised (no files) and everything is in D:
+  // the engine is tuned to the root, the music changes mode per theme, and
+  // near-miss chains climb the current scale. Levels below are gains.
+  audio: {
+    // Buses
+    master: 0.75,
+    musicBus: 0.55,
+    sfxBus: 0.9,
+    ambienceBus: 0.7,
+    // Engine and continuous layers
+    engine: 0.07, // body tone
+    engineIdle: 0.02, // on the title screen
+    rumble: 0.09, // low thrust noise
+    whine: 0.006, // turbine whine, rises with speed
+    air: 0.03, // air rushing past
+    airBoost: 0.07,
+    roar: 0.06, // extra layer while boosting
+    canyonWind: 0.06,
+    interiorHum: 0.022,
+    clanksPerSecond: 0.18, // distant metal creaks inside the ship
+    // Effects per theme
+    reverbLand: 0.12,
+    reverbInterior: 0.5,
+    echoLand: 0.2,
+    echoCanyon: 0.55,
+    muffleHz: 650, // master low-pass after a crash
+    // One-shots
+    passRange: 2.5, // obstacles within this pass with a whoosh
+    passWhoosh: 0.05,
+    nearWhoosh: 0.14,
+    chain: 0.07,
+    pickup: 0.08,
+    boost: 0.1,
+    level: 0.06,
+    door: 0.07,
+    theme: 0.14,
+    crash: 0.35,
+    debris: 0.05,
+    music: {
+      pad: 0.09,
+      bass: 0.11,
+      lead: 0.05,
+      hats: 0.02,
+      bpmMin: 84,
+      bpmMax: 116,
+      bpmBoost: 8,
+      leadDensity: 0.14, // chance of a note per eighth...
+      leadDensityIntensity: 0.32, // ...plus this much at full intensity
+      leadDensityBoost: 0.2,
+    },
+  },
+  crash: {
+    freezeMs: 120,
+    shakeMs: 340,
+    shakeAmount: 0.22,
+    fragments: 6,
+    fragmentSpeed: 5,
+    overDelayMs: 650, // when the game over text starts fading in
+    retryLockMs: 900, // ignore taps for this long after a crash
+  },
+
+  ui: {
+    fadeMs: 200,
+  },
+
+  storageKeys: {
+    best: 'endless.best',
+    sound: 'endless.sound', // 1 on, 0 off
+  },
+} as const;
