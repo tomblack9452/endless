@@ -340,9 +340,14 @@ export const CONFIG = {
       widthRampPoints: 22000,
       doorExtra: 0.8, // the entrance door is this much wider than the corridor
       wallHeight: 3.4,
-      centreSlopeFraction: 0.5,
+      centreSlopeFraction: 0.75,
       connectorLength: [14, 24], // corridor between rooms
       taperMin: 12, // shortest width change into or out of a room
+      roomShift: [2, 8], // each room's centre line shifts sideways this much (random side)
+      corridorJog: [3, 7], // some corridors jog sideways this much...
+      corridorJogChance: 0.6, // ...this often
+      sizeVariation: [0.7, 1.6], // each room's extra width is scaled by a random factor in this range
+      heightVariation: [0.85, 1.25],
       wanderExtra: 3, // how far beyond corridor width the lane may wander in wide rooms
       lights: { amber: '#e3a35c', teal: '#7cc6bd', red: '#d46a5c' },
       rooms: {
@@ -350,7 +355,12 @@ export const CONFIG = {
         servers: { weight: 3, minSub: 0, length: [55, 90], extraWidth: 2.4, height: 3.8, rowSpacing: [9, 12], pitch: 2.9, rackLength: 4 },
         deck: { weight: 2, minSub: 0, length: [60, 90], extraWidth: 2.6, height: 3.6, featureSpacing: [12, 18], enclosure: 0.3 },
         shaft: { weight: 2, minSub: 1, length: [35, 55], extraWidth: -0.6, minHalfWidth: 2.4, height: 2.6, lightSpacing: [5, 8] },
-        junction: { weight: 2, minSub: 1, length: [60, 95], dividerHalf: 0.6, crates: 0.7 },
+        junction: { weight: 2, minSub: 0, length: [60, 95], dividerHalf: 0.6, crates: 0.7 },
+        fork: { weight: 2, minSub: 1, length: [65, 100], height: 4.2, dividerHalf: 0.55, branchScale: 0.85, crates: 0.6 },
+        uneven: { weight: 2, minSub: 1, length: [55, 90], dividerHalf: 0.55, narrowExtra: 0.5, wideExtra: 2.2, crates: 1.1 },
+        islands: { weight: 3, minSub: 1, length: [70, 110], extraWidth: 6, height: 4.6, spacing: [8, 13], width: [1.2, 3.6], islandLength: [4, 11] },
+        chicane: { weight: 2, minSub: 2, length: [100, 150], extraWidth: 2.4, swing: 0.75, segment: 22 },
+        hydroponics: { weight: 2, minSub: 0, length: [60, 100], extraWidth: 4.5, height: 6.2, rowSpacing: [8, 12], pitch: 3.6, fill: 0.6 },
         lasers: { weight: 3, minSub: 1, length: [50, 80], extraWidth: 0.9, gateSpacing: [11, 15], gapWidth: 2.9 },
         reactor: { weight: 2, minSub: 1, length: [55, 80], extraWidth: 6, height: 6, coreHalf: 2.2, pylonSpacing: [14, 20] },
         pistons: { weight: 3, minSub: 2, length: [55, 85], extraWidth: 1.6, spacing: [10, 14], travel: 0.1, motionMargin: 0.45 },
