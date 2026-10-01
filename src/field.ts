@@ -193,15 +193,22 @@ export class InstancedField {
     return this.moving[i] ? this.bx[i] + this.amp[i] * Math.sin(this.phase[i]) : this.x[i];
   }
 
-  /** True if the ship hit a solid instance while moving from prevDistance to distance. */
-  hitTest(prevDistance: number, distance: number): boolean {
+  /**
+   * True if the ship hit a solid instance while moving from prevDistance to
+   * distance and sideways by `dx`. Both axes are swept, so a long frame can't
+   * carry the ship through a thin wall.
+   */
+  hitTest(prevDistance: number, distance: number, dx: number): boolean {
     const shipX = CONFIG.ship.hitHalfWidth;
     const shipZ = CONFIG.ship.hitHalfDepth;
     for (let i = 0; i < this.max; i++) {
       if (!this.active[i] || !this.solid[i]) continue;
       const rx = this.hx[i] + shipX;
+      // Instances moved by -dx this frame, so they were at x + dx before it.
       const x = this.x[i];
-      if (x > rx || x < -rx) continue;
+      const lo = dx > 0 ? x : x + dx;
+      const hi = dx > 0 ? x + dx : x;
+      if (lo > rx || hi < -rx) continue;
       // Swept test along z so high speeds can't tunnel through.
       const rz = this.hz[i] + shipZ;
       const zPrev = prevDistance - this.d[i];
