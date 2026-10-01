@@ -68,6 +68,11 @@ export class World {
   interiorMix = 0;
 
   private generatedTo = 0;
+  private lastDx = 0; // sideways movement this frame, for swept collision
+  // Inner edges of the previous row's walls (world x), so each wall segment can
+  // reach back over any step and leave no gap between rows.
+  private prevWallL = NaN;
+  private prevWallR = NaN;
   private shipX = 0; // ship's world lateral position
   private runStart: number | null = null; // null on the title screen
 
@@ -224,6 +229,7 @@ export class World {
     this.enclosure = 1;
     this.plan = null;
     this.roomShift = 0;
+    this.prevWallL = this.prevWallR = NaN;
     // startScore > 0 (dev skip) places the run part-way along.
     this.runStart = run ? this.distance - startScore / CONFIG.score.pointsPerUnit : null;
     this.theme = 'land';
@@ -250,6 +256,7 @@ export class World {
   advance(dt: number, speed: number, lateral: number): void {
     this.distance += speed * dt;
     const dx = lateral * dt;
+    this.lastDx = dx;
     this.shipX += dx;
     const behind = this.distance - F.recycleBehind;
     for (const f of this.fields) f.advance(dx, behind);
@@ -259,7 +266,7 @@ export class World {
   }
 
   hitTest(prevDistance: number): boolean {
-    for (const f of this.solids) if (f.hitTest(prevDistance, this.distance)) return true;
+    for (const f of this.solids) if (f.hitTest(prevDistance, this.distance, this.lastDx)) return true;
     return false;
   }
 
@@ -399,6 +406,7 @@ export class World {
     } else if (theme === 'interior') {
       this.entrancePending = true;
       this.room = this.lastRoom = 'corridor';
+      this.prevWallL = this.prevWallR = NaN;
     } else {
       this.laneTarget = this.lane;
     }
@@ -776,15 +784,24 @@ export class World {
     const depth = STEP + 0.12;
     const span = 2 * hw + 2 * wallT;
     for (let k = -1; k <= 1; k += 2) {
-      const wx = this.cx + k * (hw + wallT / 2);
+      // Each segment's inner face sits on this row's wall line and it extends
+      // outwards far enough to cover where the previous row's wall was, so
+      // tapers and S-bends never open a diagonal gap between rows.
+      const inner = this.cx + k * hw;
+      const prev = k < 0 ? this.prevWallL : this.prevWallR;
+      const step = Number.isNaN(prev) ? 0 : Math.abs(inner - prev);
+      const thick = wallT + step;
+      const wx = inner + (k * thick) / 2;
       if (def.windows) {
         // Observation deck: low wall, window frames, open above.
-        this.hullBox(wx, 0, d, wallT, 0.55, depth, true);
-        if (Math.floor(d / STEP) % 3 === 0) this.hullBox(wx, 0, d, 0.3, H, 0.3, true);
-        this.hullBox(wx, H, d, wallT, 0.25, depth, false);
+        this.hullBox(wx, 0, d, thick, 0.55, depth, true);
+        if (Math.floor(d / STEP) % 3 === 0) this.hullBox(inner + k * 0.15, 0, d, 0.3, H, 0.3, true);
+        this.hullBox(wx, H, d, thick, 0.25, depth, false);
       } else {
-        this.hullBox(wx, 0, d, wallT, H, depth, true);
+        this.hullBox(wx, 0, d, thick, H, depth, true);
       }
+      if (k < 0) this.prevWallL = inner;
+      else this.prevWallR = inner;
     }
     if (def.ceiling) this.hullBox(this.cx, H, d, span, 0.35, depth, false);
     this.hullBox(this.cx, -0.14, d, span, 0.14, depth, false); // floor
