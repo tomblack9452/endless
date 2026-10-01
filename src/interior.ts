@@ -16,6 +16,11 @@ export type RoomId =
   | 'deck'
   | 'shaft'
   | 'junction'
+  | 'fork'
+  | 'uneven'
+  | 'islands'
+  | 'chicane'
+  | 'hydroponics'
   | 'lasers'
   | 'reactor'
   | 'pistons'
@@ -41,6 +46,11 @@ export interface RoomAPI {
   lane: number; // world x of the safe lane
   side: number; // -1/1, which side of centre the lane favours in this room
   progress: number; // 0..1 through the room body
+  maxSlope: number; // fastest the lane may move sideways per unit forward
+  plan: RoomPlan | null; // split layout, already mirrored to this room's side
+  memo: number; // free per-room state, reset to 0 at the start of each room
+  memoAt: number;
+  memo2: number;
   /** True (and re-armed) when the room's next feature is due. */
   due(spacing: readonly number[]): boolean;
   /** True if something of half-width `half` at x keeps the lane clear. */
@@ -53,6 +63,21 @@ export interface RoomAPI {
   slider(centre: number, amp: number, arriveX: number, d: number, w: number, h: number, depth: number): void;
   light(x: number, y: number, d: number, w: number, h: number, depth: number, colour: Light, solid?: boolean): void;
   shuttle(x: number, d: number, flip: boolean): void;
+  /** Alien tree (trunk collides) for the hydroponics bay. */
+  tree(x: number, d: number, size: number): void;
+}
+
+/**
+ * Split layout, as offsets from the room centre for the + side; the world
+ * mirrors it at random. Dividers are drawn by the world; the lane runs down
+ * the branch at `offset`.
+ */
+export interface RoomPlan {
+  halfWidth: number;
+  dividers: number[];
+  dividerHalf: number;
+  branches: number[]; // branch centres, for ceiling lights
+  offset: number; // lane branch centre
 }
 
 export interface RoomDef {
@@ -66,6 +91,12 @@ export interface RoomDef {
   enclosure: number; // 1 = sealed; lower lets the sky and time of day in
   /** Fixed lane offset from centre for the whole room (e.g. around a core), or null to wander. */
   laneOffset?(base: number): number | null;
+  /** Split rooms: divider layout (overrides extraWidth and laneOffset). */
+  plan?(base: number): RoomPlan;
+  /** Lane offset that changes through the room (chicane), or null to wander. */
+  laneTarget?(api: RoomAPI): number | null;
+  /** Randomise width and height per room (default true). */
+  vary?: boolean;
   build?(api: RoomAPI): void;
 }
 
@@ -183,31 +214,160 @@ export const ROOMS: Record<RoomId, RoomDef> = {
     },
   },
 
-  // Splits around a divider wall; the lane takes one branch, the other has crates.
+  // Two branches around a divider; the lane takes one, the other has crates.
   junction: {
     name: 'junction',
-    extraWidth: (base) => base + R.junction.dividerHalf,
+    extraWidth: () => 0,
     height: CONFIG.themes.interior.wallHeight,
     ceiling: true,
     windows: false,
     light: Light.White,
     wander: 0,
     enclosure: 1,
-    laneOffset: (base) => base + R.junction.dividerHalf,
-    build(api) {
+    plan(base) {
       const dh = R.junction.dividerHalf;
-      api.box(api.cx, 0, api.d, dh * 2, api.H, 2.32, true, false);
-      api.light(api.cx, api.H - 0.3, api.d, dh * 2 + 0.04, 0.12, 1.2, Light.Amber);
-      const n = api.perRow(R.junction.crates);
-      for (let i = 0; i < Math.ceil(n * 2); i++) {
-        if (Math.random() > n / Math.ceil(n * 2)) continue;
-        const x = api.cx + (Math.random() * 2 - 1) * (api.hw - 0.6);
-        if (Math.abs(x - api.cx) < dh + 0.6 || !api.clearOf(x, 0.55)) continue;
-        api.crate(x, api.d, 1, 0.5 + Math.random() * 0.7);
+      const b = base;
+      return { halfWidth: 2 * b + dh, dividers: [0], dividerHalf: dh, branches: [-(b + dh), b + dh], offset: b + dh };
+    },
+    build: (api) => branchCrates(api, R.junction.crates),
+  },
+
+  // Three branches; the lane takes any one of them.
+  fork: {
+    name: 'three-way fork',
+    extraWidth: () => 0,
+    height: R.fork.height,
+    ceiling: true,
+    windows: false,
+    light: Light.Teal,
+    wander: 0,
+    enclosure: 1,
+    plan(base) {
+      const dh = R.fork.dividerHalf;
+      const b = base * R.fork.branchScale;
+      const side = 2 * b + 2 * dh;
+      return {
+        halfWidth: 3 * b + 2 * dh,
+        dividers: [-(b + dh), b + dh],
+        dividerHalf: dh,
+        branches: [-side, 0, side],
+        offset: Math.random() < 0.4 ? 0 : side,
+      };
+    },
+    build: (api) => branchCrates(api, R.fork.crates),
+  },
+
+  // A tight, clean branch beside a wide one full of crates. Either can be the way.
+  uneven: {
+    name: 'split',
+    extraWidth: () => 0,
+    height: CONFIG.themes.interior.wallHeight,
+    ceiling: true,
+    windows: false,
+    light: Light.Amber,
+    wander: 0,
+    enclosure: 1,
+    plan(base) {
+      const dh = R.uneven.dividerHalf;
+      const n = LANE + R.uneven.narrowExtra; // narrow branch half-width
+      const w = base + R.uneven.wideExtra; // wide branch half-width
+      const wide = -(dh + n);
+      const narrow = w + dh;
+      return {
+        halfWidth: w + dh + n,
+        dividers: [w - n],
+        dividerHalf: dh,
+        branches: [wide, narrow],
+        offset: Math.random() < 0.5 ? wide : narrow,
+      };
+    },
+    build: (api) => branchCrates(api, R.uneven.crates),
+  },
+
+  // Wall islands scattered across a wide hall: routes split and rejoin.
+  islands: {
+    name: 'bulkhead maze',
+    extraWidth: () => R.islands.extraWidth,
+    height: R.islands.height,
+    ceiling: true,
+    windows: false,
+    light: Light.White,
+    wander: 0.3,
+    enclosure: 1,
+    build(api) {
+      if (!api.due(R.islands.spacing)) return;
+      const count = 1 + (Math.random() < 0.6 ? 1 : 0);
+      for (let i = 0; i < count; i++) {
+        const w = range(R.islands.width);
+        const len = range(R.islands.islandLength);
+        const x = api.cx + (Math.random() * 2 - 1) * (api.hw - w / 2 - 0.4);
+        // The island runs `len` ahead; the lane may drift that far, so clear it generously.
+        if (!api.clearOf(x, w / 2 + api.maxSlope * len + 0.2)) continue;
+        api.box(x, 0, api.d + len / 2, w, api.H, len, true, true);
+        api.light(x, api.H - 0.4, api.d + len / 2, w + 0.04, 0.1, len * 0.9, Light.Amber);
       }
     },
   },
 
+  // Baffle walls from alternating sides: a slalom. The lane swings side to side.
+  chicane: {
+    name: 'chicane',
+    extraWidth: () => R.chicane.extraWidth,
+    height: CONFIG.themes.interior.wallHeight,
+    ceiling: true,
+    windows: false,
+    light: Light.Red,
+    wander: 0,
+    enclosure: 1,
+    laneTarget(api) {
+      if (api.memo === 0) return null; // first segment: wander until the first swing
+      return api.memo * (api.hw - LANE - 0.6) * R.chicane.swing;
+    },
+    build(api) {
+      const swing = (api.hw - LANE - 0.6) * R.chicane.swing;
+      const seg = Math.max(R.chicane.segment, (2 * swing) / (api.maxSlope * 0.8));
+      if (api.d >= api.memoAt) {
+        api.memo = api.memo > 0 ? -1 : 1;
+        api.memoAt = api.d + seg;
+        // A baffle from the far wall up to the lane's gap, half a segment
+        // later when the lane has crossed over.
+        api.memo2 = api.d + seg * 0.55;
+      }
+      if (api.memo2 > 0 && api.d >= api.memo2) {
+        api.memo2 = 0;
+        const from = -api.memo; // baffle comes from the side the lane is leaving
+        const wall = api.cx + from * api.hw;
+        const edge = api.lane + from * (LANE + 0.35 + api.jitter);
+        const w = (wall - edge) * from; // > 0 only if the wall is further out than the gap edge
+        if (w > 0.4) {
+          api.box((wall + edge) / 2, 0, api.d, w, api.H, 0.8, true, true);
+          api.light((wall + edge) / 2, 0.01, api.d - 0.6, w, 0.01, 0.2, Light.Red);
+        }
+      }
+    },
+  },
+
+  // Hydroponics: alien trees in planter rows, lit green-teal, with a high ceiling.
+  hydroponics: {
+    name: 'hydroponics',
+    extraWidth: () => R.hydroponics.extraWidth,
+    height: R.hydroponics.height,
+    ceiling: true,
+    windows: false,
+    light: Light.Teal,
+    wander: 0.5,
+    enclosure: 1,
+    build(api) {
+      if (!api.due(R.hydroponics.rowSpacing)) return;
+      const pitch = R.hydroponics.pitch;
+      const shift = Math.random() * pitch;
+      for (let x = api.cx - api.hw + 1.2 + shift; x < api.cx + api.hw - 1; x += pitch) {
+        if (Math.random() > R.hydroponics.fill || !api.clearOf(x, 0.75)) continue;
+        api.crate(x, api.d, 1.5, 0.35); // planter
+        api.tree(x, api.d, 0.75 + Math.random() * 0.35);
+      }
+    },
+  },
   // Security fences: bright beams across the floor between posts, with a gap at the lane.
   lasers: {
     name: 'laser gates',
@@ -314,6 +474,21 @@ export const ROOMS: Record<RoomId, RoomDef> = {
     },
   },
 };
+
+/** Crates scattered in the branches of a split room, off the lane and clear of dividers. */
+function branchCrates(api: RoomAPI, scale: number): void {
+  const n = api.perRow(scale);
+  const tries = Math.ceil(n * 2);
+  for (let i = 0; i < tries; i++) {
+    if (Math.random() > n / tries) continue;
+    const x = api.cx + (Math.random() * 2 - 1) * (api.hw - 0.6);
+    if (!api.clearOf(x, 0.55)) continue;
+    let nearDivider = false;
+    if (api.plan) for (const dv of api.plan.dividers) if (Math.abs(x - (api.cx + dv)) < api.plan.dividerHalf + 0.6) nearDivider = true;
+    if (nearDivider) continue;
+    api.crate(x, api.d, 1, 0.5 + Math.random() * 0.7);
+  }
+}
 
 function beam(api: RoomAPI, from: number, to: number): void {
   const w = to - from;
