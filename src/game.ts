@@ -10,6 +10,7 @@ import { Stage } from './renderer';
 import { Sky } from './sky';
 import { SpeedLines } from './speedLines';
 import { cycle, DEFAULT_SETTINGS, LEVEL_GAIN, loadSettings, saveSettings, type SettingKey, STEERING_RANGE, TILT_GAIN } from './settings';
+import { Hints } from './hints';
 import { newSeed } from './rng';
 import { loadNumber, saveNumber } from './storage';
 import { UI } from './ui';
@@ -45,6 +46,8 @@ export class Game {
   private settings = { ...DEFAULT_SETTINGS };
   private settingsOpen = false; // settings screen showing (from the title or pause)
   private readonly ui = new UI();
+  private readonly hints = new Hints((text) => this.ui.showHint(text));
+  private runTime = 0; // seconds into the current run
 
   private state: State = 'title';
   private speed: number = CONFIG.speed.titleDrift;
@@ -170,6 +173,7 @@ export class Game {
     this.ui.show(null);
     this.ui.showHud(true);
     this.state = 'playing';
+    this.runTime = 0;
   }
 
   /** `fell` = dropped into a pit (falls away) rather than hitting something (shatters). */
@@ -393,6 +397,8 @@ export class Game {
 
   private updatePlaying(dt: number): void {
     this.input.update(dt);
+    this.runTime += dt;
+    this.offerHints();
     const target = speedAt(this.distanceScore);
     this.speed += (target - this.speed) * (1 - Math.exp(-CONFIG.speed.ease * dt));
     this.updateBoost(dt);
@@ -407,6 +413,7 @@ export class Game {
     if (got > 0) {
       this.boostMeter = Math.min(1, this.boostMeter + got * CONFIG.boost.pickup.amount);
       this.bonus += got * CONFIG.score.pickupPoints;
+      this.hints.offer('pickup');
       this.ui.flashBoost();
       this.sound.pickup();
     }
@@ -468,6 +475,7 @@ export class Game {
       this.chainTimer = nm.comboWindow;
       this.nudgeMs = nm.nudgeMs;
       this.ui.showCombo(this.chain, points);
+      this.hints.offer('nearMiss');
       this.sound.pass(side, gap, this.chain);
     }
     if (this.chain > 0) {
@@ -477,6 +485,14 @@ export class Game {
         this.ui.hideCombo();
       }
     }
+  }
+
+  /** First-run hints, each once ever (see hints.ts). */
+  private offerHints(): void {
+    if (this.runTime > 1) this.hints.offer('steer');
+    if (this.boostMeter >= 0.5 && !this.boosting) this.hints.offer('boost');
+    const room = this.world.roomName;
+    if (room === 'maintenance gantry' || room === 'hull breach') this.hints.offer('pits');
   }
 
   /** Fill or drain the meter and ease the boost amount in and out. */

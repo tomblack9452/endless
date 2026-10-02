@@ -25,6 +25,7 @@ export class UI {
   private readonly bannerTheme = $('banner-theme');
   private readonly roomLabel = $('room-label');
   private readonly notice = $('notice');
+  private readonly hint = $('hint');
   readonly boostControl = $('hud-boost');
   private readonly combo = $('combo');
   private readonly comboCount = $('combo-count');
@@ -172,6 +173,14 @@ export class UI {
     this.notice.classList.remove('show');
     void this.notice.offsetWidth; // restart the animation
     this.notice.classList.add('show');
+  }
+
+  /** A first-run hint in the middle of the screen. */
+  showHint(text: string): void {
+    this.hint.textContent = text;
+    this.hint.classList.remove('show');
+    void this.hint.offsetWidth; // restart the animation
+    this.hint.classList.add('show');
   }
 
   /** Briefly show the name of the room just entered. */
