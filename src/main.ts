@@ -1,6 +1,7 @@
-import '@fontsource/jetbrains-mono/300.css';
-import '@fontsource/jetbrains-mono/400.css';
-import '@fontsource/jetbrains-mono/500.css';
+// Latin only: the UI is all lowercase English, so the other scripts would be dead weight.
+import '@fontsource/jetbrains-mono/latin-300.css';
+import '@fontsource/jetbrains-mono/latin-400.css';
+import '@fontsource/jetbrains-mono/latin-500.css';
 import './style.css';
 import { Game } from './game';
 
