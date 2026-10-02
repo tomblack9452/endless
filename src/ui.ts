@@ -54,6 +54,8 @@ export class UI {
   private readonly missionsNext = $('missions-next');
   private readonly hangarCount = $('hangar-count');
   private readonly overMissions = $('over-missions');
+  private readonly hudPower = $('hud-power');
+  private shownPower = '';
   private readonly statsRows = $('stats-rows');
   private readonly overExtra = $('over-extra');
   readonly titleSettings = $('title-settings');
@@ -204,6 +206,13 @@ export class UI {
   renderMissions(rows: [string, string][], next: string): void {
     this.fillRows(this.missionsRows, rows);
     this.missionsNext.textContent = next;
+  }
+
+  /** Active power-up line in the HUD ('' hides it). */
+  setPower(text: string): void {
+    if (text === this.shownPower) return;
+    this.shownPower = text;
+    this.hudPower.textContent = text;
   }
 
   /** Mission progress under the game-over score. */

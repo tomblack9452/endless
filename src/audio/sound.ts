@@ -246,6 +246,24 @@ export class Sound {
     this.bell(m.scaleNote(12, ROOT_MIDI + 24), t + 0.16, A.pickup * 0.4, 0, 1.2, 2);
   }
 
+  /** A power-up: a rising arpeggio, brighter than a boost pickup. */
+  power(): void {
+    const ctx = this.ctx;
+    if (!ctx) return;
+    const t = ctx.currentTime;
+    const m = this.music;
+    for (let i = 0; i < 4; i++) this.bell(m.scaleNote(5 + i * 2, ROOT_MIDI + 24), t + i * 0.06, A.pickup * (1 - i * 0.15), 0, 1, 2);
+  }
+
+  /** The shield took a hit: a hard knock and a falling tone. */
+  shieldHit(): void {
+    const ctx = this.ctx;
+    if (!ctx) return;
+    const t = ctx.currentTime;
+    this.glide(t, 900, 180, 0.35, A.boost * 0.6);
+    this.bell(ROOT_MIDI + 12, t, A.pickup, 0, 0.8, 3.5);
+  }
+
   boostStart(): void {
     const ctx = this.ctx;
     if (!ctx) return;

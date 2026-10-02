@@ -20,11 +20,13 @@ import { newSeed } from './rng';
 import { loadNumber, saveNumber } from './storage';
 import { formatScore, UI } from './ui';
 import type { RoomId } from './interior';
-import { themeForLevel, themeName, World } from './world';
+import { type PowerKind, themeForLevel, themeName, World } from './world';
 
 type State = 'title' | 'playing' | 'paused' | 'crashed';
 
 const DEG = Math.PI / 180;
+
+const POWER_NOTICE = ['shield. takes one hit', 'magnet. pulls in boost', 'slow-mo'];
 
 export class Game {
   private readonly basePalette = new LivePalette(); // the level's palette
@@ -102,6 +104,13 @@ export class Game {
   private boostMeter = 0; // 0..1
   private boosting = false;
   private boostLevel = 0; // eased 0..1, scales the speed boost
+
+  // Power-ups (see CONFIG.powers).
+  private shield = false;
+  private graceT = 0; // seconds of passing through things after a shield hit
+  private magnetT = 0;
+  private slowT = 0;
+  private slowLevel = 0; // eased 0..1
 
   private crashMs = 0;
   private shattered = false;
@@ -203,6 +212,7 @@ export class Game {
     this.boostMeter = this.dev.fullBoost ? 1 : 0;
     this.boosting = false;
     this.boostLevel = 0;
+    this.endPowers();
     this.stage.pullBack = this.stage.drop = 0;
     this.speedLines.update(0, 0, 0);
     this.player.reset();
@@ -244,6 +254,8 @@ export class Game {
     }
     this.ui.hideCombo();
     this.trail.setVisible(false);
+    this.player.setShield(false);
+    this.ui.setPower('');
     const isNewBest = this.score > this.best;
     if (isNewBest) {
       this.best = Math.floor(this.score);
@@ -516,6 +528,7 @@ export class Game {
     this.input.releaseAll();
     this.boosting = false;
     this.boostLevel = 0;
+    this.endPowers();
     this.chain = 0;
     this.speed = CONFIG.speed.titleDrift;
     this.stage.pullBack = this.stage.drop = 0;
@@ -664,6 +677,9 @@ export class Game {
       this.sound.pickup();
       this.haptics.pickup();
     }
+    const power = this.world.collectPower(prev);
+    if (power >= 0) this.gainPower(power as PowerKind);
+    this.updatePowers(dt);
     this.ui.setBoost(this.boostMeter, this.boostMeter >= CONFIG.boost.minToStart, this.boosting);
 
     const distancePoints = (this.world.distance - this.runStart) * CONFIG.score.pointsPerUnit;
@@ -689,7 +705,16 @@ export class Game {
     this.applyLook(progress);
 
     const fell = this.world.overPit();
-    if ((fell || this.world.hitTest(prev)) && !this.dev.invincible) {
+    const hit = !fell && this.graceT <= 0 && this.world.hitTest(prev);
+    if (hit && this.shield && !this.dev.invincible) {
+      // The shield takes the hit; pass through for a moment.
+      this.shield = false;
+      this.player.setShield(false);
+      this.graceT = CONFIG.powers.shield.graceSeconds;
+      this.sound.shieldHit();
+      this.haptics.crash();
+      this.nudgeMs = CONFIG.score.nearMiss.nudgeMs * 2;
+    } else if ((fell || hit) && !this.dev.invincible) {
       this.crash(fell);
       this.world.sync();
       return;
@@ -798,9 +823,48 @@ export class Game {
     this.sound.update(dt, a);
   }
 
-  /** Forward speed including boost. */
+  /** Forward speed including boost and slow-mo. */
   private currentSpeed(): number {
-    return this.speed * (1 + (CONFIG.boost.speedMultiplier - 1) * this.boostLevel);
+    const slow = 1 - (1 - CONFIG.powers.slow.factor) * this.slowLevel;
+    return this.speed * (1 + (CONFIG.boost.speedMultiplier - 1) * this.boostLevel) * slow;
+  }
+
+  private gainPower(kind: PowerKind): void {
+    const p = CONFIG.powers;
+    if (kind === 0) {
+      this.shield = true;
+      this.player.setShield(true);
+    } else if (kind === 1) this.magnetT = p.magnet.seconds;
+    else this.slowT = p.slow.seconds;
+    this.pickupCount++;
+    this.ui.showNotice(POWER_NOTICE[kind]);
+    this.sound.power();
+    this.haptics.pickup();
+  }
+
+  private updatePowers(dt: number): void {
+    this.graceT = Math.max(0, this.graceT - dt);
+    this.player.updateShield(dt, this.graceT);
+    if (this.magnetT > 0) {
+      this.magnetT = Math.max(0, this.magnetT - dt);
+      this.world.attractPickups(dt);
+    }
+    this.slowT = Math.max(0, this.slowT - dt);
+    const goal = this.slowT > 0 ? 1 : 0;
+    this.slowLevel += (goal - this.slowLevel) * (1 - Math.exp(-4 * dt));
+    const parts: string[] = [];
+    if (this.shield) parts.push('shield');
+    if (this.magnetT > 0) parts.push(`magnet ${Math.ceil(this.magnetT)}`);
+    if (this.slowT > 0) parts.push(`slow-mo ${Math.ceil(this.slowT)}`);
+    this.ui.setPower(parts.join('  '));
+  }
+
+  private endPowers(): void {
+    this.shield = false;
+    this.graceT = this.magnetT = this.slowT = this.slowLevel = 0;
+    this.player.setShield(false);
+    this.player.updateShield(0, 0);
+    this.ui.setPower('');
   }
 
   private updateCamera(dt: number): void {

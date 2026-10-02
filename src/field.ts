@@ -35,7 +35,7 @@ export class InstancedField {
   readonly amp: Float32Array;
   readonly freq: Float32Array;
   readonly phase: Float32Array;
-  private readonly colorIdx: Uint8Array;
+  readonly colorIdx: Uint8Array;
   private colorTable: Color[] | null = null;
   private colorAttr: InstancedBufferAttribute | null = null;
   /** Set before spawn(): colour table index for the next instance. */
