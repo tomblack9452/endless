@@ -5,6 +5,7 @@ import { rand, seed as seedRandom } from './rng';
 import { densityAt, lateralSpeedAt, speedAt } from './difficulty';
 import { InstancedField, wrap } from './field';
 import type { LivePalette } from './palette';
+import { type Biome, BIOME_NAMES } from './biomes';
 import { Decor, decorate, Light, pickRoom, ROOM_IDS, ROOMS, roomLength, type RoomAPI, type RoomId, type RoomPlan } from './interior';
 import { BOULDER_HEIGHT, boulder, canister, crystalCluster, greebleBox, mushroomTree, pipeSegment, powerGem, shuttle, spireTree } from './props';
 
@@ -65,8 +66,19 @@ export function themeForLevel(level: number): ThemeId {
   return THEMES[Math.floor((level - 1) / LPT) % THEMES.length];
 }
 
+const GROUND_BIOMES: Biome[] = ['alien', 'ice', 'volcanic'];
+const SECOND_BIOMES: Biome[] = ['canyon', 'asteroids', 'canyon'];
+
+/** The biome at `level`: the outdoor themes change look each loop (see biomes.ts). */
+export function biomeForLevel(level: number): Biome {
+  const theme = themeForLevel(level);
+  if (theme === 'interior') return 'interior';
+  const loop = Math.floor((level - 1) / (LPT * THEMES.length)) % 3;
+  return theme === 'land' ? GROUND_BIOMES[loop] : SECOND_BIOMES[loop];
+}
+
 export function themeName(level: number): string {
-  return TH.names[themeForLevel(level)];
+  return BIOME_NAMES[biomeForLevel(level)];
 }
 
 export class World {
@@ -74,6 +86,10 @@ export class World {
   canyonMix = 0; // 0..1, how much the canyon look applies at the ship
   interiorMix = 0;
   deckMix = 0; // 0..1, open to space on the observation deck
+  biome: Biome = 'alien'; // at the ship
+  biomeMix = 0; // 0..1, how much the biome look applies at the ship
+  asteroidMix = 0; // 0..1, in the asteroid belt (no ground, open to space)
+  private genBiome: Biome = 'alien'; // at the row being generated
   insideMix = 0; // 0..1, inside the ship at all (ignores how open the room is)
 
   private generatedTo = 0;
@@ -414,7 +430,7 @@ export class World {
   }
 
   private updateMix(dt: number): void {
-    this.canyonMix = this.interiorMix = this.insideMix = 0;
+    this.canyonMix = this.interiorMix = this.insideMix = this.biomeMix = this.asteroidMix = 0;
     this.roomName = '';
     if (themeForLevel(this.levelAt(this.distance)) !== 'interior') this.deckMix = 0;
     if (this.runStart === null) return;
@@ -424,6 +440,9 @@ export class World {
       ease((this.distance - this.levelStart(first)) / TH.fadeIn) *
       ease((this.levelStart(first + LPT) - this.distance) / TH.fadeOut);
     const theme = themeForLevel(level);
+    this.biome = biomeForLevel(level);
+    this.biomeMix = k;
+    if (this.biome === 'asteroids') this.asteroidMix = k;
     if (theme === 'canyon') this.canyonMix = k;
     else if (theme === 'interior') {
       const room = this.roomAtShip();
@@ -450,6 +469,7 @@ export class World {
   private row(d: number): void {
     const level = this.levelAt(d);
     const theme = themeForLevel(level);
+    this.genBiome = this.runStart === null ? 'alien' : biomeForLevel(level);
     if (theme !== this.theme) this.startTheme(theme, d, level);
     const sub = (level - 1) % LPT;
     const score = this.scoreAt(d);
@@ -538,6 +558,7 @@ export class World {
     }
 
     this.scatter(d, densityAt(score) * (sub === 1 ? lt.denseFactor : 1), laneRel, LANE + jitter);
+    if (this.genBiome === 'volcanic') this.lavaCrack(d, laneRel, jitter);
 
     // Level 2: rock clusters, well clear of the lane.
     if (sub === 1 && d >= this.nextFeatureAt) {
@@ -568,9 +589,20 @@ export class World {
     }
   }
 
+  /** Volcanic plain: a glowing crack in the ground now and then, off the lane (scenery). */
+  private lavaCrack(d: number, laneRel: number, jitter: number): void {
+    if (rand() > CONFIG.biomes.lavaChance) return;
+    const x = (rand() * 2 - 1) * W;
+    if (Math.abs(x - laneRel) < LANE + jitter + 0.5) return;
+    const len = 1.5 + rand() * 4;
+    this.light(x + this.shipX, 0.01, d, 0.15 + rand() * 0.25, 0.01, len, Light.Red, false);
+    if (rand() < 0.5) this.light(x + this.shipX + (rand() - 0.5) * 0.8, 0.01, d + len * 0.6, 0.12, 0.01, len * 0.5, Light.Amber, false);
+  }
+
   /** Choose the next open-ground prop's kind and size (sets propKind/propSize/propHit). */
   private pickProp(): void {
-    const m = TH.land.mix;
+    const b = this.genBiome;
+    const m = CONFIG.biomes.mix[b === 'ice' || b === 'volcanic' ? b : 'alien'];
     const r = rand() * (m.mushroom + m.spire + m.rock + m.crystal);
     if (r < m.mushroom) {
       this.propKind = Prop.Mushroom;

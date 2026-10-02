@@ -300,7 +300,6 @@ export const CONFIG = {
   // the ship can steer at that speed. Obstacles never cover the lane.
   themes: {
     levelsPerTheme: 3,
-    names: { land: 'open ground', canyon: 'canyon', interior: 'interior' },
     fadeIn: 40, // units over which theme colours blend in after a boundary
     fadeOut: 25, // ...and out before the next boundary
     lane: {
@@ -323,7 +322,6 @@ export const CONFIG = {
     //   level 2: denser, with rock clusters
     //   level 3: forest path, a clear winding path through dense forest
     land: {
-      mix: { mushroom: 0.4, spire: 0.2, rock: 0.28, crystal: 0.12 }, // relative chances
       denseFactor: 1.4, // level 2 density multiplier
       clusterSpacing: [30, 55], // level 2
       clusterSize: [3, 6],
@@ -468,6 +466,47 @@ export const CONFIG = {
       color: '#e2b86b',
       collectRadius: 1.0,
       spinSpeed: 2.4, // radians per second
+    },
+  },
+
+  // Biomes (see biomes.ts): outdoor looks that rotate in each loop of the themes.
+  biomes: {
+    // Prop mixes for open ground by biome (relative chances).
+    mix: {
+      alien: { mushroom: 0.4, spire: 0.2, rock: 0.28, crystal: 0.12 },
+      ice: { mushroom: 0, spire: 0.3, rock: 0.25, crystal: 0.45 },
+      volcanic: { mushroom: 0, spire: 0.25, rock: 0.6, crystal: 0.15 },
+    },
+    lavaChance: 0.6, // per row on the volcanic plain: a glowing crack off the lane
+    looks: {
+      ice: {
+        ground: '#e4edf2',
+        sky: '#dfe9f0',
+        fog: '#cfdde6',
+        rock: '#9fb4c2',
+        obstacle: '#6f8a9e',
+        light: [0.82, 0.97, 1.15] as [number, number, number],
+        amount: 0.75,
+      },
+      volcanic: {
+        ground: '#2a2322',
+        sky: '#7a4c3c',
+        fog: '#5e3e34',
+        rock: '#4a3c38',
+        obstacle: '#2c2422',
+        light: [0.5, 0.42, 0.42] as [number, number, number],
+        amount: 0.9,
+        ship: ['#e6ddd4', '#b3a69c'] as [string, string],
+      },
+      asteroids: {
+        ground: '#101218',
+        sky: '#141824',
+        fog: '#1a1e2a',
+        rock: '#5b5a5e',
+        obstacle: '#3d3c42',
+        light: [0.8, 0.8, 0.85] as [number, number, number],
+        amount: 0.85,
+      },
     },
   },
 

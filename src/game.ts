@@ -21,7 +21,8 @@ import { newSeed } from './rng';
 import { loadNumber, saveNumber } from './storage';
 import { formatScore, UI } from './ui';
 import type { RoomId } from './interior';
-import { type PowerKind, themeForLevel, themeName, World } from './world';
+import { biomeForLevel, type PowerKind, themeForLevel, themeName, World } from './world';
+import { tintBiome } from './biomes';
 
 type State = 'title' | 'playing' | 'paused' | 'crashed';
 
@@ -610,16 +611,20 @@ export class Game {
       this.fadeT = Math.min(1, this.fadeT + 1 / 60 / CONFIG.ui.paletteFadeSeconds);
       this.basePalette.mix(this.fadeFrom, this.fadeTo, this.fadeT * this.fadeT * (3 - 2 * this.fadeT));
     }
-    applyAtmosphere(this.basePalette, this.palette, levelProgress, w.canyonMix, w.interiorMix, w.deckMix, this.settings.contrast);
-    if (!this.settings.contrast) this.events.tint(this.palette);
+    const space = Math.max(w.deckMix, w.asteroidMix);
+    applyAtmosphere(this.basePalette, this.palette, levelProgress, w.canyonMix, w.interiorMix, space, this.settings.contrast);
+    if (!this.settings.contrast) {
+      tintBiome(this.palette, w.biome, w.biomeMix);
+      this.events.tint(this.palette);
+    }
     this.stage.fog.density = CONFIG.fog.density * this.events.fogScale();
     // Stars: full over the deck, faint outside at night.
     const sky = this.palette.sky;
     const daylight = Math.pow(0.2126 * sky.r + 0.7152 * sky.g + 0.0722 * sky.b, 1 / 2.2);
     const night = Math.max(0, Math.min(1, (0.55 - daylight) / 0.35)) * CONFIG.space.nightStars * (1 - w.interiorMix);
-    this.sky.setAmount(Math.max(w.deckMix, night));
+    this.sky.setAmount(Math.max(space, night));
     this.stage.setPlanetVisible(1 - this.world.interiorMix);
-    this.stage.setUnderfloor(this.world.insideMix);
+    this.stage.setUnderfloor(Math.max(w.insideMix, w.asteroidMix));
     this.stage.applyPalette();
     this.world.applyPalette();
     this.speedLines.applyPalette();
@@ -845,7 +850,7 @@ export class Game {
     if ((level - 1) % CONFIG.themes.levelsPerTheme !== 1) return;
     const roll = (Math.imul(this.seed ^ level, 2654435761) >>> 0) / 4294967296;
     if (roll >= CONFIG.events.chance) return;
-    const kind = Events.forTheme(themeForLevel(level));
+    const kind = Events.forBiome(biomeForLevel(level));
     this.events.start(kind);
     this.ui.showNotice(EVENT_NOTICE[kind]);
   }
@@ -853,7 +858,7 @@ export class Game {
   private updateEvents(dt: number, dz: number): void {
     const ev = this.events;
     // An event ends early if the theme changes under it.
-    const allowed = ev.kind === 'none' || Events.forTheme(themeForLevel(this.level)) === ev.kind;
+    const allowed = ev.kind === 'none' || Events.forBiome(biomeForLevel(this.level)) === ev.kind;
     ev.update(dt, dz, allowed);
     if (ev.impact !== null) {
       this.sound.impact(ev.impact);

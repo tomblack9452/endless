@@ -1,7 +1,7 @@
 import { BufferAttribute, BufferGeometry, Color, LineBasicMaterial, LineSegments, Points, PointsMaterial, Scene } from 'three';
 import { CONFIG } from './config';
 import type { LivePalette } from './palette';
-import type { ThemeId } from './world';
+import type { Biome } from './biomes';
 
 // Theme events: a stretch of weather or trouble partway through a theme.
 //   meteors   - open ground: meteors streak down to the horizon and thud
@@ -13,7 +13,14 @@ export type EventKind = 'none' | 'meteors' | 'sandstorm' | 'redAlert';
 
 const E = CONFIG.events;
 const WHITE = new Color(1, 1, 1);
-const EVENT_FOR: Record<ThemeId, EventKind> = { land: 'meteors', canyon: 'sandstorm', interior: 'redAlert' };
+const EVENT_FOR: Record<Biome, EventKind> = {
+  alien: 'meteors',
+  ice: 'meteors',
+  volcanic: 'meteors',
+  canyon: 'sandstorm',
+  asteroids: 'meteors',
+  interior: 'redAlert',
+};
 export const EVENT_NOTICE: Record<EventKind, string> = {
   none: '',
   meteors: 'meteor shower',
@@ -84,9 +91,9 @@ export class Events {
     for (let i = 0; i < E.sandstorm.streaks; i++) this.respawnSand(i, true);
   }
 
-  /** The event that belongs to a theme. */
-  static forTheme(theme: ThemeId): EventKind {
-    return EVENT_FOR[theme];
+  /** The event that belongs to a biome. */
+  static forBiome(biome: Biome): EventKind {
+    return EVENT_FOR[biome];
   }
 
   start(kind: EventKind): void {
