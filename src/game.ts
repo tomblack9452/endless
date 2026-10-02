@@ -10,6 +10,7 @@ import { Stage } from './renderer';
 import { Sky } from './sky';
 import { SpeedLines } from './speedLines';
 import { cycle, DEFAULT_SETTINGS, LEVEL_GAIN, loadSettings, saveSettings, type SettingKey, STEERING_RANGE, TILT_GAIN } from './settings';
+import { newSeed } from './rng';
 import { loadNumber, saveNumber } from './storage';
 import { UI } from './ui';
 import type { RoomId } from './interior';
@@ -59,7 +60,8 @@ export class Game {
   private shownRoom = '';
   private level = 1;
   private best = 0;
-  private runs = 0;
+  /** Seed of the current (or last) run: the same seed rebuilds the same course. */
+  seed = 0;
 
   /** Dev-only switches, set from the dev panel (never shown in production builds). */
   readonly dev = { invincible: false, fullBoost: false };
@@ -128,11 +130,13 @@ export class Game {
 
   // --- state changes -------------------------------------------------------
 
-  /** `startScore` > 0 starts part-way along (dev skip); otherwise a normal run. */
-  private beginRun(startScore = 0): void {
-    // From the title the open ground already ahead is kept; a retry starts clean.
-    if (this.runs++ === 0 && startScore === 0) this.world.beginRun(CONFIG.field.startClearance);
-    else this.world.reset(CONFIG.field.startClearance, true, startScore);
+  /**
+   * `startScore` > 0 starts part-way along (dev skip). `seed` replays a
+   * known course; otherwise every run gets a fresh one.
+   */
+  private beginRun(startScore = 0, seed = newSeed()): void {
+    this.seed = seed;
+    this.world.reset(CONFIG.field.startClearance, true, startScore, seed);
     const level = Math.floor(startScore / CONFIG.score.levelLength) + 1;
     this.sound.ignite();
     this.sound.setTheme(themeForLevel(level));
@@ -309,6 +313,11 @@ export class Game {
   /** Dev: force every interior room to be `id` (null = random). */
   devSetRoom(id: RoomId | null): void {
     this.world.devRoom = id;
+  }
+
+  /** Dev: replay the last run's course from the start. */
+  devReplay(): void {
+    this.beginRun(0, this.seed);
   }
 
   /** Dev: start a run a little before `level` begins. */

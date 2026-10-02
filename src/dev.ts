@@ -78,6 +78,19 @@ function install(game: Game, title: HTMLElement): void {
   toggle('invincible', 'invincible');
   toggle('full boost', 'fullBoost');
 
+  // Replay the last course exactly (same seed).
+  const replay = document.createElement('button');
+  replay.type = 'button';
+  replay.className = 'label dev-toggle';
+  const renderReplay = () => (replay.textContent = `replay seed ${game.seed}`);
+  replay.addEventListener('click', () => {
+    show(false);
+    game.devReplay();
+  });
+  renderReplay();
+  renders.push(renderReplay);
+  panel.appendChild(replay);
+
   // Force one interior room type (pair with "7 inte") to test it.
   const rooms: (RoomId | null)[] = [null, ...ROOM_IDS.filter((r) => r !== 'corridor')];
   const roomBtn = document.createElement('button');
