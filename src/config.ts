@@ -414,7 +414,22 @@ export const CONFIG = {
         lasers: { weight: 3, minSub: 1, length: [50, 80], extraWidth: 0.9, gateSpacing: [11, 15], gapWidth: 2.9 },
         reactor: { weight: 2, minSub: 1, length: [55, 80], extraWidth: 6, height: 6, coreHalf: 2.2, pylonSpacing: [14, 20] },
         pistons: { weight: 3, minSub: 2, length: [55, 85], extraWidth: 1.6, spacing: [10, 14], travel: 0.1, motionMargin: 0.45 },
-        hangar: { weight: 2, minSub: 2, length: [70, 110], extraWidth: 9, height: 7, rowSpacing: [13, 18], pitch: 4.8, fill: 0.7, shuttleHalfWidth: 1.75 },
+        hangar: {
+          weight: 2,
+          minSub: 2,
+          length: [70, 110],
+          extraWidth: 9,
+          height: 7,
+          rowSpacing: [13, 18],
+          pitch: 4.8,
+          fill: 0.7,
+          shuttleHalfWidth: 1.75,
+          doorAt: 0.85, // blast doors this far through the room
+          doorGap: 0.9, // clearance either side of the lane once closed
+          doorClose: [70, 6], // closes over 70 units of approach, done 6 ahead
+        },
+        // Set piece: reactor collapse (debris falls off the lane as you approach).
+        collapse: { weight: 1.5, minSub: 2, length: [70, 95], extraWidth: 6, spacing: [5, 8], landAhead: [9, 16], fallOver: 22 },
       },
     },
   },

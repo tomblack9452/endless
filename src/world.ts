@@ -1099,6 +1099,28 @@ export class World {
       light(x, y, d, width, h, depth, colour, solid = false) {
         w.light(x, y, d, width, h, depth, colour, solid);
       },
+      door(d, gapX, gapHalf) {
+        const hd = CONFIG.themes.interior.rooms.hangar;
+        const [len, finish] = hd.doorClose;
+        // Each leaf starts inside its wall and slides in to the gap edge.
+        for (const side of [-1, 1]) {
+          const wallX = this.cx + side * this.hw;
+          const edge = gapX + side * gapHalf;
+          const width = (wallX - edge) * side;
+          if (width < 0.3) continue;
+          const closed = (wallX + edge) / 2;
+          w.hull.setNextRamp(-side * width, len, finish, false);
+          w.hullBox(closed + side * width, 0, d, width, this.H, 0.7, true, false);
+        }
+        // Hazard stripes on the floor and a lintel across the top.
+        w.light(this.cx, 0.01, d - 0.7, this.hw * 2, 0.01, 0.25, Light.Amber, false);
+        w.light(this.cx, 0.01, d + 0.7, this.hw * 2, 0.01, 0.25, Light.Amber, false);
+        this.greeble(this.cx, this.H - 0.9, d, this.hw * 2, 0.9, 1.1, Decor.Yellow);
+      },
+      debris(x, d, width, h, depth, landAhead) {
+        w.hull.setNextRamp(this.H - h, CONFIG.themes.interior.rooms.collapse.fallOver, landAhead, true);
+        w.hullBox(x, 0, d, width, h, depth, true, true);
+      },
       wall(side) {
         return this.cx + side * this.hw;
       },
