@@ -68,6 +68,11 @@ function build(parts: Part[]): BufferGeometry {
 }
 
 /** Alien mushroom tree: thin leaning trunk, wide faceted cap above head height, hanging pods. */
+/** Power-up gem: white with baked shading, tinted per kind by instance colour. Centred. */
+export function powerGem(size: number): BufferGeometry {
+  return build([part(new IcosahedronGeometry(size, 0), '#ffffff')]);
+}
+
 export function mushroomTree(): BufferGeometry {
   const parts: Part[] = [
     part(new CylinderGeometry(0.1, 0.19, 3.1, 6), '#5d544c', move(0, 1.55, 0), tiltZ(0.06)),

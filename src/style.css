@@ -366,6 +366,11 @@ body {
   left: calc(var(--safe-left) + 22px);
   bottom: calc(var(--safe-bottom) + 22px);
 }
+
+/* Active power-up, just above the boost readout. */
+.power-label {
+  bottom: calc(var(--safe-bottom) + 46px);
+}
 /* Top-right link on the title screen (settings). */
 .corner-link {
   position: absolute;

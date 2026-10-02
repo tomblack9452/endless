@@ -6,7 +6,7 @@ import { densityAt, lateralSpeedAt, speedAt } from './difficulty';
 import { InstancedField, wrap } from './field';
 import type { LivePalette } from './palette';
 import { Decor, decorate, Light, pickRoom, ROOM_IDS, ROOMS, roomLength, type RoomAPI, type RoomId, type RoomPlan } from './interior';
-import { BOULDER_HEIGHT, boulder, canister, crystalCluster, greebleBox, mushroomTree, pipeSegment, shuttle, spireTree } from './props';
+import { BOULDER_HEIGHT, boulder, canister, crystalCluster, greebleBox, mushroomTree, pipeSegment, powerGem, shuttle, spireTree } from './props';
 
 // The world ahead of the ship: obstacle pools plus the generator that lays
 // out each theme row by row.
@@ -19,6 +19,10 @@ import { BOULDER_HEIGHT, boulder, canister, crystalCluster, greebleBox, mushroom
 // row's speed, and obstacles never overlap it, so there is always a way through.
 
 export type ThemeId = 'land' | 'canyon' | 'interior';
+
+/** Power-up kinds: 0 shield, 1 magnet, 2 slow-mo. */
+export type PowerKind = 0 | 1 | 2;
+export const POWER_NAMES = ['shield', 'magnet', 'slow-mo'] as const;
 const THEMES: ThemeId[] = ['land', 'canyon', 'interior'];
 
 const F = CONFIG.field;
@@ -102,6 +106,7 @@ export class World {
   private readonly floorCount = new Int8Array(FLOOR_ROWS).fill(-1);
   private readonly floorRows = new Float32Array(FLOOR_ROWS * 12);
   private readonly pickups: InstancedField;
+  private readonly powers: InstancedField; // colour index = PowerKind
   private readonly fields: InstancedField[];
   private readonly solids: InstancedField[]; // everything that can be hit
   private readonly obstacleMat: MeshBasicMaterial;
@@ -160,6 +165,7 @@ export class World {
   private roomLogHead = 0;
   private readonly api: RoomAPI = this.makeApi();
   private nextPickupAt = Infinity;
+  private nextPowerAt = Infinity;
 
   constructor(scene: Scene, private readonly palette: LivePalette, textures?: { side: Texture; top: Texture }) {
     const s = F.cubeSize;
@@ -209,8 +215,11 @@ export class World {
     this.pickupMat = new MeshBasicMaterial();
     const p = CONFIG.boost.pickup;
     this.pickups = new InstancedField(scene, new OctahedronGeometry(p.size, 0), this.pickupMat, F.maxPickups);
+    const pw = CONFIG.powers;
+    this.powers = new InstancedField(scene, powerGem(pw.size), new MeshBasicMaterial({ vertexColors: true }), F.maxPowers);
+    this.powers.setColorTable([pw.shield.color, pw.magnet.color, pw.slow.color].map((c) => new Color(c)));
     this.solids = [this.blocks, this.hull, this.rocks, this.obstacleRocks, this.mushrooms, this.spires, this.crystals, this.shuttles, this.strips];
-    this.fields = [...this.solids, this.pickups, this.pipes, this.greebles, this.voids, this.canisters];
+    this.fields = [...this.solids, this.pickups, this.powers, this.pipes, this.greebles, this.voids, this.canisters];
     this.applyPalette();
   }
 
@@ -280,6 +289,7 @@ export class World {
     this.laneRetargetAt = this.distance + clearance + 20;
     this.nextFeatureAt = this.distance + clearance;
     this.nextPickupAt = this.distance + clearance + 40;
+    this.nextPowerAt = this.distance + CONFIG.powers.firstAfter + range(CONFIG.powers.spacing) * 0.5;
     this.generatedTo = this.distance + clearance;
     this.fill();
   }
@@ -331,6 +341,38 @@ export class World {
     return n;
   }
 
+  /** Collects a power-up the ship passed through; returns its kind, or -1. */
+  collectPower(prevDistance: number): PowerKind | -1 {
+    const p = this.powers;
+    const r = CONFIG.boost.pickup.collectRadius;
+    for (let i = 0; i < p.max; i++) {
+      if (!p.active[i]) continue;
+      const x = p.x[i];
+      if (x > r || x < -r) continue;
+      const zPrev = prevDistance - p.d[i];
+      const zNow = this.distance - p.d[i];
+      if (zNow >= -r && zPrev <= r) {
+        p.d[i] = -Infinity;
+        p.y[i] = -100;
+        return p.colorIdx[i] as PowerKind;
+      }
+    }
+    return -1;
+  }
+
+  /** Magnet: boost pickups within `reach` ahead slide towards the ship. */
+  attractPickups(dt: number): void {
+    const m = CONFIG.powers.magnet;
+    const p = this.pickups;
+    const k = 1 - Math.exp(-m.pull * dt);
+    for (let i = 0; i < p.max; i++) {
+      if (!p.active[i]) continue;
+      const ahead = p.d[i] - this.distance;
+      if (ahead < -1 || ahead > m.reach) continue;
+      p.x[i] -= p.x[i] * k;
+    }
+  }
+
   /** Turn the pickups (cosmetic). */
   spinPickups(dt: number): void {
     this.pickupSpin += CONFIG.boost.pickup.spinSpeed * dt;
@@ -342,6 +384,10 @@ export class World {
     const y = p.height + Math.sin(this.pickupSpin * 0.8) * p.bob; // octahedron is centred
     const ys = this.pickups.y;
     for (let i = 0; i < ys.length; i++) if (ys[i] > -50) ys[i] = y; // collected ones stay hidden
+    this.powers.cos.fill(Math.cos(-this.pickupSpin * 0.7));
+    this.powers.sin.fill(Math.sin(-this.pickupSpin * 0.7));
+    const py = this.powers.y;
+    for (let i = 0; i < py.length; i++) if (py[i] > -50) py[i] = y;
   }
 
   sync(): void {
@@ -415,7 +461,14 @@ export class World {
     if (this.runStart !== null && d >= this.nextPickupAt && !this.quiet(d)) {
       this.nextPickupAt = d + range(CONFIG.boost.pickup.spacing);
       const x = this.lane - this.shipX;
-      this.pickups.spawn(x, CONFIG.boost.pickup.height, d, 1, 1, 1, 0, false, this.theme === 'land', 0, 0);
+      if (d >= this.nextPowerAt) {
+        // Now and then a power-up takes the boost pickup's place.
+        this.nextPowerAt = d + range(CONFIG.powers.spacing);
+        this.powers.nextColor = Math.floor(rand() * 3);
+        this.powers.spawn(x, CONFIG.boost.pickup.height, d, 1, 1, 1, 0, false, this.theme === 'land', 0, 0);
+      } else {
+        this.pickups.spawn(x, CONFIG.boost.pickup.height, d, 1, 1, 1, 0, false, this.theme === 'land', 0, 0);
+      }
     }
   }
 

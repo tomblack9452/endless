@@ -3,6 +3,7 @@ import {
   DoubleSide,
   Float32BufferAttribute,
   Group,
+  IcosahedronGeometry,
   Mesh,
   MeshBasicMaterial,
   Scene,
@@ -88,6 +89,8 @@ interface Fragment {
 
 export class Player {
   readonly root = new Group(); // follows bank
+  private readonly shield: Mesh;
+  private readonly shieldMat: MeshBasicMaterial;
   private readonly body: Mesh;
   private readonly shadow: Mesh;
   private readonly matTop: MeshBasicMaterial;
@@ -115,6 +118,12 @@ export class Player {
     this.root.add(this.body);
     this.root.position.y = S.hoverY;
     scene.add(this.root);
+    // Shield bubble: a faint wireframe shell, shown while a shield is held.
+    this.shieldMat = new MeshBasicMaterial({ color: CONFIG.powers.shield.color, wireframe: true, transparent: true, opacity: 0.3, fog: false });
+    this.shield = new Mesh(new IcosahedronGeometry(S.length * 0.62, 1), this.shieldMat);
+    this.shield.scale.set(1, 0.55, 1);
+    this.shield.visible = false;
+    this.root.add(this.shield);
 
     const sg = new BufferGeometry();
     sg.setAttribute(
@@ -129,6 +138,16 @@ export class Player {
 
     this.buildFragments(scene);
     this.setVisible(false);
+  }
+
+  setShield(on: boolean): void {
+    this.shield.visible = on;
+  }
+
+  /** Spin the shield; `blink` > 0 flickers the ship (grace after a shield hit). */
+  updateShield(dt: number, blink: number): void {
+    this.shield.rotation.y += dt * 0.8;
+    this.body.visible = blink <= 0 || Math.floor(blink * 14) % 2 === 0;
   }
 
   /** Swap the ship's shape (cosmetic). */

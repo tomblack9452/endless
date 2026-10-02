@@ -232,6 +232,7 @@ export const CONFIG = {
     maxMushrooms: 1200,
     maxSpires: 800,
     maxCrystals: 700,
+    maxPowers: 8,
     maxPickups: 16,
     maxShuttles: 120,
     maxPipes: 2600,
@@ -453,6 +454,16 @@ export const CONFIG = {
       collectRadius: 1.0,
       spinSpeed: 2.4, // radians per second
     },
+  },
+
+  // Power-ups: rarer than boost pickups, also on the safe lane. They stack.
+  powers: {
+    spacing: [1300, 2000], // distance between power-ups (replaces a boost pickup)
+    firstAfter: 600, // none in the first stretch of a run
+    size: 0.5,
+    shield: { color: '#6fb7d9', graceSeconds: 1.2 }, // lasts until you hit something
+    magnet: { color: '#b48ad8', seconds: 9, reach: 28, pull: 7 },
+    slow: { color: '#7fc28e', seconds: 6, factor: 0.62 },
   },
   // Sound design. Everything is synthesised (no files) and everything is in D:
   // the engine is tuned to the root, the music changes mode per theme, and
