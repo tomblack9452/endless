@@ -60,6 +60,8 @@
           <div class="title-links">
             <span class="label link" data-title="from">start: open ground</span>
             <span class="label link" data-title="daily">daily run</span>
+            <span class="label link" data-title="missions">missions</span>
+            <span class="label link" data-title="hangar">hangar</span>
             <span class="label link" data-title="stats">stats</span>
           </div>
           <div id="title-best" class="label dim"></div>
@@ -109,6 +111,30 @@
         </div>
       </div>
 
+      <div id="screen-missions" class="layer screen">
+        <div class="settings">
+          <div class="label dim settings-title">missions</div>
+          <div id="missions-rows"></div>
+          <div id="missions-next" class="label dim settings-group"></div>
+          <div class="menu left">
+            <button class="label button" type="button" data-action="back">back</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="screen-hangar" class="layer screen">
+        <div class="settings">
+          <div class="label dim settings-title">hangar</div>
+          <button class="setting-row" type="button" data-hangar="ship"><span class="label">ship</span><span class="label value"></span></button>
+          <button class="setting-row" type="button" data-hangar="trail"><span class="label">trail</span><span class="label value"></span></button>
+          <button class="setting-row" type="button" data-hangar="palette"><span class="label">colours</span><span class="label value"></span></button>
+          <div id="hangar-count" class="label dim settings-group"></div>
+          <div class="menu left">
+            <button class="label button" type="button" data-action="back">back</button>
+          </div>
+        </div>
+      </div>
+
       <div id="screen-over" class="layer screen">
         <div class="screen-center">
           <div class="label">crashed</div>
@@ -116,6 +142,7 @@
           <div id="over-best" class="label dim"></div>
           <div id="over-stats" class="label dim"></div>
           <div id="over-extra" class="label dim"></div>
+          <div id="over-missions" class="label dim over-missions"></div>
           <div class="label rule">tap to retry</div>
           <div class="menu">
             <button class="label button" type="button" data-action="menu">main menu</button>
