@@ -1,4 +1,5 @@
 import { CONFIG } from './config';
+import { rand } from './rng';
 
 // Ship interior: a sequence of reusable rooms joined by short corridors.
 //
@@ -144,7 +145,7 @@ const R = CONFIG.themes.interior.rooms;
 const LANE = CONFIG.themes.lane.halfWidth;
 
 function range(r: readonly number[]): number {
-  return r[0] + Math.random() * (r[1] - r[0]);
+  return r[0] + rand() * (r[1] - r[0]);
 }
 
 export const ROOMS: Record<RoomId, RoomDef> = {
@@ -176,10 +177,10 @@ export const ROOMS: Record<RoomId, RoomDef> = {
       const pitch = R.cargo.pitch;
       const fill = Math.min(0.85, R.cargo.fill + api.score / R.cargo.fillRampPoints);
       for (let x = api.cx - api.hw + 1; x < api.cx + api.hw - 0.8; x += pitch) {
-        if (Math.random() > fill || !api.clearOf(x, 0.75)) continue;
-        const tiers = 1 + Math.floor(Math.random() * 3);
+        if (rand() > fill || !api.clearOf(x, 0.75)) continue;
+        const tiers = 1 + Math.floor(rand() * 3);
         api.crate(x, api.d, 1.4, tiers * 0.9);
-        if (Math.random() < 0.45) api.crate(x, api.d + 1.45, 1.4, (1 + Math.floor(Math.random() * 2)) * 0.9);
+        if (rand() < 0.45) api.crate(x, api.d + 1.45, 1.4, (1 + Math.floor(rand() * 2)) * 0.9);
       }
     },
   },
@@ -197,14 +198,14 @@ export const ROOMS: Record<RoomId, RoomDef> = {
     build(api) {
       if (!api.due(R.servers.rowSpacing)) return;
       const pitch = R.servers.pitch;
-      const shift = Math.random() * pitch;
+      const shift = rand() * pitch;
       const len = R.servers.rackLength;
       for (let x = api.cx - api.hw + 0.8 + shift; x < api.cx + api.hw - 0.6; x += pitch) {
         if (!api.clearOf(x, 0.45 + 0.1)) continue;
         api.box(x, 0, api.d, 0.9, api.H - 0.7, len, true, true);
-        const colour = Math.random() < 0.7 ? Light.Teal : Light.Amber;
-        api.light(x - 0.47, 1.1 + Math.random() * 0.8, api.d, 0.04, 0.06, len * 0.7, colour);
-        api.light(x + 0.47, 0.9 + Math.random() * 0.8, api.d, 0.04, 0.06, len * 0.7, colour);
+        const colour = rand() < 0.7 ? Light.Teal : Light.Amber;
+        api.light(x - 0.47, 1.1 + rand() * 0.8, api.d, 0.04, 0.06, len * 0.7, colour);
+        api.light(x + 0.47, 0.9 + rand() * 0.8, api.d, 0.04, 0.06, len * 0.7, colour);
       }
     },
   },
@@ -221,10 +222,10 @@ export const ROOMS: Record<RoomId, RoomDef> = {
     enclosure: R.deck.enclosure,
     build(api) {
       if (!api.due(R.deck.featureSpacing)) return;
-      const count = Math.random() < 0.5 ? 1 : 2;
+      const count = rand() < 0.5 ? 1 : 2;
       for (let i = 0; i < count; i++) {
-        const x = api.cx + (Math.random() * 2 - 1) * (api.hw - 1);
-        if (Math.random() < 0.5) {
+        const x = api.cx + (rand() * 2 - 1) * (api.hw - 1);
+        if (rand() < 0.5) {
           if (api.clearOf(x, 0.4)) api.box(x, 0, api.d + i * 3, 0.7, api.H, 0.7, true, true);
         } else if (api.clearOf(x, 0.85)) {
           api.crate(x, api.d + i * 3, 1.6, 0.8); // console
@@ -250,7 +251,7 @@ export const ROOMS: Record<RoomId, RoomDef> = {
         api.box(api.cx + s * (api.hw + 0.05), 1.5, api.d, 0.14, 0.14, 2.4, false, false);
       }
       if (api.due(R.shaft.lightSpacing)) {
-        const s = Math.random() < 0.5 ? -1 : 1;
+        const s = rand() < 0.5 ? -1 : 1;
         api.light(api.cx + s * (api.hw - 0.02), 1.9, api.d, 0.06, 0.18, 0.35, Light.Red);
       }
     },
@@ -293,7 +294,7 @@ export const ROOMS: Record<RoomId, RoomDef> = {
         dividers: [-(b + dh), b + dh],
         dividerHalf: dh,
         branches: [-side, 0, side],
-        offset: Math.random() < 0.4 ? 0 : side,
+        offset: rand() < 0.4 ? 0 : side,
       };
     },
     build: (api) => branchCrates(api, R.fork.crates),
@@ -320,7 +321,7 @@ export const ROOMS: Record<RoomId, RoomDef> = {
         dividers: [w - n],
         dividerHalf: dh,
         branches: [wide, narrow],
-        offset: Math.random() < 0.5 ? wide : narrow,
+        offset: rand() < 0.5 ? wide : narrow,
       };
     },
     build: (api) => branchCrates(api, R.uneven.crates),
@@ -338,11 +339,11 @@ export const ROOMS: Record<RoomId, RoomDef> = {
     enclosure: 1,
     build(api) {
       if (!api.due(R.islands.spacing)) return;
-      const count = 1 + (Math.random() < 0.6 ? 1 : 0);
+      const count = 1 + (rand() < 0.6 ? 1 : 0);
       for (let i = 0; i < count; i++) {
         const w = range(R.islands.width);
         const len = range(R.islands.islandLength);
-        const x = api.cx + (Math.random() * 2 - 1) * (api.hw - w / 2 - 0.4);
+        const x = api.cx + (rand() * 2 - 1) * (api.hw - w / 2 - 0.4);
         // The island runs `len` ahead; the lane may drift that far, so clear it generously.
         if (!api.clearOf(x, w / 2 + api.maxSlope * len + 0.2)) continue;
         api.box(x, 0, api.d + len / 2, w, api.H, len, true, true);
@@ -402,11 +403,11 @@ export const ROOMS: Record<RoomId, RoomDef> = {
     build(api) {
       if (!api.due(R.hydroponics.rowSpacing)) return;
       const pitch = R.hydroponics.pitch;
-      const shift = Math.random() * pitch;
+      const shift = rand() * pitch;
       for (let x = api.cx - api.hw + 1.2 + shift; x < api.cx + api.hw - 1; x += pitch) {
-        if (Math.random() > R.hydroponics.fill || !api.clearOf(x, 0.75)) continue;
+        if (rand() > R.hydroponics.fill || !api.clearOf(x, 0.75)) continue;
         api.crate(x, api.d, 1.5, 0.35); // planter
-        api.tree(x, api.d, 0.75 + Math.random() * 0.35);
+        api.tree(x, api.d, 0.75 + rand() * 0.35);
       }
     },
   },
@@ -423,8 +424,8 @@ export const ROOMS: Record<RoomId, RoomDef> = {
     build(api) {
       if (!api.due(R.lasers.gateSpacing)) return;
       const g = R.lasers.gapWidth / 2 + api.jitter;
-      const gaps = api.sub === 2 && Math.random() < 0.5 ? 2 : 1;
-      const extra = api.cx + (Math.random() * 2 - 1) * (api.hw - g - 0.5);
+      const gaps = api.sub === 2 && rand() < 0.5 ? 2 : 1;
+      const extra = api.cx + (rand() * 2 - 1) * (api.hw - g - 0.5);
       const left = api.cx - api.hw;
       const right = api.cx + api.hw;
       // Cut the beam line at the gap(s) and draw the remaining spans with posts at each end.
@@ -457,7 +458,7 @@ export const ROOMS: Record<RoomId, RoomDef> = {
       }
       // Pylons on the far side from the lane.
       if (api.due(R.reactor.pylonSpacing)) {
-        const x = api.cx - api.side * (ch + 2.5 + Math.random() * (api.hw - ch - 3.2));
+        const x = api.cx - api.side * (ch + 2.5 + rand() * (api.hw - ch - 3.2));
         if (api.clearOf(x, 0.5)) api.box(x, 0, api.d, 0.8, api.H, 0.8, true, true);
       }
     },
@@ -475,13 +476,13 @@ export const ROOMS: Record<RoomId, RoomDef> = {
     enclosure: 1,
     build(api) {
       if (!api.due(R.pistons.spacing)) return;
-      const count = api.sub === 2 && Math.random() < 0.4 ? 2 : 1;
+      const count = api.sub === 2 && rand() < 0.4 ? 2 : 1;
       for (let i = 0; i < count; i++) {
-        const w = 1.6 + Math.random() * 0.6;
+        const w = 1.6 + rand() * 0.6;
         const amp = api.hw - w / 2 - 0.1;
         const dd = api.d + i * 4;
         for (let t = 0; t < 6; t++) {
-          const arrive = api.cx + (Math.random() * 2 - 1) * amp;
+          const arrive = api.cx + (rand() * 2 - 1) * amp;
           // Extra margin covers the little it moves while level with the ship.
           if (!api.clearOf(arrive, w / 2 + R.pistons.motionMargin)) continue;
           api.slider(api.cx, amp, arrive, dd, w, 1.6, 1.2);
@@ -508,10 +509,10 @@ export const ROOMS: Record<RoomId, RoomDef> = {
       if (Math.floor(api.d / 2.2) % 2 === 0) api.light(api.lane, 0.01, api.d, 0.12, 0.01, 1.3, Light.Amber);
       if (!api.due(R.hangar.rowSpacing)) return;
       const pitch = R.hangar.pitch;
-      const shift = Math.random() * pitch;
+      const shift = rand() * pitch;
       for (let x = api.cx - api.hw + 2 + shift; x < api.cx + api.hw - 1.8; x += pitch) {
-        if (Math.random() > R.hangar.fill || !api.clearOf(x, R.hangar.shuttleHalfWidth)) continue;
-        api.shuttle(x, api.d, Math.random() < 0.3);
+        if (rand() > R.hangar.fill || !api.clearOf(x, R.hangar.shuttleHalfWidth)) continue;
+        api.shuttle(x, api.d, rand() < 0.3);
       }
     },
   },
@@ -522,13 +523,13 @@ function branchCrates(api: RoomAPI, scale: number): void {
   const n = api.perRow(scale);
   const tries = Math.ceil(n * 2);
   for (let i = 0; i < tries; i++) {
-    if (Math.random() > n / tries) continue;
-    const x = api.cx + (Math.random() * 2 - 1) * (api.hw - 0.6);
+    if (rand() > n / tries) continue;
+    const x = api.cx + (rand() * 2 - 1) * (api.hw - 0.6);
     if (!api.clearOf(x, 0.55)) continue;
     let nearDivider = false;
     if (api.plan) for (const dv of api.plan.dividers) if (Math.abs(x - (api.cx + dv)) < api.plan.dividerHalf + 0.6) nearDivider = true;
     if (nearDivider) continue;
-    api.crate(x, api.d, 1, 0.5 + Math.random() * 0.7);
+    api.crate(x, api.d, 1, 0.5 + rand() * 0.7);
   }
 }
 
@@ -552,7 +553,7 @@ const gantry: RoomDef = {
     // Side walkway: runs parallel for a while, joined to the main one by bridges at both ends.
     if (api.memoAt <= api.d && api.due(R.gantry.sideWalks)) {
       const room = api.hw - 1.4;
-      const off = (Math.random() < 0.5 ? -1 : 1) * (ch * 2 + 1 + Math.random() * Math.max(0, room - ch * 2 - 1.5));
+      const off = (rand() < 0.5 ? -1 : 1) * (ch * 2 + 1 + rand() * Math.max(0, room - ch * 2 - 1.5));
       api.memo = Math.max(-room, Math.min(room, api.lane - api.cx + off)); // offset from cx
       api.memoAt = api.d + range(R.gantry.sideLength);
       api.memo2 = api.d; // start, for the first bridge
@@ -582,9 +583,9 @@ const breach: RoomDef = {
   floor(api) {
     wallHoles(api, R.breach.holeSpacing, R.breach.holeLength, R.breach.bothChance);
     // Sparks where the floor tore.
-    if (Math.random() < 0.15) {
-      const s = Math.random() < 0.5 ? -1 : 1;
-      api.light(api.wall(s) - s * 0.3, 0.1 + Math.random() * 0.4, api.d, 0.05, 0.05, 0.05, Math.random() < 0.5 ? Light.Amber : Light.Red);
+    if (rand() < 0.15) {
+      const s = rand() < 0.5 ? -1 : 1;
+      api.light(api.wall(s) - s * 0.3, 0.1 + rand() * 0.4, api.d, 0.05, 0.05, 0.05, rand() < 0.5 ? Light.Amber : Light.Red);
     }
   },  decor(api) {
     corridorDecor(api);
@@ -604,8 +605,8 @@ const breach: RoomDef = {
  */
 function wallHoles(api: RoomAPI, spacing: readonly number[], length: readonly number[], bothChance: number, chance = 1): void {
   if (api.memoAt <= api.d) {
-    if (!api.due(spacing) || Math.random() > chance) return;
-    const r = Math.random();
+    if (!api.due(spacing) || rand() > chance) return;
+    const r = rand();
     api.memo = r < bothChance ? 3 : r < bothChance + (1 - bothChance) / 2 ? 1 : 2; // 1 left, 2 right, 3 both
     api.memoAt = api.d + range(length);
   }
@@ -655,8 +656,8 @@ function serversDecor(api: RoomAPI): void {
   for (const s of [-1, 1]) {
     api.greeble(api.wall(s) - s * 0.1, 0.45, api.d, 0.2, api.H - 1.1, 2.32, Decor.Dark);
     for (let k = 0; k < 5; k++) {
-      if (Math.random() > 0.55) continue;
-      api.light(api.wall(s) - s * 0.21, 0.7 + k * 0.42, api.d + (Math.random() - 0.5) * 1.8, 0.03, 0.05, 0.12, colours[Math.floor(Math.random() * 4)]);
+      if (rand() > 0.55) continue;
+      api.light(api.wall(s) - s * 0.21, 0.7 + k * 0.42, api.d + (rand() - 0.5) * 1.8, 0.03, 0.05, 0.12, colours[Math.floor(rand() * 4)]);
     }
     api.pipe(s, 0.22, 0.05, Decor.Dark);
     api.pipe(s, 0.32, 0.04, Decor.Dark);
@@ -805,7 +806,7 @@ export const ROOM_IDS = Object.keys(ROOMS) as RoomId[];
 export function pickRoom(sub: number, last: RoomId): RoomId {
   let total = 0;
   for (const id of ROOM_IDS) total += weight(id, sub, last);
-  let r = Math.random() * total;
+  let r = rand() * total;
   for (const id of ROOM_IDS) {
     r -= weight(id, sub, last);
     if (r <= 0) return id;
