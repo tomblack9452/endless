@@ -236,6 +236,9 @@ export class World {
     this.propMat.color.copy(this.palette.light);
     this.stripMat.color.copy(this.palette.strip);
     this.pickupMat.color.copy(this.palette.pickup);
+    this.decorMat.color.setScalar(0.95);
+    const alert = this.palette.alert;
+    for (const m of [this.matLight, this.matMid, this.matDark, this.matHullTop, this.decorMat, this.propMat]) m.color.multiply(alert);
   }
   /** Flat blocks take the palette colour; textured ones read as steel at its brightness. */
   private faceColor(out: Color, src: Color): void {

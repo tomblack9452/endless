@@ -40,6 +40,7 @@ export class Sound {
   private effectsLevel = 1;
   private paused = false;
   private engineOn = false; // false after a crash until the next run
+  private storm = 0; // sandstorm, 0..1: turns the canyon wind up
   private frame = 0;
   private clankTimer = 0;
 
@@ -188,7 +189,7 @@ export class Sound {
     this.roarFilter.frequency.setTargetAtTime(800 + b * 700, t, 0.1);
     this.roarGain.gain.setTargetAtTime(on * run * A.roar * b, t, 0.08);
 
-    this.windGain.gain.setTargetAtTime(A.canyonWind * s.canyon, t, 0.5);
+    this.windGain.gain.setTargetAtTime(A.canyonWind * s.canyon + A.wind * this.storm, t, 0.5);
     this.humGain.gain.setTargetAtTime(A.interiorHum * s.interior, t, 0.5);
 
     // Space: dry on open ground, roomy inside, echoing in the canyon.
@@ -284,6 +285,52 @@ export class Sound {
   }
 
   /** Passing through a doorway in the ship: a pneumatic hiss and a soft thunk. */
+  /** A meteor landing far off: a low thud and a rumble. */
+  impact(pan: number): void {
+    const ctx = this.ctx;
+    if (!ctx) return;
+    const t = ctx.currentTime;
+    const o = ctx.createOscillator();
+    o.frequency.setValueAtTime(70, t);
+    o.frequency.exponentialRampToValueAtTime(30, t + 0.6);
+    const g = ctx.createGain();
+    pluckEnv(g.gain, t, A.impact, 0.01, 0.8);
+    const p = ctx.createStereoPanner();
+    p.pan.value = pan * 0.7;
+    o.connect(g).connect(p).connect(this.sfxBus);
+    g.connect(this.reverbSend);
+    o.start(t);
+    o.stop(t + 1.2);
+    this.burst(t + 0.02, 300, A.impact * 0.6, 0.5);
+  }
+
+  /** Red alert: a two-tone klaxon, quiet and far away down the corridors. */
+  alarm(): void {
+    const ctx = this.ctx;
+    if (!ctx) return;
+    const t = ctx.currentTime;
+    for (const [i, f] of [660, 520].entries()) {
+      const o = ctx.createOscillator();
+      o.type = 'square';
+      o.frequency.value = f;
+      const lp = ctx.createBiquadFilter();
+      lp.type = 'lowpass';
+      lp.frequency.value = 1400;
+      const g = ctx.createGain();
+      const at = t + i * 0.42;
+      pluckEnv(g.gain, at, A.alarm, 0.03, 0.4);
+      o.connect(lp).connect(g).connect(this.sfxBus);
+      g.connect(this.reverbSend);
+      o.start(at);
+      o.stop(at + 0.6);
+    }
+  }
+
+  /** Sandstorm, 0..1: the canyon wind rises with it. */
+  setWind(k: number): void {
+    this.storm = k;
+  }
+
   door(): void {
     const ctx = this.ctx;
     if (!ctx) return;

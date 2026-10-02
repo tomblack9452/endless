@@ -456,6 +456,15 @@ export const CONFIG = {
     },
   },
 
+  // Theme events (see events.ts): one may start as the middle level of a theme begins.
+  events: {
+    chance: 0.6,
+    seconds: 22,
+    meteors: { count: 6, every: [0.5, 1.6], distance: [140, 240], tail: 1.4, color: '#e2763f' },
+    sandstorm: { color: '#c9a57a', fog: 0.8, streaks: 70, width: 9, wind: 26, length: 1.4, opacity: 0.8 },
+    redAlert: { color: '#d8433a', dark: '#2a0e10', pulseHz: 0.7, alarmEvery: 2.4 },
+  },
+
   // Power-ups: rarer than boost pickups, also on the safe lane. They stack.
   powers: {
     spacing: [1300, 2000], // distance between power-ups (replaces a boost pickup)
@@ -499,6 +508,9 @@ export const CONFIG = {
     pickup: 0.08,
     boost: 0.1,
     level: 0.06,
+    impact: 0.16,
+    alarm: 0.05,
+    wind: 0.09,
     door: 0.07,
     theme: 0.14,
     crash: 0.35,
