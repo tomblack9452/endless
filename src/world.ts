@@ -1,6 +1,7 @@
 import { BoxGeometry, Color, MeshBasicMaterial, OctahedronGeometry, Scene, type Texture } from 'three';
 import { patchBlockMaterial } from './blockTextures';
 import { CONFIG } from './config';
+import { rand, seed as seedRandom } from './rng';
 import { densityAt, lateralSpeedAt, speedAt } from './difficulty';
 import { InstancedField, wrap } from './field';
 import type { LivePalette } from './palette';
@@ -53,7 +54,7 @@ function lerp(a: number, b: number, t: number): number {
 }
 
 function range(r: readonly [number, number] | readonly number[]): number {
-  return r[0] + Math.random() * (r[1] - r[0]);
+  return r[0] + rand() * (r[1] - r[0]);
 }
 
 export function themeForLevel(level: number): ThemeId {
@@ -247,7 +248,18 @@ export class World {
    * Regenerate everything. `run` starts a scored run (themes progress);
    * otherwise it's the title screen (open ground forever).
    */
-  reset(clearance: number, run: boolean, startScore = 0): void {
+  /** `seed` makes the layout reproducible (same seed, same course). */
+  reset(clearance: number, run: boolean, startScore = 0, seed?: number): void {
+    if (seed !== undefined) seedRandom(seed);
+    // Start from a clean slate so a seed always rebuilds the same course: every
+    // piece is cleared below, so distance and sideways position can restart too.
+    this.distance = 0;
+    this.shipX = 0;
+    this.cx = 0;
+    this.cxSlope = this.cxTargetSlope = 0;
+    this.cxRetargetAt = 0;
+    this.laneTarget = 0;
+    this.api.row = 0;
     for (const f of this.fields) f.clear();
     // Forget rooms generated ahead in the previous run.
     this.roomLogD.fill(-Infinity);
@@ -270,15 +282,6 @@ export class World {
     this.nextPickupAt = this.distance + clearance + 40;
     this.generatedTo = this.distance + clearance;
     this.fill();
-  }
-
-  /** Start a run from the title scene, keeping the open ground already generated. */
-  beginRun(clearance: number): void {
-    for (const f of this.fields) f.clearBefore(this.distance + clearance);
-    this.runStart = this.distance;
-    this.themeEnd = this.levelStart(1 + LPT);
-    this.nextPickupAt = this.generatedTo + range(CONFIG.boost.pickup.spacing);
-    // The lane is left as is: rows already ahead were built around it.
   }
 
   advance(dt: number, speed: number, lateral: number): void {
@@ -453,7 +456,7 @@ export class World {
       this.laneTarget = this.shipX;
     } else if (d >= this.laneRetargetAt) {
       const wander = sub === 2 ? lt.pathWander : TH.lane.landWander;
-      this.laneTarget = this.lane + (Math.random() * 2 - 1) * wander;
+      this.laneTarget = this.lane + (rand() * 2 - 1) * wander;
       this.laneRetargetAt = d + range([TH.lane.retargetMin, TH.lane.retargetMax]);
     }
     this.lane += clamp(this.laneTarget - this.lane, -maxSlope * STEP, maxSlope * STEP);
@@ -470,10 +473,10 @@ export class World {
       this.scatter(d, densityAt(score) * lt.forestDensity, laneRel, pathHalf + jitter);
       // Line both edges so the path reads as a path.
       for (let side = -1; side <= 1; side += 2) {
-        if (Math.random() > lt.edgeChance) continue;
+        if (rand() > lt.edgeChance) continue;
         this.pickProp();
-        const x = laneRel + side * (pathHalf + jitter + this.propHit + Math.random() * 0.5);
-        this.placeProp(x, d + (Math.random() - 0.5) * STEP, true);
+        const x = laneRel + side * (pathHalf + jitter + this.propHit + rand() * 0.5);
+        this.placeProp(x, d + (rand() - 0.5) * STEP, true);
       }
       return;
     }
@@ -483,14 +486,14 @@ export class World {
     // Level 2: rock clusters, well clear of the lane.
     if (sub === 1 && d >= this.nextFeatureAt) {
       this.nextFeatureAt = d + range(lt.clusterSpacing);
-      const centre = (Math.random() * 2 - 1) * W;
+      const centre = (rand() * 2 - 1) * W;
       const size = Math.round(range(lt.clusterSize));
       for (let i = 0; i < size; i++) {
-        const r = 0.5 + Math.random() * 0.6;
-        const x = centre + (Math.random() - 0.5) * 4;
+        const r = 0.5 + rand() * 0.6;
+        const x = centre + (rand() - 0.5) * 4;
         // Cluster rocks spread ±2 units along the run, where the lane may have moved.
         if (Math.abs(wrap(x - laneRel)) < LANE + maxSlope * 2 + r * 0.8) continue;
-        this.obstacle(x + this.shipX, d + (Math.random() - 0.5) * 4, r, 0.6 + Math.random() * 1.2, true);
+        this.obstacle(x + this.shipX, d + (rand() - 0.5) * 4, r, 0.6 + rand() * 1.2, true);
       }
     }
   }
@@ -501,33 +504,33 @@ export class World {
     const tries = Math.ceil(expected * 2);
     const p = tries > 0 ? expected / tries : 0;
     for (let i = 0; i < tries; i++) {
-      if (Math.random() >= p) continue;
+      if (rand() >= p) continue;
       this.pickProp();
-      const x = (Math.random() * 2 - 1) * W;
+      const x = (rand() * 2 - 1) * W;
       if (Math.abs(wrap(x - laneRel)) < clear + this.propHit) continue;
-      this.placeProp(x, d + (Math.random() - 0.5) * STEP, true);
+      this.placeProp(x, d + (rand() - 0.5) * STEP, true);
     }
   }
 
   /** Choose the next open-ground prop's kind and size (sets propKind/propSize/propHit). */
   private pickProp(): void {
     const m = TH.land.mix;
-    const r = Math.random() * (m.mushroom + m.spire + m.rock + m.crystal);
+    const r = rand() * (m.mushroom + m.spire + m.rock + m.crystal);
     if (r < m.mushroom) {
       this.propKind = Prop.Mushroom;
-      this.propSize = 0.8 + Math.random() * 0.45;
+      this.propSize = 0.8 + rand() * 0.45;
       this.propHit = 0.2 * this.propSize;
     } else if (r < m.mushroom + m.spire) {
       this.propKind = Prop.Spire;
-      this.propSize = 0.8 + Math.random() * 0.4;
+      this.propSize = 0.8 + rand() * 0.4;
       this.propHit = 0.16 * this.propSize;
     } else if (r < m.mushroom + m.spire + m.rock) {
       this.propKind = Prop.Rock;
-      this.propSize = 0.5 + Math.random() * 0.6;
+      this.propSize = 0.5 + rand() * 0.6;
       this.propHit = 0.8 * this.propSize;
     } else {
       this.propKind = Prop.Crystal;
-      this.propSize = 0.8 + Math.random() * 0.5;
+      this.propSize = 0.8 + rand() * 0.5;
       this.propHit = 0.45 * this.propSize;
     }
   }
@@ -536,12 +539,12 @@ export class World {
   private placeProp(x: number, d: number, wraps: boolean): void {
     const s = this.propSize;
     const h = this.propHit;
-    const rot = Math.random() * Math.PI * 2;
+    const rot = rand() * Math.PI * 2;
     if (this.propKind === Prop.Rock) {
-      this.obstacleRocks.spawn(x, 0, d, s, (0.6 + Math.random()) / BOULDER_HEIGHT, s, rot, true, wraps, h, h);
+      this.obstacleRocks.spawn(x, 0, d, s, (0.6 + rand()) / BOULDER_HEIGHT, s, rot, true, wraps, h, h);
     } else {
       const field = this.propKind === Prop.Mushroom ? this.mushrooms : this.propKind === Prop.Spire ? this.spires : this.crystals;
-      field.spawn(x, 0, d, s, s * (0.85 + Math.random() * 0.3), s, rot, true, wraps, h, h);
+      field.spawn(x, 0, d, s, s * (0.85 + rand() * 0.3), s, rot, true, wraps, h, h);
     }
   }
   // --- shared path steering --------------------------------------------------
@@ -549,8 +552,8 @@ export class World {
   /** Wind the path centre; slope changes gradually so turns are smooth. */
   private steerCentre(d: number, maxSlope: number): void {
     if (d >= this.cxRetargetAt) {
-      this.cxTargetSlope = (Math.random() * 2 - 1) * maxSlope;
-      this.cxRetargetAt = d + 25 + Math.random() * 35;
+      this.cxTargetSlope = (rand() * 2 - 1) * maxSlope;
+      this.cxRetargetAt = d + 25 + rand() * 35;
     }
     const target = clamp(this.cxTargetSlope, -maxSlope, maxSlope);
     const turn = 0.012 * STEP;
@@ -571,7 +574,7 @@ export class World {
 
   private retargetOffset(d: number, maxOffset: number): void {
     if (d >= this.laneRetargetAt) {
-      this.laneTarget = (Math.random() * 2 - 1) * Math.max(0, maxOffset) * 0.8;
+      this.laneTarget = (rand() * 2 - 1) * Math.max(0, maxOffset) * 0.8;
       this.laneRetargetAt = d + range([TH.lane.retargetMin, TH.lane.retargetMax]);
     }
   }
@@ -595,19 +598,19 @@ export class World {
     // through, plus tall outer rocks for the canyon sides.
     for (let side = -1; side <= 1; side += 2) {
       for (let k = 0; k < 2; k++) {
-        const r = 0.9 + Math.random() * 0.8;
-        this.rock(this.cx + side * (hw + r * 0.65), d + k * STEP * 0.5, r, 1.6 + Math.random() * 2.6);
+        const r = 0.9 + rand() * 0.8;
+        this.rock(this.cx + side * (hw + r * 0.65), d + k * STEP * 0.5, r, 1.6 + rand() * 2.6);
       }
       for (let k = 0; k < 2; k++) {
-        const r = 1.5 + Math.random() * 2.2;
-        const off = hw + 2 + k * 6 + Math.random() * 6;
-        this.rock(this.cx + side * off, d + (Math.random() - 0.5) * STEP, r, 4 + Math.random() * 7);
+        const r = 1.5 + rand() * 2.2;
+        const off = hw + 2 + k * 6 + rand() * 6;
+        this.rock(this.cx + side * off, d + (rand() - 0.5) * STEP, r, 4 + rand() * 7);
       }
       // Crystals growing out of the canyon sides (scenery: behind the wall rocks, never hit).
-      if (Math.random() < c.wallCrystals) {
-        const s = 1.1 + Math.random() * 1.1;
-        const x = this.cx + side * (hw + 1.4 + Math.random() * 4) - this.shipX;
-        this.crystals.spawn(x, 0, d, s, s * (0.8 + Math.random() * 0.6), s, Math.random() * 6.28, false, false, 0, 0, false);
+      if (rand() < c.wallCrystals) {
+        const s = 1.1 + rand() * 1.1;
+        const x = this.cx + side * (hw + 1.4 + rand() * 4) - this.shipX;
+        this.crystals.spawn(x, 0, d, s, s * (0.8 + rand() * 0.6), s, rand() * 6.28, false, false, 0, 0, false);
       }
     }
 
@@ -619,27 +622,27 @@ export class World {
     if (sub === 0) {
       // Lone boulders.
       this.nextFeatureAt = d + range(c.loneBoulderSpacing);
-      const r = 0.9 + Math.random() * 0.5;
+      const r = 0.9 + rand() * 0.5;
       const x = this.offLane(hw - r, LANE + r * 0.8 + jitter);
-      if (x !== null) this.obstacle(x, d, r, 1.2 + Math.random() * 0.8);
-    } else if (sub === 1 || Math.random() < 0.3) {
+      if (x !== null) this.obstacle(x, d, r, 1.2 + rand() * 0.8);
+    } else if (sub === 1 || rand() < 0.3) {
       // Rockfall band across the path with one wide gap on the lane.
       this.nextFeatureAt = d + range(c.bandSpacing) * (sub === 2 ? 1.6 : 1);
       this.band(d, hw, c.bandGapWidth / 2 + jitter);
     } else {
       // Pillar slalom: one or two tall pillars off the lane.
       this.nextFeatureAt = d + range(c.pillarSpacing);
-      const count = Math.random() < 0.5 ? 1 : 2;
+      const count = rand() < 0.5 ? 1 : 2;
       for (let i = 0; i < count; i++) {
-        const r = 0.7 + Math.random() * 0.3;
+        const r = 0.7 + rand() * 0.3;
         const x = this.offLane(hw - r, LANE + r * 0.8 + jitter + 0.3);
         if (x === null) continue;
-        if (Math.random() < 0.5) {
-          this.obstacle(x, d + i * 3, r, 5 + Math.random() * 4);
+        if (rand() < 0.5) {
+          this.obstacle(x, d + i * 3, r, 5 + rand() * 4);
         } else {
           // Crystal spire instead of a rock pillar.
           const s = r * 1.5;
-          this.crystals.spawn(x - this.shipX, 0, d + i * 3, s, s * 1.4, s, Math.random() * 6.28, true, false, r * 0.8, r * 0.8);
+          this.crystals.spawn(x - this.shipX, 0, d + i * 3, s, s * 1.4, s, rand() * 6.28, true, false, r * 0.8, r * 0.8);
         }
       }
     }
@@ -648,16 +651,16 @@ export class World {
   /** A row of boulders across the canyon, leaving a gap of half-width `gapHalf` on the lane. */
   private band(d: number, hw: number, gapHalf: number): void {
     for (let x = this.cx - hw + 0.8; x < this.cx + hw - 0.5; x += 1.7) {
-      const r = 0.75 + Math.random() * 0.2;
+      const r = 0.75 + rand() * 0.2;
       if (Math.abs(x - this.lane) < gapHalf + r * 0.8) continue;
-      this.obstacle(x, d + (Math.random() - 0.5) * 0.6, r, 0.9 + Math.random() * 0.7);
+      this.obstacle(x, d + (rand() - 0.5) * 0.6, r, 0.9 + rand() * 0.7);
     }
   }
 
   /** Random x within cx ± halfRange at least `clear` from the lane, or null. */
   private offLane(halfRange: number, clear: number): number | null {
     for (let t = 0; t < 6; t++) {
-      const x = this.cx + (Math.random() * 2 - 1) * halfRange;
+      const x = this.cx + (rand() * 2 - 1) * halfRange;
       if (Math.abs(x - this.lane) >= clear) return x;
     }
     return null;
@@ -680,7 +683,7 @@ export class World {
     // towards the side the lane is already on, so it has less to cross).
     const plan = def.plan ? def.plan(base) : null;
     const towards = this.lane >= this.cx ? 1 : -1;
-    const side = plan && Math.random() < 0.25 ? -towards : towards;
+    const side = plan && rand() < 0.25 ? -towards : towards;
     let roomHw: number;
     if (plan) {
       roomHw = plan.halfWidth;
@@ -691,10 +694,10 @@ export class World {
     const offset = plan ? plan.offset : def.laneOffset ? def.laneOffset(base) : null;
 
     // Every room (and some corridors) shifts the centre line sideways: an S-bend.
-    const dir = Math.random() < 0.5 ? -1 : 1;
+    const dir = rand() < 0.5 ? -1 : 1;
     let shift = 0;
     if (id !== 'corridor') shift = dir * range(it.roomShift);
-    else if (jog && Math.random() < it.corridorJogChance) shift = dir * range(it.corridorJog);
+    else if (jog && rand() < it.corridorJogChance) shift = dir * range(it.corridorJog);
 
     // Tapers long enough for the lane to follow the shift and reach its
     // offset (or come back from its widest wander before the exit).
@@ -734,7 +737,7 @@ export class World {
     this.api.memo = 0;
     this.api.memo2 = 0;
     this.api.memoAt = d + taper;
-    this.api.seed = Math.random();
+    this.api.seed = rand();
     this.nextFeatureAt = d + taper + 4;
     this.framePending = true;
     this.logRoom(d, id);
@@ -921,16 +924,16 @@ export class World {
       // Hull panels from the door outwards.
       let x = door + 0.6;
       while (x < fc.width) {
-        const w = 2.5 + Math.random() * 5;
+        const w = 2.5 + rand() * 5;
         const h = range(fc.height);
-        const dep = 1.2 + Math.random() * 3;
+        const dep = 1.2 + rand() * 3;
         const px = cx + s * (x + w / 2);
         this.hullBox(px, 0, front + dep / 2, w, h, dep, true);
         // Rows of small windows on some panels.
-        if (Math.random() < 0.55) {
-          const rows = 1 + Math.floor(Math.random() * 3);
-          const colour = Math.random() < 0.6 ? Light.White : Light.Teal;
-          for (let k = 0; k < rows; k++) this.light(px, 3 + k * 2.2 + Math.random(), front - 0.03, w * 0.7, 0.18, 0.05, colour, false);
+        if (rand() < 0.55) {
+          const rows = 1 + Math.floor(rand() * 3);
+          const colour = rand() < 0.6 ? Light.White : Light.Teal;
+          for (let k = 0; k < rows; k++) this.light(px, 3 + k * 2.2 + rand(), front - 0.03, w * 0.7, 0.18, 0.05, colour, false);
         }
         x += w;
       }
@@ -943,18 +946,18 @@ export class World {
     }
     // Towers standing proud of the hull, with lit windows.
     for (let t = 0; t < Math.round(range(fc.towers)); t++) {
-      const s = Math.random() < 0.5 ? -1 : 1;
-      const w = 3 + Math.random() * 4;
-      const tx = cx + s * (door + 5 + Math.random() * (fc.width - door - 10));
-      const th = 20 + Math.random() * 14;
+      const s = rand() < 0.5 ? -1 : 1;
+      const w = 3 + rand() * 4;
+      const tx = cx + s * (door + 5 + rand() * (fc.width - door - 10));
+      const th = 20 + rand() * 14;
       this.hullBox(tx, 0, front + 1.5, w, th, 4, true);
-      for (let k = 0; k < 6; k++) this.light(tx, 6 + k * 2.6, front - 0.53, w * 0.6, 0.2, 0.05, Math.random() < 0.3 ? Light.Amber : Light.White, false);
+      for (let k = 0; k < 6; k++) this.light(tx, 6 + k * 2.6, front - 0.53, w * 0.6, 0.2, 0.05, rand() < 0.3 ? Light.Amber : Light.White, false);
     }
     // Antenna masts with red beacons.
     for (let m = 0; m < Math.round(range(fc.masts)); m++) {
-      const s = Math.random() < 0.5 ? -1 : 1;
-      const mx = cx + s * (door + 3 + Math.random() * (fc.width - door - 6));
-      const mh = 18 + Math.random() * 16;
+      const s = rand() < 0.5 ? -1 : 1;
+      const mx = cx + s * (door + 3 + rand() * (fc.width - door - 6));
+      const mh = 18 + rand() * 16;
       api.greeble(mx, 0, front + 1, 0.3, mh, 0.3, Decor.Steel);
       this.light(mx, mh, front + 1, 0.5, 0.5, 0.5, Light.Red, false);
     }
@@ -1033,7 +1036,7 @@ export class World {
       },
       slider(centre, amp, arriveX, d, width, h, depth) {
         const s = clamp((arriveX - centre) / amp, -1, 1);
-        const phase = Math.random() < 0.5 ? Math.asin(s) : Math.PI - Math.asin(s);
+        const phase = rand() < 0.5 ? Math.asin(s) : Math.PI - Math.asin(s);
         w.hull.setNextMotion(amp, CONFIG.themes.interior.rooms.pistons.travel, phase);
         w.hullBox(centre, 0, d, width, h, depth, true, true);
       },
@@ -1058,7 +1061,7 @@ export class World {
       },
       canister(x, d, colour, size) {
         w.canisters.nextColor = colour;
-        w.canisters.spawn(x - w.shipX, 0, d, size, size, size, Math.random() * 6.28, false, false, 0, 0, false);
+        w.canisters.spawn(x - w.shipX, 0, d, size, size, size, rand() * 6.28, false, false, 0, 0, false);
       },
       floorBegin() {
         w.floorN = 0;
@@ -1070,9 +1073,9 @@ export class World {
         w.floorN++;
       },
       tree(x, d, size) {
-        const field = Math.random() < 0.6 ? w.mushrooms : w.spires;
+        const field = rand() < 0.6 ? w.mushrooms : w.spires;
         const hit = (field === w.mushrooms ? 0.2 : 0.16) * size;
-        field.spawn(x - w.shipX, 0.35, d, size, size, size, Math.random() * Math.PI * 2, true, false, hit, hit);
+        field.spawn(x - w.shipX, 0.35, d, size, size, size, rand() * Math.PI * 2, true, false, hit, hit);
       },
       shuttle(x, d, flip) {
         const r = CONFIG.themes.interior.rooms.hangar.shuttleHalfWidth;
@@ -1122,11 +1125,11 @@ export class World {
 
   private obstacle(x: number, d: number, r: number, height: number, wraps = false): void {
     const hit = r * 0.8;
-    this.obstacleRocks.spawn(x - this.shipX, 0, d, r, height / BOULDER_HEIGHT, r, Math.random() * Math.PI * 2, true, wraps, hit, hit);
+    this.obstacleRocks.spawn(x - this.shipX, 0, d, r, height / BOULDER_HEIGHT, r, rand() * Math.PI * 2, true, wraps, hit, hit);
   }
 
   private rock(x: number, d: number, r: number, height: number): void {
     const hit = r * 0.8;
-    this.rocks.spawn(x - this.shipX, 0, d, r, height / BOULDER_HEIGHT, r, Math.random() * Math.PI * 2, true, false, hit, hit, false);
+    this.rocks.spawn(x - this.shipX, 0, d, r, height / BOULDER_HEIGHT, r, rand() * Math.PI * 2, true, false, hit, hit, false);
   }
 }
