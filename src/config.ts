@@ -516,6 +516,7 @@ export const CONFIG = {
   },
 
   ui: {
+    paletteFadeSeconds: 1.2, // palette cross-fade at each loop of the themes
     fadeMs: 200,
   },
 

@@ -34,6 +34,19 @@ export class LivePalette {
     this.text.set(p.text);
   }
 
+  /** The per-level colours part way from `a` to `b` (palette cross-fades). */
+  mix(a: LivePalette, b: LivePalette, t: number): void {
+    this.ground.lerpColors(a.ground, b.ground, t);
+    this.sky.lerpColors(a.sky, b.sky, t);
+    this.fog.lerpColors(a.fog, b.fog, t);
+    this.cubeLight.lerpColors(a.cubeLight, b.cubeLight, t);
+    this.cubeMid.lerpColors(a.cubeMid, b.cubeMid, t);
+    this.cubeDark.lerpColors(a.cubeDark, b.cubeDark, t);
+    this.ship.lerpColors(a.ship, b.ship, t);
+    this.shipShade.lerpColors(a.shipShade, b.shipShade, t);
+    this.text.lerpColors(a.text, b.text, t);
+  }
+
   copy(o: LivePalette): void {
     this.ground.copy(o.ground);
     this.sky.copy(o.sky);
