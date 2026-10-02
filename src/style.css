@@ -87,6 +87,25 @@ body {
   transform: none;
 }
 
+/* A band of sky colour behind the HUD text so bright ceiling lights inside
+   the ship can't wash it out. Matches the sky, so outdoors it's invisible. */
+#hud::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: calc(var(--safe-top) + 108px);
+  background: linear-gradient(to bottom, var(--sky, transparent) 55%, transparent);
+  opacity: 0.85;
+  pointer-events: none;
+}
+
+/* Lift the top row above the band (the other HUD pieces are already positioned). */
+.hud-top {
+  position: relative;
+}
+
 /* Text */
 
 .label {
