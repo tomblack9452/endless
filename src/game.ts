@@ -9,9 +9,12 @@ import { Player } from './player';
 import { Stage } from './renderer';
 import { Sky } from './sky';
 import { SpeedLines } from './speedLines';
+import { Trail } from './trail';
 import { cycle, DEFAULT_SETTINGS, LEVEL_GAIN, loadSettings, saveSettings, type SettingKey, STEERING_RANGE, TEXT_SCALE, TILT_GAIN } from './settings';
+import { Cosmetics, describe, UNLOCK_ORDER } from './cosmetics';
 import { Haptics } from './haptics';
 import { Hints } from './hints';
+import { Missions, type RunMetrics } from './missions';
 import { dailySeed, Progress } from './progress';
 import { newSeed } from './rng';
 import { loadNumber, saveNumber } from './storage';
@@ -26,6 +29,11 @@ const DEG = Math.PI / 180;
 export class Game {
   private readonly basePalette = new LivePalette(); // the level's palette
   private readonly palette = new LivePalette(); // after time of day, read by materials
+  // Palette cross-fade between theme loops.
+  private readonly fadeFrom = new LivePalette();
+  private readonly fadeTo = new LivePalette();
+  private fadeT = 1; // 1 = done
+  private paletteLoop = 0;
   private shownTextHex = -1;
   private shownPageHex = -1;
   private readonly stage: Stage;
@@ -34,6 +42,7 @@ export class Game {
   private readonly input: Input;
   private readonly speedLines: SpeedLines;
   private readonly sky: Sky;
+  private readonly trail: Trail;
   private readonly sound = new Sound();
   private readonly audio: AudioState = {
     playing: false,
@@ -57,7 +66,15 @@ export class Game {
   private scoreBase = 0; // checkpoint runs score from zero
   private pickupCount = 0;
   private recorded = false; // this run's stats are saved
-  private statsOpen = false;
+  private readonly cosmetics = new Cosmetics();
+  private readonly missions = new Missions();
+  /** Which info screen is open from the title (stats, missions, hangar), if any. */
+  private infoOpen: 'stats' | 'missions' | 'hangar' | null = null;
+  // Run metrics for missions.
+  private boostSeconds = 0;
+  private boosted = false;
+  private roomsEntered = 0;
+  private missionTimer = 0;
   private shownSky = -1;
   private runTime = 0; // seconds into the current run
 
@@ -103,6 +120,7 @@ export class Game {
     this.world = new World(this.stage.scene, this.palette, textures);
     this.player = new Player(this.stage.scene, this.palette);
     this.speedLines = new SpeedLines(this.stage.scene, this.palette);
+    this.trail = new Trail(this.stage.scene, this.palette);
     this.sky = new Sky(this.stage.scene);
     this.input = new Input(document.body);
     this.input.bindBoostControl(this.ui.boostControl);
@@ -130,6 +148,9 @@ export class Game {
 
     this.ui.bindTitleLinks(this.onTitleLink);
     void this.progress.load().then(() => this.refreshTitle());
+    this.ui.bindHangar(this.onHangar);
+    void this.missions.load();
+    void this.cosmetics.load().then(() => this.applyCosmetics());
     void loadSettings().then((s) => {
       this.settings = s;
       this.applySettings();
@@ -157,6 +178,12 @@ export class Game {
     this.scoreBase = opts.countFrom ? startScore : 0;
     this.pickupCount = 0;
     this.recorded = false;
+    this.boostSeconds = this.roomsEntered = this.missionTimer = 0;
+    this.boosted = false;
+    this.infoOpen = null;
+    this.paletteLoop = 0;
+    this.fadeT = 1;
+    this.applyCosmetics();
     this.world.reset(CONFIG.field.startClearance, true, startScore, seed);
     const level = Math.floor(startScore / CONFIG.score.levelLength) + 1;
     this.sound.ignite();
@@ -179,6 +206,8 @@ export class Game {
     this.speedLines.update(0, 0, 0);
     this.player.reset();
     this.player.setVisible(true);
+    this.trail.reset();
+    this.trail.setVisible(true);
     this.input.releaseAll();
     this.input.calibrate(); // however you're holding the phone now is straight ahead
     this.input.enabled = true;
@@ -213,6 +242,7 @@ export class Game {
       this.haptics.crash();
     }
     this.ui.hideCombo();
+    this.trail.setVisible(false);
     const isNewBest = this.score > this.best;
     if (isNewBest) {
       this.best = Math.floor(this.score);
@@ -222,6 +252,7 @@ export class Game {
     this.ui.setGameOver(this.score, this.best, isNewBest, this.nearMissCount, this.bestChain, this.seed);
     const where = themeForLevel(this.level) === 'interior' ? this.world.roomName || 'corridor' : themeName(this.level);
     this.ui.setGameOverExtra(this.finishRun(where));
+    this.ui.setGameOverMissions(this.missions.lines());
   }
 
   /** Save this run into the lifetime stats (once). Returns a line for the game-over screen. */
@@ -241,10 +272,85 @@ export class Game {
       },
       this.daily,
     );
+    for (const done of this.missions.endRun(this.metrics())) this.missionDone(done);
     this.refreshTitle();
     if (this.daily) return newDaily ? 'new daily best' : `daily best ${formatScore(this.progress.dailyBest)}`;
     if (this.scoreBase > 0) return `started at the ${themeName(this.fromLevel)}`;
     return '';
+  }
+
+  private metrics(): RunMetrics {
+    return {
+      level: this.level,
+      score: this.score,
+      nearMisses: this.nearMissCount,
+      bestChain: this.bestChain,
+      pickups: this.pickupCount,
+      boostSeconds: this.boostSeconds,
+      rooms: this.roomsEntered,
+      boosted: this.boosted,
+      daily: this.daily,
+    };
+  }
+
+  /** A mission is complete: say so and unlock the next cosmetic. */
+  private missionDone(text: string): void {
+    const u = this.cosmetics.unlockNext();
+    this.ui.showNotice(u ? `done: ${text}. unlocked ${describe(u)}` : `done: ${text}`);
+    this.sound.pickup();
+    this.haptics.level(false);
+  }
+
+  /** Ship shape, trail and the chosen palette (outside a run's later loops). */
+  private applyCosmetics(): void {
+    const c = this.cosmetics;
+    this.player.setShape(c.ship);
+    this.trail.setStyle(c.trail);
+    this.basePalette.set(PALETTES.find((p) => p.name === c.palette) ?? PALETTES[0]);
+    this.applyLook(this.distanceScore / CONFIG.score.levelLength);
+  }
+
+  /** Each loop of the themes fades the world to the next unlocked palette. */
+  private startPaletteFade(loop: number): void {
+    const list = this.cosmetics.palettes();
+    if (list.length < 2) return;
+    const name = list[(list.indexOf(this.cosmetics.palette) + loop) % list.length];
+    this.fadeFrom.copy(this.basePalette);
+    this.fadeTo.set(PALETTES.find((p) => p.name === name) ?? PALETTES[0]);
+    this.fadeT = 0;
+  }
+
+  private onHangar = (kind: 'ship' | 'trail' | 'palette'): void => {
+    this.cosmetics.cycle(kind);
+    this.applyCosmetics();
+    this.openHangar();
+  };
+
+  private openHangar(): void {
+    const c = this.cosmetics;
+    this.ui.renderHangar(
+      {
+        ship: [c.ship, c.ships().length],
+        trail: [c.trail, c.trails().length],
+        palette: [c.palette, c.palettes().length],
+      },
+      c.next() ? `missions unlock more (${c.unlocked} of ${UNLOCK_ORDER.length})` : 'everything unlocked',
+    );
+    // Show the ship over the title scene while choosing.
+    this.player.reset();
+    this.player.setVisible(true);
+    this.openInfo('hangar');
+  }
+
+  private openMissions(): void {
+    const next = this.cosmetics.next();
+    this.ui.renderMissions(this.missions.lines(), next ? `next unlock: ${describe(next)}` : 'everything unlocked');
+    this.openInfo('missions');
+  }
+
+  private openInfo(which: 'stats' | 'missions' | 'hangar'): void {
+    this.infoOpen = which;
+    this.ui.show(which);
   }
 
   /** Start a normal run from the chosen checkpoint (scoring from zero). */
@@ -265,6 +371,8 @@ export class Game {
   private onTitleLink = (name: string): void => {
     if (name === 'daily') this.startDaily();
     else if (name === 'stats') this.openStats();
+    else if (name === 'missions') this.openMissions();
+    else if (name === 'hangar') this.openHangar();
     else if (name === 'from') {
       const cps = this.progress.checkpoints();
       this.fromLevel = cps[(cps.indexOf(this.fromLevel) + 1) % cps.length];
@@ -297,8 +405,7 @@ export class Game {
       ['pickups', formatScore(s.pickups)],
       ['crash most in', worst ? `${worst} (${s.crashes[worst]})` : '-'],
     ]);
-    this.statsOpen = true;
-    this.ui.show('stats');
+    this.openInfo('stats');
   }
 
   private pause(): void {
@@ -320,7 +427,7 @@ export class Game {
   }
 
   private onTap = (): void => {
-    if (this.settingsOpen || this.statsOpen) return;
+    if (this.settingsOpen || this.infoOpen) return;
     switch (this.state) {
       case 'title':
         this.startNormal();
@@ -336,6 +443,7 @@ export class Game {
     if ((e.code === 'Space' || e.code === 'Enter') && this.state !== 'paused') this.onTap();
     else if (e.code === 'Escape' || e.code === 'KeyP') {
       if (this.settingsOpen) this.closeSettings();
+      else if (this.infoOpen) this.closeInfo();
       else if (this.state === 'playing') this.pause();
       else if (this.state === 'paused') this.resume();
     }
@@ -353,12 +461,16 @@ export class Game {
     else if (action === 'settings') this.openSettings();
     else if (action === 'menu') this.toMainMenu();
     else if (action === 'back') {
-      if (this.statsOpen) {
-        this.statsOpen = false;
-        this.ui.show('title');
-      } else this.closeSettings();
+      if (this.infoOpen) this.closeInfo();
+      else this.closeSettings();
     }
   };
+
+  private closeInfo(): void {
+    if (this.infoOpen === 'hangar' && this.state === 'title') this.player.setVisible(false);
+    this.infoOpen = null;
+    this.ui.show('title');
+  }
 
   private onSetting = (key: SettingKey): void => {
     cycle(this.settings, key);
@@ -410,6 +522,10 @@ export class Game {
     this.speedLines.update(0, 0, 0);
     this.player.reset(); // clears any crash pieces or fall
     this.player.setVisible(false);
+    this.trail.setVisible(false);
+    this.fadeT = 1;
+    this.paletteLoop = 0;
+    this.applyCosmetics();
     this.world.reset(0, false);
     this.level = 1;
     this.applyLook(0);
@@ -469,6 +585,10 @@ export class Game {
   /** Apply time of day for `levelProgress` (score / levelLength) to every material and the UI. */
   private applyLook(levelProgress: number): void {
     const w = this.world;
+    if (this.fadeT < 1) {
+      this.fadeT = Math.min(1, this.fadeT + 1 / 60 / CONFIG.ui.paletteFadeSeconds);
+      this.basePalette.mix(this.fadeFrom, this.fadeTo, this.fadeT * this.fadeT * (3 - 2 * this.fadeT));
+    }
     applyAtmosphere(this.basePalette, this.palette, levelProgress, w.canyonMix, w.interiorMix, w.deckMix, this.settings.contrast);
     // Stars: full over the deck, faint outside at night.
     const sky = this.palette.sky;
@@ -524,6 +644,11 @@ export class Game {
     const speed = this.currentSpeed();
     this.player.update(dt, this.input.steering(), lateralSpeedAt(speed), this.boostLevel * CONFIG.boost.shipPitchDeg * DEG);
     this.speedLines.update(dt, speed, this.settings.reduceMotion ? 0 : this.boostLevel);
+    this.trail.update(this.player.lateral * dt, speed * dt, -this.player.steer * CONFIG.ship.maxBankDeg * DEG);
+    if (this.boosting) {
+      this.boostSeconds += dt;
+      this.boosted = true;
+    }
 
     const prev = this.world.distance;
     this.world.advance(dt, speed, this.player.lateral);
@@ -553,6 +678,11 @@ export class Game {
       this.ui.announceLevel(level, themeName(level));
       this.sound.level(themeChange, themeForLevel(level));
       this.haptics.level(themeChange);
+      const loop = Math.floor((level - 1) / (CONFIG.themes.levelsPerTheme * 3));
+      if (loop !== this.paletteLoop) {
+        this.paletteLoop = loop;
+        this.startPaletteFade(loop);
+      }
     }
     this.ui.setProgress(progress - (level - 1));
     this.applyLook(progress);
@@ -566,12 +696,20 @@ export class Game {
     this.updateNearMisses(dt, prev);
     if (this.world.roomName !== this.shownRoom) {
       // A doorway: name the room (corridors have no name) and hiss.
-      if (this.world.roomName) this.ui.showRoom(this.world.roomName);
+      if (this.world.roomName) {
+        this.ui.showRoom(this.world.roomName);
+        this.roomsEntered++;
+      }
       if (this.world.interiorMix > 0.5) this.sound.door();
       this.shownRoom = this.world.roomName;
     }
     this.score = this.distanceScore - this.scoreBase + this.bonus;
     this.ui.setScore(this.score);
+    this.missionTimer += dt;
+    if (this.missionTimer > 0.5) {
+      this.missionTimer = 0;
+      for (const done of this.missions.check(this.metrics())) this.missionDone(done);
+    }
 
     this.updateCamera(dt);
     this.sky.update(dt);

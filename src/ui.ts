@@ -1,7 +1,7 @@
 import { CONFIG } from './config';
 import { label, type SettingKey, type Settings } from './settings';
 
-export type ScreenName = 'title' | 'paused' | 'over' | 'settings' | 'stats';
+export type ScreenName = 'title' | 'paused' | 'over' | 'settings' | 'stats' | 'missions' | 'hangar';
 
 const fmt = new Intl.NumberFormat('en-US');
 
@@ -47,7 +47,13 @@ export class UI {
     over: $('screen-over'),
     settings: $('screen-settings'),
     stats: $('screen-stats'),
+    missions: $('screen-missions'),
+    hangar: $('screen-hangar'),
   };
+  private readonly missionsRows = $('missions-rows');
+  private readonly missionsNext = $('missions-next');
+  private readonly hangarCount = $('hangar-count');
+  private readonly overMissions = $('over-missions');
   private readonly statsRows = $('stats-rows');
   private readonly overExtra = $('over-extra');
   readonly titleSettings = $('title-settings');
@@ -191,7 +197,46 @@ export class UI {
   }
 
   renderStats(rows: [string, string][]): void {
-    this.statsRows.replaceChildren(
+    this.fillRows(this.statsRows, rows);
+  }
+
+  /** Missions screen: each mission with its progress, and what the next one unlocks. */
+  renderMissions(rows: [string, string][], next: string): void {
+    this.fillRows(this.missionsRows, rows);
+    this.missionsNext.textContent = next;
+  }
+
+  /** Mission progress under the game-over score. */
+  setGameOverMissions(rows: [string, string][]): void {
+    this.overMissions.replaceChildren(
+      ...rows.map(([text, prog]) => {
+        const line = document.createElement('div');
+        line.textContent = `${text}  ${prog}`;
+        return line;
+      }),
+    );
+  }
+
+  bindHangar(onPick: (kind: 'ship' | 'trail' | 'palette') => void): void {
+    for (const el of document.querySelectorAll<HTMLElement>('[data-hangar]')) {
+      el.addEventListener('pointerdown', (e) => e.stopPropagation());
+      el.addEventListener('click', () => onPick(el.dataset.hangar as 'ship' | 'trail' | 'palette'));
+    }
+  }
+
+  /** Hangar values; a choice with only one option unlocked is shown dimmed. */
+  renderHangar(values: Record<'ship' | 'trail' | 'palette', [string, number]>, count: string): void {
+    for (const el of document.querySelectorAll<HTMLElement>('[data-hangar]')) {
+      const [name, options] = values[el.dataset.hangar as 'ship' | 'trail' | 'palette'];
+      const value = el.querySelector('.value');
+      if (value) value.textContent = options > 1 ? `${name} (${options})` : name;
+      el.classList.toggle('locked', options < 2);
+    }
+    this.hangarCount.textContent = count;
+  }
+
+  private fillRows(into: HTMLElement, rows: [string, string][]): void {
+    into.replaceChildren(
       ...rows.map(([k, v]) => {
         const row = document.createElement('div');
         row.className = 'stat-row';

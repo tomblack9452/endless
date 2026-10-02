@@ -662,9 +662,9 @@ body {
 
 .title-links {
   display: flex;
-  flex-direction: column;
+  flex-wrap: wrap;
   align-items: flex-start;
-  gap: 4px;
+  gap: 0 4px;
   margin: 6px 0 12px;
 }
 
@@ -675,6 +675,15 @@ body {
 .title-links .link {
   padding: 8px 16px 8px 0;
   margin: 0;
+}
+
+.over-missions {
+  margin-top: 0.8em;
+  line-height: 1.7;
+}
+
+.setting-row.locked {
+  opacity: 0.5;
 }
 
 .stat-row {
