@@ -1,5 +1,6 @@
 import { BufferGeometry, type Color, InstancedBufferAttribute, InstancedMesh, type Material, Scene } from 'three';
 import { CONFIG } from './config';
+import { terrain } from './terrain';
 
 // A pool of instances of one mesh (blocks, hull plates, rocks, light strips).
 // Positions are stored relative to the ship laterally (the ship always sits
@@ -279,6 +280,8 @@ export class InstancedField {
   /** Write instance matrices for every active instance. */
   sync(distance: number): void {
     const a = this.mesh.instanceMatrix.array as Float32Array;
+    const hills = terrain.amp !== 0;
+    const h0 = hills ? terrain.heightAt(distance) : 0;
     let n = 0;
     for (let i = 0; i < this.max; i++) {
       if (!this.active[i]) continue;
@@ -297,7 +300,7 @@ export class InstancedField {
       a[o + 9] = 0;
       a[o + 10] = c * sz;
       a[o + 12] = this.x[i];
-      a[o + 13] = this.y[i];
+      a[o + 13] = hills ? this.y[i] + terrain.heightAt(this.d[i]) - h0 : this.y[i];
       a[o + 14] = distance - this.d[i];
       if (this.colorTable) {
         const col = this.colorTable[this.colorIdx[i]];

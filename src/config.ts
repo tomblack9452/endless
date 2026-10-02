@@ -469,6 +469,17 @@ export const CONFIG = {
     },
   },
 
+  // Rolling hills on open ground (see terrain.ts). Looks only: collision is flat.
+  terrain: {
+    amplitude: 1.6,
+    freqA: 0.045, // two waves, ~140 and ~57 units long
+    freqB: 0.11,
+    fade: 80, // units to fade in and out at each end of a theme
+    flatEdge: 40, // flat this far into and before the end of a theme
+    shipPitch: 0.6, // how much the ship noses up and down with the slope
+    shade: 2.5, // ground brightness change per unit of slope
+  },
+
   // Biomes (see biomes.ts): outdoor looks that rotate in each loop of the themes.
   biomes: {
     // Prop mixes for open ground by biome (relative chances).
