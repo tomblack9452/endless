@@ -132,6 +132,20 @@ export function shuttle(): BufferGeometry {
   ]);
 }
 
+/**
+ * Pipe segment: an 8-sided cylinder running along z, radius 1 and length 1,
+ * centred. Shading only; instance colours give it copper, steel and so on.
+ */
+export function pipeSegment(): BufferGeometry {
+  return build([part(new CylinderGeometry(1, 1, 1, 8, 1, true), '#ffffff', (m) => m.makeRotationX(Math.PI / 2))]);
+}
+
+/** Unit box standing on y = 0 with baked shading: panels, ducts, uprights, vents. */
+export function greebleBox(): BufferGeometry {
+  const box = new CylinderGeometry(Math.SQRT1_2, Math.SQRT1_2, 1, 4, 1);
+  return build([part(box, '#ffffff', (m) => m.makeRotationY(Math.PI / 4), move(0, 0.5, 0))]);
+}
+
 /** Boulder: jittered icosahedron, shading only (the material gives it its colour). */
 export function boulder(): BufferGeometry {
   const g = new IcosahedronGeometry(1, 1);

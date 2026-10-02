@@ -117,6 +117,17 @@ export const CONFIG = {
     far: 400,
   },
 
+  // Deep space over the observation deck (and faintly outside at night):
+  // a spiral galaxy, stars and the odd shooting star.
+  space: {
+    sky: '#10141d',
+    fog: '#1b2130',
+    stars: 420,
+    nightStars: 0.55, // star visibility outside at full night
+    galaxy: { x: 70, y: 115, z: -360, size: 175, tilt: 0.45 },
+    shootingEvery: [1.8, 5], // seconds between shooting stars
+  },
+
   // Ringed planet low in the sky (hidden inside the ship).
   planet: {
     x: -62,
@@ -209,6 +220,9 @@ export const CONFIG = {
     maxCrystals: 700,
     maxPickups: 16,
     maxShuttles: 120,
+    maxPipes: 2600,
+    maxGreebles: 2600,
+    maxVoids: 400,
     // Cubes per 100 square units, on the same capped curve as speed.
     // Rough density at the start of: L1 0.35, L5 0.52, L10 0.68, L20 0.87, cap 1.05.
     densityStart: 0.35,
@@ -349,7 +363,23 @@ export const CONFIG = {
       sizeVariation: [0.7, 1.6], // each room's extra width is scaled by a random factor in this range
       heightVariation: [0.85, 1.25],
       wanderExtra: 3, // how far beyond corridor width the lane may wander in wide rooms
-      lights: { amber: '#e3a35c', teal: '#7cc6bd', red: '#d46a5c' },
+      lights: { amber: '#e3a35c', teal: '#7cc6bd', red: '#d46a5c', dark: '#1f2226', green: '#8fc77a' },
+      // Wall dressing colours (pipes and greebles share this table).
+      decor: {
+        steel: '#8e959c',
+        copper: '#b27b52',
+        teal: '#5e8e8a',
+        red: '#9b4c44',
+        dark: '#2b2f34',
+        yellow: '#c9a03c',
+        panel: '#5a6068',
+        green: '#5f7d55',
+      },
+      pitDepth: 6, // how far the floor drops away in pits
+      void: '#07090c', // pit bottom
+      railHeight: 0.9, // catwalk railings
+      // Exterior hull the canyon runs into.
+      facade: { width: 46, height: [12, 22], towers: [3, 5], masts: [2, 4] },
       rooms: {
         cargo: { weight: 3, minSub: 0, length: [60, 100], extraWidth: 3.8, height: 4.4, rowSpacing: [7, 10], pitch: 3.2, fill: 0.45, fillRampPoints: 40000 },
         servers: { weight: 3, minSub: 0, length: [55, 90], extraWidth: 2.4, height: 3.8, rowSpacing: [9, 12], pitch: 2.9, rackLength: 4 },
@@ -360,6 +390,8 @@ export const CONFIG = {
         uneven: { weight: 2, minSub: 1, length: [55, 90], dividerHalf: 0.55, narrowExtra: 0.5, wideExtra: 2.2, crates: 1.1 },
         islands: { weight: 3, minSub: 1, length: [70, 110], extraWidth: 6, height: 4.6, spacing: [8, 13], width: [1.2, 3.6], islandLength: [4, 11] },
         chicane: { weight: 2, minSub: 2, length: [100, 150], extraWidth: 2.4, swing: 0.75, segment: 22 },
+        gantry: { weight: 3, minSub: 1, length: [70, 110], extraWidth: 5, height: 6, catwalkHalf: 1.5, sideWalks: [14, 22], sideLength: [8, 18] },
+        breach: { weight: 3, minSub: 0, length: [60, 100], extraWidth: 2.5, height: 4, holeSpacing: [9, 15], holeWidth: [1.6, 4.5], holeLength: [3, 8] },
         hydroponics: { weight: 2, minSub: 0, length: [60, 100], extraWidth: 4.5, height: 6.2, rowSpacing: [8, 12], pitch: 3.6, fill: 0.6 },
         lasers: { weight: 3, minSub: 1, length: [50, 80], extraWidth: 0.9, gateSpacing: [11, 15], gapWidth: 2.9 },
         reactor: { weight: 2, minSub: 1, length: [55, 80], extraWidth: 6, height: 6, coreHalf: 2.2, pylonSpacing: [14, 20] },
