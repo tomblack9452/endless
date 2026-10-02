@@ -680,7 +680,8 @@ export class Game {
     // Nose up and down with the hills ahead.
     const dist = this.world.distance;
     const slope = (terrain.heightAt(dist + 6) - terrain.heightAt(dist)) / 6;
-    const pitch = this.boostLevel * CONFIG.boost.shipPitchDeg * DEG + Math.atan(slope) * CONFIG.terrain.shipPitch;
+    // Positive pitch dips the nose, so climbing subtracts.
+    const pitch = this.boostLevel * CONFIG.boost.shipPitchDeg * DEG - Math.atan(slope) * CONFIG.terrain.shipPitch;
     this.player.update(dt, this.input.steering(), lateralSpeedAt(speed), pitch);
     this.speedLines.update(dt, speed, this.settings.reduceMotion ? 0 : this.boostLevel);
     this.trail.update(this.player.lateral * dt, speed * dt, -this.player.steer * CONFIG.ship.maxBankDeg * DEG);
