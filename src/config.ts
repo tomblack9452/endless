@@ -173,6 +173,11 @@ export const CONFIG = {
     response: 9, // how fast lateral speed reaches its target
     keyRamp: 7, // how fast keyboard steering ramps to full
     dragRangeFraction: 0.14, // finger travel (fraction of screen width) for full steer
+    tilt: {
+      deadzoneDeg: 3, // lean ignored either side of neutral
+      fullTiltDeg: 16, // lean (beyond the deadzone) for full steer at medium sensitivity
+      smoothing: 14, // higher = snappier response to the phone
+    },
   },
 
   // Difficulty rises continuously with score and levels off at a cap:
