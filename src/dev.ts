@@ -13,6 +13,7 @@ const LEVELS = CONFIG.themes.levelsPerTheme * 4; // four full theme loops
 let forcedRoom: RoomId | null = null; // shared by both panels
 
 export function installDevPanel(game: Game): void {
+  installFps(game);
   // On the title and on the game-over screen (there's no way back to the title after a crash).
   for (const id of ['screen-title', 'screen-over']) {
     const screen = document.getElementById(id);
@@ -91,4 +92,25 @@ function install(game: Game, title: HTMLElement): void {
   renderRoom();
   renders.push(renderRoom);
   panel.appendChild(roomBtn);
+}
+
+/** Small FPS / render scale / draw call readout, bottom-left above the boost text. */
+function installFps(game: Game): void {
+  const el = document.createElement('div');
+  el.className = 'label dev-fps';
+  document.getElementById('ui')?.appendChild(el);
+  let frames = 0;
+  let last = performance.now();
+  const tick = (now: number) => {
+    frames++;
+    if (now - last >= 500) {
+      const fps = Math.round((frames * 1000) / (now - last));
+      const s = game.devStats();
+      el.textContent = `${fps} fps  x${s.ratio.toFixed(2)}  ${s.calls} calls`;
+      frames = 0;
+      last = now;
+    }
+    requestAnimationFrame(tick);
+  };
+  requestAnimationFrame(tick);
 }

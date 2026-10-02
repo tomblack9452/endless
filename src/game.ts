@@ -296,6 +296,11 @@ export class Game {
     this.lastTime = performance.now();
   }
 
+  /** Dev: renderer stats for the FPS readout. */
+  devStats(): { ratio: number; calls: number } {
+    return { ratio: this.stage.pixelRatio, calls: this.stage.renderer.info.render.calls };
+  }
+
   /** Dev: force every interior room to be `id` (null = random). */
   devSetRoom(id: RoomId | null): void {
     this.world.devRoom = id;
@@ -311,6 +316,7 @@ export class Game {
 
   private frame = (now: number): void => {
     requestAnimationFrame(this.frame);
+    if (this.state === 'playing' || this.state === 'title') this.stage.adapt(now - this.lastTime);
     const dt = Math.max(0, Math.min((now - this.lastTime) / 1000, 1 / 20));
     this.lastTime = now;
 

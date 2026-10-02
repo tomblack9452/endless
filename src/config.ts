@@ -93,6 +93,15 @@ export const PALETTES: Palette[] = [
 export const CONFIG = {
   render: {
     maxPixelRatio: 2,
+    // Adaptive resolution: if frames run slow, render at a lower scale; step
+    // back up when there's headroom. Frame times are averaged first.
+    adaptive: true,
+    minPixelRatio: 0.85,
+    pixelRatioStep: 0.25,
+    slowFrameMs: 21, // average frame time that counts as struggling (~48 fps)
+    fastFrameMs: 14.5, // ...and as comfortable (~69 fps)
+    slowForMs: 1200, // struggling this long: step down
+    fastForMs: 6000, // comfortable this long: step up
     // Widest play area as width / height. Wider screens (desktop, landscape)
     // get a centred column so the game plays the same as on a phone.
     maxAspect: 0.75,

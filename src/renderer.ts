@@ -36,6 +36,12 @@ export class Stage {
   private readonly planetMat: MeshBasicMaterial;
   private readonly ringMat: MeshBasicMaterial;
   private planetVisible = 1;
+  // Adaptive resolution state.
+  private maxRatio = 1;
+  private ratio = 1;
+  private frameAvg = 16.7;
+  private slowFor = 0;
+  private fastFor = 0;
   private readonly ground: Mesh;
   private underfloor = 0; // inside the ship: ground drops away and turns black
 
@@ -55,7 +61,9 @@ export class Stage {
       antialias: CONFIG.render.antialias,
       powerPreference: 'high-performance',
     });
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, CONFIG.render.maxPixelRatio));
+    this.maxRatio = Math.min(window.devicePixelRatio || 1, CONFIG.render.maxPixelRatio);
+    this.ratio = this.maxRatio;
+    this.renderer.setPixelRatio(this.ratio);
 
     const c = CONFIG.camera;
     // The camera looks dead level; a vertical lens shift (view offset) moves the
@@ -105,6 +113,33 @@ export class Stage {
     this.ringMat.color.copy(PLANET_RING).lerp(this.palette.sky, P.skyBlend);
     this.planetMat.opacity = this.planetVisible;
     this.ringMat.opacity = this.planetVisible * P.ringOpacity;
+  }
+
+  /** Current render scale (device pixels per CSS pixel). */
+  get pixelRatio(): number {
+    return this.ratio;
+  }
+
+  /**
+   * Feed the real frame time; lowers the render scale when frames run slow
+   * and raises it again when there's headroom. Ignores stalls (tab switches).
+   */
+  adapt(frameMs: number): void {
+    const R = CONFIG.render;
+    if (!R.adaptive || frameMs > 100) return;
+    this.frameAvg += (frameMs - this.frameAvg) * 0.05;
+    this.slowFor = this.frameAvg > R.slowFrameMs ? this.slowFor + frameMs : 0;
+    this.fastFor = this.frameAvg < R.fastFrameMs ? this.fastFor + frameMs : 0;
+    let next = this.ratio;
+    if (this.slowFor > R.slowForMs) next = Math.max(R.minPixelRatio, this.ratio - R.pixelRatioStep);
+    else if (this.fastFor > R.fastForMs) next = Math.min(this.maxRatio, this.ratio + R.pixelRatioStep);
+    if (next !== this.ratio) {
+      this.ratio = next;
+      this.renderer.setPixelRatio(next);
+      this.resize();
+      this.slowFor = this.fastFor = 0;
+      this.frameAvg = 16.7;
+    }
   }
 
   /**
