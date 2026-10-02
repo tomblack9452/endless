@@ -456,6 +456,36 @@ body {
   animation: room-label 4000ms ease-out both;
 }
 
+/* First-run hints: between the horizon and the ship, above the combo. */
+.hint {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  text-align: center;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.hint.show {
+  animation: hint 3600ms ease-out both;
+}
+
+@keyframes hint {
+  0% {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  10%,
+  80% {
+    opacity: 0.9;
+    transform: none;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
 /* Near-miss chain: sits between the horizon and the ship. */
 .combo {
   position: absolute;
