@@ -21,6 +21,8 @@ export class LivePalette {
   readonly pickup = new Color(CONFIG.boost.pickup.color);
   // Brightness for props whose hues are baked in (trees, crystals): white by day.
   readonly light = new Color(1, 1, 1);
+  // Multiplied onto the structure's materials: white normally, red in a red alert.
+  readonly alert = new Color(1, 1, 1);
 
   set(p: Palette): void {
     this.ground.set(p.ground);
@@ -62,6 +64,7 @@ export class LivePalette {
     this.obstacle.copy(o.obstacle);
     this.pickup.copy(o.pickup);
     this.light.copy(o.light);
+    this.alert.copy(o.alert);
   }
 
   textCss(): string {

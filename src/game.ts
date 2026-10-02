@@ -11,6 +11,7 @@ import { Sky } from './sky';
 import { SpeedLines } from './speedLines';
 import { Trail } from './trail';
 import { cycle, DEFAULT_SETTINGS, LEVEL_GAIN, loadSettings, saveSettings, type SettingKey, STEERING_RANGE, TEXT_SCALE, TILT_GAIN } from './settings';
+import { EVENT_NOTICE, Events } from './events';
 import { Cosmetics, describe, UNLOCK_ORDER } from './cosmetics';
 import { Haptics } from './haptics';
 import { Hints } from './hints';
@@ -45,6 +46,7 @@ export class Game {
   private readonly speedLines: SpeedLines;
   private readonly sky: Sky;
   private readonly trail: Trail;
+  private readonly events: Events;
   private readonly sound = new Sound();
   private readonly audio: AudioState = {
     playing: false,
@@ -131,6 +133,7 @@ export class Game {
     this.player = new Player(this.stage.scene, this.palette);
     this.speedLines = new SpeedLines(this.stage.scene, this.palette);
     this.trail = new Trail(this.stage.scene, this.palette);
+    this.events = new Events(this.stage.scene);
     this.sky = new Sky(this.stage.scene);
     this.input = new Input(document.body);
     this.input.bindBoostControl(this.ui.boostControl);
@@ -219,6 +222,7 @@ export class Game {
     this.player.setVisible(true);
     this.trail.reset();
     this.trail.setVisible(true);
+    this.events.clear();
     this.input.releaseAll();
     this.input.calibrate(); // however you're holding the phone now is straight ahead
     this.input.enabled = true;
@@ -254,6 +258,7 @@ export class Game {
     }
     this.ui.hideCombo();
     this.trail.setVisible(false);
+    this.sound.setWind(0);
     this.player.setShield(false);
     this.ui.setPower('');
     const isNewBest = this.score > this.best;
@@ -537,6 +542,8 @@ export class Game {
     this.player.reset(); // clears any crash pieces or fall
     this.player.setVisible(false);
     this.trail.setVisible(false);
+    this.events.clear();
+    this.sound.setWind(0);
     this.fadeT = 1;
     this.paletteLoop = 0;
     this.applyCosmetics();
@@ -604,6 +611,8 @@ export class Game {
       this.basePalette.mix(this.fadeFrom, this.fadeTo, this.fadeT * this.fadeT * (3 - 2 * this.fadeT));
     }
     applyAtmosphere(this.basePalette, this.palette, levelProgress, w.canyonMix, w.interiorMix, w.deckMix, this.settings.contrast);
+    if (!this.settings.contrast) this.events.tint(this.palette);
+    this.stage.fog.density = CONFIG.fog.density * this.events.fogScale();
     // Stars: full over the deck, faint outside at night.
     const sky = this.palette.sky;
     const daylight = Math.pow(0.2126 * sky.r + 0.7152 * sky.g + 0.0722 * sky.b, 1 / 2.2);
@@ -680,6 +689,7 @@ export class Game {
     const power = this.world.collectPower(prev);
     if (power >= 0) this.gainPower(power as PowerKind);
     this.updatePowers(dt);
+    this.updateEvents(dt, speed * dt);
     this.ui.setBoost(this.boostMeter, this.boostMeter >= CONFIG.boost.minToStart, this.boosting);
 
     const distancePoints = (this.world.distance - this.runStart) * CONFIG.score.pointsPerUnit;
@@ -695,6 +705,7 @@ export class Game {
       this.ui.announceLevel(level, themeName(level));
       this.sound.level(themeChange, themeForLevel(level));
       this.haptics.level(themeChange);
+      this.maybeStartEvent(level);
       const loop = Math.floor((level - 1) / (CONFIG.themes.levelsPerTheme * 3));
       if (loop !== this.paletteLoop) {
         this.paletteLoop = loop;
@@ -827,6 +838,29 @@ export class Game {
   private currentSpeed(): number {
     const slow = 1 - (1 - CONFIG.powers.slow.factor) * this.slowLevel;
     return this.speed * (1 + (CONFIG.boost.speedMultiplier - 1) * this.boostLevel) * slow;
+  }
+
+  /** As the middle level of a theme begins, maybe start its event (same per seed). */
+  private maybeStartEvent(level: number): void {
+    if ((level - 1) % CONFIG.themes.levelsPerTheme !== 1) return;
+    const roll = (Math.imul(this.seed ^ level, 2654435761) >>> 0) / 4294967296;
+    if (roll >= CONFIG.events.chance) return;
+    const kind = Events.forTheme(themeForLevel(level));
+    this.events.start(kind);
+    this.ui.showNotice(EVENT_NOTICE[kind]);
+  }
+
+  private updateEvents(dt: number, dz: number): void {
+    const ev = this.events;
+    // An event ends early if the theme changes under it.
+    const allowed = ev.kind === 'none' || Events.forTheme(themeForLevel(this.level)) === ev.kind;
+    ev.update(dt, dz, allowed);
+    if (ev.impact !== null) {
+      this.sound.impact(ev.impact);
+      this.haptics.pickup();
+    }
+    if (ev.alarm) this.sound.alarm();
+    this.sound.setWind(ev.kind === 'sandstorm' ? ev.amount : 0);
   }
 
   private gainPower(kind: PowerKind): void {

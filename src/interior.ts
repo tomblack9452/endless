@@ -26,6 +26,7 @@ export type RoomId =
   | 'reactor'
   | 'pistons'
   | 'hangar'
+  | 'collapse'
   | 'gantry'
   | 'breach';
 
@@ -98,6 +99,10 @@ export interface RoomAPI {
   slider(centre: number, amp: number, arriveX: number, d: number, w: number, h: number, depth: number): void;
   light(x: number, y: number, d: number, w: number, h: number, depth: number, colour: Light, solid?: boolean): void;
   shuttle(x: number, d: number, flip: boolean): void;
+  /** Blast door across the room at d, closing as you approach to leave a gap at `gapX`. */
+  door(d: number, gapX: number, gapHalf: number): void;
+  /** Solid debris that falls from the ceiling, landing `landAhead` before you reach it. */
+  debris(x: number, d: number, w: number, h: number, depth: number, landAhead: number): void;
   /** Alien tree (trunk collides) for the hydroponics bay. */
   tree(x: number, d: number, size: number): void;
 }
@@ -505,6 +510,12 @@ export const ROOMS: Record<RoomId, RoomDef> = {
     wander: 0.2,
     enclosure: 1,
     build(api) {
+      // Set piece: blast doors near the end close down to the lane as you arrive.
+      if (api.progress > R.hangar.doorAt && api.memo2 === 0) {
+        api.memo2 = 1;
+        api.door(api.d, api.lane, LANE + R.hangar.doorGap);
+        return;
+      }
       // Dashed taxi line along the lane.
       if (Math.floor(api.d / 2.2) % 2 === 0) api.light(api.lane, 0.01, api.d, 0.12, 0.01, 1.3, Light.Amber);
       if (!api.due(R.hangar.rowSpacing)) return;
@@ -513,6 +524,39 @@ export const ROOMS: Record<RoomId, RoomDef> = {
       for (let x = api.cx - api.hw + 2 + shift; x < api.cx + api.hw - 1.8; x += pitch) {
         if (rand() > R.hangar.fill || !api.clearOf(x, R.hangar.shuttleHalfWidth)) continue;
         api.shuttle(x, api.d, rand() < 0.3);
+      }
+    },
+  },
+
+  // Set piece: the reactor is coming apart. Debris crashes down off the lane as
+  // you approach and the core lights run red. The lane stays clear throughout.
+  collapse: {
+    name: 'reactor collapse',
+    extraWidth: () => R.collapse.extraWidth,
+    height: R.reactor.height,
+    ceiling: true,
+    windows: false,
+    light: Light.Red,
+    wander: 0,
+    enclosure: 1,
+    laneOffset: () => R.reactor.coreHalf + LANE + 1.2,
+    build(api) {
+      const ch = R.reactor.coreHalf;
+      if (api.progress > 0.12 && api.progress < 0.88) {
+        api.box(api.cx, 0, api.d, ch * 2, api.H - 0.4, 2.32, true, false);
+        if (Math.floor(api.d / 2.2) % 2 === 0) api.light(api.cx, 1.2, api.d, ch * 2 + 0.06, 0.16, 0.4, Light.Red);
+      }
+      if (!api.due(R.collapse.spacing)) return;
+      // A chunk or two, anywhere clear of the lane (including the lane's side of the core).
+      const n = api.sub === 2 && rand() < 0.5 ? 2 : 1;
+      for (let i = 0; i < n; i++) {
+        for (let t = 0; t < 6; t++) {
+          const w = 0.9 + rand() * 1.1;
+          const x = api.cx + (rand() * 2 - 1) * (api.hw - w / 2 - 0.2);
+          if (Math.abs(x - api.cx) < ch + w / 2 || !api.clearOf(x, w / 2)) continue;
+          api.debris(x, api.d + i * 3, w, 0.6 + rand() * 0.8, 0.9 + rand() * 0.8, R.collapse.landAhead[0] + rand() * (R.collapse.landAhead[1] - R.collapse.landAhead[0]));
+          break;
+        }
       }
     },
   },

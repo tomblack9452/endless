@@ -414,7 +414,22 @@ export const CONFIG = {
         lasers: { weight: 3, minSub: 1, length: [50, 80], extraWidth: 0.9, gateSpacing: [11, 15], gapWidth: 2.9 },
         reactor: { weight: 2, minSub: 1, length: [55, 80], extraWidth: 6, height: 6, coreHalf: 2.2, pylonSpacing: [14, 20] },
         pistons: { weight: 3, minSub: 2, length: [55, 85], extraWidth: 1.6, spacing: [10, 14], travel: 0.1, motionMargin: 0.45 },
-        hangar: { weight: 2, minSub: 2, length: [70, 110], extraWidth: 9, height: 7, rowSpacing: [13, 18], pitch: 4.8, fill: 0.7, shuttleHalfWidth: 1.75 },
+        hangar: {
+          weight: 2,
+          minSub: 2,
+          length: [70, 110],
+          extraWidth: 9,
+          height: 7,
+          rowSpacing: [13, 18],
+          pitch: 4.8,
+          fill: 0.7,
+          shuttleHalfWidth: 1.75,
+          doorAt: 0.85, // blast doors this far through the room
+          doorGap: 0.9, // clearance either side of the lane once closed
+          doorClose: [70, 6], // closes over 70 units of approach, done 6 ahead
+        },
+        // Set piece: reactor collapse (debris falls off the lane as you approach).
+        collapse: { weight: 1.5, minSub: 2, length: [70, 95], extraWidth: 6, spacing: [5, 8], landAhead: [9, 16], fallOver: 22 },
       },
     },
   },
@@ -454,6 +469,15 @@ export const CONFIG = {
       collectRadius: 1.0,
       spinSpeed: 2.4, // radians per second
     },
+  },
+
+  // Theme events (see events.ts): one may start as the middle level of a theme begins.
+  events: {
+    chance: 0.6,
+    seconds: 22,
+    meteors: { count: 6, every: [0.5, 1.6], distance: [140, 240], tail: 1.4, color: '#e2763f' },
+    sandstorm: { color: '#c9a57a', fog: 0.8, streaks: 70, width: 9, wind: 26, length: 1.4, opacity: 0.8 },
+    redAlert: { color: '#d8433a', dark: '#2a0e10', pulseHz: 0.7, alarmEvery: 2.4 },
   },
 
   // Power-ups: rarer than boost pickups, also on the safe lane. They stack.
@@ -499,6 +523,9 @@ export const CONFIG = {
     pickup: 0.08,
     boost: 0.1,
     level: 0.06,
+    impact: 0.16,
+    alarm: 0.05,
+    wind: 0.09,
     door: 0.07,
     theme: 0.14,
     crash: 0.35,
