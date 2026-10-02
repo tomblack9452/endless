@@ -91,6 +91,8 @@ export class World {
   biomeMix = 0; // 0..1, how much the biome look applies at the ship
   asteroidMix = 0; // 0..1, in the asteroid belt (no ground, open to space)
   private genBiome: Biome = 'alien'; // at the row being generated
+  /** Assist mode: mark the safe line on the ground (rows generated from now on). */
+  assist = false;
   insideMix = 0; // 0..1, inside the ship at all (ignores how open the room is)
 
   private generatedTo = 0;
@@ -483,6 +485,10 @@ export class World {
     if (theme === 'land') this.land(d, sub, score, maxSlope);
     else if (theme === 'canyon') this.canyon(d, sub, score, maxSlope);
     else this.interior(d, sub, score, maxSlope);
+
+    if (this.assist && this.runStart !== null && Math.round(d / STEP) % CONFIG.assist.markerEvery === 0) {
+      this.light(this.lane, 0.012, d, 0.1, 0.01, 0.9, Light.Teal, false);
+    }
 
     // Boost pickups sit on the safe lane, so they also hint at the way through.
     if (this.runStart !== null && d >= this.nextPickupAt && !this.quiet(d)) {

@@ -73,6 +73,7 @@ export class Game {
   private scoreBase = 0; // checkpoint runs score from zero
   private pickupCount = 0;
   private recorded = false; // this run's stats are saved
+  private assisted = false; // assist mode was on at some point this run
   private readonly cosmetics = new Cosmetics();
   private readonly missions = new Missions();
   /** Which info screen is open from the title (stats, missions, hangar), if any. */
@@ -193,6 +194,7 @@ export class Game {
     this.scoreBase = opts.countFrom ? startScore : 0;
     this.pickupCount = 0;
     this.recorded = false;
+    this.assisted = this.settings.assist;
     this.boostSeconds = this.roomsEntered = this.missionTimer = 0;
     this.boosted = false;
     this.infoOpen = null;
@@ -263,7 +265,7 @@ export class Game {
     this.sound.setWind(0);
     this.player.setShield(false);
     this.ui.setPower('');
-    const isNewBest = this.score > this.best;
+    const isNewBest = !this.assisted && this.score > this.best;
     if (isNewBest) {
       this.best = Math.floor(this.score);
       void saveNumber(CONFIG.storageKeys.best, this.best);
@@ -281,7 +283,7 @@ export class Game {
     this.recorded = true;
     const newDaily = this.progress.recordRun(
       {
-        score: this.score,
+        score: this.assisted ? 0 : this.score,
         level: this.level,
         distance: this.world.distance,
         seconds: this.runTime,
@@ -294,6 +296,7 @@ export class Game {
     );
     for (const done of this.missions.endRun(this.metrics())) this.missionDone(done);
     this.refreshTitle();
+    if (this.assisted) return 'assist mode. not counted as a best';
     if (this.daily) return newDaily ? 'new daily best' : `daily best ${formatScore(this.progress.dailyBest)}`;
     if (this.scoreBase > 0) return `started at the ${themeName(this.fromLevel)}`;
     return '';
@@ -302,7 +305,7 @@ export class Game {
   private metrics(): RunMetrics {
     return {
       level: this.level,
-      score: this.score,
+      score: this.assisted ? 0 : this.score,
       nearMisses: this.nearMissCount,
       bestChain: this.bestChain,
       pickups: this.pickupCount,
@@ -507,6 +510,8 @@ export class Game {
     this.input.tiltSensitivity = TILT_GAIN[s.tiltSensitivity];
     this.input.sidesMode = s.touch === 1;
     this.haptics.enabled = s.haptics;
+    this.world.assist = s.assist;
+    if (s.assist && this.state !== 'title') this.assisted = true;
     this.ui.setDisplay(TEXT_SCALE[s.textSize], s.boostSide === 1, s.reduceMotion);
     this.applyLook(this.distanceScore / CONFIG.score.levelLength);
     this.ui.renderSettings(s);
@@ -525,7 +530,7 @@ export class Game {
   /** Abandon the run and go back to the live title scene. Best score still counts. */
   private toMainMenu(): void {
     if (this.state === 'paused') this.finishRun(null); // abandoned mid-run: still counts for stats
-    if (this.score > this.best) {
+    if (!this.assisted && this.score > this.best) {
       this.best = Math.floor(this.score);
       void saveNumber(CONFIG.storageKeys.best, this.best);
       this.ui.setBest(this.best);
@@ -848,7 +853,8 @@ export class Game {
   /** Forward speed including boost and slow-mo. */
   private currentSpeed(): number {
     const slow = 1 - (1 - CONFIG.powers.slow.factor) * this.slowLevel;
-    return this.speed * (1 + (CONFIG.boost.speedMultiplier - 1) * this.boostLevel) * slow;
+    const assist = this.settings.assist ? CONFIG.assist.speed : 1;
+    return this.speed * (1 + (CONFIG.boost.speedMultiplier - 1) * this.boostLevel) * slow * assist;
   }
 
   /** As the middle level of a theme begins, maybe start its event (same per seed). */

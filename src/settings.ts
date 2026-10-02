@@ -18,6 +18,7 @@ export interface Settings {
   reduceMotion: boolean;
   textSize: number; // TEXT
   contrast: boolean; // high-contrast obstacles
+  assist: boolean; // slower, with the safe line marked; scores don't count as bests
 }
 
 export type SettingKey = keyof Settings;
@@ -58,6 +59,7 @@ export const DEFAULT_SETTINGS: Settings = {
   reduceMotion: false,
   textSize: 0,
   contrast: false,
+  assist: false,
 };
 
 const KEY = 'endless.settings';
