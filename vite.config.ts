@@ -16,5 +16,11 @@ export default defineConfig(({ mode }) => ({
     target: 'es2020',
     assetsInlineLimit: 0,
     chunkSizeWarningLimit: 800, // three.js alone is ~500 kB
+    rollupOptions: {
+      output: {
+        // three.js in its own file: it rarely changes, so it stays cached across game updates.
+        manualChunks: (id: string) => (id.includes('node_modules/three/') ? 'three' : undefined),
+      },
+    },
   },
 }));
