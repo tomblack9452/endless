@@ -1,7 +1,12 @@
 import { CONFIG } from './config';
 
 // One interface for all steering sources. steering() returns -1 (left) .. 1 (right).
-// Priority: drag (while a finger is down) > keyboard. Tilt goes in later.
+// Priority: drag (while a finger is down) > keyboard > tilt.
+//
+// Tilt uses the device orientation's gamma (left/right lean in portrait),
+// measured from a neutral angle captured by calibrate() at the start of each
+// run and on resume, with a small deadzone. iOS only sends orientation after
+// a permission prompt answered from a tap; phones also need HTTPS.
 
 export class Input {
   private dragging = false;
@@ -17,6 +22,16 @@ export class Input {
   private boostPointer = -1;
 
   enabled = false;
+  /** Tilt settings. */
+  tiltEnabled = true;
+  tiltSensitivity = 1;
+  /** Called if the player declines motion access (so the game can say drag still works). */
+  onTiltDenied: (() => void) | null = null;
+  private tiltRaw = 0;
+  private tiltNeutral = 0;
+  private tiltValue = 0;
+  private tiltSeen = false;
+  private tiltAsked = false;
   /** Finger travel for full steer, as a fraction of screen width (steering setting). */
   dragRange: number = CONFIG.steering.dragRangeFraction;
 
@@ -28,19 +43,66 @@ export class Input {
     window.addEventListener('keydown', this.onKeyDown);
     window.addEventListener('keyup', this.onKeyUp);
     window.addEventListener('blur', this.releaseAll);
+    // Always listen; where the browser gates motion behind a permission
+    // prompt (iOS, some others) also ask on the first tap.
+    window.addEventListener('deviceorientation', this.onOrient);
+    const gated = typeof (DeviceOrientationEvent as unknown as { requestPermission?: unknown }).requestPermission === 'function';
+    if (gated) {
+      const ask = () => this.requestTilt();
+      window.addEventListener('click', ask);
+      window.addEventListener('touchend', ask);
+    }
   }
+
+  /** iOS: ask for motion access. Must run inside a tap (click/touchend). */
+  private requestTilt(): void {
+    if (this.tiltAsked || !this.tiltEnabled) return;
+    this.tiltAsked = true;
+    const req = (DeviceOrientationEvent as unknown as { requestPermission: () => Promise<string> }).requestPermission;
+    req()
+      .then((state) => {
+        if (state !== 'granted') this.onTiltDenied?.();
+      })
+      .catch(() => this.onTiltDenied?.());
+  }
+
+  /** Take the current lean as straight ahead. */
+  calibrate(): void {
+    this.tiltNeutral = this.tiltRaw;
+    this.tiltValue = 0;
+  }
+
+  private onOrient = (e: DeviceOrientationEvent): void => {
+    if (e.gamma === null) return;
+    // Upside-down portrait reverses left and right.
+    const angle = screen.orientation?.angle ?? 0;
+    this.tiltRaw = angle === 180 ? -e.gamma : e.gamma;
+    if (!this.tiltSeen) {
+      this.tiltSeen = true;
+      this.tiltNeutral = this.tiltRaw;
+    }
+  };
 
   update(dt: number): void {
     const want = (this.right ? 1 : 0) - (this.left ? 1 : 0);
     const ramp = CONFIG.steering.keyRamp * dt;
     if (want === 0) this.keyValue = 0;
     else this.keyValue = clamp(this.keyValue + want * ramp, -1, 1);
+
+    if (this.tiltSeen) {
+      const T = CONFIG.steering.tilt;
+      let lean = this.tiltRaw - this.tiltNeutral;
+      lean = Math.abs(lean) < T.deadzoneDeg ? 0 : lean - Math.sign(lean) * T.deadzoneDeg;
+      const target = clamp((lean * this.tiltSensitivity) / T.fullTiltDeg, -1, 1);
+      this.tiltValue += (target - this.tiltValue) * (1 - Math.exp(-T.smoothing * dt));
+    }
   }
 
   steering(): number {
     if (!this.enabled) return 0;
     if (this.dragging) return this.dragValue;
     if (this.keyValue !== 0) return this.keyValue;
+    if (this.tiltEnabled && this.tiltSeen) return this.tiltValue;
     return 0;
   }
 
