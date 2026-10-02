@@ -5,7 +5,7 @@ import { densityAt, lateralSpeedAt, speedAt } from './difficulty';
 import { InstancedField, wrap } from './field';
 import type { LivePalette } from './palette';
 import { Decor, decorate, Light, pickRoom, ROOM_IDS, ROOMS, roomLength, type RoomAPI, type RoomId, type RoomPlan } from './interior';
-import { BOULDER_HEIGHT, boulder, crystalCluster, greebleBox, mushroomTree, pipeSegment, shuttle, spireTree } from './props';
+import { BOULDER_HEIGHT, boulder, canister, crystalCluster, greebleBox, mushroomTree, pipeSegment, shuttle, spireTree } from './props';
 
 // The world ahead of the ship: obstacle pools plus the generator that lays
 // out each theme row by row.
@@ -28,6 +28,7 @@ const W = F.halfWidth;
 const SPAN = W * 2;
 const LANE = TH.lane.halfWidth;
 const FLOOR_ROWS = 512; // rows of floor history kept for fall checks
+const PIT_LIP = 0.3; // pit sides: a thin steel lip, then black
 
 /** Open-ground prop kinds. */
 const enum Prop {
@@ -68,6 +69,7 @@ export class World {
   canyonMix = 0; // 0..1, how much the canyon look applies at the ship
   interiorMix = 0;
   deckMix = 0; // 0..1, open to space on the observation deck
+  insideMix = 0; // 0..1, inside the ship at all (ignores how open the room is)
 
   private generatedTo = 0;
   private lastDx = 0; // sideways movement this frame, for swept collision
@@ -90,6 +92,7 @@ export class World {
   private readonly pipes: InstancedField; // wall dressing
   private readonly greebles: InstancedField;
   private readonly voids: InstancedField; // pit bottoms
+  private readonly canisters: InstancedField;
   private readonly decorMat: MeshBasicMaterial;
   // Custom floor of the row being built (world x pairs) and the history of past rows.
   private floorN = -1;
@@ -198,13 +201,15 @@ export class World {
     this.pipes.setColorTable(decorTable);
     this.greebles = new InstancedField(scene, greebleBox(), this.decorMat, F.maxGreebles);
     this.greebles.setColorTable(decorTable);
+    this.canisters = new InstancedField(scene, canister(), this.decorMat, F.maxCanisters);
+    this.canisters.setColorTable(decorTable);
     this.voids = new InstancedField(scene, box, new MeshBasicMaterial({ color: TH.interior.void, fog: false }), F.maxVoids);
     this.shuttles = new InstancedField(scene, shuttle(), this.propMat, F.maxShuttles);
     this.pickupMat = new MeshBasicMaterial();
     const p = CONFIG.boost.pickup;
     this.pickups = new InstancedField(scene, new OctahedronGeometry(p.size, 0), this.pickupMat, F.maxPickups);
     this.solids = [this.blocks, this.hull, this.rocks, this.obstacleRocks, this.mushrooms, this.spires, this.crystals, this.shuttles, this.strips];
-    this.fields = [...this.solids, this.pickups, this.pipes, this.greebles, this.voids];
+    this.fields = [...this.solids, this.pickups, this.pipes, this.greebles, this.voids, this.canisters];
     this.applyPalette();
   }
 
@@ -357,7 +362,7 @@ export class World {
   }
 
   private updateMix(dt: number): void {
-    this.canyonMix = this.interiorMix = 0;
+    this.canyonMix = this.interiorMix = this.insideMix = 0;
     this.roomName = '';
     if (themeForLevel(this.levelAt(this.distance)) !== 'interior') this.deckMix = 0;
     if (this.runStart === null) return;
@@ -373,6 +378,7 @@ export class World {
       this.roomName = room ? ROOMS[room].name : '';
       const target = room ? ROOMS[room].enclosure : 1;
       this.enclosure += (target - this.enclosure) * Math.min(1, dt * 1.5);
+      this.insideMix = k;
       this.interiorMix = k * this.enclosure;
       const deck = room === 'deck' ? 1 : 0;
       this.deckMix += (deck * k - this.deckMix) * Math.min(1, dt * 1.2);
@@ -829,9 +835,10 @@ export class World {
         if (Math.floor(d / STEP) % 3 === 0) this.hullBox(inner + k * 0.15, 0, d, 0.3, H, 0.3, true);
         this.hullBox(wx, H, d, thick, 0.25, depth, false);
       } else {
-        // Over a pit the wall runs down to the pit bottom.
-        const base = pit ? -P : 0;
+        // Over a pit the wall carries on down: steel near the top, then black.
+        const base = pit ? -PIT_LIP : 0;
         this.hullBox(wx, base, d, thick, H - base, depth, true);
+        if (pit) this.voids.spawn(wx - this.shipX, -P, d, thick, P - PIT_LIP, depth, 0, false, false, 0, 0, false);
       }
       if (k < 0) this.prevWallL = inner;
       else this.prevWallR = inner;
@@ -841,18 +848,21 @@ export class World {
       this.hullBox(this.cx, -0.14, d, span, 0.14, depth, false);
     } else {
       // Floor pieces over a dark drop, with lit edges or railings.
-      this.voids.spawn(this.cx - this.shipX, -P - 0.1, d, span, 0.1, depth, 0, false, false, 0, 0, false);
+      this.voids.spawn(this.cx - this.shipX, -P - 0.1, d, span + 30, 0.1, depth, 0, false, false, 0, 0, false);
       for (let i = 0; i < this.floorN; i++) {
         const x0 = this.floorSegs[i * 2];
         const x1 = this.floorSegs[i * 2 + 1];
         this.hullBox((x0 + x1) / 2, -0.14, d, x1 - x0, 0.14, depth, false);
         for (const [edge, s] of [[x0, -1], [x1, 1]] as const) {
-          this.hullBox(edge + s * 0.08, -P, d, 0.16, P - 0.14, depth, false); // the drop's side
+          if (Math.abs(edge - (this.cx + s * hw)) < 0.05) continue; // meets the wall: nothing to trim
+          // The drop's side: a steel lip, then black all the way down.
+          this.hullBox(edge + s * 0.08, -PIT_LIP, d, 0.16, PIT_LIP - 0.14, depth, false);
+          this.voids.spawn(edge + s * 0.08 - this.shipX, -P, d, 0.16, P - PIT_LIP, depth, 0, false, false, 0, 0, false);
           if (def.railings) {
             api.run(edge - s * 0.06, it.railHeight, d, 0.035, Decor.Steel);
             if (api.row % 3 === 0) api.greeble(edge - s * 0.06, 0, d, 0.07, it.railHeight, 0.07, Decor.Steel);
           } else {
-            this.light(edge - s * 0.04, 0.01, d, 0.08, 0.02, depth, Light.Amber, false);
+            this.light(edge - s * 0.05, 0.01, d, 0.1, 0.03, depth, Light.White, false); // pale rim on the drop
           }
         }
       }
@@ -874,6 +884,8 @@ export class World {
     }
 
     // Wall dressing: pipes, ducts, panels... per room type.
+    api.pit = pit;
+    api.ceiling = def.ceiling;
     decorate(this.room, api);
 
     // Door frame where each room or corridor begins: lintel, jambs and floor stripes.
@@ -883,6 +895,9 @@ export class World {
       this.hullBox(this.cx - hw - 0.3, 0, d, 0.6, H, 0.9, true);
       this.hullBox(this.cx + hw + 0.3, 0, d, 0.6, H, 0.9, true);
       for (const off of [0.6, 1.1]) this.light(this.cx, 0.01, d + off, hw * 2, 0.01, 0.22, Light.Amber, false);
+      // Number plate by the door and a light over it.
+      this.light(this.cx - hw + 0.04, 2.1, d + 0.7, 0.04, 0.3, 0.5, Light.Amber, false);
+      this.light(this.cx, H - 0.68, d - 0.3, 1.2, 0.06, 0.06, Light.White, false);
     }
 
     // Room contents (split rooms only once the dividers are up).
@@ -997,6 +1012,8 @@ export class World {
       memo2: 0,
       seed: 0,
       row: 0,
+      pit: false,
+      ceiling: true,
       due(spacing) {
         if (this.d < w.nextFeatureAt) return false;
         w.nextFeatureAt = this.d + range(spacing);
@@ -1038,6 +1055,10 @@ export class World {
       greeble(x, y, d, width, h, depth, colour) {
         w.greebles.nextColor = colour;
         w.greebles.spawn(x - w.shipX, y, d, width, h, depth, 0, false, false, 0, 0, false);
+      },
+      canister(x, d, colour, size) {
+        w.canisters.nextColor = colour;
+        w.canisters.spawn(x - w.shipX, 0, d, size, size, size, Math.random() * 6.28, false, false, 0, 0, false);
       },
       floorBegin() {
         w.floorN = 0;
