@@ -167,6 +167,13 @@ export class UI {
       if (value) value.textContent = label(s, el.dataset.setting as SettingKey);
     }
   }
+  /** Display settings that live on the page: text size, boost side, reduce motion. */
+  setDisplay(textScale: number, boostLeft: boolean, reduceMotion: boolean): void {
+    document.documentElement.style.setProperty('--ui-scale', String(textScale));
+    document.body.classList.toggle('boost-left', boostLeft);
+    document.body.classList.toggle('reduce-motion', reduceMotion);
+  }
+
   /** A short notice low on screen for a few seconds. */
   showNotice(text: string): void {
     this.notice.textContent = text;

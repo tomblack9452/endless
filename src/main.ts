@@ -10,7 +10,14 @@ document.addEventListener('contextmenu', block);
 document.addEventListener('gesturestart', block);
 document.addEventListener('dblclick', block);
 document.addEventListener('selectstart', block);
-document.addEventListener('touchmove', block, { passive: false });
+document.addEventListener(
+  'touchmove',
+  (e) => {
+    // The settings list is the one thing allowed to scroll.
+    if (!(e.target instanceof Element && e.target.closest('.settings'))) e.preventDefault();
+  },
+  { passive: false },
+);
 
 const canvas = document.getElementById('scene') as HTMLCanvasElement;
 

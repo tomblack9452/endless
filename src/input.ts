@@ -22,6 +22,10 @@ export class Input {
   private boostPointer = -1;
 
   enabled = false;
+  /** Touch steering: false = drag anywhere, true = hold the left or right side. */
+  sidesMode = false;
+  private sideDir = 0;
+  private sideValue = 0;
   /** Tilt settings. */
   tiltEnabled = true;
   tiltSensitivity = 1;
@@ -88,6 +92,9 @@ export class Input {
     const ramp = CONFIG.steering.keyRamp * dt;
     if (want === 0) this.keyValue = 0;
     else this.keyValue = clamp(this.keyValue + want * ramp, -1, 1);
+    // Tap-sides mode ramps like the keys while a side is held.
+    if (this.sideDir === 0) this.sideValue = 0;
+    else this.sideValue = clamp(this.sideValue + this.sideDir * ramp, -1, 1);
 
     if (this.tiltSeen) {
       const T = CONFIG.steering.tilt;
@@ -100,7 +107,7 @@ export class Input {
 
   steering(): number {
     if (!this.enabled) return 0;
-    if (this.dragging) return this.dragValue;
+    if (this.dragging) return this.sidesMode ? this.sideValue : this.dragValue;
     if (this.keyValue !== 0) return this.keyValue;
     if (this.tiltEnabled && this.tiltSeen) return this.tiltValue;
     return 0;
@@ -128,6 +135,7 @@ export class Input {
     this.dragging = false;
     this.pointerId = -1;
     this.dragValue = 0;
+    this.sideDir = 0;
     this.left = this.right = false;
     this.keyValue = 0;
     this.boostKey = false;
@@ -144,6 +152,8 @@ export class Input {
     this.pointerId = e.pointerId;
     this.anchorX = e.clientX;
     this.dragValue = 0;
+    this.sideDir = e.clientX < window.innerWidth / 2 ? -1 : 1;
+    this.sideValue = 0;
   };
 
   private onMove = (e: PointerEvent): void => {
@@ -166,6 +176,7 @@ export class Input {
     this.dragging = false;
     this.pointerId = -1;
     this.dragValue = 0;
+    this.sideDir = 0;
   };
 
   private onKeyDown = (e: KeyboardEvent): void => {

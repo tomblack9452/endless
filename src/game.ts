@@ -9,7 +9,7 @@ import { Player } from './player';
 import { Stage } from './renderer';
 import { Sky } from './sky';
 import { SpeedLines } from './speedLines';
-import { cycle, DEFAULT_SETTINGS, LEVEL_GAIN, loadSettings, saveSettings, type SettingKey, STEERING_RANGE, TILT_GAIN } from './settings';
+import { cycle, DEFAULT_SETTINGS, LEVEL_GAIN, loadSettings, saveSettings, type SettingKey, STEERING_RANGE, TEXT_SCALE, TILT_GAIN } from './settings';
 import { Hints } from './hints';
 import { newSeed } from './rng';
 import { loadNumber, saveNumber } from './storage';
@@ -266,6 +266,9 @@ export class Game {
     this.input.dragRange = STEERING_RANGE[s.steering];
     this.input.tiltEnabled = s.tilt;
     this.input.tiltSensitivity = TILT_GAIN[s.tiltSensitivity];
+    this.input.sidesMode = s.touch === 1;
+    this.ui.setDisplay(TEXT_SCALE[s.textSize], s.boostSide === 1, s.reduceMotion);
+    this.applyLook(this.distanceScore / CONFIG.score.levelLength);
     this.ui.renderSettings(s);
   }
 
@@ -357,7 +360,7 @@ export class Game {
   /** Apply time of day for `levelProgress` (score / levelLength) to every material and the UI. */
   private applyLook(levelProgress: number): void {
     const w = this.world;
-    applyAtmosphere(this.basePalette, this.palette, levelProgress, w.canyonMix, w.interiorMix, w.deckMix);
+    applyAtmosphere(this.basePalette, this.palette, levelProgress, w.canyonMix, w.interiorMix, w.deckMix, this.settings.contrast);
     // Stars: full over the deck, faint outside at night.
     const sky = this.palette.sky;
     const daylight = Math.pow(0.2126 * sky.r + 0.7152 * sky.g + 0.0722 * sky.b, 1 / 2.2);
@@ -404,7 +407,7 @@ export class Game {
     this.updateBoost(dt);
     const speed = this.currentSpeed();
     this.player.update(dt, this.input.steering(), lateralSpeedAt(speed), this.boostLevel * CONFIG.boost.shipPitchDeg * DEG);
-    this.speedLines.update(dt, speed, this.boostLevel);
+    this.speedLines.update(dt, speed, this.settings.reduceMotion ? 0 : this.boostLevel);
 
     const prev = this.world.distance;
     this.world.advance(dt, speed, this.player.lateral);
@@ -542,16 +545,18 @@ export class Game {
     const c = CONFIG.camera;
     const rollTarget = -this.player.steer * c.maxRollDeg * DEG;
     this.stage.roll += (rollTarget - this.stage.roll) * (1 - Math.exp(-c.rollEase * dt));
+    const still = this.settings.reduceMotion;
+    if (still) this.stage.roll *= 0.3; // a hint of lean, no swing
     this.stage.fovBoost =
       Math.min(c.maxFovBoost, Math.max(0, (this.speed - CONFIG.speed.base) * c.fovPerSpeed)) +
-      this.boostLevel * CONFIG.boost.fovKick;
+      (still ? 0 : this.boostLevel * CONFIG.boost.fovKick);
     const b = CONFIG.boost;
     this.stage.pullBack = this.boostLevel * b.cameraPullBack;
     this.stage.drop = this.boostLevel * b.cameraDrop;
-    const v = this.boostLevel * b.vibration;
+    const v = still ? 0 : this.boostLevel * b.vibration;
     this.stage.shakeX = (Math.random() * 2 - 1) * v;
     this.stage.shakeY = (Math.random() * 2 - 1) * v;
-    if (this.nudgeMs > 0) {
+    if (this.nudgeMs > 0 && !still) {
       // Near-miss kick: a quick downward jolt that fades out.
       const nm = CONFIG.score.nearMiss;
       this.stage.shakeY -= nm.nudge * (this.nudgeMs / nm.nudgeMs);
@@ -577,7 +582,7 @@ export class Game {
 
     const t = (this.crashMs - c.freezeMs) / c.shakeMs;
     if (t < 1) {
-      const amp = c.shakeAmount * (1 - t) * (1 - t);
+      const amp = this.settings.reduceMotion ? 0 : c.shakeAmount * (1 - t) * (1 - t);
       this.stage.shakeX = (Math.random() * 2 - 1) * amp;
       this.stage.shakeY = (Math.random() * 2 - 1) * amp * 0.6;
     } else {
