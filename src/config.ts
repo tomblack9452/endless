@@ -503,6 +503,10 @@ export const CONFIG = {
       leadDensity: 0.14, // chance of a note per eighth...
       leadDensityIntensity: 0.32, // ...plus this much at full intensity
       leadDensityBoost: 0.2,
+      // Layers that join as the near-miss chain grows (chain length to start).
+      chainLayers: { pulse: 2, arp: 4, hats: 6 },
+      pulse: 0.08,
+      arp: 0.026,
     },
   },
   crash: {
