@@ -32,6 +32,8 @@ const INTERIOR_SKY = new Color(T.interior.sky);
 const INTERIOR_FOG = new Color(T.interior.fog);
 const INTERIOR_LIGHT = Math.pow(T.interior.light, 2.2);
 const lit = new Color();
+const WHITE = new Color(1, 1, 1);
+const BLACK = new Color(0.02, 0.02, 0.025);
 const SPACE_SKY = new Color(CONFIG.space.sky);
 const SPACE_FOG = new Color(CONFIG.space.fog);
 
@@ -66,6 +68,7 @@ export function applyAtmosphere(
   canyon: number,
   interior: number,
   space = 0,
+  contrast = false,
 ): void {
   out.copy(base);
   out.ground.lerp(CANYON_GROUND, canyon);
@@ -79,7 +82,25 @@ export function applyAtmosphere(
     out.sky.lerp(SPACE_SKY, space);
     out.fog.lerp(SPACE_FOG, space * 0.8);
   }
+  if (contrast) highContrast(out);
   flipForeground(out);
+}
+
+/**
+ * High-contrast option: push the ground and everything you can hit apart in
+ * brightness (whatever the time of day), so obstacles stand out by lightness
+ * alone, not by hue.
+ */
+function highContrast(out: LivePalette): void {
+  const groundLight = brightness(out.ground) > 0.45;
+  out.ground.lerp(groundLight ? WHITE : BLACK, 0.35);
+  const target = groundLight ? BLACK : WHITE;
+  out.obstacle.lerp(target, 0.65);
+  out.rock.lerp(target, 0.45);
+  out.cubeLight.lerp(target, 0.4);
+  out.cubeMid.lerp(target, 0.4);
+  out.cubeDark.lerp(target, 0.4);
+  out.light.lerp(groundLight ? BLACK : WHITE, 0.25);
 }
 
 function applyTimeOfDay(base: LivePalette, out: LivePalette, levelProgress: number): void {
