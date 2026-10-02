@@ -682,6 +682,11 @@ body {
   margin: 0;
 }
 
+.setting-note {
+  padding: 8px 0 0;
+  line-height: 1.6;
+}
+
 .over-missions {
   margin-top: 0.8em;
   line-height: 1.7;

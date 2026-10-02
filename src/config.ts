@@ -469,6 +469,12 @@ export const CONFIG = {
     },
   },
 
+  // Assist mode (settings): a gentler way to play.
+  assist: {
+    speed: 0.8, // forward speed multiplier
+    markerEvery: 3, // rows between safe-line markers
+  },
+
   // Rolling hills on open ground (see terrain.ts). Looks only: collision is flat.
   terrain: {
     amplitude: 1.6,
