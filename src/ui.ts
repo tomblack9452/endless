@@ -1,7 +1,7 @@
 import { CONFIG } from './config';
 import { label, type SettingKey, type Settings } from './settings';
 
-export type ScreenName = 'title' | 'paused' | 'over' | 'settings';
+export type ScreenName = 'title' | 'paused' | 'over' | 'settings' | 'stats';
 
 const fmt = new Intl.NumberFormat('en-US');
 
@@ -46,7 +46,10 @@ export class UI {
     paused: $('screen-paused'),
     over: $('screen-over'),
     settings: $('screen-settings'),
+    stats: $('screen-stats'),
   };
+  private readonly statsRows = $('stats-rows');
+  private readonly overExtra = $('over-extra');
   readonly titleSettings = $('title-settings');
   private readonly titleBest = $('title-best');
   private readonly overScore = $('over-score');
@@ -172,6 +175,41 @@ export class UI {
     document.documentElement.style.setProperty('--ui-scale', String(textScale));
     document.body.classList.toggle('boost-left', boostLeft);
     document.body.classList.toggle('reduce-motion', reduceMotion);
+  }
+
+  /** Title links (start-from, daily run, stats). Taps on them never start a normal run. */
+  bindTitleLinks(onLink: (name: string) => void): void {
+    for (const el of document.querySelectorAll<HTMLElement>('[data-title]')) {
+      el.addEventListener('pointerdown', (e) => e.stopPropagation());
+      el.addEventListener('click', () => onLink(el.dataset.title ?? ''));
+    }
+  }
+
+  setTitleLink(name: string, text: string): void {
+    const el = document.querySelector<HTMLElement>(`[data-title="${name}"]`);
+    if (el) el.textContent = text;
+  }
+
+  renderStats(rows: [string, string][]): void {
+    this.statsRows.replaceChildren(
+      ...rows.map(([k, v]) => {
+        const row = document.createElement('div');
+        row.className = 'stat-row';
+        const a = document.createElement('span');
+        a.className = 'label';
+        a.textContent = k;
+        const b = document.createElement('span');
+        b.className = 'label';
+        b.textContent = v;
+        row.append(a, b);
+        return row;
+      }),
+    );
+  }
+
+  /** Extra line on the game-over screen (daily run, checkpoint). */
+  setGameOverExtra(text: string): void {
+    this.overExtra.textContent = text;
   }
 
   setSkyColor(css: string): void {

@@ -57,6 +57,11 @@
         <div class="title-mark">endless<br />space</div>
         <div class="screen-foot">
           <button id="title-start" class="label button" type="button">press to start</button>
+          <div class="title-links">
+            <span class="label link" data-title="from">start: open ground</span>
+            <span class="label link" data-title="daily">daily run</span>
+            <span class="label link" data-title="stats">stats</span>
+          </div>
           <div id="title-best" class="label dim"></div>
         </div>
       </div>
@@ -94,12 +99,23 @@
           </div>
         </div>
       </div>
+      <div id="screen-stats" class="layer screen">
+        <div class="settings">
+          <div class="label dim settings-title">stats</div>
+          <div id="stats-rows"></div>
+          <div class="menu left">
+            <button class="label button" type="button" data-action="back">back</button>
+          </div>
+        </div>
+      </div>
+
       <div id="screen-over" class="layer screen">
         <div class="screen-center">
           <div class="label">crashed</div>
           <div id="over-score" class="score">0</div>
           <div id="over-best" class="label dim"></div>
           <div id="over-stats" class="label dim"></div>
+          <div id="over-extra" class="label dim"></div>
           <div class="label rule">tap to retry</div>
           <div class="menu">
             <button class="label button" type="button" data-action="menu">main menu</button>

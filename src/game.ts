@@ -12,9 +12,10 @@ import { SpeedLines } from './speedLines';
 import { cycle, DEFAULT_SETTINGS, LEVEL_GAIN, loadSettings, saveSettings, type SettingKey, STEERING_RANGE, TEXT_SCALE, TILT_GAIN } from './settings';
 import { Haptics } from './haptics';
 import { Hints } from './hints';
+import { dailySeed, Progress } from './progress';
 import { newSeed } from './rng';
 import { loadNumber, saveNumber } from './storage';
-import { UI } from './ui';
+import { formatScore, UI } from './ui';
 import type { RoomId } from './interior';
 import { themeForLevel, themeName, World } from './world';
 
@@ -49,6 +50,14 @@ export class Game {
   private readonly ui = new UI();
   private readonly hints = new Hints((text) => this.ui.showHint(text));
   private readonly haptics = new Haptics();
+  private readonly progress = new Progress();
+  // Run mode: daily (fixed seed) or normal from a checkpoint.
+  private daily = false;
+  private fromLevel = 1; // checkpoint chosen on the title screen
+  private scoreBase = 0; // checkpoint runs score from zero
+  private pickupCount = 0;
+  private recorded = false; // this run's stats are saved
+  private statsOpen = false;
   private shownSky = -1;
   private runTime = 0; // seconds into the current run
 
@@ -112,13 +121,15 @@ export class Game {
     this.ui.pauseButton.addEventListener('pointerdown', this.onPauseButton);
     // Tapping anywhere also starts; the button is the explicit target.
     this.ui.startButton.addEventListener('click', () => {
-      if (this.state === 'title') this.beginRun();
+      if (this.state === 'title') this.startNormal();
     });
     document.addEventListener('visibilitychange', () => {
       if (document.hidden) this.pause();
     });
     window.addEventListener('blur', () => this.pause());
 
+    this.ui.bindTitleLinks(this.onTitleLink);
+    void this.progress.load().then(() => this.refreshTitle());
     void loadSettings().then((s) => {
       this.settings = s;
       this.applySettings();
@@ -140,14 +151,19 @@ export class Game {
    * `startScore` > 0 starts part-way along (dev skip). `seed` replays a
    * known course; otherwise every run gets a fresh one.
    */
-  private beginRun(startScore = 0, seed = newSeed()): void {
+  private beginRun(startScore = 0, seed = newSeed(), opts: { daily?: boolean; countFrom?: boolean } = {}): void {
     this.seed = seed;
+    this.daily = opts.daily ?? false;
+    this.scoreBase = opts.countFrom ? startScore : 0;
+    this.pickupCount = 0;
+    this.recorded = false;
     this.world.reset(CONFIG.field.startClearance, true, startScore, seed);
     const level = Math.floor(startScore / CONFIG.score.levelLength) + 1;
     this.sound.ignite();
     this.sound.setTheme(themeForLevel(level));
     this.runStart = this.world.distance - startScore / CONFIG.score.pointsPerUnit;
-    this.score = this.distanceScore = startScore;
+    this.distanceScore = startScore;
+    this.score = startScore - this.scoreBase;
     this.bonus = 0;
     this.speed = speedAt(startScore);
     this.chain = this.chainTimer = this.nearMissCount = this.bestChain = 0;
@@ -168,7 +184,8 @@ export class Game {
     this.input.enabled = true;
     this.level = level;
     const progress = startScore / CONFIG.score.levelLength;
-    this.ui.setScore(startScore);
+    this.ui.setScore(this.score);
+    this.progress.reachedLevel(level);
     this.ui.setLevel(level);
     this.ui.setProgress(progress - (level - 1));
     this.applyLook(progress);
@@ -181,6 +198,7 @@ export class Game {
 
   /** `fell` = dropped into a pit (falls away) rather than hitting something (shatters). */
   private crash(fell = false): void {
+    if (this.state === 'crashed') return;
     this.fell = fell;
     this.state = 'crashed';
     this.crashMs = 0;
@@ -202,6 +220,85 @@ export class Game {
       this.ui.setBest(this.best);
     }
     this.ui.setGameOver(this.score, this.best, isNewBest, this.nearMissCount, this.bestChain, this.seed);
+    const where = themeForLevel(this.level) === 'interior' ? this.world.roomName || 'corridor' : themeName(this.level);
+    this.ui.setGameOverExtra(this.finishRun(where));
+  }
+
+  /** Save this run into the lifetime stats (once). Returns a line for the game-over screen. */
+  private finishRun(crashedIn: string | null): string {
+    if (this.recorded) return '';
+    this.recorded = true;
+    const newDaily = this.progress.recordRun(
+      {
+        score: this.score,
+        level: this.level,
+        distance: this.world.distance,
+        seconds: this.runTime,
+        nearMisses: this.nearMissCount,
+        bestChain: this.bestChain,
+        pickups: this.pickupCount,
+        crashedIn,
+      },
+      this.daily,
+    );
+    this.refreshTitle();
+    if (this.daily) return newDaily ? 'new daily best' : `daily best ${formatScore(this.progress.dailyBest)}`;
+    if (this.scoreBase > 0) return `started at the ${themeName(this.fromLevel)}`;
+    return '';
+  }
+
+  /** Start a normal run from the chosen checkpoint (scoring from zero). */
+  private startNormal(): void {
+    this.beginRun((this.fromLevel - 1) * CONFIG.score.levelLength, newSeed(), { countFrom: true });
+  }
+
+  private startDaily(): void {
+    this.beginRun(0, dailySeed(), { daily: true });
+  }
+
+  /** Retry in the same mode as the run that just ended. */
+  private retry(): void {
+    if (this.daily) this.startDaily();
+    else this.startNormal();
+  }
+
+  private onTitleLink = (name: string): void => {
+    if (name === 'daily') this.startDaily();
+    else if (name === 'stats') this.openStats();
+    else if (name === 'from') {
+      const cps = this.progress.checkpoints();
+      this.fromLevel = cps[(cps.indexOf(this.fromLevel) + 1) % cps.length];
+      this.refreshTitle();
+    }
+  };
+
+  private refreshTitle(): void {
+    const cps = this.progress.checkpoints();
+    if (!cps.includes(this.fromLevel)) this.fromLevel = 1;
+    // Only offer a choice once there's somewhere other than the start to begin.
+    this.ui.setTitleLink('from', cps.length > 1 ? `start: ${themeName(this.fromLevel)}` : '');
+    const db = this.progress.dailyBest;
+    this.ui.setTitleLink('daily', db > 0 ? `daily run (best ${formatScore(db)})` : 'daily run');
+  }
+
+  private openStats(): void {
+    const s = this.progress.stats;
+    const hours = Math.floor(s.seconds / 3600);
+    const mins = Math.floor((s.seconds % 3600) / 60);
+    const worst = this.progress.worstPlace();
+    this.ui.renderStats([
+      ['runs', formatScore(s.runs)],
+      ['time played', hours > 0 ? `${hours}h ${mins}m` : `${mins}m`],
+      ['distance', `${(s.distance / 1000).toFixed(1)} km`],
+      ['best score', formatScore(Math.max(s.bestScore, this.best))],
+      ['furthest level', String(s.bestLevel || 1)],
+      ['best chain', `x${s.bestChain}`],
+      ['near misses', formatScore(s.nearMisses)],
+      ['pickups', formatScore(s.pickups)],
+      ['crash most in', worst ? `${worst} (${s.crashes[worst]})` : '-'],
+    ]);
+    this.statsOpen = true;
+    this.ui.show('stats');
   }
 
   private pause(): void {
@@ -223,13 +320,13 @@ export class Game {
   }
 
   private onTap = (): void => {
-    if (this.settingsOpen) return;
+    if (this.settingsOpen || this.statsOpen) return;
     switch (this.state) {
       case 'title':
-        this.beginRun();
+        this.startNormal();
         break;
       case 'crashed':
-        if (this.crashMs >= CONFIG.crash.retryLockMs) this.beginRun();
+        if (this.crashMs >= CONFIG.crash.retryLockMs) this.retry();
         break;
     }
   };
@@ -255,7 +352,12 @@ export class Game {
     if (action === 'resume') this.resume();
     else if (action === 'settings') this.openSettings();
     else if (action === 'menu') this.toMainMenu();
-    else if (action === 'back') this.closeSettings();
+    else if (action === 'back') {
+      if (this.statsOpen) {
+        this.statsOpen = false;
+        this.ui.show('title');
+      } else this.closeSettings();
+    }
   };
 
   private onSetting = (key: SettingKey): void => {
@@ -290,6 +392,7 @@ export class Game {
 
   /** Abandon the run and go back to the live title scene. Best score still counts. */
   private toMainMenu(): void {
+    if (this.state === 'paused') this.finishRun(null); // abandoned mid-run: still counts for stats
     if (this.score > this.best) {
       this.best = Math.floor(this.score);
       void saveNumber(CONFIG.storageKeys.best, this.best);
@@ -429,6 +532,7 @@ export class Game {
     if (got > 0) {
       this.boostMeter = Math.min(1, this.boostMeter + got * CONFIG.boost.pickup.amount);
       this.bonus += got * CONFIG.score.pickupPoints;
+      this.pickupCount += got;
       this.hints.offer('pickup');
       this.ui.flashBoost();
       this.sound.pickup();
@@ -445,6 +549,7 @@ export class Game {
       const themeChange = themeName(level) !== themeName(this.level);
       this.level = level;
       this.ui.setLevel(level);
+      this.progress.reachedLevel(level);
       this.ui.announceLevel(level, themeName(level));
       this.sound.level(themeChange, themeForLevel(level));
       this.haptics.level(themeChange);
@@ -465,7 +570,7 @@ export class Game {
       if (this.world.interiorMix > 0.5) this.sound.door();
       this.shownRoom = this.world.roomName;
     }
-    this.score = this.distanceScore + this.bonus;
+    this.score = this.distanceScore - this.scoreBase + this.bonus;
     this.ui.setScore(this.score);
 
     this.updateCamera(dt);
