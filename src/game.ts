@@ -339,6 +339,7 @@ export class Game {
     const night = Math.max(0, Math.min(1, (0.55 - daylight) / 0.35)) * CONFIG.space.nightStars * (1 - w.interiorMix);
     this.sky.setAmount(Math.max(w.deckMix, night));
     this.stage.setPlanetVisible(1 - this.world.interiorMix);
+    this.stage.setUnderfloor(this.world.insideMix);
     this.stage.applyPalette();
     this.world.applyPalette();
     this.speedLines.applyPalette();
