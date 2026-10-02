@@ -53,6 +53,7 @@ export class Game {
     interior: 0,
     daylight: 1,
     intensity: 0,
+    chain: 0,
   };
   private settings = { ...DEFAULT_SETTINGS };
   private settingsOpen = false; // settings screen showing (from the title or pause)
@@ -785,6 +786,7 @@ export class Game {
     a.speed = speed;
     a.boost = playing ? this.boostLevel : 0;
     a.steer = playing ? this.player.steer : 0;
+    a.chain = playing ? this.chain : 0;
     a.canyon = this.world.canyonMix;
     a.interior = this.world.interiorMix;
     const sky = this.palette.sky;

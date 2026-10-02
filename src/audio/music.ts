@@ -12,6 +12,11 @@ import { midiHz, pluckEnv, ROOT_MIDI } from './synth';
 //   lead:   sparse plucks from a 2-bar pattern that re-rolls every 4 bars
 //   hats:   soft off-beat ticks when intensity or boost is high
 //
+// A near-miss chain builds the track up a layer at a time (see
+// CONFIG.audio.music.chainLayers): a soft pulse on the beat, then a chord
+// arpeggio, then hats on every off-beat. Breaking the chain drops them at the
+// next note.
+//
 // Tempo follows speed; density follows intensity (level and speed) and boost;
 // brightness follows daylight.
 
@@ -83,6 +88,7 @@ export class Music {
   boost = 0; // 0..1
   daylight = 1; // 0..1
   melody = false; // lead and hats on/off (pad and bass always play)
+  chain = 0; // current near-miss chain length
 
   private readonly padFilter: BiquadFilterNode;
   private readonly leadFilter: BiquadFilterNode;
@@ -177,7 +183,16 @@ export class Music {
     if (this.melody) {
       const i = step % 16;
       if (this.pattern[i]) this.lead(this.scaleNote(this.notes[i]), t);
-      if (pos % 2 === 1 && (this.intensity > 0.55 || this.boost > 0.3)) this.hat(t, pos === 3 || pos === 7);
+      const layers = M.chainLayers;
+      const hats = this.intensity > 0.55 || this.boost > 0.3 || this.chain >= layers.hats;
+      if (pos % 2 === 1 && hats) this.hat(t, pos === 3 || pos === 7);
+      if (this.chain >= layers.pulse && pos % 4 === 0) this.pulse(t, pos === 0);
+      if (this.chain >= layers.arp) {
+        const chord = this.chord();
+        // Up and down the chord, an octave above the pad.
+        const order = [0, 1, 2, 3, 2, 1, 0, 1];
+        this.arp(ROOT_MIDI + 12 + chord[order[pos]], t);
+      }
     }
   }
 
@@ -283,6 +298,32 @@ export class Music {
       o.stop(t + 0.8);
       o2.stop(t + 0.8);
     }
+  }
+
+  /** Soft kick: a sine dropping in pitch. */
+  private pulse(t: number, downbeat: boolean): void {
+    const ctx = this.ctx;
+    const o = ctx.createOscillator();
+    o.frequency.setValueAtTime(110, t);
+    o.frequency.exponentialRampToValueAtTime(42, t + 0.14);
+    const g = ctx.createGain();
+    pluckEnv(g.gain, t, M.pulse * (downbeat ? 1 : 0.7), 0.003, 0.22);
+    o.connect(g).connect(this.out);
+    o.start(t);
+    o.stop(t + 0.3);
+  }
+
+  /** Arpeggio note: a short square through the lead filter, into the echo. */
+  private arp(midi: number, t: number): void {
+    const ctx = this.ctx;
+    const o = ctx.createOscillator();
+    o.type = 'square';
+    o.frequency.value = midiHz(midi);
+    const g = ctx.createGain();
+    pluckEnv(g.gain, t, M.arp, 0.004, 0.16);
+    o.connect(g).connect(this.leadFilter);
+    o.start(t);
+    o.stop(t + 0.25);
   }
 
   private hat(t: number, accent: boolean): void {

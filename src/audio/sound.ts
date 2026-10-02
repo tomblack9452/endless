@@ -30,6 +30,7 @@ export interface AudioState {
   interior: number; // 0..1
   daylight: number; // 0..1
   intensity: number; // 0..1, from level and speed
+  chain: number; // near-miss chain length (builds the music up)
 }
 
 export class Sound {
@@ -140,6 +141,7 @@ export class Sound {
     m.boost = s.boost;
     m.daylight = s.daylight;
     m.intensity = s.intensity;
+    m.chain = s.chain;
     m.melody = s.playing && this.engineOn;
     m.schedule();
     this.echoDelay.delayTime.setTargetAtTime(
