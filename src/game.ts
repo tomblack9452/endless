@@ -283,6 +283,7 @@ export class Game {
     this.stage.pullBack = this.stage.drop = 0;
     this.stage.shakeX = this.stage.shakeY = 0;
     this.speedLines.update(0, 0, 0);
+    this.player.reset(); // clears any crash pieces or fall
     this.player.setVisible(false);
     this.world.reset(0, false);
     this.level = 1;
