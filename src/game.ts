@@ -10,6 +10,7 @@ import { Stage } from './renderer';
 import { Sky } from './sky';
 import { SpeedLines } from './speedLines';
 import { cycle, DEFAULT_SETTINGS, LEVEL_GAIN, loadSettings, saveSettings, type SettingKey, STEERING_RANGE, TEXT_SCALE, TILT_GAIN } from './settings';
+import { Haptics } from './haptics';
 import { Hints } from './hints';
 import { newSeed } from './rng';
 import { loadNumber, saveNumber } from './storage';
@@ -47,6 +48,8 @@ export class Game {
   private settingsOpen = false; // settings screen showing (from the title or pause)
   private readonly ui = new UI();
   private readonly hints = new Hints((text) => this.ui.showHint(text));
+  private readonly haptics = new Haptics();
+  private shownSky = -1;
   private runTime = 0; // seconds into the current run
 
   private state: State = 'title';
@@ -185,9 +188,11 @@ export class Game {
     this.speedLines.update(0, 0, 0);
     if (fell) {
       this.sound.fall();
+      this.haptics.fall();
       this.player.fall();
     } else {
       this.sound.crash();
+      this.haptics.crash();
     }
     this.ui.hideCombo();
     const isNewBest = this.score > this.best;
@@ -196,7 +201,7 @@ export class Game {
       void saveNumber(CONFIG.storageKeys.best, this.best);
       this.ui.setBest(this.best);
     }
-    this.ui.setGameOver(this.score, this.best, isNewBest, this.nearMissCount, this.bestChain);
+    this.ui.setGameOver(this.score, this.best, isNewBest, this.nearMissCount, this.bestChain, this.seed);
   }
 
   private pause(): void {
@@ -267,6 +272,7 @@ export class Game {
     this.input.tiltEnabled = s.tilt;
     this.input.tiltSensitivity = TILT_GAIN[s.tiltSensitivity];
     this.input.sidesMode = s.touch === 1;
+    this.haptics.enabled = s.haptics;
     this.ui.setDisplay(TEXT_SCALE[s.textSize], s.boostSide === 1, s.reduceMotion);
     this.applyLook(this.distanceScore / CONFIG.score.levelLength);
     this.ui.renderSettings(s);
@@ -378,6 +384,13 @@ export class Game {
       this.shownTextHex = text;
       this.ui.setTextColor(this.palette.textCss());
     }
+    // The HUD's backing band takes the sky colour, so it's invisible by day and
+    // only shows where something bright sits behind the text.
+    const skyHex = this.palette.sky.getHex();
+    if (skyHex !== this.shownSky) {
+      this.shownSky = skyHex;
+      this.ui.setSkyColor('#' + this.palette.sky.getHexString());
+    }
     const page = this.palette.fog.getHex();
     if (page !== this.shownPageHex) {
       this.shownPageHex = page;
@@ -419,6 +432,7 @@ export class Game {
       this.hints.offer('pickup');
       this.ui.flashBoost();
       this.sound.pickup();
+      this.haptics.pickup();
     }
     this.ui.setBoost(this.boostMeter, this.boostMeter >= CONFIG.boost.minToStart, this.boosting);
 
@@ -433,6 +447,7 @@ export class Game {
       this.ui.setLevel(level);
       this.ui.announceLevel(level, themeName(level));
       this.sound.level(themeChange, themeForLevel(level));
+      this.haptics.level(themeChange);
     }
     this.ui.setProgress(progress - (level - 1));
     this.applyLook(progress);
@@ -479,6 +494,7 @@ export class Game {
       this.nudgeMs = nm.nudgeMs;
       this.ui.showCombo(this.chain, points);
       this.hints.offer('nearMiss');
+      this.haptics.nearMiss();
       this.sound.pass(side, gap, this.chain);
     }
     if (this.chain > 0) {
@@ -510,6 +526,7 @@ export class Game {
     } else if (want && this.boostMeter >= b.minToStart) {
       this.boosting = true;
       this.sound.boostStart();
+      this.haptics.boost();
     }
     if (this.boosting) this.boostMeter = Math.max(0, this.boostMeter - dt / b.drainSeconds);
     else this.boostMeter = Math.min(1, this.boostMeter + dt / b.fillSeconds);
