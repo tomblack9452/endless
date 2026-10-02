@@ -14,6 +14,11 @@ document.addEventListener('touchmove', block, { passive: false });
 
 const canvas = document.getElementById('scene') as HTMLCanvasElement;
 
+// Offline support and add-to-home-screen, in real builds only.
+if (import.meta.env.PROD && 'serviceWorker' in navigator) {
+  window.addEventListener('load', () => void navigator.serviceWorker.register('./sw.js'));
+}
+
 // Wait for the font so the first frame of UI text doesn't swap.
 void document.fonts.ready.then(() => {
   const game = new Game(canvas);
