@@ -218,7 +218,7 @@ are saved on the device.
   - which corner the boost button sits in
   - vibration
 - **Display:**
-  - reduce motion: no shake, roll, speed lines or dust kick
+  - reduce motion: no shake, roll or speed lines
   - text size
   - high contrast
 - **Assist mode:** 80% speed and teal markers along the safe line. Assisted
