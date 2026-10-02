@@ -10,10 +10,13 @@ import {
   PlaneGeometry,
   RingGeometry,
   Scene,
+  Vector2,
+  Vector4,
   WebGLRenderer,
 } from 'three';
 import { CONFIG } from './config';
 import type { LivePalette } from './palette';
+import { terrain, TERRAIN_GLSL } from './terrain';
 
 const DEG = Math.PI / 180;
 const PLANET_BODY = new Color(CONFIG.planet.body);
@@ -44,6 +47,9 @@ export class Stage {
   private fastFor = 0;
   private readonly ground: Mesh;
   private underfloor = 0; // inside the ship: ground drops away and turns black
+  private readonly hillDistance = { value: 0 };
+  private readonly hillWindow = { value: new Vector4() };
+  private readonly hillPhase = { value: new Vector2() };
 
   // Camera state driven by the game.
   roll = 0; // radians
@@ -75,7 +81,27 @@ export class Stage {
     this.scene.background = palette.sky.clone();
 
     this.groundMat = new MeshBasicMaterial({ color: palette.ground });
-    const ground = new Mesh(new PlaneGeometry(2000, 2000), this.groundMat);
+    // Subdivided along the run so it can follow the hills (see terrain.ts).
+    this.groundMat.onBeforeCompile = (shader) => {
+      shader.uniforms.uDistance = this.hillDistance;
+      shader.uniforms.uHill = this.hillWindow;
+      shader.uniforms.uPhase = this.hillPhase;
+      shader.vertexShader = shader.vertexShader
+        .replace('#include <common>', `#include <common>\n${TERRAIN_GLSL}\nvarying float vHillShade;`)
+        .replace(
+          '#include <begin_vertex>',
+          `#include <begin_vertex>
+          float hillD = uDistance - (modelMatrix * vec4(transformed, 1.0)).z;
+          transformed.z += hillAt(hillD) - hillAt(uDistance);
+          // Slopes facing the camera catch the light; the far sides fall into shade.
+          vHillShade = clamp((hillAt(hillD + 1.0) - hillAt(hillD - 1.0)) * 0.5, -1.0, 1.0);`,
+        );
+      shader.fragmentShader = shader.fragmentShader
+        .replace('#include <common>', '#include <common>\nvarying float vHillShade;')
+        .replace('#include <color_fragment>', `#include <color_fragment>
+        diffuseColor.rgb *= 1.0 + vHillShade * ${CONFIG.terrain.shade.toFixed(2)};`);
+    };
+    const ground = new Mesh(new PlaneGeometry(2000, 2000, 1, 800), this.groundMat);
     this.ground = ground;
     ground.rotation.x = -Math.PI / 2;
     ground.position.z = -600;
@@ -101,6 +127,13 @@ export class Stage {
     this.resize();
     window.addEventListener('resize', this.resize);
     window.visualViewport?.addEventListener('resize', this.resize);
+  }
+
+  /** Hills for the current distance (call every frame before rendering). */
+  setTerrain(distance: number): void {
+    this.hillDistance.value = distance;
+    this.hillWindow.value.set(terrain.start, terrain.end, terrain.amp, 0);
+    this.hillPhase.value.set(terrain.p, terrain.q);
   }
 
   applyPalette(): void {

@@ -6,6 +6,7 @@ import { densityAt, lateralSpeedAt, speedAt } from './difficulty';
 import { InstancedField, wrap } from './field';
 import type { LivePalette } from './palette';
 import { type Biome, BIOME_NAMES } from './biomes';
+import { terrain } from './terrain';
 import { Decor, decorate, Light, pickRoom, ROOM_IDS, ROOMS, roomLength, type RoomAPI, type RoomId, type RoomPlan } from './interior';
 import { BOULDER_HEIGHT, boulder, canister, crystalCluster, greebleBox, mushroomTree, pipeSegment, powerGem, shuttle, spireTree } from './props';
 
@@ -302,8 +303,11 @@ export class World {
     this.runStart = run ? this.distance - startScore / CONFIG.score.pointsPerUnit : null;
     this.theme = 'land';
     this.themeStart = -Infinity;
+    terrain.flatten();
     const level = this.levelAt(this.distance);
     this.themeEnd = run ? this.levelStart(level - ((level - 1) % LPT) + LPT) : Infinity;
+    // A run that starts on open ground never calls startTheme for it, so set its hills here.
+    if (run && themeForLevel(level) === 'land') terrain.setWindow(this.distance + clearance, this.themeEnd, rand() * 6.28, rand() * 6.28);
     this.lane = this.laneTarget = this.shipX;
     this.laneRetargetAt = this.distance + clearance + 20;
     this.nextFeatureAt = this.distance + clearance;
@@ -520,6 +524,7 @@ export class World {
       this.prevWallL = this.prevWallR = NaN;
     } else {
       this.laneTarget = this.lane;
+      if (this.runStart !== null) terrain.setWindow(d, this.themeEnd, rand() * 6.28, rand() * 6.28);
     }
   }
 

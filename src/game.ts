@@ -23,6 +23,7 @@ import { formatScore, UI } from './ui';
 import type { RoomId } from './interior';
 import { biomeForLevel, type PowerKind, themeForLevel, themeName, World } from './world';
 import { tintBiome } from './biomes';
+import { terrain } from './terrain';
 
 type State = 'title' | 'playing' | 'paused' | 'crashed';
 
@@ -584,6 +585,7 @@ export class Game {
 
   private frame = (now: number): void => {
     requestAnimationFrame(this.frame);
+    this.stage.setTerrain(this.world.distance);
     if (this.state === 'playing' || this.state === 'title') this.stage.adapt(now - this.lastTime);
     const dt = Math.max(0, Math.min((now - this.lastTime) / 1000, 1 / 20));
     this.lastTime = now;
@@ -670,7 +672,11 @@ export class Game {
     this.speed += (target - this.speed) * (1 - Math.exp(-CONFIG.speed.ease * dt));
     this.updateBoost(dt);
     const speed = this.currentSpeed();
-    this.player.update(dt, this.input.steering(), lateralSpeedAt(speed), this.boostLevel * CONFIG.boost.shipPitchDeg * DEG);
+    // Nose up and down with the hills ahead.
+    const dist = this.world.distance;
+    const slope = (terrain.heightAt(dist + 6) - terrain.heightAt(dist)) / 6;
+    const pitch = this.boostLevel * CONFIG.boost.shipPitchDeg * DEG + Math.atan(slope) * CONFIG.terrain.shipPitch;
+    this.player.update(dt, this.input.steering(), lateralSpeedAt(speed), pitch);
     this.speedLines.update(dt, speed, this.settings.reduceMotion ? 0 : this.boostLevel);
     this.trail.update(this.player.lateral * dt, speed * dt, -this.player.steer * CONFIG.ship.maxBankDeg * DEG);
     if (this.boosting) {
