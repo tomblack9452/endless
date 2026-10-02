@@ -13,6 +13,10 @@ import { CONFIG } from './config';
 // arrives (distance = d) the position is base + amp * sin(phase) whatever the
 // speed, so the generator knows exactly where it will be.
 //
+// Ramped instances (setNextRamp) move once instead: sideways or down by
+// `amp`, over `len` units of approach, finishing `finish` units before the
+// ship reaches them. Used for closing doors and falling debris.
+//
 // Optional per-instance colours come from a small table (see setColorTable).
 
 export class InstancedField {
@@ -30,7 +34,7 @@ export class InstancedField {
   readonly solid: Uint8Array;
   readonly wraps: Uint8Array;
   readonly scores: Uint8Array; // counts for near misses (walls don't)
-  readonly moving: Uint8Array;
+  readonly moving: Uint8Array; // 0 still, 1 sine, 2 ramp sideways, 3 ramp down
   readonly bx: Float32Array; // moving: centre of travel
   readonly amp: Float32Array;
   readonly freq: Float32Array;
@@ -43,6 +47,7 @@ export class InstancedField {
   private nextAmp = 0;
   private nextFreq = 0;
   private nextPhase = 0;
+  private nextRamp = 0; // 0 = the next motion is a sine
   private readonly free: Int32Array;
   private freeTop = 0;
   count = 0;
@@ -94,6 +99,14 @@ export class InstancedField {
   }
 
   /** Make the next spawn() a moving instance (see the note at the top). */
+  /** Make the next spawn() ramp once: sideways (`down` false) or dropping from `amp` above. */
+  setNextRamp(amp: number, len: number, finish: number, down: boolean): void {
+    this.nextAmp = amp;
+    this.nextFreq = len;
+    this.nextPhase = finish;
+    this.nextRamp = down ? 3 : 2;
+  }
+
   setNextMotion(amp: number, freq: number, phase: number): void {
     this.nextAmp = amp;
     this.nextFreq = freq;
@@ -140,13 +153,21 @@ export class InstancedField {
     this.colorIdx[i] = this.nextColor;
     this.nextColor = 0;
     if (this.nextAmp !== 0) {
-      this.moving[i] = 1;
-      this.bx[i] = x;
+      this.moving[i] = this.nextRamp || 1;
       this.amp[i] = this.nextAmp;
       this.freq[i] = this.nextFreq;
       this.phase[i] = this.nextPhase;
-      this.x[i] = x + this.nextAmp * Math.sin(this.nextPhase);
+      if (this.nextRamp === 3) {
+        this.bx[i] = y; // a drop keeps its resting height here
+        this.y[i] = y + this.nextAmp;
+      } else if (this.nextRamp === 2) {
+        this.bx[i] = x;
+      } else {
+        this.bx[i] = x;
+        this.x[i] = x + this.nextAmp * Math.sin(this.nextPhase);
+      }
       this.nextAmp = 0;
+      this.nextRamp = 0;
     } else {
       this.moving[i] = 0;
     }
@@ -176,7 +197,7 @@ export class InstancedField {
       }
       const x = this.x[i] - dx;
       this.x[i] = this.wraps[i] ? wrap(x) : x;
-      if (this.moving[i]) this.bx[i] -= dx;
+      if (this.moving[i] === 1 || this.moving[i] === 2) this.bx[i] -= dx;
     }
   }
 
@@ -184,13 +205,29 @@ export class InstancedField {
   animate(distance: number): void {
     for (let i = 0; i < this.max; i++) {
       if (!this.active[i] || !this.moving[i]) continue;
-      this.x[i] = this.bx[i] + this.amp[i] * Math.sin(this.freq[i] * (distance - this.d[i]) + this.phase[i]);
+      const m = this.moving[i];
+      if (m === 1) {
+        this.x[i] = this.bx[i] + this.amp[i] * Math.sin(this.freq[i] * (distance - this.d[i]) + this.phase[i]);
+        continue;
+      }
+      // Ramp: 0 far out, 1 once `finish` ahead of the ship, eased.
+      const ahead = this.d[i] - distance;
+      let t = 1 - (ahead - this.phase[i]) / this.freq[i];
+      t = t < 0 ? 0 : t > 1 ? 1 : t;
+      if (m === 2) {
+        this.x[i] = this.bx[i] + this.amp[i] * t * t * (3 - 2 * t);
+      } else {
+        this.y[i] = this.bx[i] + this.amp[i] * (1 - t * t); // falls, accelerating
+      }
     }
   }
 
   /** Where instance `i` will be when the ship reaches it (ship-relative x). */
   arrivalX(i: number): number {
-    return this.moving[i] ? this.bx[i] + this.amp[i] * Math.sin(this.phase[i]) : this.x[i];
+    const m = this.moving[i];
+    if (m === 1) return this.bx[i] + this.amp[i] * Math.sin(this.phase[i]);
+    if (m === 2) return this.bx[i] + this.amp[i];
+    return this.x[i];
   }
 
   /**
