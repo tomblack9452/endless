@@ -9,6 +9,7 @@ import {
   Vector3,
 } from 'three';
 import { CONFIG } from './config';
+import type { ShipId } from './cosmetics';
 import type { LivePalette } from './palette';
 
 const DEG = Math.PI / 180;
@@ -19,6 +20,65 @@ const NOSE = new Vector3(0, 0, -S.length * 0.6);
 const LEFT = new Vector3(-S.halfWidth, 0, S.length * 0.4);
 const RIGHT = new Vector3(S.halfWidth, 0, S.length * 0.4);
 const RIDGE = new Vector3(0, S.height, S.length * 0.28);
+
+/**
+ * Ship shapes (cosmetic; the hitbox is the same for all). Each is a list of
+ * triangles, light faces first then shaded ones, plus an outline for the
+ * shadow. Units are the ship's half-width (w), length (l) and ridge height (h).
+ */
+function shipShape(id: ShipId): { light: Vector3[]; shade: Vector3[]; outline: Vector3[] } {
+  const w = S.halfWidth;
+  const l = S.length;
+  const h = S.height;
+  const v = (x: number, y: number, z: number) => new Vector3(x, y, z);
+  switch (id) {
+    case 'wing': {
+      // Wide, shallow delta with a notched tail.
+      const nose = v(0, 0, -l * 0.5);
+      const lt = v(-w * 1.5, 0, l * 0.45);
+      const rt = v(w * 1.5, 0, l * 0.45);
+      const ridge = v(0, h * 0.8, l * 0.05);
+      const notch = v(0, 0, l * 0.25);
+      return { light: [nose, lt, ridge, ridge, notch, rt], shade: [nose, ridge, rt, lt, notch, ridge], outline: [nose, lt, rt] };
+    }
+    case 'needle': {
+      // Long and narrow with a tall spine.
+      const nose = v(0, 0, -l * 0.85);
+      const lt = v(-w * 0.62, 0, l * 0.45);
+      const rt = v(w * 0.62, 0, l * 0.45);
+      const ridge = v(0, h * 1.6, l * 0.3);
+      return { light: [nose, lt, ridge], shade: [nose, ridge, rt, lt, rt, ridge], outline: [nose, lt, rt] };
+    }
+    case 'manta': {
+      // Broad body with forward canards.
+      const nose = v(0, 0, -l * 0.55);
+      const lt = v(-w * 1.25, 0, l * 0.35);
+      const rt = v(w * 1.25, 0, l * 0.35);
+      const tail = v(0, 0, l * 0.5);
+      const ridge = v(0, h * 1.1, l * 0.1);
+      const cl = v(-w * 0.7, 0.01, -l * 0.25);
+      const cr = v(w * 0.7, 0.01, -l * 0.25);
+      return {
+        light: [nose, lt, ridge, ridge, tail, rt, nose, cl, v(0, 0.01, -l * 0.15)],
+        shade: [nose, ridge, rt, lt, tail, ridge, nose, v(0, 0.01, -l * 0.15), cr],
+        outline: [nose, lt, rt],
+      };
+    }
+    default: {
+      // Dart: the original low pyramid.
+      return { light: [NOSE, LEFT, RIDGE], shade: [NOSE, RIDGE, RIGHT, LEFT, RIGHT, RIDGE], outline: [NOSE, LEFT, RIGHT] };
+    }
+  }
+}
+
+function shipGeometry(id: ShipId): BufferGeometry {
+  const s = shipShape(id);
+  const g = new BufferGeometry();
+  g.setAttribute('position', new Float32BufferAttribute([...s.light, ...s.shade].flatMap(xyz), 3));
+  g.addGroup(0, s.light.length, 0);
+  g.addGroup(s.light.length, s.shade.length, 1);
+  return g;
+}
 
 interface Fragment {
   mesh: Mesh;
@@ -51,23 +111,7 @@ export class Player {
       depthWrite: false,
     });
 
-    // Low pyramid: two top faces in different tones plus a thin back face.
-    const g = new BufferGeometry();
-    g.setAttribute(
-      'position',
-      new Float32BufferAttribute(
-        [
-          ...xyz(NOSE), ...xyz(LEFT), ...xyz(RIDGE), // left top
-          ...xyz(NOSE), ...xyz(RIDGE), ...xyz(RIGHT), // right top
-          ...xyz(LEFT), ...xyz(RIGHT), ...xyz(RIDGE), // back
-        ],
-        3,
-      ),
-    );
-    g.addGroup(0, 3, 0);
-    g.addGroup(3, 3, 1);
-    g.addGroup(6, 3, 1);
-    this.body = new Mesh(g, [this.matTop, this.matShade]);
+    this.body = new Mesh(shipGeometry('dart'), [this.matTop, this.matShade]);
     this.root.add(this.body);
     this.root.position.y = S.hoverY;
     scene.add(this.root);
@@ -85,6 +129,17 @@ export class Player {
 
     this.buildFragments(scene);
     this.setVisible(false);
+  }
+
+  /** Swap the ship's shape (cosmetic). */
+  setShape(id: ShipId): void {
+    const s = shipShape(id);
+    this.body.geometry.dispose();
+    this.body.geometry = shipGeometry(id);
+    this.shadow.geometry.dispose();
+    const sg = new BufferGeometry();
+    sg.setAttribute('position', new Float32BufferAttribute(s.outline.flatMap(xyz), 3));
+    this.shadow.geometry = sg;
   }
 
   applyPalette(): void {
