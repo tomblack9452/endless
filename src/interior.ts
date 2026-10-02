@@ -24,7 +24,9 @@ export type RoomId =
   | 'lasers'
   | 'reactor'
   | 'pistons'
-  | 'hangar';
+  | 'hangar'
+  | 'gantry'
+  | 'breach';
 
 /** Strip light colours (index into the strip colour table). */
 export enum Light {
@@ -32,6 +34,20 @@ export enum Light {
   Amber = 1,
   Teal = 2,
   Red = 3,
+  Dark = 4,
+  Green = 5,
+}
+
+/** Wall dressing colours (index into the decor colour table). */
+export enum Decor {
+  Steel = 0,
+  Copper = 1,
+  Teal = 2,
+  Red = 3,
+  Dark = 4,
+  Yellow = 5,
+  Panel = 6,
+  Green = 7,
 }
 
 /** What a room's build() can see and do. One object, reused every row. */
@@ -51,6 +67,20 @@ export interface RoomAPI {
   memo: number; // free per-room state, reset to 0 at the start of each room
   memoAt: number;
   memo2: number;
+  seed: number; // 0..1, fixed for the room: decor choices stay consistent along it
+  row: number; // row counter, for repeating patterns
+  /** Inner face of the wall on `side` (-1 left, 1 right), world x. */
+  wall(side: number): number;
+  /** Pipe running along the wall on `side` at height y (centre). */
+  pipe(side: number, y: number, r: number, colour: Decor): void;
+  /** Pipe along the run at any x (railings, cables). */
+  run(x: number, y: number, d: number, r: number, colour: Decor): void;
+  /** Flat-coloured box standing at y: panels, ducts, uprights, debris. Never solid. */
+  greeble(x: number, y: number, d: number, w: number, h: number, depth: number, colour: Decor): void;
+  /** Start a custom floor for this row (anything not covered is a pit). */
+  floorBegin(): void;
+  /** Add a floor segment from x0 to x1 (world x). */
+  floor(x0: number, x1: number): void;
   /** True (and re-armed) when the room's next feature is due. */
   due(spacing: readonly number[]): boolean;
   /** True if something of half-width `half` at x keeps the lane clear. */
@@ -98,6 +128,12 @@ export interface RoomDef {
   /** Randomise width and height per room (default true). */
   vary?: boolean;
   build?(api: RoomAPI): void;
+  /** Wall dressing, every row (default: corridor pipes and ducts). */
+  decor?(api: RoomAPI): void;
+  /** Custom floor with pits, body rows only (default: solid floor). */
+  floor?(api: RoomAPI): void;
+  /** Railings along custom floor edges (gantry) instead of hazard lights. */
+  railings?: boolean;
 }
 
 const R = CONFIG.themes.interior.rooms;
@@ -108,6 +144,8 @@ function range(r: readonly number[]): number {
 }
 
 export const ROOMS: Record<RoomId, RoomDef> = {
+  gantry: null as unknown as RoomDef, // filled in below (defined after the helpers they use)
+  breach: null as unknown as RoomDef,
   corridor: {
     name: '',
     extraWidth: () => 0,
@@ -490,6 +528,201 @@ function branchCrates(api: RoomAPI, scale: number): void {
   }
 }
 
+// --- pit rooms ---------------------------------------------------------------
+
+/** Maintenance gantry: the floor drops away; railed catwalks, one always on the lane. */
+const gantry: RoomDef = {
+  name: 'maintenance gantry',
+  extraWidth: () => R.gantry.extraWidth,
+  height: R.gantry.height,
+  ceiling: true,
+  windows: false,
+  light: Light.Amber,
+  wander: 0.5,
+  enclosure: 1,
+  railings: true,
+  floor(api) {
+    const ch = R.gantry.catwalkHalf;
+    api.floorBegin();
+    api.floor(api.lane - ch, api.lane + ch);
+    // Side walkway: runs parallel for a while, joined to the main one by bridges at both ends.
+    if (api.memoAt <= api.d && api.due(R.gantry.sideWalks)) {
+      const room = api.hw - 1.4;
+      const off = (Math.random() < 0.5 ? -1 : 1) * (ch * 2 + 1 + Math.random() * Math.max(0, room - ch * 2 - 1.5));
+      api.memo = Math.max(-room, Math.min(room, api.lane - api.cx + off)); // offset from cx
+      api.memoAt = api.d + range(R.gantry.sideLength);
+      api.memo2 = api.d; // start, for the first bridge
+    }
+    if (api.memoAt > api.d) {
+      const x = api.cx + api.memo;
+      api.floor(x - 1, x + 1);
+      // Bridges at the two ends.
+      if (api.d - api.memo2 < 2.3 || api.memoAt - api.d < 2.3) api.floor(Math.min(x, api.lane), Math.max(x, api.lane));
+    }
+  },
+  decor(api) {
+    corridorDecor(api);
+  },
+};
+
+/** Hull breach: damaged deck with holes torn in the floor, sparks and broken pipes. */
+const breach: RoomDef = {
+  name: 'hull breach',
+  extraWidth: () => R.breach.extraWidth,
+  height: R.breach.height,
+  ceiling: true,
+  windows: false,
+  light: Light.Red,
+  wander: 0.6,
+  enclosure: 1,
+  floor(api) {
+    const left = api.cx - api.hw;
+    const right = api.cx + api.hw;
+    if (api.memoAt <= api.d && api.due(R.breach.holeSpacing)) {
+      const w = range(R.breach.holeWidth);
+      const len = range(R.breach.holeLength);
+      // Clear of the lane for as long as the hole lasts, however the lane drifts.
+      const clear = w / 2 + LANE + api.jitter + api.maxSlope * len + 0.2;
+      for (let t = 0; t < 6; t++) {
+        const x = api.cx + (Math.random() * 2 - 1) * (api.hw - w / 2 - 0.4);
+        if (Math.abs(x - api.lane) < clear) continue;
+        api.memo = x - api.cx;
+        api.memo2 = w;
+        api.memoAt = api.d + len;
+        break;
+      }
+    }
+    if (api.memoAt <= api.d) return; // solid floor this row
+    const x0 = api.cx + api.memo - api.memo2 / 2;
+    const x1 = api.cx + api.memo + api.memo2 / 2;
+    api.floorBegin();
+    if (x0 > left + 0.05) api.floor(left, x0);
+    if (x1 < right - 0.05) api.floor(x1, right);
+    // Sparks at the torn edges.
+    if (Math.random() < 0.3) api.light(Math.random() < 0.5 ? x0 : x1, 0.05 + Math.random() * 0.3, api.d, 0.05, 0.05, 0.05, Math.random() < 0.5 ? Light.Amber : Light.Red);
+  },
+  decor(api) {
+    corridorDecor(api);
+    // Broken pipe ends and debris against the walls.
+    if (api.row % 5 === 0) {
+      const s = h(api, api.row) < 0.5 ? -1 : 1;
+      api.greeble(api.wall(s) - s * 0.5, 0, api.d, 0.6 + h(api, api.row + 1) * 0.6, 0.2 + h(api, api.row + 2) * 0.4, 0.8, Decor.Dark);
+    }
+  },
+};
+
+// --- wall dressing (the asset pack) ---------------------------------------------
+
+/** Seeded 0..1 per room, so a pipe run keeps its height and colour along the room. */
+function h(api: RoomAPI, n: number): number {
+  const v = Math.sin((api.seed * 1000 + n) * 12.9898) * 43758.5453;
+  return v - Math.floor(v);
+}
+
+const PIPE_COLOURS = [Decor.Steel, Decor.Copper, Decor.Teal, Decor.Red, Decor.Steel];
+
+/** Corridors: pipe runs, ceiling ducts, wall ribs and small lights. */
+function corridorDecor(api: RoomAPI, runs = 1 + Math.floor(h(api, 1) * 3)): void {
+  for (const s of [-1, 1]) {
+    for (let i = 0; i < runs; i++) {
+      const k = i * 7 + (s > 0 ? 3 : 0);
+      api.pipe(s, 0.45 + h(api, 10 + k) * 2.1, 0.06 + h(api, 20 + k) * 0.14, PIPE_COLOURS[Math.floor(h(api, 30 + k) * 5)]);
+    }
+    if (h(api, 40) > 0.35) api.greeble(api.wall(s) - s * 0.35, api.H - 0.55, api.d, 0.7, 0.5, 2.32, Decor.Panel);
+    if (api.row % 4 === 0) api.greeble(api.wall(s) - s * 0.1, 0, api.d, 0.2, api.H, 0.25, Decor.Dark);
+    if (api.row % 8 === (s > 0 ? 4 : 0)) api.light(api.wall(s) - s * 0.03, 2.2, api.d, 0.05, 0.12, 0.6, Light.White);
+    // Now and then a control panel: a dark box with a lit screen.
+    if (api.row % 11 === (s > 0 ? 3 : 8) && h(api, 50 + api.row) > 0.4) {
+      api.greeble(api.wall(s) - s * 0.15, 0.7, api.d, 0.3, 0.9, 1.2, Decor.Panel);
+      api.light(api.wall(s) - s * 0.31, 1.15, api.d, 0.02, 0.32, 0.8, h(api, 60 + api.row) < 0.5 ? Light.Teal : Light.Amber);
+    }
+  }
+}
+
+/** Server hall: computers covering the walls, indicator lights, cable bundles and trays. */
+function serversDecor(api: RoomAPI): void {
+  const colours = [Light.Teal, Light.Amber, Light.White, Light.Green];
+  for (const s of [-1, 1]) {
+    api.greeble(api.wall(s) - s * 0.1, 0.45, api.d, 0.2, api.H - 1.1, 2.32, Decor.Dark);
+    for (let k = 0; k < 5; k++) {
+      if (Math.random() > 0.55) continue;
+      api.light(api.wall(s) - s * 0.21, 0.7 + k * 0.42, api.d + (Math.random() - 0.5) * 1.8, 0.03, 0.05, 0.12, colours[Math.floor(Math.random() * 4)]);
+    }
+    api.pipe(s, 0.22, 0.05, Decor.Dark);
+    api.pipe(s, 0.32, 0.04, Decor.Dark);
+    api.greeble(api.wall(s) - s * 0.5, api.H - 0.35, api.d, 1, 0.12, 2.32, Decor.Dark);
+  }
+}
+
+/** Cargo bay: hazard stripes along the base, shelving uprights, one high pipe run. */
+function cargoDecor(api: RoomAPI): void {
+  for (const s of [-1, 1]) {
+    api.greeble(api.wall(s) - s * 0.06, 0, api.d, 0.12, 0.45, 2.32, api.row % 2 ? Decor.Yellow : Decor.Dark);
+    if (api.row % 3 === 0) api.greeble(api.wall(s) - s * 0.15, 0, api.d, 0.3, api.H, 0.3, Decor.Panel);
+    api.pipe(s, api.H - 0.6, 0.12, Decor.Steel);
+  }
+}
+
+/** Reactor: huge coolant pipes and ribs. */
+function reactorDecor(api: RoomAPI): void {
+  for (const s of [-1, 1]) {
+    api.pipe(s, 1.1, 0.45, Decor.Teal);
+    api.pipe(s, 2.5, 0.3, Decor.Teal);
+    api.pipe(s, 3.6, 0.15, Decor.Steel);
+    if (api.row % 3 === 0) api.greeble(api.wall(s) - s * 0.5, 0, api.d, 1, api.H, 0.35, Decor.Panel);
+  }
+}
+
+/** Piston hall: hydraulic lines, hazard stripes, red lights. */
+function pistonsDecor(api: RoomAPI): void {
+  for (const s of [-1, 1]) {
+    api.pipe(s, 0.55, 0.09, Decor.Yellow);
+    api.pipe(s, 0.75, 0.09, Decor.Yellow);
+    api.greeble(api.wall(s) - s * 0.06, 0, api.d, 0.12, 0.35, 2.32, api.row % 2 ? Decor.Yellow : Decor.Dark);
+    if (api.row % 6 === 0) api.light(api.wall(s) - s * 0.03, 2.4, api.d, 0.05, 0.15, 0.4, Light.Red);
+  }
+}
+
+/** Hangar: tall uprights, a high walkway with a rail. */
+function hangarDecor(api: RoomAPI): void {
+  for (const s of [-1, 1]) {
+    if (api.row % 5 === 0) api.greeble(api.wall(s) - s * 0.3, 0, api.d, 0.6, api.H, 0.6, Decor.Panel);
+    api.greeble(api.wall(s) - s * 0.6, api.H - 1.8, api.d, 1.2, 0.12, 2.32, Decor.Dark);
+    api.run(api.wall(s) - s * 1.15, api.H - 0.9, api.d, 0.04, Decor.Steel);
+  }
+}
+
+/** Hydroponics: irrigation pipes and grow lights. */
+function hydroponicsDecor(api: RoomAPI): void {
+  for (const s of [-1, 1]) {
+    api.pipe(s, 0.4, 0.08, Decor.Teal);
+    api.pipe(s, 1.2, 0.05, Decor.Green);
+    api.light(api.wall(s) - s * 0.05, api.H - 1, api.d, 0.06, 0.06, 1.8, Light.Green);
+    if (api.row % 4 === 0) api.greeble(api.wall(s) - s * 0.4, 0, api.d, 0.8, 0.6, 1.6, Decor.Green);
+  }
+}
+
+/** Laser gates: emitter panels on the walls. */
+function lasersDecor(api: RoomAPI): void {
+  corridorDecor(api, 1);
+  if (api.row % 6 === 0) {
+    for (const s of [-1, 1]) {
+      api.greeble(api.wall(s) - s * 0.12, 0.15, api.d, 0.24, 0.8, 0.6, Decor.Dark);
+      api.light(api.wall(s) - s * 0.25, 0.5, api.d, 0.02, 0.1, 0.3, Light.Red);
+    }
+  }
+}
+
+/** Observation deck: a railing along the low wall. */
+function deckDecor(api: RoomAPI): void {
+  for (const s of [-1, 1]) api.run(api.wall(s) - s * 0.08, 0.95, api.d, 0.04, Decor.Steel);
+}
+
+export function decorate(id: RoomId, api: RoomAPI): void {
+  const def = ROOMS[id];
+  if (def.decor) def.decor(api);
+  else corridorDecor(api);
+}
 function beam(api: RoomAPI, from: number, to: number): void {
   const w = to - from;
   const mid = (from + to) / 2;
@@ -498,6 +731,18 @@ function beam(api: RoomAPI, from: number, to: number): void {
   api.box(from + 0.12, 0, api.d, 0.24, 1.1, 0.3, true, true);
   api.box(to - 0.12, 0, api.d, 0.24, 1.1, 0.3, true, true);
 }
+
+ROOMS.gantry = gantry;
+ROOMS.breach = breach;
+ROOMS.servers.decor = serversDecor;
+ROOMS.cargo.decor = cargoDecor;
+ROOMS.reactor.decor = reactorDecor;
+ROOMS.pistons.decor = pistonsDecor;
+ROOMS.hangar.decor = hangarDecor;
+ROOMS.hydroponics.decor = hydroponicsDecor;
+ROOMS.lasers.decor = lasersDecor;
+ROOMS.deck.decor = deckDecor;
+ROOMS.shaft.decor = (api) => corridorDecor(api, 5);
 
 export const ROOM_IDS = Object.keys(ROOMS) as RoomId[];
 

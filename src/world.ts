@@ -4,8 +4,8 @@ import { CONFIG } from './config';
 import { densityAt, lateralSpeedAt, speedAt } from './difficulty';
 import { InstancedField, wrap } from './field';
 import type { LivePalette } from './palette';
-import { Light, pickRoom, ROOM_IDS, ROOMS, roomLength, type RoomAPI, type RoomId, type RoomPlan } from './interior';
-import { BOULDER_HEIGHT, boulder, crystalCluster, mushroomTree, shuttle, spireTree } from './props';
+import { Decor, decorate, Light, pickRoom, ROOM_IDS, ROOMS, roomLength, type RoomAPI, type RoomId, type RoomPlan } from './interior';
+import { BOULDER_HEIGHT, boulder, crystalCluster, greebleBox, mushroomTree, pipeSegment, shuttle, spireTree } from './props';
 
 // The world ahead of the ship: obstacle pools plus the generator that lays
 // out each theme row by row.
@@ -27,6 +27,7 @@ const STEP = F.rowSpacing;
 const W = F.halfWidth;
 const SPAN = W * 2;
 const LANE = TH.lane.halfWidth;
+const FLOOR_ROWS = 512; // rows of floor history kept for fall checks
 
 /** Open-ground prop kinds. */
 const enum Prop {
@@ -66,6 +67,7 @@ export class World {
   distance = 0;
   canyonMix = 0; // 0..1, how much the canyon look applies at the ship
   interiorMix = 0;
+  deckMix = 0; // 0..1, open to space on the observation deck
 
   private generatedTo = 0;
   private lastDx = 0; // sideways movement this frame, for swept collision
@@ -85,6 +87,16 @@ export class World {
   private readonly crystals: InstancedField;
   private readonly strips: InstancedField; // lights, and laser beams (solid ones)
   private readonly shuttles: InstancedField;
+  private readonly pipes: InstancedField; // wall dressing
+  private readonly greebles: InstancedField;
+  private readonly voids: InstancedField; // pit bottoms
+  private readonly decorMat: MeshBasicMaterial;
+  // Custom floor of the row being built (world x pairs) and the history of past rows.
+  private floorN = -1;
+  private readonly floorSegs = new Float32Array(12);
+  private readonly floorD = new Float64Array(FLOOR_ROWS).fill(-Infinity);
+  private readonly floorCount = new Int8Array(FLOOR_ROWS).fill(-1);
+  private readonly floorRows = new Float32Array(FLOOR_ROWS * 12);
   private readonly pickups: InstancedField;
   private readonly fields: InstancedField[];
   private readonly solids: InstancedField[]; // everything that can be hit
@@ -176,13 +188,23 @@ export class World {
     this.stripMat = new MeshBasicMaterial();
     this.strips = new InstancedField(scene, box, this.stripMat, F.maxStrips);
     const L = TH.interior.lights;
-    this.strips.setColorTable([new Color(1, 1, 1), new Color(L.amber), new Color(L.teal), new Color(L.red)]);
+    this.strips.setColorTable([new Color(1, 1, 1), new Color(L.amber), new Color(L.teal), new Color(L.red), new Color(L.dark), new Color(L.green)]);
+    // Wall dressing: shaded geometry tinted per instance from the decor table (Decor order).
+    const D = TH.interior.decor;
+    const decorTable = [D.steel, D.copper, D.teal, D.red, D.dark, D.yellow, D.panel, D.green].map((h) => new Color(h));
+    this.decorMat = new MeshBasicMaterial({ vertexColors: true });
+    this.decorMat.color.setScalar(0.95);
+    this.pipes = new InstancedField(scene, pipeSegment(), this.decorMat, F.maxPipes);
+    this.pipes.setColorTable(decorTable);
+    this.greebles = new InstancedField(scene, greebleBox(), this.decorMat, F.maxGreebles);
+    this.greebles.setColorTable(decorTable);
+    this.voids = new InstancedField(scene, box, new MeshBasicMaterial({ color: TH.interior.void, fog: false }), F.maxVoids);
     this.shuttles = new InstancedField(scene, shuttle(), this.propMat, F.maxShuttles);
     this.pickupMat = new MeshBasicMaterial();
     const p = CONFIG.boost.pickup;
     this.pickups = new InstancedField(scene, new OctahedronGeometry(p.size, 0), this.pickupMat, F.maxPickups);
     this.solids = [this.blocks, this.hull, this.rocks, this.obstacleRocks, this.mushrooms, this.spires, this.crystals, this.shuttles, this.strips];
-    this.fields = [...this.solids, this.pickups];
+    this.fields = [...this.solids, this.pickups, this.pipes, this.greebles, this.voids];
     this.applyPalette();
   }
 
@@ -230,6 +252,7 @@ export class World {
     this.plan = null;
     this.roomShift = 0;
     this.prevWallL = this.prevWallR = NaN;
+    this.floorD.fill(-Infinity);
     // startScore > 0 (dev skip) places the run part-way along.
     this.runStart = run ? this.distance - startScore / CONFIG.score.pointsPerUnit : null;
     this.theme = 'land';
@@ -336,6 +359,7 @@ export class World {
   private updateMix(dt: number): void {
     this.canyonMix = this.interiorMix = 0;
     this.roomName = '';
+    if (themeForLevel(this.levelAt(this.distance)) !== 'interior') this.deckMix = 0;
     if (this.runStart === null) return;
     const level = this.levelAt(this.distance);
     const first = level - ((level - 1) % LPT);
@@ -350,6 +374,8 @@ export class World {
       const target = room ? ROOMS[room].enclosure : 1;
       this.enclosure += (target - this.enclosure) * Math.min(1, dt * 1.5);
       this.interiorMix = k * this.enclosure;
+      const deck = room === 'deck' ? 1 : 0;
+      this.deckMix += (deck * k - this.deckMix) * Math.min(1, dt * 1.2);
     }
   }
 
@@ -702,6 +728,7 @@ export class World {
     this.api.memo = 0;
     this.api.memo2 = 0;
     this.api.memoAt = d + taper;
+    this.api.seed = Math.random();
     this.nextFeatureAt = d + taper + 4;
     this.framePending = true;
     this.logRoom(d, id);
@@ -714,12 +741,7 @@ export class World {
     if (this.entrancePending) {
       // Hull face with a door, so the canyon ends at the ship.
       this.entrancePending = false;
-      const door = base + it.doorExtra;
-      const fw = 34;
-      const fh = 10;
-      this.hullBox(this.cx - door - wallT - fw / 2, 0, d - 1, fw, fh, 1.2, true);
-      this.hullBox(this.cx + door + wallT + fw / 2, 0, d - 1, fw, fh, 1.2, true);
-      this.hullBox(this.cx, it.wallHeight, d - 1, 2 * door + 2 * wallT, fh - it.wallHeight, 1.2, false);
+      this.buildFacade(d, base + it.doorExtra);
       this.startRoom('corridor', d, base, maxSlope, false);
     } else if (d >= this.roomEnd) {
       let next: RoomId = 'corridor';
@@ -780,6 +802,15 @@ export class World {
     }
     api.lane = this.lane;
 
+    // Floor: solid, or (gantry, breach) a custom floor with pits in the room body.
+    const inBody = d >= this.roomStart + taper && d <= this.roomEnd - taper && !this.quiet(d);
+    api.row++;
+    this.floorN = -1;
+    if (def.floor && inBody) def.floor(api);
+    const pit = this.floorN >= 0;
+    const P = it.pitDepth;
+    this.recordFloor(d);
+
     // Shell
     const depth = STEP + 0.12;
     const span = 2 * hw + 2 * wallT;
@@ -798,13 +829,34 @@ export class World {
         if (Math.floor(d / STEP) % 3 === 0) this.hullBox(inner + k * 0.15, 0, d, 0.3, H, 0.3, true);
         this.hullBox(wx, H, d, thick, 0.25, depth, false);
       } else {
-        this.hullBox(wx, 0, d, thick, H, depth, true);
+        // Over a pit the wall runs down to the pit bottom.
+        const base = pit ? -P : 0;
+        this.hullBox(wx, base, d, thick, H - base, depth, true);
       }
       if (k < 0) this.prevWallL = inner;
       else this.prevWallR = inner;
     }
     if (def.ceiling) this.hullBox(this.cx, H, d, span, 0.35, depth, false);
-    this.hullBox(this.cx, -0.14, d, span, 0.14, depth, false); // floor
+    if (!pit) {
+      this.hullBox(this.cx, -0.14, d, span, 0.14, depth, false);
+    } else {
+      // Floor pieces over a dark drop, with lit edges or railings.
+      this.voids.spawn(this.cx - this.shipX, -P - 0.1, d, span, 0.1, depth, 0, false, false, 0, 0, false);
+      for (let i = 0; i < this.floorN; i++) {
+        const x0 = this.floorSegs[i * 2];
+        const x1 = this.floorSegs[i * 2 + 1];
+        this.hullBox((x0 + x1) / 2, -0.14, d, x1 - x0, 0.14, depth, false);
+        for (const [edge, s] of [[x0, -1], [x1, 1]] as const) {
+          this.hullBox(edge + s * 0.08, -P, d, 0.16, P - 0.14, depth, false); // the drop's side
+          if (def.railings) {
+            api.run(edge - s * 0.06, it.railHeight, d, 0.035, Decor.Steel);
+            if (api.row % 3 === 0) api.greeble(edge - s * 0.06, 0, d, 0.07, it.railHeight, 0.07, Decor.Steel);
+          } else {
+            this.light(edge - s * 0.04, 0.01, d, 0.08, 0.02, depth, Light.Amber, false);
+          }
+        }
+      }
+    }
     const split = this.plan !== null && open > 0.97;
     if (split) {
       // Dividers between branches, a light down each branch.
@@ -821,6 +873,9 @@ export class World {
       this.lightStrip(this.cx, 0.01, d, def.light); // deck: a line along the floor instead
     }
 
+    // Wall dressing: pipes, ducts, panels... per room type.
+    decorate(this.room, api);
+
     // Door frame where each room or corridor begins: lintel, jambs and floor stripes.
     if (this.framePending) {
       this.framePending = false;
@@ -831,10 +886,96 @@ export class World {
     }
 
     // Room contents (split rooms only once the dividers are up).
-    if (!def.build || this.quiet(d)) return;
-    if (d < this.roomStart + taper || d > this.roomEnd - taper) return;
+    if (!def.build || !inBody) return;
     if (this.plan && !split) return;
     def.build(api);
+  }
+
+  /**
+   * The outside of the ship, where the canyon ends: layered hull panels of
+   * different heights and depths, towers with window strips, antenna masts
+   * with red beacons, big pipes running across, and a hazard-striped door.
+   */
+  private buildFacade(d: number, door: number): void {
+    const it = TH.interior;
+    const fc = it.facade;
+    const cx = this.cx;
+    const front = d - 1.6; // the face nearest the ship
+    const api = this.api;
+    for (const s of [-1, 1]) {
+      // Hull panels from the door outwards.
+      let x = door + 0.6;
+      while (x < fc.width) {
+        const w = 2.5 + Math.random() * 5;
+        const h = range(fc.height);
+        const dep = 1.2 + Math.random() * 3;
+        const px = cx + s * (x + w / 2);
+        this.hullBox(px, 0, front + dep / 2, w, h, dep, true);
+        // Rows of small windows on some panels.
+        if (Math.random() < 0.55) {
+          const rows = 1 + Math.floor(Math.random() * 3);
+          const colour = Math.random() < 0.6 ? Light.White : Light.Teal;
+          for (let k = 0; k < rows; k++) this.light(px, 3 + k * 2.2 + Math.random(), front - 0.03, w * 0.7, 0.18, 0.05, colour, false);
+        }
+        x += w;
+      }
+      // Big pipes running across the face.
+      for (let k = 0; k < 2; k++) {
+        const len = fc.width - door - 2;
+        this.pipes.nextColor = k ? Decor.Copper : Decor.Steel;
+        this.pipes.spawn(cx + s * (door + 1 + len / 2) - this.shipX, 4.4 + k * 3.5, front - 0.7, 0.45 - k * 0.15, 0.45 - k * 0.15, len, Math.PI / 2, false, false, 0, 0, false);
+      }
+    }
+    // Towers standing proud of the hull, with lit windows.
+    for (let t = 0; t < Math.round(range(fc.towers)); t++) {
+      const s = Math.random() < 0.5 ? -1 : 1;
+      const w = 3 + Math.random() * 4;
+      const tx = cx + s * (door + 5 + Math.random() * (fc.width - door - 10));
+      const th = 20 + Math.random() * 14;
+      this.hullBox(tx, 0, front + 1.5, w, th, 4, true);
+      for (let k = 0; k < 6; k++) this.light(tx, 6 + k * 2.6, front - 0.53, w * 0.6, 0.2, 0.05, Math.random() < 0.3 ? Light.Amber : Light.White, false);
+    }
+    // Antenna masts with red beacons.
+    for (let m = 0; m < Math.round(range(fc.masts)); m++) {
+      const s = Math.random() < 0.5 ? -1 : 1;
+      const mx = cx + s * (door + 3 + Math.random() * (fc.width - door - 6));
+      const mh = 18 + Math.random() * 16;
+      api.greeble(mx, 0, front + 1, 0.3, mh, 0.3, Decor.Steel);
+      this.light(mx, mh, front + 1, 0.5, 0.5, 0.5, Light.Red, false);
+    }
+    // Over the door, then hazard stripes around it and floodlights.
+    const H = it.wallHeight;
+    this.hullBox(cx, H, front + 1, 2 * door + 1.2, range(fc.height) - H, 2, false);
+    for (let k = 0; k < 7; k++) {
+      const colour = k % 2 ? Light.Amber : Light.Dark;
+      this.light(cx - door - 0.35, k * 0.5 + 0.25, front - 0.05, 0.7, 0.5, 0.08, colour, false);
+      this.light(cx + door + 0.35, k * 0.5 + 0.25, front - 0.05, 0.7, 0.5, 0.08, colour, false);
+    }
+    for (let k = 0; k < 8; k++) {
+      this.light(cx - door + (k + 0.5) * ((2 * door) / 8), H + 0.25, front - 0.05, (2 * door) / 8, 0.5, 0.08, k % 2 ? Light.Amber : Light.Dark, false);
+    }
+    this.light(cx - door * 0.6, H + 1.2, front - 0.1, 1.2, 0.3, 0.1, Light.White, false);
+    this.light(cx + door * 0.6, H + 1.2, front - 0.1, 1.2, 0.3, 0.1, Light.White, false);
+  }
+  /** Remember this row's floor so the ship can fall through gaps (ring buffer by row). */
+  private recordFloor(d: number): void {
+    const slot = (((Math.round(d / STEP) % FLOOR_ROWS) + FLOOR_ROWS) % FLOOR_ROWS);
+    this.floorD[slot] = d;
+    this.floorCount[slot] = this.floorN;
+    for (let i = 0; i < Math.max(0, this.floorN) * 2; i++) this.floorRows[slot * 12 + i] = this.floorSegs[i];
+  }
+
+  /** True if the ship is over a pit (no floor under it). */
+  overPit(): boolean {
+    const slot = (((Math.round(this.distance / STEP) % FLOOR_ROWS) + FLOOR_ROWS) % FLOOR_ROWS);
+    if (Math.abs(this.floorD[slot] - this.distance) > STEP * 0.6) return false;
+    const n = this.floorCount[slot];
+    if (n < 0) return false;
+    const x = this.shipX;
+    for (let i = 0; i < n; i++) {
+      if (x >= this.floorRows[slot * 12 + i * 2] - 0.1 && x <= this.floorRows[slot * 12 + i * 2 + 1] + 0.1) return false;
+    }
+    return true;
   }
   private makeApi(): RoomAPI {
     const w = this; // eslint-disable-line @typescript-eslint/no-this-alias
@@ -854,6 +995,8 @@ export class World {
       memo: 0,
       memoAt: 0,
       memo2: 0,
+      seed: 0,
+      row: 0,
       due(spacing) {
         if (this.d < w.nextFeatureAt) return false;
         w.nextFeatureAt = this.d + range(spacing);
@@ -879,6 +1022,31 @@ export class World {
       },
       light(x, y, d, width, h, depth, colour, solid = false) {
         w.light(x, y, d, width, h, depth, colour, solid);
+      },
+      wall(side) {
+        return this.cx + side * this.hw;
+      },
+      pipe(side, y, r, colour) {
+        w.pipes.nextColor = colour;
+        const x = this.cx + side * (this.hw - r - 0.02);
+        w.pipes.spawn(x - w.shipX, y, this.d, r, r, STEP + 0.1, 0, false, false, 0, 0, false);
+      },
+      run(x, y, d, r, colour) {
+        w.pipes.nextColor = colour;
+        w.pipes.spawn(x - w.shipX, y, d, r, r, STEP + 0.1, 0, false, false, 0, 0, false);
+      },
+      greeble(x, y, d, width, h, depth, colour) {
+        w.greebles.nextColor = colour;
+        w.greebles.spawn(x - w.shipX, y, d, width, h, depth, 0, false, false, 0, 0, false);
+      },
+      floorBegin() {
+        w.floorN = 0;
+      },
+      floor(x0, x1) {
+        if (w.floorN >= 6 || x1 <= x0) return;
+        w.floorSegs[w.floorN * 2] = x0;
+        w.floorSegs[w.floorN * 2 + 1] = x1;
+        w.floorN++;
       },
       tree(x, d, size) {
         const field = Math.random() < 0.6 ? w.mushrooms : w.spires;

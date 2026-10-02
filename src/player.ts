@@ -38,6 +38,8 @@ export class Player {
   lateral = 0; // sideways speed, units/s, + = right
   steer = 0; // smoothed steering, -1..1
   private broken = false;
+  private falling = false;
+  private fallVel = 0;
 
   constructor(scene: Scene, private readonly palette: LivePalette) {
     this.matTop = new MeshBasicMaterial({ color: palette.ship, side: DoubleSide });
@@ -101,7 +103,26 @@ export class Player {
     this.steer = 0;
     this.broken = false;
     this.root.rotation.set(0, 0, 0);
+    this.root.position.set(0, S.hoverY, 0);
+    this.fallVel = 0;
+    this.falling = false;
     for (const f of this.fragments) f.mesh.visible = false;
+  }
+
+  /** Drop into a pit: the ship tips forward and falls away (instead of shattering). */
+  fall(): void {
+    this.falling = true;
+    this.fallVel = 0;
+    this.shadow.visible = false;
+  }
+
+  updateFall(dt: number): void {
+    if (!this.falling) return;
+    this.fallVel += 16 * dt;
+    this.root.position.y -= this.fallVel * dt;
+    this.root.position.z -= 3 * dt; // keeps a little forward momentum
+    this.root.rotation.x -= 1.6 * dt;
+    if (this.root.position.y < -CONFIG.themes.interior.pitDepth) this.root.visible = false;
   }
 
   /** `maxLateral` is the sideways speed at full steer (rises with forward speed). */

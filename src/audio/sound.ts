@@ -302,6 +302,28 @@ export class Sound {
     for (let i = 0; i < 3; i++) this.bell(m.scaleNote(i * 2, ROOT_MIDI + 24), t + 0.1 + i * 0.13, A.level, 0, 1.4, 2);
   }
 
+  /** Fell into a pit: a falling whistle, then a distant thud below. */
+  fall(): void {
+    const ctx = this.ctx;
+    if (!ctx) return;
+    const t = ctx.currentTime;
+    this.engineOn = false;
+    this.glide(t, 900, 140, 0.9, A.boost * 0.5);
+    this.sweep(t, 2400, 300, 0.9, A.boost * 0.6, 0);
+    const o = ctx.createOscillator();
+    o.frequency.setValueAtTime(70, t + 0.75);
+    o.frequency.exponentialRampToValueAtTime(30, t + 1.2);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    pluckEnv(g.gain, t + 0.75, A.crash * 0.4, 0.01, 0.6);
+    o.connect(g).connect(this.sfxBus);
+    g.connect(this.reverbSend);
+    o.start(t);
+    o.stop(t + 1.6);
+    this.muffle.frequency.cancelScheduledValues(t);
+    this.muffle.frequency.setTargetAtTime(A.muffleHz, t + 0.6, 0.4);
+  }
+
   /** Crash: thump, crunch, scattered debris, then everything muffled. */
   crash(): void {
     const ctx = this.ctx;

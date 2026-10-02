@@ -32,6 +32,8 @@ const INTERIOR_SKY = new Color(T.interior.sky);
 const INTERIOR_FOG = new Color(T.interior.fog);
 const INTERIOR_LIGHT = Math.pow(T.interior.light, 2.2);
 const lit = new Color();
+const SPACE_SKY = new Color(CONFIG.space.sky);
+const SPACE_FOG = new Color(CONFIG.space.fog);
 
 const skyA = new Color();
 const skyB = new Color();
@@ -63,6 +65,7 @@ export function applyAtmosphere(
   levelProgress: number,
   canyon: number,
   interior: number,
+  space = 0,
 ): void {
   out.copy(base);
   out.ground.lerp(CANYON_GROUND, canyon);
@@ -71,6 +74,11 @@ export function applyAtmosphere(
   out.light.setRGB(1, 1, 1);
   if (A.enabled) applyTimeOfDay(base, out, levelProgress);
   applyInterior(base, out, interior);
+  // Observation deck: deep space overhead.
+  if (space > 0) {
+    out.sky.lerp(SPACE_SKY, space);
+    out.fog.lerp(SPACE_FOG, space * 0.8);
+  }
   flipForeground(out);
 }
 
