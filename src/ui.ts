@@ -174,6 +174,10 @@ export class UI {
     document.body.classList.toggle('reduce-motion', reduceMotion);
   }
 
+  setSkyColor(css: string): void {
+    document.documentElement.style.setProperty('--sky', css);
+  }
+
   /** A short notice low on screen for a few seconds. */
   showNotice(text: string): void {
     this.notice.textContent = text;
@@ -219,9 +223,10 @@ export class UI {
     this.titleBest.textContent = text;
   }
 
-  setGameOver(score: number, best: number, isNewBest: boolean, nearMisses: number, bestCombo: number): void {
+  setGameOver(score: number, best: number, isNewBest: boolean, nearMisses: number, bestCombo: number, seed: number): void {
     this.overStats.textContent =
-      nearMisses > 0 ? `near misses ${nearMisses}, best chain x${bestCombo}` : 'no near misses';
+      (nearMisses > 0 ? `near misses ${nearMisses}, best chain x${bestCombo}` : 'no near misses') +
+      (import.meta.env.DEV ? `  seed ${seed}` : ''); // dev builds: for reporting a layout
     this.overScore.textContent = formatScore(score);
     this.overBest.textContent = isNewBest ? 'new best' : `best ${formatScore(best)}`;
   }
