@@ -24,6 +24,7 @@ export class UI {
   private readonly bannerNum = $('banner-num');
   private readonly bannerTheme = $('banner-theme');
   private readonly roomLabel = $('room-label');
+  private readonly notice = $('notice');
   readonly boostControl = $('hud-boost');
   private readonly combo = $('combo');
   private readonly comboCount = $('combo-count');
@@ -165,6 +166,14 @@ export class UI {
       if (value) value.textContent = label(s, el.dataset.setting as SettingKey);
     }
   }
+  /** A short notice low on screen for a few seconds. */
+  showNotice(text: string): void {
+    this.notice.textContent = text;
+    this.notice.classList.remove('show');
+    void this.notice.offsetWidth; // restart the animation
+    this.notice.classList.add('show');
+  }
+
   /** Briefly show the name of the room just entered. */
   showRoom(name: string): void {
     this.roomLabel.textContent = name;

@@ -9,7 +9,7 @@ import { Player } from './player';
 import { Stage } from './renderer';
 import { Sky } from './sky';
 import { SpeedLines } from './speedLines';
-import { cycle, DEFAULT_SETTINGS, LEVEL_GAIN, loadSettings, saveSettings, type SettingKey, STEERING_RANGE } from './settings';
+import { cycle, DEFAULT_SETTINGS, LEVEL_GAIN, loadSettings, saveSettings, type SettingKey, STEERING_RANGE, TILT_GAIN } from './settings';
 import { loadNumber, saveNumber } from './storage';
 import { UI } from './ui';
 import type { RoomId } from './interior';
@@ -89,6 +89,7 @@ export class Game {
     this.sky = new Sky(this.stage.scene);
     this.input = new Input(document.body);
     this.input.bindBoostControl(this.ui.boostControl);
+    this.input.onTiltDenied = () => this.ui.showNotice('motion access off. drag to steer');
     this.sound.attachUnlock();
     this.ui.bindMenus(this.onMenu, this.onSetting);
     this.applySettings();
@@ -153,6 +154,7 @@ export class Game {
     this.player.reset();
     this.player.setVisible(true);
     this.input.releaseAll();
+    this.input.calibrate(); // however you're holding the phone now is straight ahead
     this.input.enabled = true;
     this.level = level;
     const progress = startScore / CONFIG.score.levelLength;
@@ -202,6 +204,7 @@ export class Game {
     this.state = 'playing';
     this.input.releaseAll();
     this.lastTime = performance.now();
+    this.input.calibrate();
     this.sound.resume();
     this.ui.show(null);
   }
@@ -253,6 +256,8 @@ export class Game {
     this.sound.setMuted(!s.sound);
     this.sound.setLevels(LEVEL_GAIN[s.music], LEVEL_GAIN[s.effects]);
     this.input.dragRange = STEERING_RANGE[s.steering];
+    this.input.tiltEnabled = s.tilt;
+    this.input.tiltSensitivity = TILT_GAIN[s.tiltSensitivity];
     this.ui.renderSettings(s);
   }
 
