@@ -17,6 +17,7 @@ import type { LivePalette } from './palette';
 
 const DEG = Math.PI / 180;
 const PLANET_BODY = new Color(CONFIG.planet.body);
+const BLACK = new Color(0x050608);
 const PLANET_RING = new Color(CONFIG.planet.ring);
 
 // Vertical FOV at which the ship sits exactly at CONFIG.camera.shipY.
@@ -35,6 +36,8 @@ export class Stage {
   private readonly planetMat: MeshBasicMaterial;
   private readonly ringMat: MeshBasicMaterial;
   private planetVisible = 1;
+  private readonly ground: Mesh;
+  private underfloor = 0; // inside the ship: ground drops away and turns black
 
   // Camera state driven by the game.
   roll = 0; // radians
@@ -65,6 +68,7 @@ export class Stage {
 
     this.groundMat = new MeshBasicMaterial({ color: palette.ground });
     const ground = new Mesh(new PlaneGeometry(2000, 2000), this.groundMat);
+    this.ground = ground;
     ground.rotation.x = -Math.PI / 2;
     ground.position.z = -600;
     ground.renderOrder = -1;
@@ -92,7 +96,7 @@ export class Stage {
   }
 
   applyPalette(): void {
-    this.groundMat.color.copy(this.palette.ground);
+    this.groundMat.color.copy(this.palette.ground).lerp(BLACK, this.underfloor);
     this.fog.color.copy(this.palette.fog);
     (this.scene.background as typeof this.palette.sky).copy(this.palette.sky);
     // Tinted towards the sky so it stays faint by day and stands out at night.
@@ -101,6 +105,21 @@ export class Stage {
     this.ringMat.color.copy(PLANET_RING).lerp(this.palette.sky, P.skyBlend);
     this.planetMat.opacity = this.planetVisible;
     this.ringMat.opacity = this.planetVisible * P.ringOpacity;
+  }
+
+  /**
+   * Inside the ship (k = 1) the ground plane sinks below the pits and goes
+   * black, so holes in the floor look bottomless.
+   */
+  setUnderfloor(k: number): void {
+    this.underfloor = k;
+    this.ground.position.y = -CONFIG.themes.interior.pitDepth * 1.5 * k;
+    // Unfogged inside, so looking down a hole stays black however far it runs.
+    const fog = k < 0.5;
+    if (this.groundMat.fog !== fog) {
+      this.groundMat.fog = fog;
+      this.groundMat.needsUpdate = true;
+    }
   }
 
   /** 0 hides the planet (inside the ship), 1 shows it. */

@@ -222,7 +222,8 @@ export const CONFIG = {
     maxShuttles: 120,
     maxPipes: 2600,
     maxGreebles: 2600,
-    maxVoids: 400,
+    maxVoids: 1600,
+    maxCanisters: 500,
     // Cubes per 100 square units, on the same capped curve as speed.
     // Rough density at the start of: L1 0.35, L5 0.52, L10 0.68, L20 0.87, cap 1.05.
     densityStart: 0.35,
@@ -375,7 +376,7 @@ export const CONFIG = {
         panel: '#5a6068',
         green: '#5f7d55',
       },
-      pitDepth: 6, // how far the floor drops away in pits
+      pitDepth: 10, // how far the pit walls go down (below that it's black)
       void: '#07090c', // pit bottom
       railHeight: 0.9, // catwalk railings
       // Exterior hull the canyon runs into.
@@ -391,7 +392,9 @@ export const CONFIG = {
         islands: { weight: 3, minSub: 1, length: [70, 110], extraWidth: 6, height: 4.6, spacing: [8, 13], width: [1.2, 3.6], islandLength: [4, 11] },
         chicane: { weight: 2, minSub: 2, length: [100, 150], extraWidth: 2.4, swing: 0.75, segment: 22 },
         gantry: { weight: 3, minSub: 1, length: [70, 110], extraWidth: 5, height: 6, catwalkHalf: 1.5, sideWalks: [14, 22], sideLength: [8, 18] },
-        breach: { weight: 3, minSub: 0, length: [60, 100], extraWidth: 2.5, height: 4, holeSpacing: [9, 15], holeWidth: [1.6, 4.5], holeLength: [3, 8] },
+        breach: { weight: 3, minSub: 0, length: [70, 110], extraWidth: 3, height: 4, holeSpacing: [6, 14], holeLength: [9, 22], bothChance: 0.35 },
+        // Wall holes in ordinary corridors too, from level 8.
+        corridorHoles: { minSub: 1, chance: 0.5, spacing: [4, 12], length: [7, 14], bothChance: 0.3 },
         hydroponics: { weight: 2, minSub: 0, length: [60, 100], extraWidth: 4.5, height: 6.2, rowSpacing: [8, 12], pitch: 3.6, fill: 0.6 },
         lasers: { weight: 3, minSub: 1, length: [50, 80], extraWidth: 0.9, gateSpacing: [11, 15], gapWidth: 2.9 },
         reactor: { weight: 2, minSub: 1, length: [55, 80], extraWidth: 6, height: 6, coreHalf: 2.2, pylonSpacing: [14, 20] },

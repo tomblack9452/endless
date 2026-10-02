@@ -77,6 +77,10 @@ export interface RoomAPI {
   run(x: number, y: number, d: number, r: number, colour: Decor): void;
   /** Flat-coloured box standing at y: panels, ducts, uprights, debris. Never solid. */
   greeble(x: number, y: number, d: number, w: number, h: number, depth: number, colour: Decor): void;
+  pit: boolean; // this row has holes in the floor
+  ceiling: boolean; // this room has a ceiling
+  /** Upright canister at x (world) against a wall, scenery only. */
+  canister(x: number, d: number, colour: Decor, size: number): void;
   /** Start a custom floor for this row (anything not covered is a pit). */
   floorBegin(): void;
   /** Add a floor segment from x0 to x1 (world x). */
@@ -576,32 +580,13 @@ const breach: RoomDef = {
   wander: 0.6,
   enclosure: 1,
   floor(api) {
-    const left = api.cx - api.hw;
-    const right = api.cx + api.hw;
-    if (api.memoAt <= api.d && api.due(R.breach.holeSpacing)) {
-      const w = range(R.breach.holeWidth);
-      const len = range(R.breach.holeLength);
-      // Clear of the lane for as long as the hole lasts, however the lane drifts.
-      const clear = w / 2 + LANE + api.jitter + api.maxSlope * len + 0.2;
-      for (let t = 0; t < 6; t++) {
-        const x = api.cx + (Math.random() * 2 - 1) * (api.hw - w / 2 - 0.4);
-        if (Math.abs(x - api.lane) < clear) continue;
-        api.memo = x - api.cx;
-        api.memo2 = w;
-        api.memoAt = api.d + len;
-        break;
-      }
+    wallHoles(api, R.breach.holeSpacing, R.breach.holeLength, R.breach.bothChance);
+    // Sparks where the floor tore.
+    if (Math.random() < 0.15) {
+      const s = Math.random() < 0.5 ? -1 : 1;
+      api.light(api.wall(s) - s * 0.3, 0.1 + Math.random() * 0.4, api.d, 0.05, 0.05, 0.05, Math.random() < 0.5 ? Light.Amber : Light.Red);
     }
-    if (api.memoAt <= api.d) return; // solid floor this row
-    const x0 = api.cx + api.memo - api.memo2 / 2;
-    const x1 = api.cx + api.memo + api.memo2 / 2;
-    api.floorBegin();
-    if (x0 > left + 0.05) api.floor(left, x0);
-    if (x1 < right - 0.05) api.floor(x1, right);
-    // Sparks at the torn edges.
-    if (Math.random() < 0.3) api.light(Math.random() < 0.5 ? x0 : x1, 0.05 + Math.random() * 0.3, api.d, 0.05, 0.05, 0.05, Math.random() < 0.5 ? Light.Amber : Light.Red);
-  },
-  decor(api) {
+  },  decor(api) {
     corridorDecor(api);
     // Broken pipe ends and debris against the walls.
     if (api.row % 5 === 0) {
@@ -611,6 +596,31 @@ const breach: RoomDef = {
   },
 };
 
+/**
+ * Big holes in the floor flush against the walls (left, right or both),
+ * reaching in as far as the safe lane allows, and following the walls' curve.
+ * Each row the hole edge is placed from the lane at that row, so the lane
+ * always keeps floor under it.
+ */
+function wallHoles(api: RoomAPI, spacing: readonly number[], length: readonly number[], bothChance: number, chance = 1): void {
+  if (api.memoAt <= api.d) {
+    if (!api.due(spacing) || Math.random() > chance) return;
+    const r = Math.random();
+    api.memo = r < bothChance ? 3 : r < bothChance + (1 - bothChance) / 2 ? 1 : 2; // 1 left, 2 right, 3 both
+    api.memoAt = api.d + range(length);
+  }
+  if (api.memoAt <= api.d) return;
+  const clear = LANE + api.jitter + 0.25;
+  const left = api.wall(-1);
+  const right = api.wall(1);
+  const edgeL = api.memo !== 2 ? api.lane - clear : left;
+  const edgeR = api.memo !== 1 ? api.lane + clear : right;
+  const holeL = edgeL - left > 0.9;
+  const holeR = right - edgeR > 0.9;
+  if (!holeL && !holeR) return;
+  api.floorBegin();
+  api.floor(holeL ? edgeL : left, holeR ? edgeR : right);
+}
 // --- wall dressing (the asset pack) ---------------------------------------------
 
 /** Seeded 0..1 per room, so a pipe run keeps its height and colour along the room. */
@@ -722,6 +732,47 @@ export function decorate(id: RoomId, api: RoomAPI): void {
   const def = ROOMS[id];
   if (def.decor) def.decor(api);
   else corridorDecor(api);
+  if (id !== 'deck') ambientProps(api);
+}
+
+const CANISTER_COLOURS = [Decor.Yellow, Decor.Red, Decor.Steel, Decor.Teal, Decor.Yellow];
+
+/**
+ * Props every room shares on top of its own dressing: ceiling cross-beams,
+ * canister clusters, hanging cables, wall vents, big wall screens.
+ * Everything stays against the walls or overhead, clear of the path.
+ */
+function ambientProps(api: RoomAPI): void {
+  const r = api.row;
+  if (api.ceiling && r % 6 === 0) {
+    api.greeble(api.cx, api.H - 0.45, api.d, api.hw * 2, 0.4, 0.35, Decor.Panel);
+    if (h(api, r) < 0.4) api.light(api.cx, api.H - 0.47, api.d, 0.9, 0.03, 0.2, Light.White);
+  }
+  const s = h(api, r + 0.5) < 0.5 ? -1 : 1;
+  // Canisters huddled against a wall (not where the floor's gone).
+  if (!api.pit && r % 9 === 3 && h(api, r + 1) > 0.45) {
+    const n = 2 + Math.floor(h(api, r + 2) * 3);
+    for (let k = 0; k < n; k++) {
+      // One row tight against the wall, so the path never runs through them.
+      const x = api.wall(s) - s * 0.38;
+      api.canister(x, api.d + (k - n / 2) * 0.72, CANISTER_COLOURS[Math.floor(h(api, r + 3 + k) * 5)], 0.8 + h(api, r + 9 + k) * 0.15);
+    }
+  }
+  // Cables hanging from the ceiling near a wall.
+  if (api.ceiling && r % 7 === 2 && h(api, r + 4) > 0.5) {
+    const len = 0.6 + h(api, r + 5) * 0.8;
+    api.greeble(api.wall(-s) + s * (0.5 + h(api, r + 6) * 0.6), api.H - len, api.d, 0.05, len, 0.05, Decor.Dark);
+    api.greeble(api.wall(-s) + s * (0.62 + h(api, r + 6) * 0.6), api.H - len * 0.7, api.d + 0.3, 0.04, len * 0.7, 0.04, Decor.Dark);
+  }
+  // Wall vent: dark slats.
+  if (r % 10 === 5) {
+    for (let k = 0; k < 4; k++) api.greeble(api.wall(s) - s * 0.05, 0.35 + k * 0.16, api.d, 0.1, 0.08, 1.2, k % 2 ? Decor.Panel : Decor.Dark);
+  }
+  // Big wall screen in a frame.
+  if (r % 13 === 6 && api.H > 3.5 && h(api, r + 7) > 0.45) {
+    api.greeble(api.wall(-s) + s * 0.06, 1.3, api.d, 0.12, 1.3, 2, Decor.Panel);
+    api.light(api.wall(-s) + s * 0.13, 1.42, api.d, 0.02, 1.06, 1.7, h(api, r + 8) < 0.6 ? Light.Teal : Light.White);
+  }
 }
 function beam(api: RoomAPI, from: number, to: number): void {
   const w = to - from;
@@ -733,6 +784,10 @@ function beam(api: RoomAPI, from: number, to: number): void {
 }
 
 ROOMS.gantry = gantry;
+ROOMS.corridor.floor = (api) => {
+  const ch = R.corridorHoles;
+  if (api.sub >= ch.minSub) wallHoles(api, ch.spacing, ch.length, ch.bothChance, ch.chance);
+};
 ROOMS.breach = breach;
 ROOMS.servers.decor = serversDecor;
 ROOMS.cargo.decor = cargoDecor;

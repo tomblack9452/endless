@@ -146,6 +146,16 @@ export function greebleBox(): BufferGeometry {
   return build([part(box, '#ffffff', (m) => m.makeRotationY(Math.PI / 4), move(0, 0.5, 0))]);
 }
 
+/** Upright canister / barrel with darker bands and a lid. Tinted per instance. */
+export function canister(): BufferGeometry {
+  return build([
+    part(new CylinderGeometry(0.35, 0.35, 1.05, 10), '#ffffff', move(0, 0.525, 0)),
+    part(new CylinderGeometry(0.37, 0.37, 0.07, 10), '#5c5c5c', move(0, 0.22, 0)),
+    part(new CylinderGeometry(0.37, 0.37, 0.07, 10), '#5c5c5c', move(0, 0.82, 0)),
+    part(new CylinderGeometry(0.22, 0.25, 0.08, 8), '#8a8a8a', move(0, 1.09, 0)),
+  ]);
+}
+
 /** Boulder: jittered icosahedron, shading only (the material gives it its colour). */
 export function boulder(): BufferGeometry {
   const g = new IcosahedronGeometry(1, 1);
