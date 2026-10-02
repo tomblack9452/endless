@@ -7,6 +7,7 @@ import { Input } from './input';
 import { LivePalette } from './palette';
 import { Player } from './player';
 import { Stage } from './renderer';
+import { Sky } from './sky';
 import { SpeedLines } from './speedLines';
 import { cycle, DEFAULT_SETTINGS, LEVEL_GAIN, loadSettings, saveSettings, type SettingKey, STEERING_RANGE } from './settings';
 import { loadNumber, saveNumber } from './storage';
@@ -28,6 +29,7 @@ export class Game {
   private readonly player: Player;
   private readonly input: Input;
   private readonly speedLines: SpeedLines;
+  private readonly sky: Sky;
   private readonly sound = new Sound();
   private readonly audio: AudioState = {
     playing: false,
@@ -68,6 +70,7 @@ export class Game {
 
   private crashMs = 0;
   private shattered = false;
+  private fell = false;
   private overShown = false;
 
   private lastTime = 0;
@@ -83,6 +86,7 @@ export class Game {
     this.world = new World(this.stage.scene, this.palette, textures);
     this.player = new Player(this.stage.scene, this.palette);
     this.speedLines = new SpeedLines(this.stage.scene, this.palette);
+    this.sky = new Sky(this.stage.scene);
     this.input = new Input(document.body);
     this.input.bindBoostControl(this.ui.boostControl);
     this.sound.attachUnlock();
@@ -162,12 +166,19 @@ export class Game {
     this.state = 'playing';
   }
 
-  private crash(): void {
+  /** `fell` = dropped into a pit (falls away) rather than hitting something (shatters). */
+  private crash(fell = false): void {
+    this.fell = fell;
     this.state = 'crashed';
     this.crashMs = 0;
     this.input.enabled = false;
     this.speedLines.update(0, 0, 0);
-    this.sound.crash();
+    if (fell) {
+      this.sound.fall();
+      this.player.fall();
+    } else {
+      this.sound.crash();
+    }
     this.ui.hideCombo();
     const isNewBest = this.score > this.best;
     if (isNewBest) {
@@ -320,7 +331,13 @@ export class Game {
 
   /** Apply time of day for `levelProgress` (score / levelLength) to every material and the UI. */
   private applyLook(levelProgress: number): void {
-    applyAtmosphere(this.basePalette, this.palette, levelProgress, this.world.canyonMix, this.world.interiorMix);
+    const w = this.world;
+    applyAtmosphere(this.basePalette, this.palette, levelProgress, w.canyonMix, w.interiorMix, w.deckMix);
+    // Stars: full over the deck, faint outside at night.
+    const sky = this.palette.sky;
+    const daylight = Math.pow(0.2126 * sky.r + 0.7152 * sky.g + 0.0722 * sky.b, 1 / 2.2);
+    const night = Math.max(0, Math.min(1, (0.55 - daylight) / 0.35)) * CONFIG.space.nightStars * (1 - w.interiorMix);
+    this.sky.setAmount(Math.max(w.deckMix, night));
     this.stage.setPlanetVisible(1 - this.world.interiorMix);
     this.stage.applyPalette();
     this.world.applyPalette();
@@ -388,8 +405,9 @@ export class Game {
     this.ui.setProgress(progress - (level - 1));
     this.applyLook(progress);
 
-    if (this.world.hitTest(prev) && !this.dev.invincible) {
-      this.crash();
+    const fell = this.world.overPit();
+    if ((fell || this.world.hitTest(prev)) && !this.dev.invincible) {
+      this.crash(fell);
       this.world.sync();
       return;
     }
@@ -404,6 +422,7 @@ export class Game {
     this.ui.setScore(this.score);
 
     this.updateCamera(dt);
+    this.sky.update(dt);
     this.feedAudio(dt, true, speed);
     this.world.sync();
   }
@@ -508,11 +527,15 @@ export class Game {
     this.feedAudio(dt, false, 0); // music keeps going, muffled, under the game-over text
     if (this.crashMs < c.freezeMs) return;
 
-    if (!this.shattered) {
-      this.shattered = true;
-      this.player.shatter();
+    if (this.fell) {
+      this.player.updateFall(dt);
+    } else {
+      if (!this.shattered) {
+        this.shattered = true;
+        this.player.shatter();
+      }
+      this.player.updateFragments(dt);
     }
-    this.player.updateFragments(dt);
 
     const t = (this.crashMs - c.freezeMs) / c.shakeMs;
     if (t < 1) {
