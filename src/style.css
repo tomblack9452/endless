@@ -437,8 +437,8 @@ body {
 /* Dev panel (dev server only). */
 .dev-fps {
   position: absolute;
-  left: calc(var(--safe-left) + 22px);
-  bottom: calc(var(--safe-bottom) + 46px);
+  right: calc(var(--safe-right) + 22px);
+  top: calc(var(--safe-top) + 64px);
   opacity: 0.6;
   pointer-events: none;
 }
@@ -658,6 +658,30 @@ body {
 
 .screen-center .score {
   margin: 14px 0 12px;
+}
+
+.title-links {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  margin: 6px 0 12px;
+}
+
+.title-links .link:empty {
+  display: none;
+}
+
+.title-links .link {
+  padding: 8px 16px 8px 0;
+  margin: 0;
+}
+
+.stat-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 13px 0 8px;
+  border-bottom: 1px solid color-mix(in srgb, currentColor 25%, transparent);
 }
 
 .title-mark {
