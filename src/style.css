@@ -1,6 +1,7 @@
 :root {
   --text: #2b2824;
   --fade: 200ms;
+  --ui-scale: 1; /* text size setting */
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
   --safe-left: env(safe-area-inset-left, 0px);
@@ -89,7 +90,7 @@ body {
 /* Text */
 
 .label {
-  font-size: 11px;
+  font-size: calc(11px * var(--ui-scale));
   font-weight: 400;
   letter-spacing: 0.22em;
   text-transform: lowercase;
@@ -101,7 +102,7 @@ body {
 }
 
 .score {
-  font-size: 34px;
+  font-size: calc(34px * var(--ui-scale));
   font-weight: 300;
   letter-spacing: 0.04em;
   line-height: 1;
@@ -118,7 +119,7 @@ body {
 .button {
   display: block;
   font: inherit;
-  font-size: 11px;
+  font-size: calc(11px * var(--ui-scale));
   color: inherit;
   background: none;
   border: 0;
@@ -172,7 +173,7 @@ body {
 }
 
 .level-num {
-  font-size: 22px;
+  font-size: calc(22px * var(--ui-scale));
   font-weight: 400;
   line-height: 1;
   letter-spacing: 0.04em;
@@ -225,6 +226,50 @@ body {
 
 .hud-boost.ready {
   opacity: 1;
+}
+
+/* Boost control on the left (setting): swap it with the percentage readout. */
+.boost-left .hud-boost {
+  right: auto;
+  left: calc(var(--safe-left) + 22px);
+  padding: 28px 44px 18px 22px;
+  margin: -28px -44px -18px -22px;
+  text-align: left;
+}
+
+.boost-left .boost-pct {
+  left: auto;
+  right: calc(var(--safe-right) + 22px);
+}
+
+.boost-left .boost-fill {
+  transform-origin: right center;
+}
+
+/* Reduce motion: fades stay, movement goes. */
+.reduce-motion .layer,
+.reduce-motion .layer.on {
+  transform: none;
+}
+
+.reduce-motion .banner.show,
+.reduce-motion .hint.show {
+  animation-name: fade-only;
+}
+
+.reduce-motion .combo.pop .combo-count {
+  animation: none;
+}
+
+@keyframes fade-only {
+  0%,
+  100% {
+    opacity: 0;
+  }
+  12%,
+  80% {
+    opacity: 1;
+  }
 }
 
 /* Boost meter: full width along the bottom edge of the play area. */
@@ -332,8 +377,16 @@ body {
   position: absolute;
   left: calc(var(--safe-left) + 26px);
   right: calc(var(--safe-right) + 26px);
-  top: 22%;
+  top: calc(var(--safe-top) + 56px);
+  bottom: calc(var(--safe-bottom) + 16px);
+  overflow-y: auto;
+  touch-action: pan-y; /* the only scrollable thing in the game */
+  overscroll-behavior: contain;
   pointer-events: auto;
+}
+
+.settings-group {
+  margin-top: 22px;
 }
 
 .settings-title {
@@ -342,10 +395,11 @@ body {
 
 .setting-row {
   display: flex;
+  flex-shrink: 0;
   justify-content: space-between;
   align-items: baseline;
   width: 100%;
-  padding: 15px 0 9px;
+  padding: 13px 0 8px;
   font: inherit;
   color: inherit;
   background: none;
@@ -399,7 +453,7 @@ body {
 .dev-level,
 .dev-toggle {
   font: inherit;
-  font-size: 11px;
+  font-size: calc(11px * var(--ui-scale));
   color: inherit;
   background: none;
   border: 0;
@@ -504,7 +558,7 @@ body {
 }
 
 .combo-count {
-  font-size: 26px;
+  font-size: calc(26px * var(--ui-scale));
   font-weight: 400;
   line-height: 1;
   letter-spacing: 0.04em;
@@ -539,7 +593,7 @@ body {
 }
 
 .banner-num {
-  font-size: 64px;
+  font-size: calc(64px * var(--ui-scale));
   font-weight: 300;
   line-height: 1;
   letter-spacing: 0.02em;
@@ -591,7 +645,7 @@ body {
   position: absolute;
   left: calc(var(--safe-left) + 26px);
   top: calc(var(--safe-top) + 22%);
-  font-size: 13px;
+  font-size: calc(13px * var(--ui-scale));
   font-weight: 500;
   letter-spacing: 0.42em;
   line-height: 1.8;
