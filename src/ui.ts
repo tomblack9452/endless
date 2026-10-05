@@ -34,6 +34,15 @@ export interface UpgradeRow {
   on: boolean | null; // switch state once bought, null before
 }
 
+/** One tile on the set levels grid. */
+export interface CourseTile {
+  index: number;
+  name: string;
+  stars: number;
+  time: string;
+  locked: boolean;
+}
+
 /** One tile on the sector map. */
 export interface SectorTile {
   index: number;
@@ -352,6 +361,55 @@ export class UI {
         return row;
       }),
     );
+  }
+
+  bindSolo(onCourse: (index: number) => void): void {
+    for (const el of document.querySelectorAll<HTMLElement>('[data-solotab]')) {
+      el.addEventListener('pointerdown', (e) => e.stopPropagation());
+      el.addEventListener('click', () => this.setSoloTab(el.dataset.solotab as 'levels' | 'random'));
+    }
+    const grid = $('courses-grid');
+    grid.addEventListener('pointerdown', (e) => e.stopPropagation());
+    grid.addEventListener('click', (e) => {
+      const tile = (e.target as HTMLElement).closest<HTMLElement>('.course-tile');
+      if (tile && !tile.classList.contains('locked')) onCourse(Number(tile.dataset.course));
+    });
+  }
+
+  setSoloTab(tab: 'levels' | 'random'): void {
+    for (const el of document.querySelectorAll<HTMLElement>('[data-solotab]')) el.classList.toggle('on', el.dataset.solotab === tab);
+    for (const el of document.querySelectorAll<HTMLElement>('[data-solopane]')) el.hidden = el.dataset.solopane !== tab;
+  }
+
+  renderCourses(tiles: CourseTile[], summary: string): void {
+    $('courses-summary').textContent = summary;
+    const grid = document.createElement('div');
+    grid.className = 'course-grid';
+    for (const t of tiles) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = `course-tile${t.locked ? ' locked' : ''}`;
+      b.dataset.course = String(t.index);
+      const num = document.createElement('span');
+      num.className = 'course-num';
+      num.textContent = String(t.index + 1);
+      const name = document.createElement('span');
+      name.className = 'course-name';
+      name.textContent = t.locked ? 'locked' : t.name;
+      const stars = document.createElement('span');
+      stars.className = 'sector-stars';
+      stars.textContent = [1, 2, 4].map((bit) => (t.stars & bit ? '★' : '☆')).join('');
+      const time = document.createElement('span');
+      time.className = 'course-time';
+      time.textContent = t.time;
+      b.append(num, name, stars, time);
+      grid.append(b);
+    }
+    $('courses-grid').replaceChildren(grid);
+  }
+
+  setOverHeading(text: string): void {
+    $('over-heading').textContent = text;
   }
 
   /** Taps on unlocked sector tiles call `onPick` with the sector index. */

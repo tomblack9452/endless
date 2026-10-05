@@ -7,6 +7,17 @@ import { InstancedField, wrap } from './field';
 import type { LivePalette } from './palette';
 import { type Biome, BIOME_NAMES } from './biomes';
 import { terrain } from './terrain';
+import type { Course, Section } from './courses';
+
+/** A stretch of a course in one theme (and, for groups, one biome). */
+interface Span {
+  theme: ThemeId;
+  biome: Biome;
+  start: number; // offsets from the run start
+  end: number;
+}
+
+const DEFAULT_BIOME: Record<ThemeId, Biome> = { land: 'alien', canyon: 'canyon', interior: 'interior' };
 import { Decor, decorate, Light, pickRoom, ROOM_IDS, ROOMS, roomLength, type RoomAPI, type RoomId, type RoomPlan } from './interior';
 import { fxMaterial, LIQUID_COLOURS, Sparks } from './fx';
 import { ceilingFan } from './props';
@@ -216,6 +227,15 @@ export class World {
   // --- interior rooms ---
   /** Dev: force this room every time (null = random). */
   devRoom: RoomId | null = null;
+  /** The set course being followed (see courses.ts), or null for the endless plan. */
+  private course: Course | null = null;
+  private sectionStarts: number[] = []; // offsets from the run start
+  private themeRuns: Span[] = []; // contiguous sections in one theme
+  private biomeGroups: Span[] = []; // ...and in one biome
+  private roomQueue: RoomId[] = [];
+  private roomScript: RoomId[] = []; // the course's rooms for this stretch, repeated if it runs long
+  private nextOverlayAt = 0;
+  private overlaySide = 1;
   /** Name of the room the ship is in ('' for corridors and outside). */
   roomName = '';
   private room: RoomId = 'corridor';
@@ -403,8 +423,15 @@ export class World {
     terrain.flatten();
     const level = this.levelAt(this.distance);
     this.themeEnd = run ? this.levelStart(level - ((level - 1) % LPT) + LPT) : Infinity;
+    if (run && this.course) {
+      const first = this.themeRuns[0];
+      this.themeEnd = this.distance + first.end;
+      // Not starting on open ground: row() will start the right theme.
+      if (first.theme !== 'land') this.theme = first.theme === 'canyon' ? 'interior' : 'canyon';
+    }
     // A run that starts on open ground never calls startTheme for it, so set its hills here.
-    if (run && themeForLevel(level) === 'land') this.setHills(this.distance + clearance, this.themeEnd);
+    const firstTheme = run && this.course ? this.themeRuns[0].theme : themeForLevel(level);
+    if (run && firstTheme === 'land') this.setHills(this.distance + clearance, this.themeEnd);
     this.nextRockFaceAt = this.distance + clearance + range(TH.land.rockFaceSpacing) * 0.5;
     this.rockFaceUntil = -Infinity;
     this.nextArchAt = this.distance + clearance + range(TH.land.archSpacing) * 0.5;
@@ -553,6 +580,93 @@ export class World {
     for (const f of this.fields) f.sync(this.distance);
   }
 
+  // --- set courses -----------------------------------------------------------
+
+  /** Follow `course` on the next reset (null: back to the endless plan). */
+  setCourse(course: Course | null): void {
+    this.course = course;
+    this.sectionStarts = [];
+    this.themeRuns = [];
+    this.biomeGroups = [];
+    if (!course) return;
+    let at = 0;
+    for (const s of course.sections) {
+      this.sectionStarts.push(at);
+      const biome = s.biome ?? DEFAULT_BIOME[s.theme];
+      const run = this.themeRuns[this.themeRuns.length - 1];
+      if (run && run.theme === s.theme) run.end = at + s.length;
+      else this.themeRuns.push({ theme: s.theme, biome, start: at, end: at + s.length });
+      const group = this.biomeGroups[this.biomeGroups.length - 1];
+      if (group && group.theme === s.theme && group.biome === biome) group.end = at + s.length;
+      else this.biomeGroups.push({ theme: s.theme, biome, start: at, end: at + s.length });
+      at += s.length;
+    }
+  }
+
+  /** Where the finish line is (Infinity outside a course). */
+  get finishAt(): number {
+    if (!this.course || this.runStart === null) return Infinity;
+    return this.runStart + this.sectionStarts[this.sectionStarts.length - 1] + this.course.sections[this.course.sections.length - 1].length;
+  }
+
+  /** Index of the course section at distance `d` (the last one past the finish). */
+  sectionIndexAt(d: number): number {
+    const off = d - (this.runStart ?? 0);
+    let i = 0;
+    while (i + 1 < this.sectionStarts.length && off >= this.sectionStarts[i + 1]) i++;
+    return i;
+  }
+
+  sectionAt(d: number): Section | null {
+    return this.course ? this.course.sections[this.sectionIndexAt(d)] : null;
+  }
+
+  private spanAt(spans: Span[], d: number): Span {
+    const off = d - (this.runStart ?? 0);
+    for (const s of spans) if (off < s.end) return s;
+    return spans[spans.length - 1];
+  }
+
+  /** A course's set piece laid over the generator's own work, clear of the lane. */
+  private overlay(d: number, kind: Section['overlay'], maxSlope: number): void {
+    if (!kind || this.quiet(d) || d < this.nextOverlayAt) return;
+    const jitter = maxSlope * STEP * 0.5;
+    const land = this.theme === 'land';
+    switch (kind) {
+      case 'pickups':
+        // A trail of boost pickups down the lane.
+        this.nextOverlayAt = d + STEP * 3;
+        this.pickups.spawn(this.lane - this.shipX, CONFIG.boost.pickup.height, d, 1, 1, 1, 0, false, land, 0, 0);
+        break;
+      case 'arches':
+        this.nextOverlayAt = d + 110 + rand() * 50;
+        this.placeArch(d, this.lane - this.shipX);
+        break;
+      case 'slalom': {
+        // Tall pillars just off the lane, side to side: weave between them.
+        this.nextOverlayAt = d + 13 + rand() * 4;
+        this.overlaySide = -this.overlaySide;
+        const r = 0.55 + rand() * 0.25;
+        const x = this.lane + this.overlaySide * (LANE + r + jitter + 0.5);
+        if (land) this.rockSpires.spawn(wrap(x - this.shipX), 0, d, r / 0.6, (r / 0.6) * 1.2, r / 0.6, rand() * 6.28, true, true, r, r);
+        else this.obstacle(x, d, r, 4 + rand() * 3);
+        break;
+      }
+      case 'gates': {
+        // A wall of rock across the way with one gap on the lane.
+        this.nextOverlayAt = d + 22 + rand() * 8;
+        const gap = 1.6 + jitter;
+        const span = land ? 9 : 30;
+        for (let x = this.lane - span; x <= this.lane + span; x += 1.5) {
+          const r = 0.6 + rand() * 0.3;
+          if (Math.abs(x - this.lane) < gap + r * 0.8) continue;
+          this.obstacle(x, d + (rand() - 0.5) * 0.6, r, 0.9 + rand() * 1.4, land);
+        }
+        break;
+      }
+    }
+  }
+
   // --- levels ----------------------------------------------------------------
 
   private scoreAt(d: number): number {
@@ -572,15 +686,30 @@ export class World {
   private updateMix(dt: number): void {
     this.canyonMix = this.interiorMix = this.insideMix = this.biomeMix = this.asteroidMix = 0;
     this.roomName = '';
-    if (themeForLevel(this.levelAt(this.distance)) !== 'interior') this.deckMix = 0;
-    if (this.runStart === null) return;
-    const level = this.levelAt(this.distance);
-    const first = level - ((level - 1) % LPT);
-    const k =
-      ease((this.distance - this.levelStart(first)) / TH.fadeIn) *
-      ease((this.levelStart(first + LPT) - this.distance) / TH.fadeOut);
-    const theme = themeForLevel(level);
-    this.biome = biomeForLevel(level);
+    let theme: ThemeId;
+    let k: number;
+    if (this.course && this.runStart !== null) {
+      // A course: the look follows its sections, fading at each change of area.
+      const run = this.spanAt(this.themeRuns, this.distance);
+      const group = this.spanAt(this.biomeGroups, this.distance);
+      const off = this.distance - this.runStart;
+      theme = run.theme;
+      this.biome = group.biome;
+      k = ease((off - run.start) / TH.fadeIn) * ease((run.end - off) / TH.fadeOut);
+      if (group.biome !== run.biome || this.biomeGroups.length !== this.themeRuns.length) {
+        // A change of biome inside one area: dip through the plain look between them.
+        k *= ease((off - group.start) / TH.fadeIn) * ease((group.end - off) / TH.fadeOut);
+      }
+    } else {
+      if (themeForLevel(this.levelAt(this.distance)) !== 'interior') this.deckMix = 0;
+      if (this.runStart === null) return;
+      const level = this.levelAt(this.distance);
+      const first = level - ((level - 1) % LPT);
+      k = ease((this.distance - this.levelStart(first)) / TH.fadeIn) * ease((this.levelStart(first + LPT) - this.distance) / TH.fadeOut);
+      theme = themeForLevel(level);
+      this.biome = biomeForLevel(level);
+    }
+    if (theme !== 'interior') this.deckMix = 0;
     this.biomeMix = k;
     if (this.biome === 'asteroids') this.asteroidMix = k;
     if (theme === 'canyon') this.canyonMix = k;
@@ -608,17 +737,28 @@ export class World {
 
   private row(d: number): void {
     const level = this.levelAt(d);
-    const theme = themeForLevel(level);
-    this.genBiome = this.runStart === null ? 'alien' : biomeForLevel(level);
-    if (theme !== this.theme) this.startTheme(theme, d, level);
-    const sub = (level - 1) % LPT;
-    const score = this.scoreAt(d);
+    let theme = themeForLevel(level);
+    let sub = (level - 1) % LPT;
+    let score = this.scoreAt(d);
+    const section = this.runStart !== null ? this.sectionAt(d) : null;
+    if (section) {
+      // Following a course: its section decides the area, flavour and difficulty.
+      theme = section.theme;
+      sub = section.sub;
+      score = section.difficulty;
+      this.genBiome = this.spanAt(this.biomeGroups, d).biome;
+      if (theme !== this.theme) this.startTheme(theme, d, level, (this.runStart ?? 0) + this.spanAt(this.themeRuns, d).end);
+    } else {
+      this.genBiome = this.runStart === null ? 'alien' : biomeForLevel(level);
+      if (theme !== this.theme) this.startTheme(theme, d, level);
+    }
     const speed = speedAt(score);
     // Fastest the lane may drift sideways per unit of forward travel.
     const maxSlope = (TH.lane.slopeFraction * lateralSpeedAt(speed)) / speed;
     if (theme === 'land') this.land(d, sub, score, maxSlope);
     else if (theme === 'canyon') this.canyon(d, sub, score, maxSlope);
     else this.interior(d, sub, score, maxSlope);
+    if (section) this.overlay(d, section.overlay, maxSlope);
 
     if (this.assist && this.runStart !== null && Math.round(d / STEP) % CONFIG.assist.markerEvery === 0) {
       this.light(this.lane, 0.012, d, 0.1, 0.01, 0.9, Light.Teal, false);
@@ -644,11 +784,13 @@ export class World {
     return d < this.themeStart + TH.lane.afterChange || this.themeEnd - d < TH.lane.beforeChange;
   }
 
-  private startTheme(theme: ThemeId, d: number, level: number): void {
+  /** `end` overrides where the theme ends (courses); otherwise it's the end of its three levels. */
+  private startTheme(theme: ThemeId, d: number, level: number, end?: number): void {
     const first = level - ((level - 1) % LPT);
     this.theme = theme;
     this.themeStart = d;
-    this.themeEnd = this.levelStart(first + LPT);
+    this.themeEnd = end ?? this.levelStart(first + LPT);
+    this.nextOverlayAt = d + 30;
     this.nextFeatureAt = d + 25;
     this.cxSlope = this.cxTargetSlope = 0;
     this.cxRetargetAt = d + 30;
@@ -663,8 +805,21 @@ export class World {
       this.splitEnd = -Infinity;
       this.nextBridgeAt = d + range(TH.canyon.bridgeSpacing) * 0.6;
     } else if (theme === 'interior') {
+      // The door goes where the path is (open ground doesn't keep a centre line like the canyon).
+      this.cx = this.lane;
       this.entrancePending = true;
       this.room = this.lastRoom = 'corridor';
+      // A course's rooms, in order, for this stretch of ship.
+      this.roomQueue = [];
+      this.roomScript = [];
+      if (this.course && this.runStart !== null) {
+        const off = d - this.runStart;
+        this.course.sections.forEach((s, i) => {
+          const start = this.sectionStarts[i];
+          if (s.theme === 'interior' && start + s.length > off && start < this.themeEnd - this.runStart!) this.roomQueue.push(...(s.rooms ?? []));
+        });
+        this.roomScript = [...this.roomQueue];
+      }
       this.prevWallL = this.prevWallR = NaN;
     } else {
       this.laneTarget = this.lane;
@@ -729,12 +884,17 @@ export class World {
     // A natural arch over the path, pillars well clear of the lane.
     if (d >= this.nextArchAt && biome !== 'ice') {
       this.nextArchAt = d + range(lt.archSpacing);
-      const s = 1 + rand() * 0.25;
-      this.arches.spawn(wrap(laneRel), 0, d, s, s, s, 0, false, true, 0, 0, false);
-      for (const side of [-1, 1]) {
-        const px = laneRel + side * ARCH_PILLAR_X * s;
-        this.rocks.spawn(wrap(px), 0, d, 1.2 * s, (5.5 * s) / BOULDER_HEIGHT, 1.2 * s, 0, true, true, 1.1 * s, 1.1 * s, false);
-      }
+      this.placeArch(d, laneRel);
+    }
+  }
+
+  /** A rock arch over the lane (ship-relative x), its pillars solid. */
+  private placeArch(d: number, laneRel: number): void {
+    const s = 1 + rand() * 0.25;
+    this.arches.spawn(wrap(laneRel), 0, d, s, s, s, 0, false, true, 0, 0, false);
+    for (const side of [-1, 1]) {
+      const px = laneRel + side * ARCH_PILLAR_X * s;
+      this.rocks.spawn(wrap(px), 0, d, 1.2 * s, (5.5 * s) / BOULDER_HEIGHT, 1.2 * s, 0, true, true, 1.1 * s, 1.1 * s, false);
     }
   }
 
@@ -1199,7 +1359,11 @@ export class World {
       this.startRoom('corridor', d, base, maxSlope, false);
     } else if (d >= this.roomEnd) {
       let next: RoomId = 'corridor';
-      if (this.room === 'corridor') next = this.devRoom ?? pickRoom(sub, this.lastRoom);
+      if (this.room === 'corridor') {
+        // A course's rooms come round again rather than falling back to random ones.
+        if (this.roomQueue.length === 0 && this.roomScript.length > 0) this.roomQueue = [...this.roomScript];
+        next = this.devRoom ?? this.roomQueue.shift() ?? pickRoom(sub, this.lastRoom);
+      }
       else this.lastRoom = this.room;
       this.startRoom(next, d, base, maxSlope);
     }

@@ -510,6 +510,11 @@ export const CONFIG = {
     },
   },
 
+  // Set levels (courses.ts).
+  courses: {
+    starCredits: 50, // per new star
+  },
+
   // Sectors (solo start points) and their stars.
   sectors: {
     starCredits: 25, // per new star
