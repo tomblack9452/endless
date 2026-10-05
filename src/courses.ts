@@ -1,6 +1,6 @@
 import type { Biome } from './biomes';
 import type { EventKind } from './events';
-import type { RoomId } from './interior';
+import { PIECES } from './pieces';
 import type { ThemeId } from './world';
 
 // Set levels ("courses"): hand-built runs with a finish line. Each is a script
@@ -22,7 +22,7 @@ export interface Section {
   length: number; // world units
   sub: 0 | 1 | 2;
   difficulty: number;
-  rooms?: RoomId[]; // interior: these rooms, in order, with corridors between
+  rooms?: string[]; // interior: these rooms (piece ids, or room families), in order, with corridors between
   overlay?: Overlay;
   event?: EventKind;
 }
@@ -52,7 +52,7 @@ const canyon = (name: string, length: number, sub: 0 | 1 | 2, difficulty: number
   difficulty,
   ...extra,
 });
-const ship = (name: string, rooms: RoomId[], length: number, difficulty: number, extra: Partial<Section> = {}): Section => ({
+const ship = (name: string, rooms: string[], length: number, difficulty: number, extra: Partial<Section> = {}): Section => ({
   name,
   theme: 'interior',
   rooms,
@@ -152,7 +152,7 @@ export const COURSES: readonly Course[] = [
     target: 8500,
     sections: [
       land('the landing pad', 600, 0, 6000),
-      ship('maintenance deck', ['cargo', 'servers', 'lasers', 'coolant', 'hydroponics', 'hangar'], 4700, 7500),
+      ship('maintenance deck', ['cargo-1', 'servers-1', 'lasers-1', 'coolant-1', 'hydroponics-1', 'hangar-2'], 4700, 7500),
     ],
   },
   {
@@ -163,7 +163,7 @@ export const COURSES: readonly Course[] = [
     target: 8800,
     sections: [
       land('the approach', 600, 0, 8000),
-      ship('red alert', ['vents', 'gantry', 'pistons', 'foundry', 'breach', 'chicane', 'vents'], 4900, 9500, { event: 'redAlert' }),
+      ship('red alert', ['vents-1', 'gantry-1', 'engine-1', 'foundry-1', 'breach-1', 'chicane-1', 'flooded-1'], 4900, 9500, { event: 'redAlert' }),
     ],
   },
   {
@@ -175,7 +175,7 @@ export const COURSES: readonly Course[] = [
     sections: [
       land('the burning plain', 1500, 1, 9000, { biome: 'volcanic' }),
       canyon('the gorge', 1800, 1, 10500),
-      ship('core breach', ['lasers', 'vents', 'gantry', 'foundry', 'pistons', 'collapse', 'hangar'], 4600, 12000, { event: 'redAlert' }),
+      ship('core breach', ['lasers-2', 'reactor-2', 'dropshaft-1', 'engine-2', 'reactor-1', 'collapse-1', 'hangar-1'], 4600, 12000, { event: 'redAlert' }),
     ],
   },
 ];
@@ -232,30 +232,8 @@ const CANYON_SECTIONS: Template[] = [
   { name: 'pillar run', sub: 2, overlay: 'slalom' },
 ];
 
-const SHIP_ROOMS: RoomId[] = [
-  'cargo',
-  'servers',
-  'lasers',
-  'coolant',
-  'hydroponics',
-  'vents',
-  'gantry',
-  'pistons',
-  'foundry',
-  'breach',
-  'chicane',
-  'reactor',
-  'hangar',
-  'junction',
-  'fork',
-  'islands',
-  'dropShaft',
-  'cargoLift',
-  'flooded',
-  'command',
-  'fanRoom',
-  'lab',
-];
+/** The weekly level's ship rooms: any hand-made room piece. */
+const SHIP_ROOMS: string[] = PIECES.filter((p) => p.family !== 'corridor').map((p) => p.id);
 
 const WEEK_MS = 7 * 24 * 3600 * 1000;
 
@@ -298,7 +276,7 @@ export function weeklyCourse(monday: string): Course {
   areas.forEach((env, a) => {
     if (env.theme === 'interior') {
       // A run of ship rooms, in a fixed order for the week.
-      const rooms: RoomId[] = [];
+      const rooms: string[] = [];
       while (rooms.length < 5) {
         const r = pick(SHIP_ROOMS);
         if (rooms[rooms.length - 1] !== r) rooms.push(r);
