@@ -20,6 +20,10 @@ import type { LivePalette } from './palette';
 import { MAX_BUMPS, MAX_PITS, MAX_STEPS, terrain, TERRAIN_GLSL } from './terrain';
 
 const DEG = Math.PI / 180;
+// Ground grid: rows along the run and columns across the middle (see groundGeometry).
+const GROUND_ROW = 2.5;
+const GROUND_COL = 1.5;
+const GROUND_Z = -600;
 const PLANET_BODY = new Color(CONFIG.planet.body);
 const BLACK = new Color(0x050608);
 const PLANET_RING = new Color(CONFIG.planet.ring);
@@ -146,13 +150,16 @@ float gNoise(vec2 p) {
           float grain = gNoise(vGround * 1.6) * 0.6 + gNoise(vGround * 4.1) * 0.4;
           diffuseColor.rgb *= 1.0 + (grain - 0.5) * 0.09 * uGroundStyle.y;
         }
-        // Chasm sides darken to black at the bottom.
-        diffuseColor.rgb *= 1.0 - 0.92 * smoothstep(0.05, 0.9, vPit);`);
+        // Chasm walls darken as soon as they drop below the rim (each wall is one steep strip of ground).
+        diffuseColor.rgb *= 1.0 - 0.9 * smoothstep(0.0, 0.06, vPit);`)
+        // ...and stay dark through the fog, so a chasm reads as a drop, not pale mist.
+        .replace('#include <fog_fragment>', `#include <fog_fragment>
+        gl_FragColor.rgb = mix(gl_FragColor.rgb, vec3(0.045, 0.04, 0.035), smoothstep(0.01, 0.12, vPit) * 0.92);`);
     };
     const ground = new Mesh(groundGeometry(), this.groundMat);
     this.ground = ground;
     ground.rotation.x = -Math.PI / 2;
-    ground.position.z = -600;
+    ground.position.z = GROUND_Z;
     ground.renderOrder = -1;
     this.scene.add(ground);
 
@@ -181,6 +188,10 @@ float gNoise(vec2 p) {
   setTerrain(distance: number, shipX = 0): void {
     this.hillDistance.value = distance;
     this.shipX.value = shipX;
+    // Keep the ground's points fixed in the world as it slides past (snapped to its
+    // grid), so chasm rims, ramps and split edges don't shimmer from frame to frame.
+    this.ground.position.z = GROUND_Z + (distance - Math.floor(distance / GROUND_ROW) * GROUND_ROW);
+    this.ground.position.x = -(shipX - Math.floor(shipX / GROUND_COL) * GROUND_COL);
     for (let i = 0; i < MAX_STEPS; i++) this.hillSteps.value[i].fromArray(terrain.steps, i * 3);
     this.liftD.value.fromArray(terrain.lift, 0);
     this.liftX.value.fromArray(terrain.lift, 4);
@@ -316,10 +327,10 @@ export { DEG };
  */
 function groundGeometry(): PlaneGeometry {
   const xs: number[] = [];
-  for (let x = -36; x <= 36; x += 1.5) xs.push(x);
+  for (let x = -36; x <= 36; x += GROUND_COL) xs.push(x);
   const outer = [48, 80, 150, 300, 600, 1000];
   const cols = [...outer.map((x) => -x).reverse(), ...xs, ...outer];
-  const g = new PlaneGeometry(1, 2000, cols.length - 1, 800);
+  const g = new PlaneGeometry(1, 2000, cols.length - 1, 2000 / GROUND_ROW);
   const pos = g.attributes.position;
   for (let i = 0; i < pos.count; i++) pos.setX(i, cols[i % cols.length]);
   pos.needsUpdate = true;
