@@ -78,9 +78,11 @@ interface Saved {
   lp: number;
   week: string;
   weekBest: number; // highest league*3+division reached this week (-1 = none played)
+  history?: number[]; // LP change of recent runs, oldest first
 }
 
 const KEY = 'endless.league';
+const HISTORY = 30;
 
 export class Leagues {
   league = 0;
@@ -88,6 +90,8 @@ export class Leagues {
   lp = 0;
   private week = '';
   private weekBest = -1;
+  /** LP change of the most recent runs, oldest first. */
+  history: number[] = [];
 
   async load(): Promise<void> {
     const raw = await storage.get(KEY);
@@ -99,13 +103,21 @@ export class Leagues {
       this.lp = s.lp ?? 0;
       this.week = s.week ?? '';
       this.weekBest = s.weekBest ?? -1;
+      this.history = s.history ?? [];
     } catch {
       // Corrupt value: start fresh.
     }
   }
 
   save(): void {
-    const s: Saved = { league: this.league, division: this.division, lp: this.lp, week: this.week, weekBest: this.weekBest };
+    const s: Saved = {
+      league: this.league,
+      division: this.division,
+      lp: this.lp,
+      week: this.week,
+      weekBest: this.weekBest,
+      history: this.history,
+    };
     void storage.set(KEY, JSON.stringify(s));
   }
 
@@ -147,6 +159,8 @@ export class Leagues {
     // At the top of a league LP stops at full until the promotion happens.
     if ((this.division === lastDivision || this.top) && lp > LP_PER_DIVISION) lp = LP_PER_DIVISION;
     this.lp = lp;
+    this.history.push(delta);
+    if (this.history.length > HISTORY) this.history.splice(0, this.history.length - HISTORY);
     this.weekBest = Math.max(this.weekBest, this.league * DIVISIONS.length + this.division);
     this.save();
     return { lp: delta, divisionUp, divisionDown, credits };
