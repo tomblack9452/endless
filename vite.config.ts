@@ -1,3 +1,4 @@
+/// <reference types="vitest/config" />
 import basicSsl from '@vitejs/plugin-basic-ssl';
 import { defineConfig } from 'vite';
 
@@ -12,6 +13,8 @@ export default defineConfig(({ mode }) => ({
     host: true,
     port: mode === 'https' ? 5191 : 5190,
   },
+  // The fairness tests fly whole levels for many seeds: slow on a busy machine.
+  test: { testTimeout: 30000 },
   build: {
     target: 'es2020',
     assetsInlineLimit: 0,
