@@ -253,7 +253,8 @@ Each new star is worth 25 credits, and star totals unlock looks.
 in solo), promotions and stars. Spend them in the **hangar**.
 
 **Upgrades** (solo only), five tiers each at 150 / 400 / 1,000 / 2,500 /
-6,000 credits. Tier 4 needs Sergeant and tier 5 needs Lieutenant.
+6,000 credits. Tier 4 needs Sergeant and tier 5 needs Lieutenant. Any bought
+system can be switched off in the hangar for a harder solo run.
 
 | System | Per tier | At tier 5 |
 |---|---|---|
@@ -273,7 +274,7 @@ items are tried on the ship with a buy button or what unlocks them.
 | Paint | standard, slate, crimson, cobalt, olive, sand, white, carbon (credits), gold (Colonel), chrome (General) |
 | Markings | stripe, twin stripes, split (credits), chevron (10 stars), two-tone (25 stars) |
 | Fins | tail fin, winglets (credits), twin fins (15 stars) |
-| Engine colour | amber, cyan, violet, green, white (credits), red (Sergeant) |
+| Engine colour | amber, cyan, violet, green, white (credits), red (Sergeant); colours the engine flames |
 | Wing decal | your rank insignia |
 
 Missions still unlock trail styles and world colour palettes.
