@@ -13,7 +13,8 @@ export interface Settings {
   tiltSensitivity: number; // TILT
   steering: number; // STEERING (drag range)
   touch: number; // TOUCH: drag anywhere, or hold the left/right side
-  boostSide: number; // SIDES: which bottom corner the boost control sits in
+  boostSide: number; // SIDES: where along the bottom the boost button sits
+  doubleTapBoost: boolean; // double-tap and hold anywhere to boost
   haptics: boolean;
   reduceMotion: boolean;
   textSize: number; // TEXT
@@ -31,7 +32,8 @@ export const STEERING_RANGE = [0.19, CONFIG.steering.dragRangeFraction, 0.1];
 export const TILT = ['low', 'medium', 'high'];
 export const TILT_GAIN = [0.7, 1, 1.4];
 export const TOUCH = ['drag', 'tap sides'];
-export const SIDES = ['right', 'left'];
+// Saved as an index, so the order stays: 0 right, 1 left, 2 middle.
+export const SIDES = ['right', 'left', 'middle'];
 export const TEXT = ['normal', 'large', 'larger'];
 export const TEXT_SCALE = [1, 1.2, 1.4];
 
@@ -55,6 +57,7 @@ export const DEFAULT_SETTINGS: Settings = {
   steering: 1,
   touch: 0,
   boostSide: 0,
+  doubleTapBoost: true,
   haptics: true,
   reduceMotion: false,
   textSize: 0,

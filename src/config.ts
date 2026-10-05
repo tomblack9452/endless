@@ -480,6 +480,9 @@ export const CONFIG = {
     fillSeconds: 60, // empty to full with no pickups
     drainSeconds: 3.5, // full to empty while boosting
     minToStart: 0.08, // need at least this much to begin
+    // Double-tap and hold anywhere: a quick tap, then a press that starts within
+    // gapMs of it and near it, boosts for as long as it's held (and still steers).
+    doubleTap: { tapMs: 250, gapMs: 250, slopPx: 70 },
     speedMultiplier: 1.45,
     easeIn: 5, // how fast boost speed ramps up (per s)
     easeOut: 2.5,
