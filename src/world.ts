@@ -1,4 +1,4 @@
-import { BoxGeometry, Color, MeshBasicMaterial, OctahedronGeometry, Scene, type Texture } from 'three';
+import { BoxGeometry, Color, CylinderGeometry, MeshBasicMaterial, PlaneGeometry, OctahedronGeometry, Scene, type Texture } from 'three';
 import { patchBlockMaterial } from './blockTextures';
 import { CONFIG } from './config';
 import { rand, seed as seedRandom } from './rng';
@@ -8,6 +8,8 @@ import type { LivePalette } from './palette';
 import { type Biome, BIOME_NAMES } from './biomes';
 import { terrain } from './terrain';
 import { Decor, decorate, Light, pickRoom, ROOM_IDS, ROOMS, roomLength, type RoomAPI, type RoomId, type RoomPlan } from './interior';
+import { fxMaterial, LIQUID_COLOURS, Sparks } from './fx';
+import { ceilingFan } from './props';
 import { ARCH_PILLAR_X, bush, deadTree, grassTuft, mesa, rockArch, rockSpire } from './props';
 import { BOULDER_HEIGHT, boulder, canister, crystalCluster, greebleBox, mushroomTree, pipeSegment, powerGem, shuttle, spireTree } from './props';
 
@@ -137,6 +139,16 @@ export class World {
   private readonly deadTrees: InstancedField;
   private readonly rockSpires: InstancedField;
   private readonly tufts: InstancedField; // grass, scenery
+  // Interior animation (fx.ts).
+  private readonly pours: InstancedField; // liquid falling from the ceiling (curtains are solid)
+  private readonly pools: InstancedField;
+  private readonly steamPlumes: InstancedField;
+  private readonly blinkers: InstancedField;
+  private readonly holos: InstancedField;
+  private readonly fans: InstancedField;
+  private readonly vents: InstancedField; // steam vent columns (a hazard)
+  readonly sparks: Sparks;
+  private fanSpin = 0;
   private readonly mesas: InstancedField; // horizon scenery
   private readonly arches: InstancedField; // rock arches over the path (pillars collide via rocks)
   private nextRockFaceAt = 0;
@@ -277,6 +289,21 @@ export class World {
     this.greebles.setColorTable(decorTable);
     this.canisters = new InstancedField(scene, canister(), this.decorMat, F.maxCanisters);
     this.canisters.setColorTable(decorTable);
+    const unitBox = new BoxGeometry(1, 1, 1).translate(0, 0.5, 0);
+    this.pours = new InstancedField(scene, unitBox, fxMaterial('pour', { opacity: 0.85 }), F.maxPours);
+    this.pours.setColorTable(LIQUID_COLOURS);
+    this.pools = new InstancedField(scene, new CylinderGeometry(1, 1, 0.04, 18), fxMaterial('pool'), F.maxPools);
+    this.pools.setColorTable(LIQUID_COLOURS);
+    this.steamPlumes = new InstancedField(scene, new CylinderGeometry(0.5, 0.18, 1, 10, 1, true).translate(0, 0.5, 0), fxMaterial('steam', { opacity: 0.55 }), F.maxSteam);
+    this.blinkers = new InstancedField(scene, box, fxMaterial('blink'), F.maxBlinkers);
+    this.blinkers.setColorTable([new Color(1, 1, 1), new Color(L.amber), new Color(L.teal), new Color(L.red), new Color(L.dark), new Color(L.green)]);
+    this.holos = new InstancedField(scene, new PlaneGeometry(1, 1).translate(0, 0.5, 0), fxMaterial('holo', { additive: true }), F.maxHolos);
+    this.holos.setColorTable([LIQUID_COLOURS[4]]);
+    this.fans = new InstancedField(scene, ceilingFan(), this.decorMat, F.maxFans);
+    // A flared plume, open at both ends.
+    this.vents = new InstancedField(scene, new CylinderGeometry(0.75, 0.5, 1, 12, 1, true).translate(0, 0.5, 0), fxMaterial('vent', { opacity: 0.6 }), F.maxVents);
+    this.vents.setColorTable([LIQUID_COLOURS[3]]);
+    this.sparks = new Sparks(scene);
     this.voids = new InstancedField(scene, box, new MeshBasicMaterial({ color: TH.interior.void, fog: false }), F.maxVoids);
     this.shuttles = new InstancedField(scene, shuttle(), this.propMat, F.maxShuttles);
     this.pickupMat = new MeshBasicMaterial();
@@ -298,8 +325,10 @@ export class World {
       this.rockSpires,
       this.shuttles,
       this.strips,
+      this.pours,
+      this.vents,
     ];
-    this.fields = [...this.solids, this.tufts, this.mesas, this.arches, this.pickups, this.powers, this.pipes, this.greebles, this.voids, this.canisters];
+    this.fields = [...this.solids, this.pools, this.steamPlumes, this.blinkers, this.holos, this.fans, this.tufts, this.mesas, this.arches, this.pickups, this.powers, this.pipes, this.greebles, this.voids, this.canisters];
     this.applyPalette();
   }
 
@@ -362,6 +391,7 @@ export class World {
     this.roomShift = 0;
     this.prevWallL = this.prevWallR = NaN;
     this.floorD.fill(-Infinity);
+    this.sparks.clear();
     // Forget the last run's look too: the title applies it straight after a reset.
     this.canyonMix = this.interiorMix = this.insideMix = this.deckMix = this.biomeMix = this.asteroidMix = 0;
     this.roomName = '';
@@ -395,6 +425,7 @@ export class World {
     for (const f of this.fields) f.advance(dx, behind);
     this.fill();
     this.hull.animate(this.distance); // pistons
+    this.vents.animate(this.distance); // steam vents
     this.updateMix(dt);
   }
 
@@ -466,6 +497,13 @@ export class World {
   }
 
   /** Turn the pickups (cosmetic). */
+  /** Turn the ceiling fans (cosmetic). */
+  spinFans(dt: number): void {
+    this.fanSpin += dt * 5;
+    this.fans.cos.fill(Math.cos(this.fanSpin));
+    this.fans.sin.fill(Math.sin(this.fanSpin));
+  }
+
   spinPickups(dt: number): void {
     this.pickupSpin += CONFIG.boost.pickup.spinSpeed * dt;
     const c = Math.cos(this.pickupSpin);
@@ -1470,6 +1508,42 @@ export class World {
         w.floorSegs[w.floorN * 2] = x0;
         w.floorSegs[w.floorN * 2 + 1] = x1;
         w.floorN++;
+      },
+      pour(x, d, width, liquid, solid) {
+        w.pours.nextColor = liquid;
+        const t = solid ? 0.22 : 0.14;
+        w.pours.spawn(x - w.shipX, 0, d, width, this.H, t, 0, solid, false, width / 2, t / 2 + 0.05, solid);
+      },
+      pool(x, d, r, liquid) {
+        w.pools.nextColor = liquid;
+        w.pools.spawn(x - w.shipX, 0.02, d, r, 1, r * 0.8, 0, false, false, 0, 0, false);
+      },
+      steam(x, y, d, height) {
+        w.steamPlumes.spawn(x - w.shipX, y, d, 0.7, height, 0.7, 0, false, false, 0, 0, false);
+      },
+      blinker(x, y, d, width, h, colour) {
+        const s = F.cubeSize;
+        w.blinkers.nextColor = colour;
+        w.blinkers.spawn(x - w.shipX, y, d, width / s, h / s, Math.max(width, 0.04) / s, 0, false, false, 0, 0, false);
+      },
+      holo(x, y, d, width, h) {
+        w.holos.spawn(x - w.shipX, y, d, width, h, 1, 0, false, false, 0, 0, false);
+      },
+      fan(x, d, size) {
+        w.fans.spawn(x - w.shipX, this.H - 0.35, d, size, size, size, 0, false, false, 0, 0, false);
+      },
+      vent(x, d, half, period) {
+        // On (or near) the lane: down when the ship gets there. Elsewhere: any rhythm.
+        const onLane = Math.abs(x - this.lane) < LANE + half + this.jitter + 0.3;
+        const phase = onLane ? -Math.PI / 2 : rand() * Math.PI * 2;
+        const height = Math.min(this.H - 0.3, 2.6);
+        w.vents.setNextPulse(height, period, phase);
+        w.vents.spawn(x - w.shipX, 0, d, half * 2, height, half * 2, 0, true, false, half, half, false);
+        // The grate it fires from, lit amber so it reads as a hazard.
+        w.light(x, 0.01, d, half * 2 + 0.2, 0.01, half * 2 + 0.2, Light.Amber, false);
+      },
+      sparks(x, y, d) {
+        w.sparks.addEmitter(x, y, d);
       },
       tree(x, d, size) {
         const field = rand() < 0.6 ? w.mushrooms : w.spires;

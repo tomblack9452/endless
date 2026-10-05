@@ -230,6 +230,13 @@ export const CONFIG = {
     maxStrips: 1600,
     maxObstacleRocks: 1400,
     maxBushes: 900,
+    maxPours: 500,
+    maxPools: 200,
+    maxSteam: 200,
+    maxBlinkers: 1400,
+    maxHolos: 120,
+    maxFans: 80,
+    maxVents: 400,
     maxDeadTrees: 500,
     maxRockSpires: 500,
     maxTufts: 2600,
@@ -456,6 +463,10 @@ export const CONFIG = {
           doorGap: 0.9, // clearance either side of the lane once closed
           doorClose: [70, 6], // closes over 70 units of approach, done 6 ahead
         },
+        // Animated rooms (fx.ts): coolant curtains, steam vents, molten metal.
+        coolant: { weight: 2, minSub: 0, length: [60, 90], extraWidth: 2.6, height: 4.4, curtainSpacing: [11, 16], gapWidth: 3.2 },
+        vents: { weight: 2, minSub: 1, length: [55, 85], extraWidth: 2.2, height: 3.8, rowSpacing: [7, 10], pitch: 2.1, period: 30, ventHalf: 0.45 },
+        foundry: { weight: 2, minSub: 1, length: [60, 90], extraWidth: 3, height: 5.2, curtainSpacing: [13, 18], gapWidth: 3.2 },
         // Set piece: reactor collapse (debris falls off the lane as you approach).
         collapse: { weight: 1.5, minSub: 2, length: [70, 95], extraWidth: 6, spacing: [5, 8], landAhead: [9, 16], fallOver: 22 },
       },
