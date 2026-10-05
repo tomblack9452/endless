@@ -4,13 +4,32 @@ import { label, type SettingKey, type Settings } from './settings';
 export type ScreenName = 'title' | 'paused' | 'over' | 'settings' | 'stats' | 'missions' | 'hangar' | 'record' | 'solo' | 'league';
 
 /** Everything the league screen shows. */
-export interface LeagueView {
+/** The service record and league screens share one layout. */
+export interface ProgressView {
   icon: string;
   name: string;
-  next: string;
-  lpFraction: number;
+  /** The headline: how much is left to the next step. */
+  big: string; // e.g. "1,240"
+  goal: string; // e.g. "xp to sergeant"
+  fraction: number; // 0..1 along the bar
+  detail: string; // e.g. "250 / 1,490 xp"
+  /** Other things the next step needs, each met or not. */
+  checks: { label: string; value: string; met: boolean }[];
+  /** What the next steps give. */
+  gives: { title: string; items: string[] }[];
+  /** Recent runs, oldest first (xp earned, or lp won and lost). */
+  trend: { title: string; values: number[]; summary: string; unit: string };
   rows: [string, string][];
-  ladder: { icon: string; name: string; needs: string; state: 'done' | 'current' | 'locked' }[];
+  ladder: { icon: string; name: string; needs: string; gives: string; state: 'done' | 'current' | 'locked' }[];
+}
+
+/** A promotion, shown big over the end-of-run screen. */
+export interface Celebration {
+  kicker: string; // "promoted"
+  icon: string;
+  name: string;
+  lines: string[];
+  color?: string; // league colour for the glow
 }
 
 /** One row on the hangar's ship tab. */
@@ -53,16 +72,6 @@ export interface SectorTile {
 }
 
 /** Everything the service record screen shows. */
-export interface RecordView {
-  icon: string; // insignia SVG
-  rank: string;
-  next: string;
-  xpFraction: number; // 0..1 towards the next rank
-  rows: [string, string][];
-  runs: [string, string][];
-  ladder: { icon: string; name: string; needs: string; state: 'done' | 'current' | 'locked' }[];
-}
-
 /** The rank block on the game-over screen. */
 export interface RankResultView {
   icon: string;
@@ -500,33 +509,104 @@ export class UI {
     $('upgrade-note').textContent = text;
   }
 
-  renderLeague(v: LeagueView): void {
-    $('league-icon').innerHTML = v.icon;
-    $('league-name').textContent = v.name;
-    $('league-next').textContent = v.next;
-    $('league-lp').style.transform = `scaleX(${Math.max(0, Math.min(1, v.lpFraction))})`;
-    this.fillRows($('league-rows'), v.rows);
-    this.fillLadder($('league-ladder'), v.ladder);
-  }
+  /** Fill the record ('record') or league ('league') screen. */
+  renderProgress(p: 'record' | 'league', v: ProgressView): void {
+    $(`${p}-icon`).innerHTML = v.icon;
+    $(`${p}-name`).textContent = v.name;
+    $(`${p}-big`).textContent = v.big;
+    $(`${p}-goal`).textContent = v.goal;
+    $(`${p}-detail`).textContent = v.detail;
+    const fill = $(`${p}-fill`);
+    fill.style.transform = 'scaleX(0)';
+    requestAnimationFrame(() => (fill.style.transform = `scaleX(${Math.max(0, Math.min(1, v.fraction))})`));
 
-  private fillLadder(into: HTMLElement, ladder: LeagueView['ladder']): void {
-    into.replaceChildren(
-      ...ladder.map((l) => {
-        const row = document.createElement('div');
-        row.className = `ladder-row ${l.state === 'locked' ? 'locked' : l.state === 'current' ? 'current' : ''}`;
-        const icon = document.createElement('span');
-        icon.className = 'insignia small';
-        icon.innerHTML = l.icon;
-        const name = document.createElement('span');
-        name.className = 'label ladder-name';
-        name.textContent = l.name;
-        const needs = document.createElement('span');
-        needs.className = 'label dim';
-        needs.textContent = l.needs;
-        row.append(icon, name, needs);
+    $(`${p}-checks`).replaceChildren(
+      ...v.checks.map((k) => {
+        const row = el('div', `prog-check ${k.met ? 'met' : ''}`);
+        row.append(el('span', 'prog-check-mark', k.met ? '✓' : '○'), el('span', 'label', k.label), el('span', 'label prog-check-value', k.value));
         return row;
       }),
     );
+
+    $(`${p}-gives`).replaceChildren(
+      ...v.gives.map((g) => {
+        const card = el('div', 'prog-card');
+        card.append(el('div', 'label dim prog-card-title', g.title));
+        for (const item of g.items) card.append(el('div', 'label prog-card-item', item));
+        return card;
+      }),
+    );
+
+    const trend = $(`${p}-trend`);
+    const t = v.trend;
+    const head = el('div', 'prog-trend-head');
+    head.append(el('span', 'label dim', t.title), el('span', 'label', t.summary));
+    trend.replaceChildren(head, t.values.length ? bars(t.values, t.unit) : el('div', 'label dim prog-empty', 'no ranked runs yet'));
+
+    this.fillRows($(`${p}-rows`), v.rows);
+
+    const ladder = $(`${p}-ladder`);
+    let current: HTMLElement | null = null;
+    ladder.replaceChildren(
+      ...v.ladder.map((l) => {
+        const row = el('div', `ladder-row ${l.state}`);
+        const icon = el('span', 'insignia small');
+        icon.innerHTML = l.icon;
+        const text = el('div', 'ladder-text');
+        const top = el('div', 'ladder-top');
+        top.append(el('span', 'label ladder-name', l.name));
+        if (l.state === 'current') top.append(el('span', 'ladder-you', 'you'));
+        else if (l.state === 'done') top.append(el('span', 'ladder-done', '✓'));
+        text.append(top, el('div', 'label dim ladder-needs', l.needs));
+        if (l.gives) text.append(el('div', 'label ladder-gives', l.gives));
+        row.append(icon, text);
+        if (l.state === 'current') current = row;
+        return row;
+      }),
+    );
+    // Open the ladder at your place in it.
+    requestAnimationFrame(() => {
+      const row = current as HTMLElement | null;
+      if (row) ladder.scrollTop = row.offsetTop - ladder.offsetTop - ladder.clientHeight / 2 + row.clientHeight / 2;
+    });
+  }
+
+  /** Show promotions one after another; each tap moves on. */
+  celebrate(items: Celebration[]): void {
+    this.promoQueue.push(...items);
+    if (!this.promo.classList.contains('show')) this.nextPromo();
+  }
+
+  private readonly promo = $('promo');
+  private promoQueue: Celebration[] = [];
+  private promoShownAt = 0;
+
+  private nextPromo(): void {
+    const v = this.promoQueue.shift();
+    if (!v) {
+      this.promo.classList.remove('show');
+      return;
+    }
+    $('promo-kicker').textContent = v.kicker;
+    $('promo-icon').innerHTML = v.icon;
+    $('promo-name').textContent = v.name;
+    $('promo-lines').replaceChildren(...v.lines.map((l) => el('div', 'label', l)));
+    this.promo.style.setProperty('--promo', v.color ?? 'var(--text)');
+    this.promo.classList.remove('show');
+    void this.promo.offsetWidth; // restart the animation
+    this.promo.classList.add('show');
+    this.promoShownAt = performance.now();
+  }
+
+  /** Taps on the promotion never reach the game (so they can't start a retry). */
+  bindCelebration(): void {
+    const stop = (e: Event) => e.stopPropagation();
+    this.promo.addEventListener('pointerdown', stop);
+    this.promo.addEventListener('click', (e) => {
+      e.stopPropagation();
+      // A short pause first, so a tap meant for the crash screen doesn't skip it unseen.
+      if (performance.now() - this.promoShownAt > 600) this.nextPromo();
+    });
   }
 
   /** Rank badge on the title screen. */
@@ -534,32 +614,6 @@ export class UI {
     $('title-rank-icon').innerHTML = icon;
     $('title-rank-name').textContent = name;
     $('title-credits').textContent = credits;
-  }
-
-  renderRecord(v: RecordView): void {
-    $('record-icon').innerHTML = v.icon;
-    $('record-rank').textContent = v.rank;
-    $('record-next').textContent = v.next;
-    $('record-xp').style.transform = `scaleX(${Math.max(0, Math.min(1, v.xpFraction))})`;
-    this.fillRows($('record-rows'), v.rows);
-    this.fillRows($('record-runs'), v.runs);
-    $('record-ladder').replaceChildren(
-      ...v.ladder.map((l) => {
-        const row = document.createElement('div');
-        row.className = `ladder-row ${l.state === 'locked' ? 'locked' : l.state === 'current' ? 'current' : ''}`;
-        const icon = document.createElement('span');
-        icon.className = 'insignia small';
-        icon.innerHTML = l.icon;
-        const name = document.createElement('span');
-        name.className = 'label ladder-name';
-        name.textContent = l.name;
-        const needs = document.createElement('span');
-        needs.className = 'label dim';
-        needs.textContent = l.needs;
-        row.append(icon, name, needs);
-        return row;
-      }),
-    );
   }
 
   /** Rank result on the game-over screen (null clears it, e.g. solo runs). */
@@ -747,4 +801,26 @@ export class UI {
     this.overScore.textContent = formatScore(score);
     this.overBest.textContent = isNewBest ? 'new best' : `best ${formatScore(best)}`;
   }
+}
+
+function el(tag: string, className: string, text?: string): HTMLElement {
+  const e = document.createElement(tag);
+  e.className = className;
+  if (text !== undefined) e.textContent = text;
+  return e;
+}
+
+/** A small bar chart of recent runs: bars up for gains, down for losses. */
+function bars(values: number[], unit: string): HTMLElement {
+  const box = el('div', 'trend-bars');
+  const max = Math.max(1, ...values.map(Math.abs));
+  const signed = values.some((v) => v < 0);
+  box.classList.toggle('signed', signed);
+  for (const v of values) {
+    const bar = el('span', `trend-bar ${v < 0 ? 'down' : ''}`);
+    bar.style.setProperty('--h', String(Math.abs(v) / max));
+    bar.title = `${v > 0 ? '+' : ''}${v} ${unit}`;
+    box.append(bar);
+  }
+  return box;
 }

@@ -18,18 +18,18 @@ import { Haptics } from './haptics';
 import { Hints } from './hints';
 import { Missions, type RunMetrics } from './missions';
 import { Progress } from './progress';
-import { creditsFor, insignia, par, Ranked, rankName, RANKS, type RunMode } from './ranks';
+import { creditsFor, insignia, par, promotionBonus, Ranked, rankName, RANKS, type RunMode, xpToRank } from './ranks';
 import { Wallet } from './wallet';
 import { fxDistance, fxTime } from './fx';
 import { type Course, COURSES, courseLength, type Environment, ENVIRONMENTS, weeklyCourse } from './courses';
-import { DIVISIONS, emblem, LEAGUES, leagueName, leaguePar, Leagues, LP_PER_DIVISION, weekKey } from './leagues';
+import { DIVISIONS, divisionReward, emblem, LEAGUES, leagueName, leaguePar, Leagues, LP_PER_DIVISION, weekKey } from './leagues';
 import { find, itemsIn, LOOKS, Looks, type Owner, type Slot, SLOT_NAMES, SLOTS, unlockText } from './looks';
 import type { Fin, Marking } from './looks';
 import type { ShipId } from './cosmetics';
-import { MAX_TIER, type ShipStats, STANDARD, SYSTEMS, type SystemId, TIER_COST, Upgrades } from './upgrades';
+import { MAX_TIER, type ShipStats, STANDARD, SYSTEMS, type SystemId, TIER_COST, TIER_LEAGUE, Upgrades } from './upgrades';
 import { newSeed } from './rng';
 import { loadNumber } from './storage';
-import { formatScore, type LookRow, type RankResultView, UI } from './ui';
+import { type Celebration, formatScore, type LookRow, type ProgressView, type RankResultView, UI } from './ui';
 import type { RoomId } from './interior';
 import { biomeForLevel, type PowerKind, themeForLevel, themeName, World } from './world';
 import { tintBiome } from './biomes';
@@ -215,6 +215,7 @@ export class Game {
     });
     window.addEventListener('blur', () => this.pause());
 
+    this.ui.bindCelebration();
     this.ui.bindTitleLinks(this.onTitleLink);
     void Promise.all([this.progress.load(), this.ranked.load(), this.wallet.load(), this.leagues.load(), this.upgrades.load()]).then(() => {
       // A new week: pay last week's league reward.
@@ -444,14 +445,29 @@ export class Game {
     const r = this.ranked.record(this.mode, this.score, this.level, this.seed, Date.now(), target, this.weekly.id);
     const promoted = r.rankAfter > r.rankBefore;
     const leagueLines: string[] = [];
+    const party: Celebration[] = [];
     let bonus = r.credits;
     {
       const res = lg.record(this.score, target);
       bonus += res.credits;
       leagueLines.push(`${leagueName(lg.league, lg.division)} · ${res.lp >= 0 ? '+' : ''}${res.lp} lp (${lg.lp}/${LP_PER_DIVISION})`);
-      if (res.divisionUp) leagueLines.push(`division up: +${formatScore(res.credits)} credits`);
+      if (res.divisionUp) {
+        leagueLines.push(`division up: +${formatScore(res.credits)} credits`);
+        party.push({
+          kicker: 'division up',
+          icon: emblem(lg.league, lg.division),
+          name: leagueName(lg.league, lg.division),
+          lines: [`+${formatScore(res.credits)} credits`, `${formatScore(lg.current.weekly[lg.division])} credits a week`],
+          color: lg.current.color,
+        });
+      }
       if (res.divisionDown) leagueLines.push('dropped a division');
-      bonus += this.promoteLeague(leagueLines);
+      bonus += this.promoteLeague(leagueLines, party);
+    }
+    if (promoted) {
+      const gives: string[] = [];
+      for (let k = r.rankBefore + 1; k <= r.rankAfter; k++) gives.push(...this.rankGives(k));
+      party.unshift({ kicker: 'promoted', icon: insignia(r.rankAfter), name: rankName(r.rankAfter), lines: mergeCredits(gives), color: '#d4a63a' });
     }
     const lines = [
       ...leagueLines,
@@ -468,6 +484,7 @@ export class Game {
       lines,
     };
     this.ui.setGameOverRank(view);
+    if (party.length) this.ui.celebrate(party);
     if (promoted) {
       this.sound.level(true, musicFor(this.level));
       this.haptics.level(true);
@@ -477,10 +494,17 @@ export class Game {
   }
 
   /** Promote to the next league if ready and enough upgrade points are owned. Returns credits. */
-  private promoteLeague(lines: string[] | null): number {
+  private promoteLeague(lines: string[] | null, party: Celebration[] = []): number {
     const lg = this.leagues;
     const credits = lg.tryPromote(this.upgrades.points());
     if (credits > 0) {
+      party.push({
+        kicker: 'new league',
+        icon: emblem(lg.league, lg.division),
+        name: `${lg.current.name} league`,
+        lines: this.leagueGives(lg.league),
+        color: lg.current.color,
+      });
       const text = `promoted to ${lg.current.name} league: +${formatScore(credits)} credits`;
       if (lines) lines.push(text);
       else this.ui.showNotice(text);
@@ -492,34 +516,92 @@ export class Game {
     return credits;
   }
 
+  /** What reaching rank `k` gives: its promotion credits, any looks, a new insignia. */
+  private rankGives(k: number): string[] {
+    const out = [`+${formatScore(promotionBonus(k))} credits`];
+    if (k > 0 && RANKS[k].tier !== RANKS[k - 1].tier) out.push('new insignia');
+    for (const l of LOOKS) if (l.unlock.by === 'rank' && l.unlock.rank === k) out.push(`${l.name} ${SLOT_NAMES[l.slot]}`);
+    return out;
+  }
+
+  /** What reaching league `l` gives. */
+  private leagueGives(l: number): string[] {
+    const x = LEAGUES[l];
+    const out: string[] = [];
+    if (x.promotion > 0) out.push(`+${formatScore(x.promotion)} credits`);
+    for (const look of LOOKS) if (look.unlock.by === 'league' && look.unlock.league === l) out.push(`${look.name} ${SLOT_NAMES[look.slot]}`);
+    TIER_LEAGUE.forEach((need, t) => {
+      if (need === l && need > 0) out.push(`tier ${t + 1} upgrades`);
+    });
+    out.push(`up to ${x.max} active upgrade points`);
+    out.push(`${formatScore(x.weekly[0])}-${formatScore(x.weekly[2])} credits a week`);
+    return out;
+  }
+
+  /** The most recent `n` ranked runs, oldest first. */
+  private recentRanked(n: number) {
+    return this.ranked.history.slice(-n);
+  }
+
   private openLeague(): void {
     const lg = this.leagues;
     const l = lg.league;
     const next = LEAGUES[l + 1];
     const owned = this.upgrades.points();
-    let nextText = 'top league';
-    if (next) {
-      if (lg.promotionReady) nextText = owned >= next.min ? 'promotion ready' : `promotion ready: own ${next.min} upgrade points (${owned} now)`;
-      else nextText = `fill division ${DIVISIONS[DIVISIONS.length - 1]}, then own ${next.min} upgrade points`;
+    const target = this.weekly.target;
+    const lastDivision = DIVISIONS.length - 1;
+    const parNow = leaguePar(l, target);
+    const left = Math.max(0, LP_PER_DIVISION - lg.lp);
+
+    let big = String(left);
+    let goal: string;
+    const checks: ProgressView['checks'] = [];
+    if (lg.top) {
+      big = String(lg.lp);
+      goal = 'lp in the top league';
+    } else if (lg.division < lastDivision) {
+      goal = `lp to ${leagueName(l, lg.division + 1)}`;
+      checks.push({ label: `own ${next.min} upgrade points for ${next.name}`, value: `${owned} owned`, met: owned >= next.min });
+    } else {
+      goal = lg.promotionReady ? `division full: ${next.name} next` : `lp to finish ${leagueName(l, lg.division)}`;
+      checks.push({ label: `fill division ${DIVISIONS[lastDivision]}`, value: `${lg.lp}/${LP_PER_DIVISION} lp`, met: lg.promotionReady });
+      checks.push({ label: `own ${next.min} upgrade points`, value: `${owned} owned`, met: owned >= next.min });
     }
-    this.ui.renderLeague({
+    // Roughly how many runs at par that is (+10 LP each).
+    const runs = Math.ceil(left / 10);
+
+    const gives: ProgressView['gives'] = [];
+    if (!lg.top && lg.division < lastDivision) {
+      gives.push({
+        title: `${leagueName(l, lg.division + 1)} gives`,
+        items: [`+${formatScore(divisionReward(l))} credits`, `${formatScore(lg.current.weekly[lg.division + 1])} credits a week`],
+      });
+    }
+    if (next) gives.push({ title: `${next.name} league gives`, items: this.leagueGives(l + 1) });
+
+    const h = lg.history.slice(-20);
+    const net = h.reduce((t, v) => t + v, 0);
+    this.ui.renderProgress('league', {
       icon: emblem(l, lg.division),
       name: leagueName(l, lg.division),
-      next: nextText,
-      lpFraction: lg.lp / LP_PER_DIVISION,
+      big,
+      goal,
+      fraction: lg.lp / LP_PER_DIVISION,
+      detail: lg.top || lg.promotionReady ? `par ${formatScore(parNow)} this week` : `${lg.lp} / ${LP_PER_DIVISION} lp · about ${runs} run${runs === 1 ? '' : 's'} at par`,
+      checks,
+      gives,
+      trend: { title: h.length ? `last ${h.length} runs` : 'recent runs', values: h, summary: h.length ? `${net >= 0 ? '+' : ''}${net} lp` : '', unit: 'lp' },
       rows: [
-        ['league points', `${lg.lp} / ${LP_PER_DIVISION}`],
-        ['league par this week', formatScore(leaguePar(l, this.weekly.target))],
+        ['par this week', `${formatScore(parNow)} = +10 lp`],
+        ['150% of par', `${formatScore(Math.round(parNow * 1.5))} = +25 lp`],
         ['active upgrade points', `${this.upgrades.activePoints()} (cap ${lg.current.max})`],
-        ['upgrade points owned', String(owned)],
         ['weekly reward so far', formatScore(lg.weeklySoFar())],
-        ['next division reward', formatScore(300 * (l + 1))],
-        ['credits', formatScore(this.wallet.credits)],
       ],
-      ladder: LEAGUES.map((x, k) => ({
+      ladder: LEAGUES.map((y, k) => ({
         icon: emblem(k, k < l ? 2 : k === l ? lg.division : -1),
-        name: x.name,
-        needs: `${x.min === x.max ? x.max : `${x.min}-${x.max}`} points · par ${formatScore(leaguePar(k, this.weekly.target))}`,
+        name: y.name,
+        needs: `${y.min === y.max ? y.max : `${y.min}-${y.max}`} upgrade points · par ${formatScore(leaguePar(k, target))}`,
+        gives: k === 0 ? 'where everyone starts' : this.leagueGives(k).slice(0, 3).join(' · '),
         state: k < l ? 'done' : k === l ? 'current' : 'locked',
       })),
     });
@@ -539,41 +621,56 @@ export class Game {
     const rk = this.ranked;
     const i = rk.rank;
     const next = RANKS[i + 1];
-    const needs: string[] = [];
+    const xpLeft = next ? xpToRank(rk.xp, i + 1) : 0;
+    const checks: ProgressView['checks'] = [];
     if (next) {
-      if (rk.xp < next.xp) needs.push(`${formatScore(next.xp - rk.xp)} xp`);
-      if (rk.highestSkill < next.skill) needs.push(`skill ${next.skill}`);
+      checks.push({ label: `${formatScore(next.xp)} xp`, value: `${formatScore(rk.xp)} now`, met: xpLeft === 0 });
+      if (next.skill > 0) checks.push({ label: `skill ${next.skill}`, value: `best ${rk.highestSkill} · now ${rk.skill}`, met: rk.highestSkill >= next.skill });
     }
+    let big = formatScore(xpLeft);
+    let goal = next ? `xp to ${rankName(i + 1)}` : 'xp. top rank reached';
+    // Enough XP but not the skill: the skill is the headline.
+    if (next && xpLeft === 0 && rk.highestSkill < next.skill) {
+      big = `skill ${next.skill}`;
+      goal = `needed for ${rankName(i + 1)}`;
+    }
+    if (!next) big = formatScore(rk.xp);
+
+    const recent = this.recentRanked(20);
+    const xpSum = recent.reduce((t, h) => t + h.xp, 0);
+    const avg = recent.length ? Math.round(xpSum / recent.length) : 0;
+    const runsToGo = avg > 0 ? Math.ceil(xpLeft / avg) : 0;
     const b = rk.bests();
-    const runs = rk.history
-      .slice(-10)
-      .reverse()
-      .map((h): [string, string] => {
-        const d = new Date(h.at);
-        const when = `${d.getDate()}/${d.getMonth() + 1} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-        return [`${when}  ${h.mode === 'daily' ? 'daily' : 'ranked'}`, `${formatScore(h.score)}  +${h.xp} xp`];
-      });
-    this.ui.renderRecord({
+
+    this.ui.renderProgress('record', {
       icon: insignia(i),
-      rank: rankName(i),
-      next: next ? `next: ${rankName(i + 1)}. needs ${needs.join(' and ') || 'one more run'}` : 'top rank',
-      xpFraction: this.xpFraction(),
+      name: rankName(i),
+      big,
+      goal,
+      fraction: this.xpFraction(),
+      detail: next
+        ? `${formatScore(rk.xp - RANKS[i].xp)} / ${formatScore(next.xp - RANKS[i].xp)} xp this rank${runsToGo ? ` · about ${runsToGo} run${runsToGo === 1 ? '' : 's'}` : ''}`
+        : 'general grade 4: the top',
+      checks,
+      gives: next ? [{ title: `${rankName(i + 1)} gives`, items: this.rankGives(i + 1) }] : [],
+      trend: {
+        title: recent.length ? `last ${recent.length} runs` : 'recent runs',
+        values: recent.map((h) => h.xp),
+        summary: recent.length ? `+${formatScore(xpSum)} xp · avg ${avg}` : '',
+        unit: 'xp',
+      },
       rows: [
-        ['xp', formatScore(rk.xp)],
-        ['skill', `${rk.skill} (highest ${rk.highestSkill})`],
-        ['par at your skill this week', formatScore(par(rk.skill, this.weekly.target))],
+        ['skill par this week', `${formatScore(par(rk.skill, this.weekly.target))} to climb`],
         ['double xp runs left today', String(rk.bonusRunsLeft())],
-        ['credits', formatScore(this.wallet.credits)],
-        ['best today', formatScore(b.today)],
         ['best this week', formatScore(b.week)],
         ['best ever', formatScore(b.all)],
         ['ranked runs', formatScore(rk.history.length)],
       ],
-      runs: runs.length ? runs : [['no ranked runs yet', '']],
       ladder: RANKS.map((r, k) => ({
         icon: insignia(k),
         name: rankName(k),
         needs: r.skill > 0 ? `${formatScore(r.xp)} xp · skill ${r.skill}` : `${formatScore(r.xp)} xp`,
+        gives: k === 0 ? '' : this.rankGives(k).join(' · '),
         state: k < i ? 'done' : k === i ? 'current' : 'locked',
       })),
     });
@@ -1612,4 +1709,16 @@ export class Game {
       this.ui.show('over');
     }
   }
+}
+
+/** "+250 credits" lines from several promotions at once, added into one. */
+function mergeCredits(lines: string[]): string[] {
+  let credits = 0;
+  const rest: string[] = [];
+  for (const l of lines) {
+    const m = /^\+([\d,]+) credits$/.exec(l);
+    if (m) credits += Number(m[1].replace(/,/g, ''));
+    else if (!rest.includes(l)) rest.push(l);
+  }
+  return credits > 0 ? [`+${formatScore(credits)} credits`, ...rest] : rest;
 }
