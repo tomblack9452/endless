@@ -39,6 +39,9 @@ interface Saved {
   stars: number[]; // per sector: bit 0 cleared, bit 1 no hits, bit 2 chain
   daily: { date: string; best: number };
   courses?: Record<string, CourseResult>;
+  weekly?: { week: string; best: number; finished: boolean };
+  envBest?: Record<string, number>;
+  endlessBest?: number;
 }
 
 /** Best results on a set course. */
@@ -112,6 +115,11 @@ export class Progress {
   stars: number[] = [];
   /** Set course results by course id. */
   courses: Record<string, CourseResult> = {};
+  /** This week's ranked level: your best score on it, and whether you've finished it. */
+  weekly = { week: '', best: 0, finished: false };
+  /** Solo high scores by environment id (see ENVIRONMENTS in courses.ts). */
+  envBest: Record<string, number> = {};
+  endlessBest = 0;
   private daily = { date: '', best: 0 };
 
   async load(): Promise<void> {
@@ -123,6 +131,9 @@ export class Progress {
       this.sector = s.sector ?? sectorOf(s.reached ?? 1);
       this.stars = s.stars ?? [];
       this.courses = s.courses ?? {};
+      if (s.weekly) this.weekly = s.weekly;
+      this.envBest = s.envBest ?? {};
+      this.endlessBest = s.endlessBest ?? 0;
       if (s.daily) this.daily = s.daily;
     } catch {
       // Corrupt value: start fresh.
@@ -130,7 +141,16 @@ export class Progress {
   }
 
   private save(): void {
-    const s: Saved = { stats: this.stats, sector: this.sector, stars: this.stars, daily: this.daily, courses: this.courses };
+    const s: Saved = {
+      stats: this.stats,
+      sector: this.sector,
+      stars: this.stars,
+      daily: this.daily,
+      courses: this.courses,
+      weekly: this.weekly,
+      envBest: this.envBest,
+      endlessBest: this.endlessBest,
+    };
     void storage.set(KEY, JSON.stringify(s));
   }
 
@@ -167,6 +187,41 @@ export class Progress {
     for (const s of this.stars) n += countBits(s ?? 0);
     for (const c of Object.values(this.courses)) n += countBits(c.stars);
     return n;
+  }
+
+  /** Best score on the weekly level `week` (0 if you haven't played it). */
+  weeklyBest(week: string): number {
+    return this.weekly.week === week ? this.weekly.best : 0;
+  }
+
+  /** Fold in a ranked run on weekly level `week`. Returns true for a new weekly best. */
+  recordWeekly(week: string, score: number, finished: boolean): boolean {
+    if (this.weekly.week !== week) this.weekly = { week, best: 0, finished: false };
+    const best = Math.floor(score) > this.weekly.best;
+    if (best) this.weekly.best = Math.floor(score);
+    if (finished) this.weekly.finished = true;
+    this.save();
+    return best;
+  }
+
+  /** Solo high score in an environment; returns true for a new best. */
+  recordEnv(id: string, score: number): boolean {
+    const best = Math.floor(score) > (this.envBest[id] ?? 0);
+    if (best) {
+      this.envBest[id] = Math.floor(score);
+      this.save();
+    }
+    return best;
+  }
+
+  /** Endless high score; returns true for a new best. */
+  recordEndless(score: number): boolean {
+    const best = Math.floor(score) > this.endlessBest;
+    if (best) {
+      this.endlessBest = Math.floor(score);
+      this.save();
+    }
+    return best;
   }
 
   course(id: string): CourseResult {

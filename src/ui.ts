@@ -1,7 +1,7 @@
 import { CONFIG } from './config';
 import { label, type SettingKey, type Settings } from './settings';
 
-export type ScreenName = 'title' | 'paused' | 'over' | 'settings' | 'stats' | 'missions' | 'hangar' | 'record' | 'sectors' | 'league';
+export type ScreenName = 'title' | 'paused' | 'over' | 'settings' | 'stats' | 'missions' | 'hangar' | 'record' | 'solo' | 'league';
 
 /** Everything the league screen shows. */
 export interface LeagueView {
@@ -119,7 +119,7 @@ export class UI {
     missions: $('screen-missions'),
     hangar: $('screen-hangar'),
     record: $('screen-record'),
-    sectors: $('screen-sectors'),
+    solo: $('screen-sectors'),
     league: $('screen-league'),
   };
   readonly titleLeague = $('title-league');
@@ -363,10 +363,16 @@ export class UI {
     );
   }
 
-  bindSolo(onCourse: (index: number) => void): void {
+  bindSolo(onCourse: (index: number) => void, onEnv: (index: number) => void): void {
+    const envs = $('env-grid');
+    envs.addEventListener('pointerdown', (e) => e.stopPropagation());
+    envs.addEventListener('click', (e) => {
+      const tile = (e.target as HTMLElement).closest<HTMLElement>('.course-tile');
+      if (tile) onEnv(Number(tile.dataset.env));
+    });
     for (const el of document.querySelectorAll<HTMLElement>('[data-solotab]')) {
       el.addEventListener('pointerdown', (e) => e.stopPropagation());
-      el.addEventListener('click', () => this.setSoloTab(el.dataset.solotab as 'levels' | 'random'));
+      el.addEventListener('click', () => this.setSoloTab(el.dataset.solotab as 'levels' | 'envs'));
     }
     const grid = $('courses-grid');
     grid.addEventListener('pointerdown', (e) => e.stopPropagation());
@@ -376,7 +382,28 @@ export class UI {
     });
   }
 
-  setSoloTab(tab: 'levels' | 'random'): void {
+  /** Solo environments: a tile each with its high score. */
+  renderEnvironments(tiles: { index: number; name: string; best: number }[]): void {
+    const grid = document.createElement('div');
+    grid.className = 'course-grid';
+    for (const t of tiles) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'course-tile';
+      b.dataset.env = String(t.index);
+      const name = document.createElement('span');
+      name.className = 'course-name';
+      name.textContent = t.name;
+      const best = document.createElement('span');
+      best.className = 'course-time';
+      best.textContent = t.best > 0 ? `best ${formatScore(t.best)}` : 'no runs yet';
+      b.append(name, best);
+      grid.append(b);
+    }
+    $('env-grid').replaceChildren(grid);
+  }
+
+  setSoloTab(tab: 'levels' | 'envs'): void {
     for (const el of document.querySelectorAll<HTMLElement>('[data-solotab]')) el.classList.toggle('on', el.dataset.solotab === tab);
     for (const el of document.querySelectorAll<HTMLElement>('[data-solopane]')) el.hidden = el.dataset.solopane !== tab;
   }
@@ -698,20 +725,9 @@ export class UI {
     this.banner.classList.remove('show');
   }
 
-  setBest(best: number): void {
-    this.bests[0] = best;
-    this.setBests(...this.bests);
-  }
-
-  private readonly bests: [number, number, number] = [0, 0, 0];
-
-  /** Title screen bests: ranked, solo and today's daily run (zeros are left out). */
-  setBests(ranked: number, solo: number, daily: number): void {
-    this.bests.splice(0, 3, ranked, solo, daily);
-    const parts: string[] = [];
-    if (ranked > 0) parts.push(`ranked ${formatScore(ranked)}`);
-    if (solo > 0) parts.push(`solo ${formatScore(solo)}`);
-    if (daily > 0) parts.push(`daily ${formatScore(daily)}`);
+  /** Title screen bests, by label (zeros are left out). */
+  setBests(bests: [string, number][]): void {
+    const parts = bests.filter(([, v]) => v > 0).map(([k, v]) => `${k} ${formatScore(v)}`);
     this.titleBest.textContent = parts.length ? `best: ${parts.join(' · ')}` : '';
   }
 
