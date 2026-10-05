@@ -930,6 +930,33 @@ body {
   display: none;
 }
 
+/* Ship tab: compact rows so the ship stays in view below them. */
+#look-rows .setting-row {
+  min-height: calc(44px * var(--ui-scale));
+}
+
+.setting-row .value.locked {
+  border-style: dashed;
+  opacity: 0.75;
+}
+
+.look-buy {
+  width: 100%;
+  margin-top: 12px;
+}
+
+.look-buy[hidden] {
+  display: none;
+}
+
+.screen.panel.top {
+  background: linear-gradient(
+    to bottom,
+    color-mix(in srgb, var(--sky, #f1ede4) 92%, transparent) 64%,
+    transparent 76%
+  );
+}
+
 /* Upgrade rows: name and effect on the left, tier pips and a buy button on the right. */
 .upgrade-row {
   display: flex;

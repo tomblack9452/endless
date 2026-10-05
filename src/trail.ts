@@ -64,6 +64,12 @@ export class Trail {
   private sinceSample = 0;
   private travelled = 0; // for dash phase
   private readonly colour = new Color();
+  private tint: Color | null = null; // engine colour (looks), or null for the default
+
+  /** Engine colour for the trail, or null for the default (text colour, or pickup colour for ion). */
+  setTint(css: string | null): void {
+    this.tint = css ? new Color(css) : null;
+  }
 
   constructor(scene: Scene, private readonly palette: LivePalette) {
     this.ribbons = this.offsets.map(() => new Ribbon(scene, this.material));
@@ -112,7 +118,7 @@ export class Trail {
     this.sinceSample -= total * SPACING; // travel since the newest fixed sample
     const added = Math.min(COUNT - 2, total); // only the most recent ones fit
     const ion = this.style === 'ion';
-    this.colour.copy(ion ? this.palette.pickup : this.palette.text);
+    this.colour.copy(this.tint ?? (ion ? this.palette.pickup : this.palette.text));
     const width = ion ? 0.016 : 0.07;
     const alpha = ion ? 0.9 : 0.6;
     const cos = Math.cos(bank);

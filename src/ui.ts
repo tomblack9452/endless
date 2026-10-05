@@ -3,6 +3,15 @@ import { label, type SettingKey, type Settings } from './settings';
 
 export type ScreenName = 'title' | 'paused' | 'over' | 'settings' | 'stats' | 'missions' | 'hangar' | 'record' | 'sectors';
 
+/** One row on the hangar's ship tab. */
+export interface LookRow {
+  key: string;
+  label: string;
+  value: string;
+  locked: boolean;
+  note: string; // how to unlock, when locked
+}
+
 /** One row on the upgrades tab. */
 export interface UpgradeRow {
   id: string;
@@ -456,22 +465,43 @@ export class UI {
     );
   }
 
-  bindHangar(onPick: (kind: 'ship' | 'trail' | 'palette') => void): void {
-    for (const el of document.querySelectorAll<HTMLElement>('[data-hangar]')) {
-      el.addEventListener('pointerdown', (e) => e.stopPropagation());
-      el.addEventListener('click', () => onPick(el.dataset.hangar as 'ship' | 'trail' | 'palette'));
-    }
+  /** Ship tab: a row tap cycles that slot; the buy button buys what's being previewed. */
+  bindLooks(onRow: (key: string) => void, onBuy: () => void): void {
+    const rows = $('look-rows');
+    rows.addEventListener('pointerdown', (e) => e.stopPropagation());
+    rows.addEventListener('click', (e) => {
+      const row = (e.target as HTMLElement).closest<HTMLElement>('[data-look]');
+      if (row) onRow(row.dataset.look ?? '');
+    });
+    const buy = $('look-buy');
+    buy.addEventListener('pointerdown', (e) => e.stopPropagation());
+    buy.addEventListener('click', () => onBuy());
   }
 
-  /** Hangar values; a choice with only one option unlocked is shown dimmed. */
-  renderHangar(values: Record<'ship' | 'trail' | 'palette', [string, number]>, count: string): void {
-    for (const el of document.querySelectorAll<HTMLElement>('[data-hangar]')) {
-      const [name, options] = values[el.dataset.hangar as 'ship' | 'trail' | 'palette'];
-      const value = el.querySelector('.value');
-      if (value) value.textContent = options > 1 ? `${name} (${options})` : name;
-      el.classList.toggle('locked', options < 2);
+  renderLooks(rows: LookRow[], buy: { text: string; enabled: boolean } | null, note: string): void {
+    $('look-rows').replaceChildren(
+      ...rows.map((r) => {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'setting-row';
+        b.dataset.look = r.key;
+        const name = document.createElement('span');
+        name.className = 'label';
+        name.textContent = r.label;
+        const value = document.createElement('span');
+        value.className = `value${r.locked ? ' locked' : ''}`;
+        value.textContent = r.locked ? `${r.value} · ${r.note}` : r.value;
+        b.append(name, value);
+        return b;
+      }),
+    );
+    const btn = $('look-buy') as HTMLButtonElement;
+    btn.hidden = !buy;
+    if (buy) {
+      btn.textContent = buy.text;
+      btn.disabled = !buy.enabled;
     }
-    this.hangarCount.textContent = count;
+    this.hangarCount.textContent = note;
   }
 
   fillRows(into: HTMLElement, rows: [string, string][]): void {
