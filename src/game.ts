@@ -866,10 +866,8 @@ export class Game {
     this.ui.setTitleLeague(emblem(lg.league, lg.division), `${leagueName(lg.league, lg.division)} · ${lg.lp} lp`, lg.lp / LP_PER_DIVISION);
     this.ui.setTitleRank(insignia(i), rankName(i), `${formatScore(this.wallet.credits)} credits`);
     const wb = this.progress.weeklyBest(this.weekly.id);
-    this.ui.setBests([
-      ['this week', wb],
-      ['endless', this.progress.endlessBest],
-    ]);
+    this.ui.setRankedSub(wb > 0 ? `${this.weekly.name} · best ${formatScore(wb)}` : this.weekly.name);
+    this.ui.setBests([['endless', this.progress.endlessBest]]);
   }
 
   private openStats(): void {
