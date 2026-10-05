@@ -38,6 +38,14 @@ interface Saved {
   sector: number; // furthest sector reached
   stars: number[]; // per sector: bit 0 cleared, bit 1 no hits, bit 2 chain
   daily: { date: string; best: number };
+  courses?: Record<string, CourseResult>;
+}
+
+/** Best results on a set course. */
+export interface CourseResult {
+  stars: number; // bits: 1 finished, 2 no hits, 4 score target
+  time: number; // best finishing time, seconds (0 = never finished)
+  score: number;
 }
 
 /** Sector a level belongs to. */
@@ -102,6 +110,8 @@ export class Progress {
   sector = 0;
   /** Star bits per sector (see STAR_*). */
   stars: number[] = [];
+  /** Set course results by course id. */
+  courses: Record<string, CourseResult> = {};
   private daily = { date: '', best: 0 };
 
   async load(): Promise<void> {
@@ -112,6 +122,7 @@ export class Progress {
       this.stats = { ...blankStats(), ...s.stats };
       this.sector = s.sector ?? sectorOf(s.reached ?? 1);
       this.stars = s.stars ?? [];
+      this.courses = s.courses ?? {};
       if (s.daily) this.daily = s.daily;
     } catch {
       // Corrupt value: start fresh.
@@ -119,7 +130,7 @@ export class Progress {
   }
 
   private save(): void {
-    const s: Saved = { stats: this.stats, sector: this.sector, stars: this.stars, daily: this.daily };
+    const s: Saved = { stats: this.stats, sector: this.sector, stars: this.stars, daily: this.daily, courses: this.courses };
     void storage.set(KEY, JSON.stringify(s));
   }
 
@@ -154,7 +165,27 @@ export class Progress {
   totalStars(): number {
     let n = 0;
     for (const s of this.stars) n += countBits(s ?? 0);
+    for (const c of Object.values(this.courses)) n += countBits(c.stars);
     return n;
+  }
+
+  course(id: string): CourseResult {
+    return this.courses[id] ?? { stars: 0, time: 0, score: 0 };
+  }
+
+  /** Fold in a course attempt. `stars` 0 = didn't finish. Returns new stars and whether the time is a best. */
+  recordCourse(id: string, stars: number, time: number, score: number): { newStars: number; bestTime: boolean } {
+    const had = this.course(id);
+    const finished = (stars & 1) !== 0;
+    const bestTime = finished && (had.time === 0 || time < had.time);
+    const next: CourseResult = {
+      stars: had.stars | stars,
+      time: bestTime ? time : had.time,
+      score: Math.max(had.score, Math.floor(score)),
+    };
+    this.courses[id] = next;
+    this.save();
+    return { newStars: countBits(next.stars) - countBits(had.stars), bestTime };
   }
 
   /** Fold a finished run into the stats; returns true for a new daily best. */

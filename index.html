@@ -177,7 +177,19 @@
           <button class="label link back" type="button" data-action="back">back</button>
           <div class="panel-title">solo</div>
         </div>
-        <div class="settings">
+        <div class="tabs">
+          <button class="tab on" type="button" data-solotab="levels">levels</button>
+          <button class="tab" type="button" data-solotab="random">random run</button>
+        </div>
+        <div class="settings tabbed" data-solopane="levels">
+          <div id="courses-summary" class="label dim setting-note"></div>
+          <div id="courses-grid"></div>
+          <div class="label dim setting-note">
+            set levels are the same every time, with a finish line. stars: finish · no hits · beat the score target.
+            finish a level to open the next.
+          </div>
+        </div>
+        <div class="settings tabbed" data-solopane="random" hidden>
           <div id="sectors-summary" class="label dim setting-note"></div>
           <div id="sectors-grid"></div>
           <div class="label dim setting-note">
@@ -232,7 +244,7 @@
 
       <div id="screen-over" class="layer screen panel">
         <div class="screen-center">
-          <div class="screen-heading">crashed</div>
+          <div id="over-heading" class="screen-heading">crashed</div>
           <div id="over-mode" class="label dim"></div>
           <div id="over-score" class="score big">0</div>
           <div id="over-best" class="label"></div>

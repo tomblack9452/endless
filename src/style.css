@@ -1033,6 +1033,52 @@ body {
   cursor: default;
 }
 
+/* Set levels: a grid of tiles with stars and best times. */
+.course-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.course-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  min-height: 104px;
+  padding: 10px;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  background: color-mix(in srgb, currentColor 5%, transparent);
+  border: 1px solid color-mix(in srgb, currentColor 28%, transparent);
+  border-radius: 14px;
+  cursor: pointer;
+}
+
+.course-tile.locked {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.course-num {
+  font-size: calc(18px * var(--ui-scale));
+  line-height: 1;
+}
+
+.course-name {
+  font-size: calc(11px * var(--ui-scale));
+  letter-spacing: 0.06em;
+  line-height: 1.3;
+}
+
+.course-time {
+  font-size: calc(10px * var(--ui-scale));
+  opacity: 0.7;
+  margin-top: auto;
+}
+
 /* Sector map: a row of three sectors per loop. */
 .sector-loop {
   margin: 22px 0 8px;
