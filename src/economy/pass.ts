@@ -28,7 +28,8 @@ export function freeReward(tier: number): Reward {
 /** The premium track's reward at a tier (1-based). */
 export function premiumReward(tier: number): Reward {
   if (tier === 10) return { look: 'paint:frost' };
-  if (tier === 20) return { look: 'engine:solar' };
+  if (tier === 15) return { look: 'engine:solar' };
+  if (tier === 20) return { look: 'hull:raptor' };
   if (tier === 30) return { look: 'paint:ember', cores: 50 };
   if (tier % 5 === 0) return { tickets: 2 };
   if (tier % 3 === 0) return { cores: 15 };

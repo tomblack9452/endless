@@ -39,7 +39,7 @@ and the web build sells nothing.
    | `cores_550` | consumable | 550 cores | 4.99 |
    | `cores_1200` | consumable | 1,200 cores | 9.99 |
    | `cores_2500` | consumable | 2,500 cores | 19.99 |
-   | `starter_pack` | non-consumable | 500 cores, 3 tickets, void paint | 2.99 |
+   | `starter_pack` | non-consumable | 500 cores, 3 tickets, the nova hull | 2.99 |
    | `season_pass` | consumable (one per season) | the pass's premium track | 4.99 |
 
 ## 3. RevenueCat

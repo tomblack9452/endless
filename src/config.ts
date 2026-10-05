@@ -667,8 +667,8 @@ export const CONFIG = {
         { id: 'cores_550', cores: 550 },
         { id: 'cores_1200', cores: 1200 },
         { id: 'cores_2500', cores: 2500 },
-        // Once per account: cores, tickets and a premium paint.
-        { id: 'starter_pack', cores: 500, tickets: 3, look: 'paint:void', once: true },
+        // Once per account: cores, tickets and the nova hull.
+        { id: 'starter_pack', cores: 500, tickets: 3, look: 'hull:nova', once: true },
         // The season pass's premium track, for money instead of cores.
         { id: 'season_pass', pass: true },
       ],
