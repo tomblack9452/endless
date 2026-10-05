@@ -1,10 +1,10 @@
-import { rankName } from './ranks';
+import { LEAGUES } from './leagues';
 import { storage } from './storage';
 
 // Ship upgrades: solo only. Ranked and daily runs always fly the standard ship
 // (STANDARD below) so their scores stay comparable. Six systems, five tiers
-// each, bought with credits; the top tiers also need a rank, so ranked play
-// is what opens up the strongest solo ship.
+// each, bought with credits; tiers 3-5 also need a league (see leagues.ts),
+// and each tier owned is one upgrade point towards the next league.
 
 export type SystemId = 'thrusters' | 'capacitor' | 'tractor' | 'deflector' | 'stabilisers' | 'scanner';
 
@@ -29,10 +29,10 @@ export const SYSTEMS: readonly SystemDef[] = [
 ];
 
 export const MAX_TIER = 5;
-/** Credits for tier 1..5. */
-export const TIER_COST = [150, 400, 1000, 2500, 6000];
-/** Rank index needed for tier 1..5 (7 = sergeant, 13 = lieutenant). */
-export const TIER_RANK = [0, 0, 0, 7, 13];
+/** Credits for tier 1..5: 41,000 a system, 246,000 for the whole ship. */
+export const TIER_COST = [500, 1500, 4000, 10000, 25000];
+/** League needed for tier 1..5 (2 = gold, 3 = platinum, 4 = diamond). */
+export const TIER_LEAGUE = [0, 0, 2, 3, 4];
 
 /** What the ship's systems add up to for a run. */
 export interface ShipStats {
@@ -114,15 +114,29 @@ export class Upgrades {
     return this.tiers[id] ?? 0;
   }
 
-  /** Can the next tier of `id` be bought with `credits` at rank `rank`? */
-  check(id: SystemId, credits: number, rank: number): BuyCheck {
+  /** Can the next tier of `id` be bought with `credits` in league `league`? */
+  check(id: SystemId, credits: number, league: number): BuyCheck {
     const next = this.tier(id) + 1;
     if (next > MAX_TIER) return { ok: false, reason: 'maxed' };
-    const needRank = TIER_RANK[next - 1];
-    if (rank < needRank) return { ok: false, reason: `needs ${rankName(needRank)}` };
+    const needLeague = TIER_LEAGUE[next - 1];
+    if (league < needLeague) return { ok: false, reason: `needs ${LEAGUES[needLeague].name}` };
     const cost = TIER_COST[next - 1];
     if (credits < cost) return { ok: false, reason: `${cost.toLocaleString('en-US')} credits` };
     return { ok: true, cost };
+  }
+
+  /** Upgrade points owned: one per tier. */
+  points(): number {
+    let n = 0;
+    for (const s of SYSTEMS) n += this.tier(s.id);
+    return n;
+  }
+
+  /** Upgrade points on systems that are switched on. */
+  activePoints(): number {
+    let n = 0;
+    for (const s of SYSTEMS) if (this.isOn(s.id)) n += this.tier(s.id);
+    return n;
   }
 
   raise(id: SystemId): void {

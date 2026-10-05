@@ -1,4 +1,5 @@
 import type { ShipId } from './cosmetics';
+import { LEAGUES } from './leagues';
 import { rankName } from './ranks';
 import { storage } from './storage';
 
@@ -16,7 +17,8 @@ export type Unlock =
   | { by: 'mission' } // hull shapes unlocked by missions
   | { by: 'credits'; cost: number }
   | { by: 'rank'; rank: number }
-  | { by: 'stars'; stars: number };
+  | { by: 'stars'; stars: number }
+  | { by: 'league'; league: number };
 
 export interface LookItem {
   slot: Slot;
@@ -30,6 +32,7 @@ const free: Unlock = { by: 'free' };
 const credits = (cost: number): Unlock => ({ by: 'credits', cost });
 const rank = (r: number): Unlock => ({ by: 'rank', rank: r });
 const stars = (n: number): Unlock => ({ by: 'stars', stars: n });
+const league = (l: number): Unlock => ({ by: 'league', league: l });
 
 export const LOOKS: readonly LookItem[] = [
   { slot: 'hull', id: 'dart', name: 'dart', unlock: free },
@@ -47,8 +50,15 @@ export const LOOKS: readonly LookItem[] = [
   { slot: 'paint', id: 'sand', name: 'sand', unlock: credits(400), colors: ['#cdb68d', '#9d8a64'] },
   { slot: 'paint', id: 'white', name: 'white', unlock: credits(500), colors: ['#efefeb', '#bfc0bb'] },
   { slot: 'paint', id: 'carbon', name: 'carbon', unlock: credits(800), colors: ['#2e2e31', '#1a1a1c'] },
-  { slot: 'paint', id: 'gold', name: 'gold', unlock: rank(25), colors: ['#d9ab3d', '#a17b24'] },
+  { slot: 'paint', id: 'gunmetal', name: 'gunmetal', unlock: rank(25), colors: ['#4c525b', '#30343a'] },
   { slot: 'paint', id: 'chrome', name: 'chrome', unlock: rank(31), colors: ['#dde1e6', '#9ba3ac'] },
+  // One paint for reaching each league above bronze.
+  { slot: 'paint', id: 'silver', name: 'silver', unlock: league(1), colors: ['#c5cad0', '#8f959d'] },
+  { slot: 'paint', id: 'gold', name: 'gold', unlock: league(2), colors: ['#d9ab3d', '#a17b24'] },
+  { slot: 'paint', id: 'platinum', name: 'platinum', unlock: league(3), colors: ['#cfe4e5', '#90b2b5'] },
+  { slot: 'paint', id: 'diamond', name: 'diamond', unlock: league(4), colors: ['#aac8f1', '#6e92c5'] },
+  { slot: 'paint', id: 'champion', name: 'champion', unlock: league(5), colors: ['#ab8ce2', '#7458ac'] },
+  { slot: 'paint', id: 'supernova', name: 'supernova', unlock: league(6), colors: ['#e8684f', '#a83f30'] },
 
   { slot: 'markings', id: 'none', name: 'none', unlock: free },
   { slot: 'markings', id: 'stripe', name: 'stripe', unlock: credits(250) },
@@ -72,6 +82,7 @@ export const LOOKS: readonly LookItem[] = [
 
   { slot: 'decal', id: 'none', name: 'none', unlock: free },
   { slot: 'decal', id: 'rank', name: 'rank insignia', unlock: free },
+  { slot: 'decal', id: 'league', name: 'league emblem', unlock: free },
 ];
 
 export const SLOTS: Slot[] = ['hull', 'paint', 'markings', 'fins', 'engine', 'decal'];
@@ -96,6 +107,7 @@ export function find(slot: Slot, id: string): LookItem {
 export interface Owner {
   rank: number;
   stars: number;
+  league: number;
   missionHulls: ShipId[];
 }
 
@@ -112,6 +124,8 @@ export function unlockText(u: Unlock): string {
       return `rank ${rankName(u.rank)}`;
     case 'stars':
       return `${u.stars} stars`;
+    case 'league':
+      return `${LEAGUES[u.league].name} league`;
   }
 }
 
@@ -153,6 +167,8 @@ export class Looks {
         return o.rank >= u.rank;
       case 'stars':
         return o.stars >= u.stars;
+      case 'league':
+        return o.league >= u.league;
     }
   }
 
