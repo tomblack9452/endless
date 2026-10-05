@@ -157,7 +157,15 @@ export class InstancedField {
     this.freeTop = 0;
     for (let i = this.max - 1; i >= 0; i--) this.free[this.freeTop++] = i;
     this.count = 0;
+    this.top = 0;
   }
+
+  /**
+   * One past the highest slot in use: every per-frame loop stops here instead
+   * of running over the whole pool. Freed slots are reused first (the free list
+   * is a stack), so the used slots stay packed at the bottom.
+   */
+  top = 0;
 
   spawn(
     x: number,
@@ -176,6 +184,7 @@ export class InstancedField {
     if (this.freeTop === 0) return;
     const i = this.free[--this.freeTop];
     this.active[i] = 1;
+    if (i >= this.top) this.top = i + 1;
     this.x[i] = wraps ? wrap(x) : x;
     this.y[i] = y;
     this.d[i] = d;
@@ -221,18 +230,19 @@ export class InstancedField {
     this.active[i] = 0;
     this.free[this.freeTop++] = i;
     this.count--;
+    while (this.top > 0 && !this.active[this.top - 1]) this.top--;
   }
 
   /** Remove everything with d below `limit`. */
   clearBefore(limit: number): void {
-    for (let i = 0; i < this.max; i++) {
+    for (let i = 0; i < this.top; i++) {
       if (this.active[i] && this.d[i] < limit) this.release(i);
     }
   }
 
   /** Shift sideways by `dx` (the ship moved right by dx) and recycle what fell behind `behind`. */
   advance(dx: number, behind: number): void {
-    for (let i = 0; i < this.max; i++) {
+    for (let i = 0; i < this.top; i++) {
       if (!this.active[i]) continue;
       if (this.d[i] < behind) {
         this.release(i);
@@ -246,7 +256,7 @@ export class InstancedField {
 
   /** Update moving instances for the current distance. */
   animate(distance: number): void {
-    for (let i = 0; i < this.max; i++) {
+    for (let i = 0; i < this.top; i++) {
       if (!this.active[i] || !this.moving[i]) continue;
       const m = this.moving[i];
       if (m === 1) {
@@ -287,7 +297,7 @@ export class InstancedField {
   hitTest(prevDistance: number, distance: number, dx: number): boolean {
     const shipX = CONFIG.ship.hitHalfWidth;
     const shipZ = CONFIG.ship.hitHalfDepth;
-    for (let i = 0; i < this.max; i++) {
+    for (let i = 0; i < this.top; i++) {
       if (!this.active[i] || !this.solid[i]) continue;
       // A pulsing vent that's mostly sunk is harmless.
       if (this.moving[i] === 4 && this.y[i] < this.bx[i] - this.amp[i] * 0.5) continue;
@@ -314,7 +324,7 @@ export class InstancedField {
    */
   passes(prevDistance: number, distance: number, range: number, side: Float32Array, gap: Float32Array, n: number): number {
     const shipHalf = CONFIG.ship.hitHalfWidth;
-    for (let i = 0; i < this.max && n < side.length; i++) {
+    for (let i = 0; i < this.top && n < side.length; i++) {
       if (!this.active[i] || !this.scores[i]) continue;
       const d = this.d[i];
       if (d <= prevDistance || d > distance) continue;
@@ -333,7 +343,7 @@ export class InstancedField {
     const hills = terrain.active;
     const h0 = hills ? terrain.heightAtX(distance, shipX) : 0;
     let n = 0;
-    for (let i = 0; i < this.max; i++) {
+    for (let i = 0; i < this.top; i++) {
       if (!this.active[i]) continue;
       const o = n * 16;
       const c = this.cos[i];
