@@ -1,4 +1,5 @@
 import { CONFIG } from './config';
+import { weekKey } from './leagues';
 import { storage } from './storage';
 
 // Long-term progress: lifetime stats, the furthest sector reached (solo start
@@ -74,8 +75,17 @@ export function today(): string {
 
 /** Same seed for everyone on the same date (FNV-1a hash of the date). */
 export function dailySeed(date = today()): number {
+  return hashSeed(`endless-${date}`);
+}
+
+/** The ranked course: the same for everyone all week, new every Monday. */
+export function weeklySeed(now = Date.now()): number {
+  return hashSeed(`endless-week-${weekKey(now)}`);
+}
+
+function hashSeed(text: string): number {
   let h = 0x811c9dc5;
-  for (const ch of `endless-${date}`) {
+  for (const ch of text) {
     h ^= ch.charCodeAt(0);
     h = Math.imul(h, 0x01000193);
   }

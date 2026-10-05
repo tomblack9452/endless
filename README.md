@@ -182,7 +182,7 @@ Events change the look and sound only, never the course.
 | | Ranked | Solo | Daily run |
 |---|---|---|---|
 | Starts at | Level 1 | Any sector you've reached | Level 1 |
-| Course | Fresh every run | Fresh every run | Same for everyone that day |
+| Course | Same for everyone all week (new every Monday) | Fresh every run, or a set level | Same for everyone that day |
 | Ship | Your upgrades, up to your league's cap | Your upgrades, no cap | Standard |
 | Assist mode | Off | Allowed | Off |
 | Earns | XP, skill, league points, credits | Stars, credits at half rate | XP, skill, credits |
