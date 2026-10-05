@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { CONFIG } from '../src/config';
 import { lateralSpeedAt, speedAt } from '../src/difficulty';
 import { LivePalette } from '../src/palette';
+import { ROOM_IDS, type RoomId } from '../src/interior';
 import { World } from '../src/world';
 
 // Fairness: every course must be survivable. A simple autopilot follows the
@@ -21,8 +22,9 @@ interface Hooked {
   shipX: number;
 }
 
-function drive(seed: number, level: number, autopilot = true): { crashed: boolean; at: number; room: string } {
+function drive(seed: number, level: number, autopilot = true, room: RoomId | null = null, seconds = SECONDS): { crashed: boolean; at: number; room: string } {
   const world = new World(new Scene(), new LivePalette());
+  world.devRoom = room;
   const hooked = world as unknown as Hooked;
   // Record the lane at each generated row.
   const lanes: [number, number][] = [];
@@ -49,7 +51,7 @@ function drive(seed: number, level: number, autopilot = true): { crashed: boolea
     return best;
   };
 
-  for (let t = 0; t < SECONDS; t += DT) {
+  for (let t = 0; t < seconds; t += DT) {
     const score = (world.distance - runStart) * CONFIG.score.pointsPerUnit;
     const speed = speedAt(score);
     const steer = autopilot ? Math.max(-1, Math.min(1, (laneAt(world.distance + 3) - hooked.shipX) * 1.5)) : 0;
@@ -76,28 +78,41 @@ describe('course fairness', () => {
   }
 });
 
-// Canyon splits: the other branch must be survivable too. This pilot takes it
-// whenever there is one, looking well ahead (as a player would, seeing the
-// island from afar) so it has time to cross.
+// Every ship room on its own (each one back to back), at the hardest level
+// of the ship, for a few seeds.
+describe('every room', () => {
+  for (const room of ROOM_IDS.filter((r) => r !== 'corridor')) {
+    it(`${room} is survivable`, () => {
+      for (const seed of SEEDS.slice(0, 4)) {
+        const r = drive(seed, 9, true, room, 30);
+        expect(r.crashed, `seed ${seed} crashed at score ${r.at} in ${r.room}`).toBe(false);
+      }
+    });
+  }
+});
+
+// Other routes: canyon splits (the upper or lower branch) and bridges that
+// fork must be survivable down the branch the lane doesn't take, too. This
+// pilot takes it whenever there is one, looking well ahead (as a player would,
+// seeing the fork from afar) so it has time to cross.
 interface SplitHooked extends Hooked {
-  splitStart: number;
-  splitEnd: number;
-  altLane: number;
+  altNow: number | null;
+  altRoutes: number;
+  chasmStart: number;
 }
 
-function driveAlt(seed: number, level: number): { crashed: boolean; at: number; splits: number } {
+function driveAlt(seed: number, level: number): { crashed: boolean; at: number; splits: number; chasms: number } {
   const world = new World(new Scene(), new LivePalette());
   const hooked = world as unknown as SplitHooked;
   const lanes: [number, number][] = [];
   const alts: [number, number][] = [];
-  const starts = new Set<number>();
+  const chasms = new Set<number>();
   const row = hooked.row.bind(world);
   hooked.row = (d: number) => {
     row(d);
     lanes.push([d, hooked.lane]);
-    const inSplit = d >= hooked.splitStart && d <= hooked.splitEnd;
-    if (inSplit) starts.add(hooked.splitStart);
-    alts.push([d, inSplit ? hooked.altLane : hooked.lane]);
+    if (hooked.chasmStart !== Infinity) chasms.add(hooked.chasmStart);
+    alts.push([d, hooked.altNow ?? hooked.lane]);
     if (lanes.length > 800) {
       lanes.shift();
       alts.shift();
@@ -121,32 +136,38 @@ function driveAlt(seed: number, level: number): { crashed: boolean; at: number; 
   for (let t = 0; t < SECONDS; t += DT) {
     const score = (world.distance - runStart) * CONFIG.score.pointsPerUnit;
     const speed = speedAt(score);
+    // Head for the other route's offset from the lane at the nearest point it differs
+    // (an offset, not a spot 50 units on: the lane itself moves in that distance).
     let target = at(lanes, world.distance + 3);
     for (const ahead of [3, 10, 20, 30, 40, 50]) {
-      const a = at(alts, world.distance + ahead);
-      if (Math.abs(a - at(lanes, world.distance + ahead)) > 0.5) {
-        target = a;
+      const off = at(alts, world.distance + ahead) - at(lanes, world.distance + ahead);
+      if (Math.abs(off) > 0.5) {
+        target += off;
         break;
       }
     }
     const steer = Math.max(-1, Math.min(1, (target - hooked.shipX) * 1.5));
     const prev = world.distance;
     world.advance(DT, speed, steer * lateralSpeedAt(speed));
-    if (world.overPit() || world.hitTest(prev)) return { crashed: true, at: Math.round(score), splits: starts.size };
+    if (world.overPit() || world.hitTest(prev)) return { crashed: true, at: Math.round(score), splits: hooked.altRoutes, chasms: chasms.size };
   }
-  return { crashed: false, at: 0, splits: starts.size };
+  return { crashed: false, at: 0, splits: hooked.altRoutes, chasms: chasms.size };
 }
 
-describe('canyon splits', () => {
-  for (const level of [4, 13, 22]) {
+describe('other routes', () => {
+  for (const level of [4, 5, 6, 13, 15, 22, 24]) {
     it(`the other branch at level ${level} is survivable for every seed`, () => {
       let splits = 0;
+      let chasms = 0;
       for (const seed of SEEDS.slice(0, 5)) {
         const r = driveAlt(seed, level);
         expect(r.crashed, `seed ${seed} crashed at score ${r.at} taking the other branch`).toBe(false);
         splits += r.splits;
+        chasms += r.chasms;
       }
-      expect(splits).toBeGreaterThan(0); // the test only means something if splits happen
+      // The test only means something if there are routes and chasms to fly.
+      expect(splits).toBeGreaterThan(0);
+      expect(chasms).toBeGreaterThan(0);
     });
   }
 });
