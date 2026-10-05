@@ -79,7 +79,7 @@
             <button class="pill" type="button" data-title="solo">solo</button>
           </div>
           <div class="title-links">
-            <span class="chip link" data-title="daily">daily run</span>
+            <span class="chip link" data-title="endless">endless</span>
             <span class="chip link" data-title="record">record</span>
             <span class="chip link" data-title="missions">missions</span>
             <span class="chip link" data-title="hangar">hangar</span>
@@ -166,7 +166,7 @@
         </div>
         <div class="settings tabbed" data-pane="upgrades" hidden>
           <div class="label dim setting-note">
-            <span id="upgrade-note">upgrades work in solo and in ranked, up to your league's cap. daily runs fly the standard ship.</span>
+            <span id="upgrade-note">upgrades work everywhere; in ranked, only up to your league's cap.</span>
           </div>
           <div id="upgrade-rows"></div>
         </div>
@@ -178,10 +178,14 @@
           <div class="panel-title">solo</div>
         </div>
         <div class="tabs">
-          <button class="tab on" type="button" data-solotab="levels">levels</button>
-          <button class="tab" type="button" data-solotab="random">random run</button>
+          <button class="tab on" type="button" data-solotab="envs">environments</button>
+          <button class="tab" type="button" data-solotab="levels">levels</button>
         </div>
-        <div class="settings tabbed" data-solopane="levels">
+        <div class="settings tabbed" data-solopane="envs">
+          <div class="label dim setting-note">pick a place and see how far you get: it stays there and keeps getting harder.</div>
+          <div id="env-grid"></div>
+        </div>
+        <div class="settings tabbed" data-solopane="levels" hidden>
           <div id="courses-summary" class="label dim setting-note"></div>
           <div id="courses-grid"></div>
           <div class="label dim setting-note">
@@ -189,14 +193,7 @@
             finish a level to open the next.
           </div>
         </div>
-        <div class="settings tabbed" data-solopane="random" hidden>
-          <div id="sectors-summary" class="label dim setting-note"></div>
-          <div id="sectors-grid"></div>
-          <div class="label dim setting-note">
-            stars: clear the sector · clear it without a hit · a near-miss chain there. reach a sector in any mode to start
-            from it here. starting part-way gives you half the points you skip.
-          </div>
-        </div>
+
       </div>
 
       <div id="screen-league" class="layer screen panel">

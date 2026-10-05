@@ -17,18 +17,18 @@ import { Cosmetics, describe } from './cosmetics';
 import { Haptics } from './haptics';
 import { Hints } from './hints';
 import { Missions, type RunMetrics } from './missions';
-import { chainTarget, dailySeed, weeklySeed, Progress, sectorOf, sectorStart, STAR_CHAIN, STAR_CLEAR, STAR_NO_HITS } from './progress';
+import { Progress } from './progress';
 import { creditsFor, insignia, par, Ranked, rankName, RANKS, type RunMode } from './ranks';
 import { Wallet } from './wallet';
 import { fxDistance, fxTime } from './fx';
-import { type Course, COURSES, courseLength } from './courses';
-import { DIVISIONS, emblem, LEAGUES, leagueName, Leagues, LP_PER_DIVISION, skillParScale, weekKey } from './leagues';
+import { type Course, COURSES, courseLength, type Environment, ENVIRONMENTS, weeklyCourse } from './courses';
+import { DIVISIONS, emblem, LEAGUES, leagueName, leaguePar, Leagues, LP_PER_DIVISION, weekKey } from './leagues';
 import { find, itemsIn, LOOKS, Looks, type Owner, type Slot, SLOT_NAMES, SLOTS, unlockText } from './looks';
 import type { Fin, Marking } from './looks';
 import type { ShipId } from './cosmetics';
 import { MAX_TIER, type ShipStats, STANDARD, SYSTEMS, type SystemId, TIER_COST, Upgrades } from './upgrades';
 import { newSeed } from './rng';
-import { loadNumber, saveNumber } from './storage';
+import { loadNumber } from './storage';
 import { formatScore, type LookRow, type RankResultView, UI } from './ui';
 import type { RoomId } from './interior';
 import { biomeForLevel, type PowerKind, themeForLevel, themeName, World } from './world';
@@ -38,7 +38,6 @@ import { terrain } from './terrain';
 type State = 'title' | 'playing' | 'paused' | 'crashed' | 'finished';
 
 const DEG = Math.PI / 180;
-const SOLO_BEST = 'endless.soloBest';
 
 /** "5 oct": the Monday this week's ranked course started. */
 /** "1:23.4" */
@@ -52,11 +51,6 @@ function formatTime(seconds: number): string {
 function musicForArea(theme: 'land' | 'canyon' | 'interior', biome?: string): MusicId {
   if (biome === 'ice' || biome === 'volcanic' || biome === 'asteroids') return biome;
   return theme;
-}
-
-function weekLabel(): string {
-  const [y, m, d] = weekKey(Date.now()).split('-').map(Number);
-  return new Date(y, m - 1, d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }).toLowerCase();
 }
 
 /** Music for a level: the theme's, or the biome's own where it has one. */
@@ -103,22 +97,25 @@ export class Game {
   private readonly hints = new Hints((text) => this.ui.showHint(text));
   private readonly haptics = new Haptics();
   private readonly progress = new Progress();
-  // Run mode. Ranked and daily use the standard ship from level 1; solo can
-  // start from an unlocked sector (with half the points it skips) and uses upgrades.
+  // Run mode: ranked (the weekly level), solo (an environment or a set level) or endless.
   private mode: RunMode = 'ranked';
-  private fromLevel = 1; // solo start level (a sector's first level)
+  /** Solo: the environment being played, or null (endless, ranked, set levels). */
+  private environment: Environment | null = null;
+  /** This week's ranked level (rebuilt when the week turns). */
+  private weekly: Course = weeklyCourse(weekKey(Date.now()));
   private scoreBase = 0; // solo starts: score begins at half the skipped points
   private readonly ranked = new Ranked();
   private readonly wallet = new Wallet();
-  private soloBest = 0;
   // A set level (courses.ts) being played, if any.
   private course: Course | null = null;
   private sectionIdx = -1;
   private hitThisRun = false; // anything hit, even a shield save (course stars)
+  private beatPar = false; // ranked: scored at least the league par (missions)
+  private finishedRun = false; // crossed a finish line (missions)
   private finishMs = 0;
   private readonly upgrades = new Upgrades();
   private readonly leagues = new Leagues();
-  /** This run's ship systems: the standard ship unless it's a solo run. */
+  /** This run's ship systems (your switched-on upgrades). */
   private ship: ShipStats = STANDARD;
   private hangarTab: 'ship' | 'upgrades' = 'ship';
   private readonly looks = new Looks();
@@ -128,14 +125,10 @@ export class Game {
   private recorded = false; // this run's stats are saved
   private assisted = false; // assist mode was on at some point this run
   private readonly cosmetics = new Cosmetics();
-  private readonly missions = new Missions();
+  private readonly rankedMissions = new Missions('ranked', 'endless.missions.ranked');
+  private readonly soloMissions = new Missions('solo', 'endless.missions');
   /** Which info screen is open from the title (stats, missions, hangar), if any. */
-  private infoOpen: 'stats' | 'missions' | 'hangar' | 'record' | 'sectors' | 'league' | null = null;
-  // The sector the ship is in and how it's going there (for stars).
-  private sector = 0;
-  private sectorFromStart = false; // entered at its start (not a dev skip mid-sector)
-  private sectorHit = false;
-  private sectorChain = 0;
+  private infoOpen: 'stats' | 'missions' | 'hangar' | 'record' | 'solo' | 'league' | null = null;
   // Run metrics for missions.
   private boostSeconds = 0;
   private boosted = false;
@@ -157,7 +150,6 @@ export class Game {
   private nudgeMs = 0;
   private shownRoom = '';
   private level = 1;
-  private best = 0;
   /** Seed of the current (or last) run: the same seed rebuilds the same course. */
   seed = 0;
 
@@ -235,10 +227,8 @@ export class Game {
     });
     this.ui.titleLeague.addEventListener('pointerdown', (e) => e.stopPropagation());
     this.ui.titleLeague.addEventListener('click', () => this.openLeague());
-    void loadNumber(SOLO_BEST, 0).then((b) => (this.soloBest = b));
     this.ui.bindLooks(this.onLookRow, this.onLookBuy);
-    this.ui.bindSectors(this.onSectorPick);
-    this.ui.bindSolo((i) => this.startCourse(i));
+    this.ui.bindSolo((i) => this.startCourse(i), (i) => this.startSolo(i));
     this.ui.bindHangarTabs((tab) => {
       this.hangarTab = tab;
       this.openHangar();
@@ -248,7 +238,8 @@ export class Game {
       this.haptics.pickup();
       this.openHangar();
     });
-    void this.missions.load();
+    void this.rankedMissions.load();
+    void this.soloMissions.load();
     void Promise.all([this.cosmetics.load(), this.looks.load()]).then(() => {
       // Saves from before the hangar had looks: carry the mission hull across.
       if (this.looks.equipped.hull === 'dart' && this.cosmetics.ship !== 'dart') this.looks.equip('hull', this.cosmetics.ship);
@@ -258,9 +249,10 @@ export class Game {
       this.settings = s;
       this.applySettings();
     });
-    void loadNumber(CONFIG.storageKeys.best, 0).then((b) => {
-      this.best = b;
-      this.ui.setBest(b);
+    // Before modes were split, ranked and solo were endless runs: carry their bests over.
+    void Promise.all([loadNumber(CONFIG.storageKeys.best, 0), loadNumber('endless.soloBest', 0), this.progress.load()]).then(([a, b]) => {
+      if (Math.max(a, b) > this.progress.endlessBest) this.progress.recordEndless(Math.max(a, b));
+      this.refreshTitle();
     });
   }
 
@@ -275,21 +267,24 @@ export class Game {
    * `startScore` > 0 starts part-way along (dev skip). `seed` replays a
    * known course; otherwise every run gets a fresh one.
    */
-  private beginRun(startScore = 0, seed = newSeed(), mode: RunMode = 'solo', course: Course | null = null): void {
+  private beginRun(startScore = 0, seed = newSeed(), mode: RunMode = 'endless', course: Course | null = null, env: Environment | null = null): void {
     this.seed = seed;
     this.mode = mode;
     this.course = course;
+    this.environment = env;
     this.world.setCourse(course);
+    this.world.setEnvironment(env);
     this.sectionIdx = -1;
     this.hitThisRun = false;
-    // Solo starts part-way along begin with half the points they skipped.
-    this.scoreBase = mode === 'solo' ? startScore / 2 : 0;
+    this.beatPar = false;
+    this.finishedRun = false;
+    this.scoreBase = 0;
     this.world.assist = this.assistOn();
-    // Daily runs fly the standard ship; ranked uses your (capped) upgrades; solo anything.
-    this.ship = mode === 'daily' ? STANDARD : this.upgrades.stats();
+    // Your switched-on upgrades (ranked checks them against the league's cap before starting).
+    this.ship = this.upgrades.stats();
     this.world.collectScale = this.ship.collect;
     this.world.powerRate = this.ship.powerRate;
-    this.ui.setMode(course ? `level ${COURSES.indexOf(course) + 1} · ${course.name}` : mode === 'solo' ? 'solo' : mode === 'daily' ? 'daily run' : `ranked · week of ${weekLabel()}`);
+    this.ui.setMode(this.modeLabel());
     this.pickupCount = 0;
     this.recorded = false;
     this.assisted = this.assistOn();
@@ -302,7 +297,7 @@ export class Game {
     this.world.reset(CONFIG.field.startClearance, true, startScore, seed);
     const level = Math.floor(startScore / CONFIG.score.levelLength) + 1;
     this.sound.ignite();
-    this.sound.setTheme(musicFor(level));
+    this.sound.setTheme(this.areaMusic(level));
     this.runStart = this.world.distance - startScore / CONFIG.score.pointsPerUnit;
     this.distanceScore = startScore;
     this.score = startScore - this.scoreBase;
@@ -332,10 +327,6 @@ export class Game {
     this.input.calibrate(); // however you're holding the phone now is straight ahead
     this.input.enabled = true;
     this.level = level;
-    this.sector = sectorOf(level);
-    this.sectorFromStart = startScore === (sectorStart(this.sector) - 1) * CONFIG.score.levelLength;
-    this.sectorHit = false;
-    this.sectorChain = 0;
     const progress = startScore / CONFIG.score.levelLength;
     this.ui.setScore(this.score);
     this.progress.reachedLevel(level);
@@ -343,11 +334,11 @@ export class Game {
     this.ui.setProgress(progress - (level - 1));
     this.applyLook(progress);
     if (course) {
-      const n = COURSES.indexOf(course) + 1;
+      const n = Math.max(1, COURSES.indexOf(course) + 1);
       this.ui.setLevel(n);
       this.ui.setProgress(0);
       this.ui.announceLevel(n, course.name);
-    } else this.ui.announceLevel(level, themeName(level));
+    } else this.ui.announceLevel(level, this.areaName(level));
     this.ui.setOverHeading('crashed');
     this.ui.show(null);
     this.ui.showHud(true);
@@ -376,44 +367,47 @@ export class Game {
     this.sound.setWind(0);
     this.player.setShield(false);
     this.ui.setPower('');
-    // Each mode keeps its own best: ranked, solo, and the daily run (in progress).
-    let isNewBest = false;
-    let shownBest = this.best;
-    if (this.mode === 'ranked') {
-      isNewBest = this.score > this.best;
-      if (isNewBest) {
-        this.best = Math.floor(this.score);
-        void saveNumber(CONFIG.storageKeys.best, this.best);
-        this.ui.setBest(this.best);
-      }
-      shownBest = this.best;
-    } else if (this.mode === 'solo') {
-      isNewBest = !this.assisted && this.score > this.soloBest;
-      if (isNewBest) {
-        this.soloBest = Math.floor(this.score);
-        void saveNumber(SOLO_BEST, this.soloBest);
-      }
-      shownBest = this.soloBest;
-    } else {
-      isNewBest = this.score > this.progress.dailyBest;
-      shownBest = Math.max(this.progress.dailyBest, Math.floor(this.score));
-    }
-    this.ui.setGameOver(this.score, shownBest, isNewBest, this.nearMissCount, this.bestChain, this.seed);
-    const where = themeForLevel(this.level) === 'interior' ? this.world.roomName || 'corridor' : themeName(this.level);
+    const { best, isNew } = this.recordBest(false);
+    this.ui.setGameOver(this.score, best, isNew, this.nearMissCount, this.bestChain, this.seed);
+    const where = themeForLevel(this.level) === 'interior' ? this.world.roomName || 'corridor' : this.areaName(this.level);
     const extra = this.finishRun(where);
     if (this.course) {
       const length = courseLength(this.course);
       const pct = Math.floor((100 * (this.world.distance - this.world.finishAt + length)) / length);
       this.ui.setGameOverExtra(`${Math.max(0, Math.min(99, pct))}% of ${this.course.name}${extra ? ' · ' + extra : ''}`);
     } else this.ui.setGameOverExtra(extra);
-    this.ui.setGameOverMissions(this.missions.lines());
+    this.ui.setGameOverMissions(this.poolMissions().lines());
+  }
+
+  /**
+   * Each mode keeps its own best: ranked (this week's level), each solo
+   * environment, each set level, and endless. Assisted runs never count.
+   */
+  private recordBest(finished: boolean): { best: number; isNew: boolean } {
+    const p = this.progress;
+    const score = this.assisted ? 0 : this.score;
+    if (this.mode === 'ranked') {
+      const isNew = p.recordWeekly(this.weekly.id, score, finished);
+      return { best: p.weeklyBest(this.weekly.id), isNew };
+    }
+    if (this.course) {
+      const before = p.course(this.course.id).score;
+      if (!finished) p.recordCourse(this.course.id, 0, this.runTime, score);
+      return { best: Math.max(before, Math.floor(score)), isNew: score > before };
+    }
+    if (this.environment) {
+      const isNew = p.recordEnv(this.environment.id, score);
+      return { best: p.envBest[this.environment.id] ?? 0, isNew };
+    }
+    const isNew = p.recordEndless(score);
+    return { best: p.endlessBest, isNew };
   }
 
   /** Save this run into the lifetime stats (once). Returns a line for the game-over screen. */
   private finishRun(crashedIn: string | null): string {
     if (this.recorded) return '';
     this.recorded = true;
-    const newDaily = this.progress.recordRun(
+    this.progress.recordRun(
       {
         score: this.assisted ? 0 : this.score,
         level: this.level,
@@ -424,18 +418,16 @@ export class Game {
         pickups: this.pickupCount,
         crashedIn,
       },
-      this.mode === 'daily',
+      false,
     );
-    for (const done of this.missions.endRun(this.metrics())) this.missionDone(done);
+    for (const done of this.poolMissions().endRun(this.metrics())) this.missionDone(done);
     const lines: string[] = [];
-    let credits = creditsFor(this.assisted ? 0 : this.score, this.mode !== 'solo');
-    if (this.mode === 'solo') {
+    // Ranked pays full rate; solo, set levels and endless half.
+    let credits = creditsFor(this.assisted ? 0 : this.score, this.mode === 'ranked');
+    if (this.mode === 'ranked') credits += this.recordRanked(this.state === 'finished');
+    else {
       this.ui.setGameOverRank(null);
       if (this.assisted) lines.push('assist mode. not counted as a best');
-      if (this.scoreBase > 0) lines.push(`started at the ${themeName(this.fromLevel)}`);
-    } else {
-      credits += this.recordRanked();
-      if (this.mode === 'daily' && newDaily) lines.push('new daily best');
     }
     this.wallet.add(credits);
     lines.push(`+${formatScore(credits)} credits`);
@@ -443,16 +435,18 @@ export class Game {
     return lines.join(' · ');
   }
 
-  /** Fold a ranked or daily run into the rank (and league); fills the game-over block. Returns bonus credits. */
-  private recordRanked(): number {
+  /** Fold a ranked run into the rank and league; fills the game-over block. Returns bonus credits. */
+  private recordRanked(finished: boolean): number {
     const lg = this.leagues;
-    const parScale = this.mode === 'ranked' ? skillParScale(lg.league) : 1;
-    const r = this.ranked.record(this.mode, this.score, this.level, this.seed, Date.now(), parScale);
+    const target = this.weekly.target;
+    this.beatPar = this.score >= leaguePar(lg.league, target);
+    this.finishedRun = finished;
+    const r = this.ranked.record(this.mode, this.score, this.level, this.seed, Date.now(), target, this.weekly.id);
     const promoted = r.rankAfter > r.rankBefore;
     const leagueLines: string[] = [];
     let bonus = r.credits;
-    if (this.mode === 'ranked') {
-      const res = lg.record(this.score);
+    {
+      const res = lg.record(this.score, target);
       bonus += res.credits;
       leagueLines.push(`${leagueName(lg.league, lg.division)} · ${res.lp >= 0 ? '+' : ''}${res.lp} lp (${lg.lp}/${LP_PER_DIVISION})`);
       if (res.divisionUp) leagueLines.push(`division up: +${formatScore(res.credits)} credits`);
@@ -463,7 +457,7 @@ export class Game {
       ...leagueLines,
       `+${r.xp} xp${r.doubled ? ' (double)' : ''}`,
       r.skillAfter === r.skillBefore ? `skill ${r.skillAfter}` : `skill ${r.skillBefore} → ${r.skillAfter}`,
-      `par for skill ${r.skillAfter}: ${formatScore(par(r.skillAfter))}`,
+      `par for skill ${r.skillAfter}: ${formatScore(par(r.skillAfter, target))}`,
     ];
     if (promoted) lines.splice(leagueLines.length, 0, `+${formatScore(r.credits)} promotion credits`);
     const view: RankResultView = {
@@ -515,7 +509,7 @@ export class Game {
       lpFraction: lg.lp / LP_PER_DIVISION,
       rows: [
         ['league points', `${lg.lp} / ${LP_PER_DIVISION}`],
-        ['league par', formatScore(lg.current.par)],
+        ['league par this week', formatScore(leaguePar(l, this.weekly.target))],
         ['active upgrade points', `${this.upgrades.activePoints()} (cap ${lg.current.max})`],
         ['upgrade points owned', String(owned)],
         ['weekly reward so far', formatScore(lg.weeklySoFar())],
@@ -525,7 +519,7 @@ export class Game {
       ladder: LEAGUES.map((x, k) => ({
         icon: emblem(k, k < l ? 2 : k === l ? lg.division : -1),
         name: x.name,
-        needs: x.min === x.max ? `${x.max} points · par ${formatScore(x.par)}` : `${x.min}-${x.max} points · par ${formatScore(x.par)}`,
+        needs: `${x.min === x.max ? x.max : `${x.min}-${x.max}`} points · par ${formatScore(leaguePar(k, this.weekly.target))}`,
         state: k < l ? 'done' : k === l ? 'current' : 'locked',
       })),
     });
@@ -567,12 +561,12 @@ export class Game {
       rows: [
         ['xp', formatScore(rk.xp)],
         ['skill', `${rk.skill} (highest ${rk.highestSkill})`],
-        ['par at your skill', formatScore(par(rk.skill))],
+        ['par at your skill this week', formatScore(par(rk.skill, this.weekly.target))],
         ['double xp runs left today', String(rk.bonusRunsLeft())],
         ['credits', formatScore(this.wallet.credits)],
         ['best today', formatScore(b.today)],
         ['best this week', formatScore(b.week)],
-        ['best ever', formatScore(Math.max(b.all, this.best))],
+        ['best ever', formatScore(b.all)],
         ['ranked runs', formatScore(rk.history.length)],
       ],
       runs: runs.length ? runs : [['no ranked runs yet', '']],
@@ -586,15 +580,44 @@ export class Game {
     this.openInfo('record');
   }
 
-  /** Assist mode only applies to solo runs: ranked and daily use the standard rules. */
+  /** Assist mode works everywhere but ranked. */
   private assistOn(): boolean {
-    return this.settings.assist && this.mode === 'solo';
+    return this.settings.assist && this.mode !== 'ranked';
+  }
+
+  /** The mission pool this run counts towards. */
+  private poolMissions(): Missions {
+    return this.mode === 'ranked' ? this.rankedMissions : this.soloMissions;
+  }
+
+  /** What the HUD and game-over screen call this run. */
+  private modeLabel(): string {
+    if (this.mode === 'ranked') return `ranked · ${this.weekly.name}`;
+    if (this.course) return `level ${COURSES.indexOf(this.course) + 1} · ${this.course.name}`;
+    if (this.environment) return `solo · ${this.environment.name}`;
+    return 'endless';
+  }
+
+  /** The area's name, biome and music at `level` (solo stays in its environment). */
+  private areaName(level: number): string {
+    return this.environment ? this.environment.name : themeName(level);
+  }
+
+  private areaBiome(level: number): ReturnType<typeof biomeForLevel> {
+    return this.environment ? this.environment.biome : biomeForLevel(level);
+  }
+
+  private areaMusic(level: number): MusicId {
+    return this.environment ? musicForArea(this.environment.theme, this.environment.biome) : musicFor(level);
   }
 
   private metrics(): RunMetrics {
+    let levelStars = 0;
+    for (const c of COURSES) levelStars += [1, 2, 4].filter((b) => this.progress.course(c.id).stars & b).length;
     return {
-      // Checkpoint runs start part-way, so they don't count towards level missions.
-      level: this.scoreBase > 0 || this.course ? 0 : this.level,
+      ranked: this.mode === 'ranked',
+      // Set levels have no level numbers to reach.
+      level: this.course ? 0 : this.level,
       score: this.assisted ? 0 : this.score,
       nearMisses: this.nearMissCount,
       bestChain: this.bestChain,
@@ -602,7 +625,10 @@ export class Game {
       boostSeconds: this.boostSeconds,
       rooms: this.roomsEntered,
       boosted: this.boosted,
-      daily: this.mode === 'daily',
+      finished: this.finishedRun,
+      clean: !this.hitThisRun,
+      beatPar: this.beatPar,
+      levelStars,
     };
   }
 
@@ -755,7 +781,7 @@ export class Game {
     const lg = this.leagues.current;
     const active = this.upgrades.activePoints();
     this.ui.setUpgradeNote(
-      `${active} of ${this.upgrades.points()} points on · ${lg.name} league cap ${lg.max}${active > lg.max ? ' (over: switch some off for ranked)' : ''}. solo has no cap; daily runs fly the standard ship.`,
+      `${active} of ${this.upgrades.points()} points on · ${lg.name} league cap ${lg.max}${active > lg.max ? ' (over: switch some off for ranked)' : ''}. solo, levels and endless have no cap.`,
     );
     this.ui.setHangarTab(this.hangarTab, `${formatScore(this.wallet.credits)} credits`);
     this.renderLooks();
@@ -768,64 +794,26 @@ export class Game {
 
   private openMissions(): void {
     const next = this.cosmetics.next();
-    this.ui.renderMissions(this.missions.lines(), next ? `next unlock: ${describe(next)}` : 'everything unlocked');
+    const rows: [string, string][] = [['RANKED', ''], ...this.rankedMissions.lines(), ['SOLO, LEVELS AND ENDLESS', ''], ...this.soloMissions.lines()];
+    this.ui.renderMissions(rows, next ? `next unlock: ${describe(next)}` : 'everything unlocked');
     this.openInfo('missions');
   }
 
-  private openInfo(which: 'stats' | 'missions' | 'hangar' | 'record' | 'sectors' | 'league'): void {
+  private openInfo(which: 'stats' | 'missions' | 'hangar' | 'record' | 'solo' | 'league'): void {
     this.infoOpen = which;
     this.ui.show(which);
   }
 
-  /** Crossing into sector `next`: award the stars for the one just finished. */
-  private leaveSector(next: number): void {
-    const done = this.sector;
-    if (this.sectorFromStart) {
-      let bits = STAR_CLEAR;
-      if (!this.sectorHit && !this.assisted) bits |= STAR_NO_HITS;
-      if (this.sectorChain >= chainTarget(done)) bits |= STAR_CHAIN;
-      const earned = this.progress.addStars(done, bits);
-      if (earned > 0) {
-        const credits = earned * CONFIG.sectors.starCredits;
-        this.wallet.add(credits);
-        const all = this.progress.starsIn(done);
-        const stars = [STAR_CLEAR, STAR_NO_HITS, STAR_CHAIN].map((b) => (all & b ? '★' : '☆')).join('');
-        this.ui.showNotice(`${themeName(sectorStart(done))} ${stars}  +${credits} credits`);
-      }
-    }
-    this.sector = next;
-    this.sectorFromStart = true;
-    this.sectorHit = false;
-    this.sectorChain = 0;
-  }
-
-  /** Solo: the sector map. */
-  private openSectors(): void {
-    const reached = this.progress.sector;
-    // Every loop row up to the one after your furthest sector.
-    const shown = (Math.floor((reached + 1) / 3) + 1) * 3;
-    const tiles = [];
-    for (let s = 0; s < shown; s++) {
-      const first = sectorStart(s);
-      tiles.push({
-        index: s,
-        name: themeName(first),
-        levels: `levels ${first}-${first + 2}`,
-        stars: this.progress.starsIn(s),
-        locked: s > reached,
-      });
-    }
+  /** Solo: pick an environment (endless in it, with a high score each) or a set level. */
+  private openSolo(): void {
+    this.ui.renderEnvironments(
+      ENVIRONMENTS.map((e, i) => ({ index: i, name: e.name, best: this.progress.envBest[e.id] ?? 0 })),
+    );
     this.openCourses();
-    this.ui.renderSectors(tiles, `${this.progress.totalStars()} stars · third star needs a x${chainTarget(0)} chain in loop 1, rising each loop`);
-    this.openInfo('sectors');
+    this.openInfo('solo');
   }
 
-  private onSectorPick = (s: number): void => {
-    this.fromLevel = sectorStart(s);
-    this.startSolo();
-  };
-
-  /** Ranked: level 1, this week's course (the same for everyone), your upgrades up to the league's cap. */
+  /** Ranked: this week's level (the same for everyone), your upgrades up to the league's cap. */
   private startRanked(): void {
     const active = this.upgrades.activePoints();
     const cap = this.leagues.current.max;
@@ -837,29 +825,34 @@ export class Game {
       this.openHangar();
       return;
     }
-    this.beginRun(0, weeklySeed(), 'ranked');
+    // The week may have turned since the game started.
+    const week = weekKey(Date.now());
+    if (this.weekly.id !== `week-${week}`) this.weekly = weeklyCourse(week);
+    this.beginRun(0, this.weekly.seed, 'ranked', this.weekly);
   }
 
-  /** Solo from the chosen start level. */
-  private startSolo(): void {
-    this.beginRun((this.fromLevel - 1) * CONFIG.score.levelLength, newSeed(), 'solo');
+  /** Solo in one environment: endless there, getting harder. */
+  private startSolo(index: number): void {
+    const env = ENVIRONMENTS[index];
+    if (env) this.beginRun(0, newSeed(), 'solo', null, env);
   }
 
-  private startDaily(): void {
-    this.beginRun(0, dailySeed(), 'daily');
+  /** Endless: open ground, then every area and biome in turn, forever. */
+  private startEndless(): void {
+    this.beginRun(0, newSeed(), 'endless');
   }
 
-  /** Retry in the same mode (and solo start, or set level) as the run that just ended. */
+  /** Retry in the same mode (and environment, or level) as the run that just ended. */
   private retry(): void {
-    if (this.course) this.startCourse(COURSES.indexOf(this.course));
-    else if (this.mode === 'daily') this.startDaily();
-    else if (this.mode === 'solo') this.startSolo();
-    else this.startRanked();
+    if (this.mode === 'ranked') this.startRanked();
+    else if (this.course) this.startCourse(COURSES.indexOf(this.course));
+    else if (this.environment) this.startSolo(ENVIRONMENTS.indexOf(this.environment));
+    else this.startEndless();
   }
 
   private onTitleLink = (name: string): void => {
-    if (name === 'daily') this.startDaily();
-    else if (name === 'solo') this.openSectors();
+    if (name === 'endless') this.startEndless();
+    else if (name === 'solo') this.openSolo();
     else if (name === 'record') this.openRecord();
     else if (name === 'stats') this.openStats();
     else if (name === 'missions') this.openMissions();
@@ -872,9 +865,11 @@ export class Game {
     const lg = this.leagues;
     this.ui.setTitleLeague(emblem(lg.league, lg.division), `${leagueName(lg.league, lg.division)} · ${lg.lp} lp`, lg.lp / LP_PER_DIVISION);
     this.ui.setTitleRank(insignia(i), rankName(i), `${formatScore(this.wallet.credits)} credits`);
-    const db = this.progress.dailyBest;
-    this.ui.setTitleLink('daily', 'daily run');
-    this.ui.setBests(this.best, this.soloBest, db);
+    const wb = this.progress.weeklyBest(this.weekly.id);
+    this.ui.setBests([
+      ['this week', wb],
+      ['endless', this.progress.endlessBest],
+    ]);
   }
 
   private openStats(): void {
@@ -886,8 +881,9 @@ export class Game {
       ['runs', formatScore(s.runs)],
       ['time played', hours > 0 ? `${hours}h ${mins}m` : `${mins}m`],
       ['distance', `${(s.distance / 1000).toFixed(1)} km`],
-      ['best ranked', formatScore(this.best)],
-      ['best solo', formatScore(this.soloBest)],
+      ['best this week (ranked)', formatScore(this.progress.weeklyBest(this.weekly.id))],
+      ['best endless', formatScore(this.progress.endlessBest)],
+      ...ENVIRONMENTS.map((e): [string, string] => [`best solo: ${e.name}`, formatScore(this.progress.envBest[e.id] ?? 0)]),
       ['furthest level', String(s.bestLevel || 1)],
       ['best chain', `x${s.bestChain}`],
       ['near misses', formatScore(s.nearMisses)],
@@ -1009,11 +1005,7 @@ export class Game {
   /** Abandon the run and go back to the live title scene. Best score still counts. */
   private toMainMenu(): void {
     if (this.state === 'paused') this.finishRun(null); // abandoned mid-run: still counts for stats
-    if (!this.assisted && this.score > this.best) {
-      this.best = Math.floor(this.score);
-      void saveNumber(CONFIG.storageKeys.best, this.best);
-      this.ui.setBest(this.best);
-    }
+
     this.state = 'title';
     this.input.enabled = false;
     this.input.releaseAll();
@@ -1059,8 +1051,6 @@ export class Game {
     this.ranked.xp = Math.max(this.ranked.xp, RANKS[RANKS.length - 1].xp);
     this.ranked.skill = this.ranked.highestSkill = 50;
     this.ranked.save();
-    this.progress.reachedLevel(sectorStart(26)); // loop 9
-    for (let s = 0; s <= 26; s++) this.progress.addStars(s, STAR_CLEAR | STAR_NO_HITS | STAR_CHAIN);
     while (this.cosmetics.unlockNext()) {
       // every mission unlock
     }
@@ -1231,13 +1221,12 @@ export class Game {
     if (this.course && section) {
       this.updateCourse();
     } else if (level !== this.level) {
-      const themeChange = themeName(level) !== themeName(this.level);
+      const themeChange = this.areaName(level) !== this.areaName(this.level) || themeForLevel(level) !== themeForLevel(this.level);
       this.level = level;
       this.ui.setLevel(level);
       this.progress.reachedLevel(level);
-      if (sectorOf(level) !== this.sector) this.leaveSector(sectorOf(level));
-      this.ui.announceLevel(level, themeName(level));
-      this.sound.level(themeChange, musicFor(level));
+      this.ui.announceLevel(level, this.areaName(level));
+      this.sound.level(themeChange, this.areaMusic(level));
       this.haptics.level(themeChange);
       this.maybeStartEvent(level);
       const loop = Math.floor((level - 1) / (CONFIG.themes.levelsPerTheme * 3));
@@ -1267,7 +1256,6 @@ export class Game {
       this.shield = false;
       this.player.setShield(false);
       this.graceT = CONFIG.powers.shield.graceSeconds + this.ship.graceExtra;
-      this.sectorHit = true; // a shield save still counts as a hit for stars
       this.hitThisRun = true;
       this.sound.shieldHit();
       this.haptics.crash();
@@ -1292,7 +1280,7 @@ export class Game {
     this.missionTimer += dt;
     if (this.missionTimer > 0.5) {
       this.missionTimer = 0;
-      for (const done of this.missions.check(this.metrics())) this.missionDone(done);
+      for (const done of this.poolMissions().check(this.metrics())) this.missionDone(done);
     }
 
     this.updateCamera(dt);
@@ -1317,7 +1305,6 @@ export class Game {
       this.bonus += points;
       this.nearMissCount++;
       if (this.chain > this.bestChain) this.bestChain = this.chain;
-      if (this.chain > this.sectorChain) this.sectorChain = this.chain;
       this.chainTimer = nm.comboWindow;
       this.nudgeMs = nm.nudgeMs;
       this.ui.showCombo(this.chain, points);
@@ -1428,6 +1415,16 @@ export class Game {
     this.boosting = false;
     this.sound.level(true, musicFor(1));
     this.haptics.level(true);
+    if (this.mode === 'ranked') {
+      // The weekly level: rank, league and the week's best.
+      const { best, isNew } = this.recordBest(true);
+      this.ui.setOverHeading('weekly level complete');
+      this.ui.setGameOver(this.score, best, isNew, this.nearMissCount, this.bestChain, this.seed);
+      this.ui.setGameOverExtra(`${formatTime(this.runTime)} · ${this.finishRun(null)}`);
+      this.ui.setGameOverMissions(this.poolMissions().lines());
+      this.refreshTitle();
+      return;
+    }
     let stars = 1;
     if (!this.hitThisRun && !this.assisted) stars |= 2;
     if (!this.assisted && this.score >= c.target) stars |= 4;
@@ -1437,6 +1434,7 @@ export class Game {
     const best = this.progress.course(c.id);
     this.ui.setOverHeading('level complete');
     this.ui.setGameOver(this.score, best.score, this.score >= best.score, this.nearMissCount, this.bestChain, this.seed);
+    this.finishedRun = true;
     const extra = this.finishRun(null);
     this.wallet.add(starCredits);
     const starText = [1, 2, 4].map((b) => (stars & b ? '★' : '☆')).join('');
@@ -1446,7 +1444,7 @@ export class Game {
     if (!(stars & 4)) lines.push(`score ${formatScore(c.target)} for the third star`);
     lines.push(extra);
     this.ui.setGameOverExtra(lines.join(' · '));
-    this.ui.setGameOverMissions(this.missions.lines());
+    this.ui.setGameOverMissions(this.poolMissions().lines());
     this.refreshTitle();
   }
 
@@ -1501,7 +1499,7 @@ export class Game {
     if ((level - 1) % CONFIG.themes.levelsPerTheme !== 1) return;
     const roll = (Math.imul(this.seed ^ level, 2654435761) >>> 0) / 4294967296;
     if (roll >= CONFIG.events.chance) return;
-    const kind = Events.forBiome(biomeForLevel(level));
+    const kind = Events.forBiome(this.areaBiome(level));
     this.events.start(kind);
     this.ui.showNotice(EVENT_NOTICE[kind]);
   }
@@ -1510,7 +1508,7 @@ export class Game {
     const ev = this.events;
     // An event ends early if the theme changes under it.
     // Set levels choose their events per section; otherwise an event ends if the area changes under it.
-    const allowed = ev.kind === 'none' || this.course !== null || Events.forBiome(biomeForLevel(this.level)) === ev.kind;
+    const allowed = ev.kind === 'none' || this.course !== null || Events.forBiome(this.areaBiome(this.level)) === ev.kind;
     ev.update(dt, dz, allowed);
     if (ev.impact !== null) {
       this.sound.impact(ev.impact);

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { emblem, LEAGUES, Leagues, lpFor, weekKey } from '../src/leagues';
+import { emblem, LEAGUES, leaguePar, Leagues, lpFor, weekKey } from '../src/leagues';
 import { TIER_COST } from '../src/upgrades';
 
 describe('leagues', () => {
@@ -8,7 +8,7 @@ describe('leagues', () => {
     expect(LEAGUES[0].min).toBe(0);
     for (let i = 1; i < LEAGUES.length; i++) {
       expect(LEAGUES[i].min).toBe(LEAGUES[i - 1].max + 1);
-      expect(LEAGUES[i].par).toBeGreaterThan(LEAGUES[i - 1].par);
+      expect(leaguePar(i, 10000)).toBeGreaterThan(leaguePar(i - 1, 10000));
     }
     expect(LEAGUES[6].max).toBe(30);
   });
@@ -23,17 +23,18 @@ describe('leagues', () => {
 
   it('climbs divisions, drops them, but never drops a league', () => {
     const l = new Leagues();
-    for (let i = 0; i < 10; i++) l.record(3000); // +10 each
+    const T = 3000 / 0.55; // a week whose bronze par is 3,000
+    for (let i = 0; i < 10; i++) l.record(3000, T); // +10 each
     expect([l.league, l.division, l.lp]).toEqual([0, 1, 0]);
-    l.record(0); // -15: back to division I
+    l.record(0, T); // -15: back to division I
     expect([l.league, l.division]).toEqual([0, 0]);
-    for (let i = 0; i < 40; i++) l.record(5000);
+    for (let i = 0; i < 40; i++) l.record(5000, T);
     expect(l.promotionReady).toBe(true);
     expect(l.lp).toBe(100); // held full until promoted
     expect(l.tryPromote(4)).toBe(0); // not enough points owned
     expect(l.tryPromote(5)).toBe(LEAGUES[1].promotion);
     expect([l.league, l.division, l.lp]).toEqual([1, 0, 0]);
-    for (let i = 0; i < 20; i++) l.record(0);
+    for (let i = 0; i < 20; i++) l.record(0, T);
     expect([l.league, l.division, l.lp]).toEqual([1, 0, 0]); // floor of the league
   });
 
@@ -41,7 +42,7 @@ describe('leagues', () => {
     const l = new Leagues();
     const mon = new Date(2026, 9, 5, 12).getTime(); // Monday 5 Oct 2026
     l.rollWeek(mon);
-    for (let i = 0; i < 10; i++) l.record(3000, mon);
+    for (let i = 0; i < 10; i++) l.record(3000, 3000 / 0.55, mon);
     expect(l.weeklySoFar()).toBe(LEAGUES[0].weekly[1]);
     expect(l.rollWeek(mon + 2 * 86400000)).toBe(0); // same week
     expect(l.rollWeek(mon + 7 * 86400000)).toBe(LEAGUES[0].weekly[1]);

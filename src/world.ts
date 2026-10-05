@@ -7,7 +7,7 @@ import { InstancedField, wrap } from './field';
 import type { LivePalette } from './palette';
 import { type Biome, BIOME_NAMES } from './biomes';
 import { terrain } from './terrain';
-import type { Course, Section } from './courses';
+import type { Course, Environment, Section } from './courses';
 
 /** A stretch of a course in one theme (and, for groups, one biome). */
 interface Span {
@@ -229,6 +229,8 @@ export class World {
   devRoom: RoomId | null = null;
   /** The set course being followed (see courses.ts), or null for the endless plan. */
   private course: Course | null = null;
+  /** Solo: stay in one environment forever (it still gets harder), or null. */
+  private environment: Environment | null = null;
   private sectionStarts: number[] = []; // offsets from the run start
   private themeRuns: Span[] = []; // contiguous sections in one theme
   private biomeGroups: Span[] = []; // ...and in one biome
@@ -428,9 +430,12 @@ export class World {
       this.themeEnd = this.distance + first.end;
       // Not starting on open ground: row() will start the right theme.
       if (first.theme !== 'land') this.theme = first.theme === 'canyon' ? 'interior' : 'canyon';
+    } else if (run && this.environment) {
+      this.themeEnd = Infinity;
+      if (this.environment.theme !== 'land') this.theme = this.environment.theme === 'canyon' ? 'interior' : 'canyon';
     }
     // A run that starts on open ground never calls startTheme for it, so set its hills here.
-    const firstTheme = run && this.course ? this.themeRuns[0].theme : themeForLevel(level);
+    const firstTheme = run && this.course ? this.themeRuns[0].theme : run && this.environment ? this.environment.theme : themeForLevel(level);
     if (run && firstTheme === 'land') this.setHills(this.distance + clearance, this.themeEnd);
     this.nextRockFaceAt = this.distance + clearance + range(TH.land.rockFaceSpacing) * 0.5;
     this.rockFaceUntil = -Infinity;
@@ -582,6 +587,11 @@ export class World {
 
   // --- set courses -----------------------------------------------------------
 
+  /** Solo: keep the next run in one environment (null: the endless plan). */
+  setEnvironment(env: Environment | null): void {
+    this.environment = env;
+  }
+
   /** Follow `course` on the next reset (null: back to the endless plan). */
   setCourse(course: Course | null): void {
     this.course = course;
@@ -700,6 +710,11 @@ export class World {
         // A change of biome inside one area: dip through the plain look between them.
         k *= ease((off - group.start) / TH.fadeIn) * ease((group.end - off) / TH.fadeOut);
       }
+    } else if (this.environment && this.runStart !== null) {
+      // One environment for the whole run: fades in at the start and stays.
+      theme = this.environment.theme;
+      this.biome = this.environment.biome;
+      k = ease((this.distance - this.runStart) / TH.fadeIn);
     } else {
       if (themeForLevel(this.levelAt(this.distance)) !== 'interior') this.deckMix = 0;
       if (this.runStart === null) return;
@@ -748,6 +763,11 @@ export class World {
       score = section.difficulty;
       this.genBiome = this.spanAt(this.biomeGroups, d).biome;
       if (theme !== this.theme) this.startTheme(theme, d, level, (this.runStart ?? 0) + this.spanAt(this.themeRuns, d).end);
+    } else if (this.environment && this.runStart !== null) {
+      // Solo: one environment forever; the theme's three flavours still cycle with the levels.
+      theme = this.environment.theme;
+      this.genBiome = this.environment.biome;
+      if (theme !== this.theme) this.startTheme(theme, d, level, Infinity);
     } else {
       this.genBiome = this.runStart === null ? 'alien' : biomeForLevel(level);
       if (theme !== this.theme) this.startTheme(theme, d, level);
@@ -797,9 +817,11 @@ export class World {
     this.laneRetargetAt = d;
     if (theme === 'canyon') {
       // Centre the mouth on the ship, not the lane: on open ground the player can
-      // roam far from the lane. Nothing is placed in the run-up, so the lane can
-      // jump here safely.
-      this.cx = this.lane = this.shipX;
+      // roam far from the lane. The lane carries on from where it was (the mouth is
+      // wide) and drifts in from there, so following it never needs a sudden swerve.
+      this.cx = this.shipX;
+      const m = TH.canyon.mouthHalfWidth - LANE - 0.4;
+      this.lane = clamp(this.lane, this.cx - m, this.cx + m);
       this.splitAt = d + range(TH.canyon.splitSpacing);
       this.splitStart = Infinity;
       this.splitEnd = -Infinity;
