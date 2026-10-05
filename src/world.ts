@@ -199,6 +199,8 @@ export class World {
   private chasmSide = 1; // fork: the side the second bridge swings out to
   private chasmOff = 0; // fork: how far it swings out
   private chasmPickups = 0;
+  private chasmWallL = 0; // last row's wall lines, for the chasm's sides
+  private chasmWallR = 0;
   private holeAt = 0; // wide bridge: where the next missing stretch starts
   private holeUntil = -Infinity;
   private holeSide = 1;
@@ -1154,6 +1156,11 @@ export class World {
     let hw = (c.halfWidthStart - c.halfWidthMin) * Math.exp(-score / c.widthRampPoints) + c.halfWidthMin;
     const left = this.themeEnd - d;
     hw = lerp(c.mouthHalfWidth, hw, ease((d - this.themeStart) / c.mouth));
+    // The lane may still be far out (it carries on from open ground). The walls
+    // never close in past it: they wait while it heads for the middle, rather than
+    // shoving it sideways faster than it can move.
+    const inMouth = d - this.themeStart < c.mouth;
+    hw = Math.max(hw, Math.abs(this.lane - this.cx) + LANE + 0.8);
     hw = lerp(this.interiorHalfWidth(score) + TH.interior.doorExtra, hw, ease(left / c.exit));
 
     // Split paths: plan one when due (not in the mouth or near the exit).
@@ -1168,6 +1175,7 @@ export class World {
       // Ride down the middle of our branch.
       this.laneTarget = this.splitSide * (this.splitHalf + hw / 2);
     } else if (left < c.exit + 60) this.laneTarget = 0; // line up with the interior door
+    else if (inMouth || Math.abs(this.lane - this.cx) > hw - LANE - 1) this.laneTarget = 0; // head for the middle as the walls close in
     else if (chasm && this.chasmKind === 2) this.laneTarget = -this.chasmSide * Math.min(1.5, maxOffset); // leave room for the fork
     else this.retargetOffset(d, maxOffset);
     this.moveLane(maxSlope, this.laneTarget, maxOffset);
@@ -1536,12 +1544,31 @@ export class World {
         }
       }
     }
-    // The chasm's sides under the canyon walls: rock, then black further down. And a rocky lip at each end.
+    // The chasm's sides under the canyon walls. Each row's slab starts at this row's
+    // wall line and reaches back over the last row's, so a winding wall leaves no gaps.
+    const first = d - this.chasmStart < STEP;
     for (const s of [-1, 1]) {
-      const x = this.cx + s * (hw + 1.6) - this.shipX;
+      const inner = this.cx + s * hw;
+      const prev = s < 0 ? this.chasmWallL : this.chasmWallR;
+      const thick = 3 + (first ? 0 : Math.abs(inner - prev));
       this.greebles.nextColor = Decor.Cliff;
-      this.greebles.spawn(x, -P * 0.45, d, 3.2, P * 0.45, STEP + 0.12, 0, false, false, 0, 0, false);
-      this.voids.spawn(x, -P, d, 3.2, P * 0.55, STEP + 0.12, 0, false, false, 0, 0, false);
+      this.greebles.spawn(inner + (s * thick) / 2 - this.shipX, -P, d, thick, P, STEP + 0.12, 0, false, false, 0, 0, false);
+      if (s < 0) this.chasmWallL = inner;
+      else this.chasmWallR = inner;
+    }
+    // A lip of rock along each rim, either side of the bridge.
+    if (first || this.chasmEnd - d < STEP) {
+      const edge = first ? d - STEP / 2 : d + STEP / 2;
+      const lip = (x0: number, x1: number) => {
+        this.greebles.nextColor = Decor.Cliff;
+        this.greebles.spawn((x0 + x1) / 2 - this.shipX, -0.6, edge, x1 - x0, 0.62, 0.5, 0, false, false, 0, 0, false);
+      };
+      let from = wallL - 0.5;
+      for (const [x0, x1] of [...segs].sort((a, b) => a[0] - b[0])) {
+        if (x0 - from > 0.2) lip(from, x0);
+        from = Math.max(from, x1);
+      }
+      if (wallR + 0.5 - from > 0.2) lip(from, wallR + 0.5);
     }
     if (d - this.chasmStart < STEP || this.chasmEnd - d < STEP) {
       for (let x = wallL; x <= wallR; x += 1.1) {
