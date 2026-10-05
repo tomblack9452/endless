@@ -474,6 +474,40 @@ export const CONFIG = {
       pitDepth: 10, // how far the pit walls go down (below that it's black)
       void: '#07090c', // pit bottom
       railHeight: 0.9, // catwalk railings
+      // Each room family's look: a tint over the steel, which floor plate it uses
+      // (0 octagon hatch, 1 tread, 2 grating, 3 big plates with a stripe) and which
+      // wall panels (0 any, 1 heavy plating and pipes, 2 grating, ribs, hazard bands, screens).
+      familyLooks: {
+        corridor: ['#ffffff', 0, 0],
+        cargo: ['#eadcbf', 1, 1],
+        cargoLift: ['#e6d6ad', 1, 2],
+        servers: ['#c8d2de', 3, 2],
+        deck: ['#dde1e8', 3, 2],
+        shaft: ['#bab3ac', 2, 1],
+        junction: ['#f2f2f2', 0, 0],
+        fork: ['#eef0f2', 0, 0],
+        uneven: ['#efeae2', 0, 1],
+        islands: ['#e8e8e8', 0, 1],
+        chicane: ['#e4d8d8', 2, 2],
+        hydroponics: ['#cfdcc4', 3, 2],
+        lasers: ['#dccccc', 3, 2],
+        reactor: ['#b8cfcb', 2, 1],
+        pistons: ['#d9c1a8', 1, 1],
+        hangar: ['#d6d6d6', 3, 1],
+        coolant: ['#c5dad7', 2, 1],
+        vents: ['#cdc1b2', 2, 2],
+        foundry: ['#d8b59a', 1, 1],
+        collapse: ['#c7aa9b', 1, 1],
+        gantry: ['#cbc2b2', 2, 2],
+        breach: ['#c2b8af', 1, 1],
+        dropShaft: ['#bfc0c2', 2, 2],
+        flooded: ['#c3d0d7', 2, 1],
+        command: ['#cad1de', 3, 2],
+        fanRoom: ['#cbcfd3', 2, 2],
+        lab: ['#e9f1ee', 3, 2],
+      },
+      // Crates come in a few paints (and tread or hatch lids).
+      crateLooks: [['#ffffff', 0], ['#e8cf8a', 1], ['#a9bdd0', 1], ['#c99a7c', 0], ['#a9c19d', 1]],
       // Ramps between decks: gentler and lower than the canyon's (the ceiling comes too).
       elevation: {
         spacing: [90, 180],
