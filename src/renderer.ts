@@ -233,6 +233,18 @@ float gNoise(vec2 p) {
     this.ringMat.opacity = this.planetVisible * P.ringOpacity;
   }
 
+  /** Performance mode: a lower top render scale. */
+  setPerformance(on: boolean): void {
+    if (on === this.performance) return;
+    this.performance = on;
+    this.maxRatio = Math.min(window.devicePixelRatio || 1, on ? CONFIG.render.performancePixelRatio : CONFIG.render.maxPixelRatio);
+    this.ratio = this.maxRatio;
+    this.renderer.setPixelRatio(this.ratio);
+    this.resize();
+  }
+
+  private performance = false;
+
   /** Current render scale (device pixels per CSS pixel). */
   get pixelRatio(): number {
     return this.ratio;

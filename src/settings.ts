@@ -20,6 +20,8 @@ export interface Settings {
   textSize: number; // TEXT
   contrast: boolean; // high-contrast obstacles
   assist: boolean; // slower, with the safe line marked; scores don't count as bests
+  ghost: boolean; // ranked: fly against your week's best
+  performance: boolean; // lower resolution and lighter weather, for older phones
 }
 
 export type SettingKey = keyof Settings;
@@ -63,6 +65,8 @@ export const DEFAULT_SETTINGS: Settings = {
   textSize: 0,
   contrast: false,
   assist: false,
+  ghost: true,
+  performance: false,
 };
 
 const KEY = 'endless.settings';

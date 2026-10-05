@@ -6,7 +6,7 @@ import { CONFIG, PALETTES } from './config';
 import { lateralSpeedAt, speedAt } from './difficulty';
 import { Input } from './input';
 import { LivePalette } from './palette';
-import { Player } from './player';
+import { Player, shipGeometry } from './player';
 import { Stage } from './renderer';
 import { Sky } from './sky';
 import { SpeedLines } from './speedLines';
@@ -14,6 +14,7 @@ import { Trail } from './trail';
 import { cycle, DEFAULT_SETTINGS, LEVEL_GAIN, loadSettings, saveSettings, type SettingKey, STEERING_RANGE, TEXT_SCALE, TILT_GAIN } from './settings';
 import { EVENT_NOTICE, Events } from './events';
 import { Weather } from './weather';
+import { Ghost } from './ghost';
 import { Cosmetics, describe } from './cosmetics';
 import { Haptics } from './haptics';
 import { Hints } from './hints';
@@ -104,6 +105,7 @@ export class Game {
   private readonly trail: Trail;
   private readonly events: Events;
   private readonly weather: Weather;
+  private readonly ghost: Ghost;
   private onIce = false;
   private readonly sound = new Sound();
   private readonly audio: AudioState = {
@@ -146,6 +148,7 @@ export class Game {
   private ownedProducts = new Set<string>();
   // Ranked: the ship's sideways position every PATH_STEP units (the leaderboard check, and later the ghost).
   private path: number[] = [];
+  private pathTimes: number[] = [];
   private pathNext = 0;
   private economyTimer = 0;
   // Revive (not in ranked): once a run. While the offer is up the run isn't recorded yet.
@@ -235,6 +238,8 @@ export class Game {
     this.trail = new Trail(this.player.engine, this.palette);
     this.events = new Events(this.stage.scene);
     this.weather = new Weather(this.stage.scene);
+    this.ghost = new Ghost(this.stage.scene, shipGeometry('dart'), this.palette);
+    void this.ghost.load();
     this.sky = new Sky(this.stage.scene);
     this.input = new Input(document.body);
     this.input.bindBoostControl(this.ui.boostControl);
@@ -341,7 +346,9 @@ export class Game {
     this.econ.setOverRewards([]);
     this.revived = this.revivePending = this.reviveAsked = false;
     this.path = [];
+    this.pathTimes = [];
     this.pathNext = 0;
+    this.ghost.start(mode === 'ranked' && course ? course.id : null, this.settings.ghost);
     this.ui.showShare(false);
     this.preview = null;
     this.seed = seed;
@@ -426,6 +433,7 @@ export class Game {
   /** `fell` = dropped into a pit (falls away) rather than hitting something (shatters). */
   private crash(fell = false): void {
     if (this.state === 'crashed') return;
+    this.ghost.stop();
     this.fell = fell;
     this.state = 'crashed';
     this.crashMs = 0;
@@ -473,6 +481,7 @@ export class Game {
     const score = this.assisted ? 0 : this.score;
     if (this.mode === 'ranked') {
       const isNew = p.recordWeekly(this.weekly.id, score, finished);
+      if (isNew && this.path.length > 1) this.ghost.save({ week: this.weekly.id, step: PATH_STEP, xs: [...this.path], ts: [...this.pathTimes] });
       return { best: p.weeklyBest(this.weekly.id), isNew };
     }
     if (this.course) {
@@ -1652,6 +1661,9 @@ export class Game {
     this.input.sidesMode = s.touch === 1;
     this.input.doubleTapBoost = s.doubleTapBoost;
     this.haptics.enabled = s.haptics;
+    this.stage.setPerformance(s.performance);
+    this.weather.lite = s.performance;
+    if (!s.ghost) this.ghost.stop();
     this.world.assist = this.assistOn();
     if (this.assistOn() && this.state !== 'title') this.assisted = true;
     this.ui.setDisplay(TEXT_SCALE[s.textSize], (['right', 'left', 'middle'] as const)[s.boostSide] ?? 'right', s.reduceMotion);
@@ -1674,6 +1686,7 @@ export class Game {
     if (this.state === 'paused') this.finishRun(null); // abandoned mid-run: still counts for stats
     this.econ.setCountdown(0);
     this.econ.dismissOffer();
+    this.ghost.stop();
 
     this.state = 'title';
     this.input.enabled = false;
@@ -1912,8 +1925,10 @@ export class Game {
     if (this.mode === 'ranked') {
       while (this.world.distance - this.runStart >= this.pathNext) {
         this.path.push(Math.round(this.world.lateral * 100) / 100);
+        this.pathTimes.push(Math.round(this.runTime * 1000) / 1000);
         this.pathNext += PATH_STEP;
       }
+      this.ghost.update(this.runTime, this.world.distance - this.runStart, this.runStart, this.world.lateral);
     }
     this.world.spinPickups(dt);
     const got = this.world.collect(prev);
@@ -2135,6 +2150,7 @@ export class Game {
   private finishCourse(): void {
     const c = this.course!;
     this.state = 'finished';
+    this.ghost.stop();
     this.finishMs = 0;
     this.input.enabled = false;
     this.boosting = false;

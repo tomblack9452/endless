@@ -101,7 +101,7 @@ function shipShape(id: ShipId): { light: Vector3[]; shade: Vector3[]; outline: V
   }
 }
 
-function shipGeometry(id: ShipId): BufferGeometry {
+export function shipGeometry(id: ShipId): BufferGeometry {
   const s = shipShape(id);
   const g = new BufferGeometry();
   g.setAttribute('position', new Float32BufferAttribute([...s.light, ...s.shade].flatMap(xyz), 3));

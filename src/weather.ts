@@ -22,6 +22,8 @@ export class Weather {
   private amount = 0;
   private target = 0;
   private wind = 0;
+  /** Performance mode: fewer particles (the fog still thickens). */
+  lite = false;
   private readonly snow = new Color(W.snowColor);
   private readonly ash = new Color(W.ashColor);
   private readonly smoke = new Color(W.smokeFog);
@@ -62,7 +64,7 @@ export class Weather {
     this.points.visible = on;
     if (!on) return;
     const n = W.particles;
-    const shown = Math.min(n, Math.round(n * Math.min(1, this.amount)));
+    const shown = Math.min(n, Math.round(n * Math.min(1, this.amount) * (this.lite ? 0.35 : 1)));
     this.geo.setDrawRange(0, shown);
     this.mat.opacity = Math.min(1, 0.35 + this.amount * 0.6);
     // Gusts: the wind swings slowly, harder in a blizzard.
