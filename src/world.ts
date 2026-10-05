@@ -233,6 +233,7 @@ export class World {
   private themeRuns: Span[] = []; // contiguous sections in one theme
   private biomeGroups: Span[] = []; // ...and in one biome
   private roomQueue: RoomId[] = [];
+  private roomScript: RoomId[] = []; // the course's rooms for this stretch, repeated if it runs long
   private nextOverlayAt = 0;
   private overlaySide = 1;
   /** Name of the room the ship is in ('' for corridors and outside). */
@@ -781,12 +782,14 @@ export class World {
       this.room = this.lastRoom = 'corridor';
       // A course's rooms, in order, for this stretch of ship.
       this.roomQueue = [];
+      this.roomScript = [];
       if (this.course && this.runStart !== null) {
         const off = d - this.runStart;
         this.course.sections.forEach((s, i) => {
           const start = this.sectionStarts[i];
           if (s.theme === 'interior' && start + s.length > off && start < this.themeEnd - this.runStart!) this.roomQueue.push(...(s.rooms ?? []));
         });
+        this.roomScript = [...this.roomQueue];
       }
       this.prevWallL = this.prevWallR = NaN;
     } else {
@@ -1326,7 +1329,11 @@ export class World {
       this.startRoom('corridor', d, base, maxSlope, false);
     } else if (d >= this.roomEnd) {
       let next: RoomId = 'corridor';
-      if (this.room === 'corridor') next = this.devRoom ?? this.roomQueue.shift() ?? pickRoom(sub, this.lastRoom);
+      if (this.room === 'corridor') {
+        // A course's rooms come round again rather than falling back to random ones.
+        if (this.roomQueue.length === 0 && this.roomScript.length > 0) this.roomQueue = [...this.roomScript];
+        next = this.devRoom ?? this.roomQueue.shift() ?? pickRoom(sub, this.lastRoom);
+      }
       else this.lastRoom = this.room;
       this.startRoom(next, d, base, maxSlope);
     }

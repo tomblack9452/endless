@@ -96,9 +96,10 @@ export class Events {
     return EVENT_FOR[biome];
   }
 
-  start(kind: EventKind): void {
+  /** Start an event; \seconds\ defaults to the usual length (set levels run one for a whole section). */
+  start(kind: EventKind, seconds: number = E.seconds): void {
     this.kind = kind;
-    this.timeLeft = E.seconds;
+    this.timeLeft = seconds;
     this.nextMeteor = 0.5;
     this.nextAlarm = 0;
   }

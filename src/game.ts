@@ -1228,7 +1228,7 @@ export class Game {
     const progress = distancePoints / CONFIG.score.levelLength;
     const level = Math.floor(progress) + 1;
     if (this.course && section) {
-      this.updateCourse(section);
+      this.updateCourse();
     } else if (level !== this.level) {
       const themeChange = themeName(level) !== themeName(this.level);
       this.level = level;
@@ -1385,9 +1385,11 @@ export class Game {
   }
 
   /** A set level, each frame: section changes (banner, event), progress, look, and the finish. */
-  private updateCourse(section: Course['sections'][number]): void {
+  private updateCourse(): void {
     const c = this.course!;
+    // The section the ship is in now (it may have just moved into the next one this frame).
     const i = this.world.sectionIndexAt(this.world.distance);
+    const section = c.sections[i];
     if (i !== this.sectionIdx) {
       const prev = this.sectionIdx >= 0 ? c.sections[this.sectionIdx] : null;
       const areaChange = !prev || prev.theme !== section.theme || (prev.biome ?? '') !== (section.biome ?? '');
@@ -1398,7 +1400,8 @@ export class Game {
         this.haptics.level(areaChange);
       } else this.sound.setTheme(musicForArea(section.theme, section.biome));
       if (section.event) {
-        this.events.start(section.event);
+        // For the whole section (at its speed), not the usual 22 seconds.
+        this.events.start(section.event, section.length / speedAt(section.difficulty) + 2);
         this.ui.showNotice(section.name);
       }
     }

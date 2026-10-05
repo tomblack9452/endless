@@ -69,7 +69,7 @@ export const COURSES: readonly Course[] = [
     name: 'first light',
     blurb: 'a gentle run across the plains, under the arches and into the forest',
     seed: 1101,
-    target: 5200,
+    target: 7000,
     sections: [
       land('the plains', 1200, 0, 0),
       land('arch run', 900, 0, 800, { overlay: 'arches' }),
@@ -82,7 +82,7 @@ export const COURSES: readonly Course[] = [
     name: 'stone garden',
     blurb: 'rock spires to weave through, then gates of stone across the hills',
     seed: 2202,
-    target: 7600,
+    target: 8500,
     sections: [
       land('the meadow', 900, 0, 1500),
       land('spire slalom', 1500, 1, 2500, { overlay: 'slalom' }),
@@ -95,7 +95,7 @@ export const COURSES: readonly Course[] = [
     name: 'frost and fire',
     blurb: 'across the ice, through a frozen forest, onto the burning plain',
     seed: 3303,
-    target: 9800,
+    target: 9600,
     sections: [
       land('ice field', 1500, 0, 3500, { biome: 'ice' }),
       land('frozen forest', 1700, 2, 4500, { biome: 'ice' }),
@@ -109,7 +109,7 @@ export const COURSES: readonly Course[] = [
     name: 'dry river',
     blurb: 'follow the old river bed down into the canyon',
     seed: 4404,
-    target: 8400,
+    target: 9000,
     sections: [
       land('the riverbank', 700, 0, 3000),
       canyon('the gorge', 1800, 0, 4000),
@@ -122,7 +122,7 @@ export const COURSES: readonly Course[] = [
     name: 'twin gorge',
     blurb: 'the canyon splits and splits again: pick your side',
     seed: 5505,
-    target: 10500,
+    target: 11200,
     sections: [
       canyon('the fork', 2200, 1, 6000),
       canyon('sandstorm', 1600, 1, 7000, { event: 'sandstorm' }),
@@ -135,7 +135,7 @@ export const COURSES: readonly Course[] = [
     name: 'asteroid run',
     blurb: 'out into the asteroid belt, through the rockfalls and the pillars',
     seed: 6606,
-    target: 12000,
+    target: 11400,
     sections: [
       canyon('the belt', 2000, 0, 8000, { biome: 'asteroids' }),
       canyon('debris field', 1900, 1, 9500, { biome: 'asteroids' }),
@@ -149,10 +149,10 @@ export const COURSES: readonly Course[] = [
     name: 'maintenance deck',
     blurb: 'a tour below decks: cargo, servers, laser gates and the coolant plant',
     seed: 7707,
-    target: 9800,
+    target: 8500,
     sections: [
       land('the landing pad', 600, 0, 6000),
-      ship('maintenance deck', ['cargo', 'servers', 'lasers', 'coolant', 'hydroponics', 'hangar'], 5600, 7500),
+      ship('maintenance deck', ['cargo', 'servers', 'lasers', 'coolant', 'hydroponics', 'hangar'], 4700, 7500),
     ],
   },
   {
@@ -160,10 +160,10 @@ export const COURSES: readonly Course[] = [
     name: 'red alert',
     blurb: 'power failure: steam vents, broken floors and the foundry',
     seed: 8808,
-    target: 11500,
+    target: 8800,
     sections: [
       land('the approach', 600, 0, 8000),
-      ship('red alert', ['vents', 'gantry', 'pistons', 'foundry', 'breach', 'chicane', 'vents'], 6200, 9500, { event: 'redAlert' }),
+      ship('red alert', ['vents', 'gantry', 'pistons', 'foundry', 'breach', 'chicane', 'vents'], 4900, 9500, { event: 'redAlert' }),
     ],
   },
   {
@@ -171,11 +171,11 @@ export const COURSES: readonly Course[] = [
     name: 'core breach',
     blurb: 'across the burning plain, down the gorge, into the ship and out through the hangar',
     seed: 9909,
-    target: 16000,
+    target: 12600,
     sections: [
       land('the burning plain', 1500, 1, 9000, { biome: 'volcanic' }),
       canyon('the gorge', 1800, 1, 10500),
-      ship('core breach', ['lasers', 'vents', 'gantry', 'foundry', 'pistons', 'collapse', 'hangar'], 6800, 12000, { event: 'redAlert' }),
+      ship('core breach', ['lasers', 'vents', 'gantry', 'foundry', 'pistons', 'collapse', 'hangar'], 4600, 12000, { event: 'redAlert' }),
     ],
   },
 ];
