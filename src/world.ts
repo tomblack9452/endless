@@ -199,6 +199,9 @@ export class World {
   private chasmSide = 1; // fork: the side the second bridge swings out to
   private chasmOff = 0; // fork: how far it swings out
   private chasmPickups = 0;
+  private readonly railPrev = new Float32Array(4); // last row's deck edges (two decks), for the rails
+  private railPrevD = -Infinity;
+  private railPrevN = 0;
   private chasmWallL = 0; // last row's wall lines, for the chasm's sides
   private chasmWallR = 0;
   private holeAt = 0; // wide bridge: where the next missing stretch starts
@@ -1522,16 +1525,24 @@ export class World {
       }
     }
     this.floorBeginRow();
-    for (const [x0, x1, railL, railR] of segs) {
+    // Where each deck's edges were last row, so planks and rails turn to follow the bridge.
+    const joined = Math.abs(this.railPrevD - (d - STEP)) < 0.5;
+    segs.forEach(([x0, x1, railL, railR], si) => {
       this.floorSeg(x0, x1);
-      // Planks with small gaps between them, darker every other one.
+      const prev = joined && si < this.railPrevN ? [this.railPrev[si * 2], this.railPrev[si * 2 + 1]] : [x0, x1];
+      const turn = Math.atan2(-((x0 + x1) / 2 - (prev[0] + prev[1]) / 2), STEP);
+      // Planks butted together (alternating shades show the boards), square to the bridge.
       this.greebles.nextColor = row % 2 === 0 ? Decor.Wood : Decor.WoodDark;
       this.greebles.nextTilt = true;
-      this.greebles.spawn((x0 + x1) / 2 - this.shipX, -0.12, d, x1 - x0, 0.12, STEP - 0.25, 0, false, false, 0, 0, false);
-      for (const [x, s, rail] of [[x0, -1, railL], [x1, 1, railR]] as const) {
+      this.greebles.spawn((x0 + x1) / 2 - this.shipX, -0.12, d, x1 - x0, 0.12, STEP + 0.04, turn, false, false, 0, 0, false);
+      for (const [x, s, rail, px] of [[x0, -1, railL, prev[0]], [x1, 1, railR, prev[1]]] as const) {
         if (rail) {
+          // Each rail piece runs from last row's rail point to this row's, leaning with
+          // the slope, so the rope is one unbroken line however the bridge winds.
+          const len = Math.hypot(x - px, STEP);
           this.pipes.nextColor = Decor.Rope;
-          this.pipes.spawn(x - this.shipX, C.railHeight, d, 0.05, 0.05, STEP + 0.1, 0, false, false, 0, 0, false);
+          this.pipes.nextTilt = true;
+          this.pipes.spawn((x + px) / 2 - this.shipX, C.railHeight, d - STEP / 2, 0.05, 0.05, len + 0.08, Math.atan2(-(x - px), STEP), false, false, 0, 0, false);
           if (row % 3 === 0) {
             this.greebles.nextColor = Decor.WoodDark;
             this.greebles.spawn(x - s * 0.05 - this.shipX, 0, d, 0.12, C.railHeight + 0.15, 0.12, 0, false, false, 0, 0, false);
@@ -1543,7 +1554,13 @@ export class World {
           this.greebles.spawn(x - s * 0.2 - this.shipX, -P, d, 0.25, P - 0.2, 0.25, 0, false, false, 0, 0, false);
         }
       }
-    }
+      if (si < this.railPrev.length / 2) {
+        this.railPrev[si * 2] = x0;
+        this.railPrev[si * 2 + 1] = x1;
+      }
+    });
+    this.railPrevD = d;
+    this.railPrevN = Math.min(segs.length, this.railPrev.length / 2);
     // The chasm's sides under the canyon walls. Each row's slab starts at this row's
     // wall line and reaches back over the last row's, so a winding wall leaves no gaps.
     const first = d - this.chasmStart < STEP;
@@ -2052,11 +2069,13 @@ export class World {
       },
       pipe(side, y, r, colour) {
         w.pipes.nextColor = colour;
+        w.pipes.nextTilt = true;
         const x = this.cx + side * (this.hw - r - 0.02);
         w.pipes.spawn(x - w.shipX, y, this.d, r, r, STEP + 0.1, 0, false, false, 0, 0, false);
       },
       run(x, y, d, r, colour) {
         w.pipes.nextColor = colour;
+        w.pipes.nextTilt = true;
         w.pipes.spawn(x - w.shipX, y, d, r, r, STEP + 0.1, 0, false, false, 0, 0, false);
       },
       greeble(x, y, d, width, h, depth, colour) {

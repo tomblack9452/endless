@@ -334,15 +334,20 @@ export class InstancedField {
         const di = this.d[i];
         a[o + 13] = this.y[i] + terrain.heightAtX(di, wx) - h0;
         if (this.tilt[i]) {
-          // Lean about x to the slope here, so neighbouring rows meet without steps.
-          // (Tilted pieces are laid square to the run: no turn about y.)
+          // Lean about x to the slope here (after any turn about y), so neighbouring
+          // rows meet without steps: rotation = Rx(lean) * Ry(turn) * scale.
           const slope = (terrain.heightAtX(di + 0.6, wx) - terrain.heightAtX(di - 0.6, wx)) / 1.2;
-          const k = 1 / Math.sqrt(1 + slope * slope); // cos, and slope * k is sin
+          const k = 1 / Math.sqrt(1 + slope * slope); // cos of the lean
+          const t = slope * k; // sin of the lean
           const sy = this.sy[i];
+          a[o] = c * sx;
+          a[o + 1] = t * s * sx;
+          a[o + 2] = -k * s * sx;
           a[o + 5] = k * sy;
-          a[o + 6] = slope * k * sy;
-          a[o + 9] = -slope * k * sz;
-          a[o + 10] = k * sz;
+          a[o + 6] = t * sy;
+          a[o + 8] = s * sz;
+          a[o + 9] = -t * c * sz;
+          a[o + 10] = k * c * sz;
         }
       } else {
         a[o + 13] = this.y[i];
