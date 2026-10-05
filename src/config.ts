@@ -239,6 +239,8 @@ export const CONFIG = {
     maxVents: 400,
     maxDeadTrees: 500,
     maxRockSpires: 500,
+    maxCacti: 500,
+    maxTumbleweeds: 60,
     maxTufts: 2600,
     maxMesas: 60,
     maxArches: 12,
@@ -337,6 +339,8 @@ export const CONFIG = {
     //   level 2: denser, with rock clusters
     //   level 3: forest path, a clear winding path through dense forest
     land: {
+      // Tumbleweeds roll across ahead of you (scenery: they never block the way).
+      tumbleweedChance: 0.03, // per row (alien ground and volcanic plain)
       denseFactor: 1.4, // level 2 density multiplier
       clusterSpacing: [30, 55], // level 2
       clusterSize: [3, 6],
@@ -391,6 +395,8 @@ export const CONFIG = {
       bandGapWidth: 4.4,
       pillarSpacing: [22, 32], // level 3
       wallCrystals: 0.22, // chance per row per side of crystals on the canyon sides
+      wallCacti: 0.06, // chance per row per side of an alien cactus by the wall (canyon only, not the asteroids)
+      tumbleweedChance: 0.04, // per row: one rolls across the canyon floor
       // Ramps, platforms and drops (heights are looks only: see terrain.ts).
       elevation: {
         spacing: [60, 140], // platform length between changes
@@ -587,6 +593,9 @@ export const CONFIG = {
     markerEvery: 3, // rows between safe-line markers
   },
 
+  // Tumbleweeds: how far they roll across, over how much of your approach.
+  tumbleweed: { travel: [22, 34], over: [150, 210], size: [0.8, 1.3] },
+
   // Rolling hills on open ground, and chasm depth (see terrain.ts). Looks only: collision is flat.
   terrain: {
     amplitude: 1.6,
@@ -603,9 +612,9 @@ export const CONFIG = {
   biomes: {
     // Prop mixes for open ground by biome (relative chances).
     mix: {
-      alien: { mushroom: 0.32, spire: 0.16, rock: 0.2, crystal: 0.1, bush: 0.17, deadTree: 0, rockSpire: 0.05 },
-      ice: { mushroom: 0, spire: 0.22, rock: 0.2, crystal: 0.38, bush: 0, deadTree: 0.05, rockSpire: 0.15 },
-      volcanic: { mushroom: 0, spire: 0.08, rock: 0.45, crystal: 0.1, bush: 0, deadTree: 0.22, rockSpire: 0.15 },
+      alien: { mushroom: 0.28, spire: 0.14, rock: 0.18, crystal: 0.1, bush: 0.15, deadTree: 0, rockSpire: 0.05, cactus: 0.1 },
+      ice: { mushroom: 0, spire: 0.22, rock: 0.2, crystal: 0.38, bush: 0, deadTree: 0.05, rockSpire: 0.15, cactus: 0 },
+      volcanic: { mushroom: 0, spire: 0.08, rock: 0.43, crystal: 0.1, bush: 0, deadTree: 0.2, rockSpire: 0.15, cactus: 0.04 },
     },
     lavaChance: 0.6, // per row on the volcanic plain: a glowing crack off the lane
     looks: {

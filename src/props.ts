@@ -7,6 +7,7 @@ import {
   IcosahedronGeometry,
   Matrix4,
   OctahedronGeometry,
+  TorusGeometry,
   Vector3,
 } from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
@@ -225,6 +226,41 @@ export function deadTree(): BufferGeometry {
     branch(0.8, 0.06, 0.15, 2.55, 0.05, 0.7, 0.3),
     branch(0.6, 0.05, 0.2, 1.5, 0, 0.2, -1.1),
   ]);
+}
+
+/**
+ * Alien cactus: a ribbed teal column with two crooked arms and glowing pink
+ * buds on the tips. About 2.6 tall; it collides at the trunk.
+ */
+export function alienCactus(): BufferGeometry {
+  const body = '#4f8a78';
+  const dark = '#3f7465';
+  const bud = '#e07aa8';
+  const arm = (side: number, y: number, out: number, up: number): Part[] => [
+    part(new CylinderGeometry(0.13, 0.15, out, 7), dark, tiltZ(Math.PI / 2), move((side * out) / 2, y, 0)),
+    part(new CylinderGeometry(0.12, 0.14, up, 7), body, move(side * out, y + up / 2, 0)),
+    part(new IcosahedronGeometry(0.13, 0), bud, move(side * out, y + up + 0.06, 0)),
+  ];
+  return build([
+    part(new CylinderGeometry(0.2, 0.26, 2.3, 8), body, move(0, 1.15, 0)),
+    part(new IcosahedronGeometry(0.2, 0), body, scale(1, 0.8, 1), move(0, 2.3, 0)),
+    part(new IcosahedronGeometry(0.15, 0), bud, move(0, 2.48, 0)),
+    ...arm(1, 1.1, 0.55, 0.7),
+    ...arm(-1, 1.5, 0.45, 0.5),
+  ]);
+}
+
+/** Tumbleweed: a loose ball of dry, crossing twig loops, centred on the origin (it rolls). About 1.1 across. */
+export function tumbleweed(): BufferGeometry {
+  const loops: Part[] = [];
+  const colours = ['#b49866', '#9c8257', '#c4aa78'];
+  for (let i = 0; i < 7; i++) {
+    const a = (i / 7) * Math.PI;
+    loops.push(
+      part(new TorusGeometry(0.5 - (i % 3) * 0.05, 0.025, 3, 12), colours[i % 3], tiltX(a), tiltZ(a * 1.7 + i)),
+    );
+  }
+  return build(loops);
 }
 
 /** Tall standing rock: a narrow tapering stack of lumps. About 4 tall. */
