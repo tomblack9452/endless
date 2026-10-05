@@ -249,6 +249,12 @@ const SHIP_ROOMS: RoomId[] = [
   'junction',
   'fork',
   'islands',
+  'dropShaft',
+  'cargoLift',
+  'flooded',
+  'command',
+  'fanRoom',
+  'lab',
 ];
 
 const WEEK_MS = 7 * 24 * 3600 * 1000;

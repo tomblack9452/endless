@@ -40,6 +40,19 @@ export type ThemeId = 'land' | 'canyon' | 'interior';
 export type PowerKind = 0 | 1 | 2;
 const THEMES: ThemeId[] = ['land', 'canyon', 'interior'];
 
+/** Ramps and drops for a theme (CONFIG.themes.*.elevation). */
+interface ElevationConfig {
+  spacing: readonly number[];
+  rise: readonly number[];
+  riseLength: readonly number[];
+  drop: readonly number[];
+  dropLength: readonly number[];
+  dropChance: number;
+  min: number;
+  max: number;
+  returnSlope: number;
+}
+
 const F = CONFIG.field;
 const TH = CONFIG.themes;
 const LPT = TH.levelsPerTheme;
@@ -173,6 +186,26 @@ export class World {
   private altTarget = 0;
   private altPickupsLeft = 0;
   private nextBridgeAt = 0;
+  // Elevation (see elevate()): ramps, platforms and drops in the canyon and the ship.
+  private nextStepAt = Infinity;
+  private themeLevel = 0; // terrain level when this theme began: it's back there by the end
+  private levelReturned = false;
+  private liftPending = false; // a split's upper/lower routes wait for the island
+  // Chasms (see planChasm()): the canyon floor falls away and bridges span it.
+  private chasmAt = Infinity;
+  private chasmStart = Infinity;
+  private chasmEnd = -Infinity;
+  private chasmKind = 0; // 0 rope bridge, 1 wide bridge with planks missing, 2 bridge that forks
+  private chasmSide = 1; // fork: the side the second bridge swings out to
+  private chasmOff = 0; // fork: how far it swings out
+  private chasmPickups = 0;
+  private holeAt = 0; // wide bridge: where the next missing stretch starts
+  private holeUntil = -Infinity;
+  private holeSide = 1;
+  /** Another way through at the row just built (world x), if there is one: tests fly it. */
+  altNow: number | null = null;
+  /** Alternative routes generated so far (tests check they happen). */
+  altRoutes = 0;
   private rockFaceUntil = -Infinity;
   private rockFaceSide = 1;
   private nextArchAt = 0;
@@ -181,6 +214,8 @@ export class World {
   private readonly pipes: InstancedField; // wall dressing
   private readonly greebles: InstancedField;
   private readonly voids: InstancedField; // pit bottoms
+  private readonly waters: InstancedField; // flooded rooms
+  private readonly tanks: InstancedField; // lab tanks (solid)
   private readonly canisters: InstancedField;
   private readonly decorMat: MeshBasicMaterial;
   // Custom floor of the row being built (world x pairs) and the history of past rows.
@@ -302,7 +337,7 @@ export class World {
     this.strips.setColorTable([new Color(1, 1, 1), new Color(L.amber), new Color(L.teal), new Color(L.red), new Color(L.dark), new Color(L.green)]);
     // Wall dressing: shaded geometry tinted per instance from the decor table (Decor order).
     const D = TH.interior.decor;
-    const decorTable = [D.steel, D.copper, D.teal, D.red, D.dark, D.yellow, D.panel, D.green].map((h) => new Color(h));
+    const decorTable = [D.steel, D.copper, D.teal, D.red, D.dark, D.yellow, D.panel, D.green, D.wood, D.woodDark, D.rope, D.glass, D.cliff].map((h) => new Color(h));
     this.decorMat = new MeshBasicMaterial({ vertexColors: true });
     this.decorMat.color.setScalar(0.95);
     this.pipes = new InstancedField(scene, pipeSegment(), this.decorMat, F.maxPipes);
@@ -326,6 +361,10 @@ export class World {
     this.vents = new InstancedField(scene, new CylinderGeometry(0.75, 0.5, 1, 12, 1, true).translate(0, 0.5, 0), fxMaterial('vent', { opacity: 0.6 }), F.maxVents);
     this.vents.setColorTable([LIQUID_COLOURS[3]]);
     this.sparks = new Sparks(scene);
+    this.waters = new InstancedField(scene, unitBox, fxMaterial('water'), F.maxWaters);
+    this.waters.setColorTable([LIQUID_COLOURS[1]]);
+    this.tanks = new InstancedField(scene, new CylinderGeometry(0.5, 0.5, 1, 14).translate(0, 0.5, 0), fxMaterial('tank', { opacity: 0.8 }), F.maxTanks);
+    this.tanks.setColorTable([LIQUID_COLOURS[0], LIQUID_COLOURS[4], LIQUID_COLOURS[1]]);
     this.voids = new InstancedField(scene, box, new MeshBasicMaterial({ color: TH.interior.void, fog: false }), F.maxVoids);
     this.shuttles = new InstancedField(scene, shuttle(), this.propMat, F.maxShuttles);
     this.pickupMat = new MeshBasicMaterial();
@@ -349,8 +388,9 @@ export class World {
       this.strips,
       this.pours,
       this.vents,
+      this.tanks,
     ];
-    this.fields = [...this.solids, this.pools, this.steamPlumes, this.blinkers, this.holos, this.fans, this.tufts, this.mesas, this.arches, this.pickups, this.powers, this.pipes, this.greebles, this.voids, this.canisters];
+    this.fields = [...this.solids, this.pools, this.steamPlumes, this.blinkers, this.holos, this.fans, this.tufts, this.mesas, this.arches, this.pickups, this.powers, this.pipes, this.greebles, this.voids, this.canisters, this.waters];
     this.applyPalette();
   }
 
@@ -414,6 +454,8 @@ export class World {
     this.prevWallL = this.prevWallR = NaN;
     this.floorD.fill(-Infinity);
     this.wallD.fill(-Infinity);
+    this.laneRingD.fill(-Infinity);
+    this.laneLogD = -Infinity;
     this.sparks.clear();
     // Forget the last run's look too: the title applies it straight after a reset.
     this.canyonMix = this.interiorMix = this.insideMix = this.deckMix = this.biomeMix = this.asteroidMix = 0;
@@ -423,6 +465,12 @@ export class World {
     this.theme = 'land';
     this.themeStart = -Infinity;
     terrain.flatten();
+    this.chasmAt = this.nextStepAt = Infinity;
+    this.chasmStart = Infinity;
+    this.chasmEnd = -Infinity;
+    this.liftPending = false;
+    this.altNow = null;
+    this.altRoutes = 0;
     const level = this.levelAt(this.distance);
     this.themeEnd = run ? this.levelStart(level - ((level - 1) % LPT) + LPT) : Infinity;
     if (run && this.course) {
@@ -582,7 +630,8 @@ export class World {
   }
 
   sync(): void {
-    for (const f of this.fields) f.sync(this.distance);
+    terrain.fold(this.distance - 80);
+    for (const f of this.fields) f.sync(this.distance, this.shipX);
   }
 
   // --- set courses -----------------------------------------------------------
@@ -639,7 +688,7 @@ export class World {
 
   /** A course's set piece laid over the generator's own work, clear of the lane. */
   private overlay(d: number, kind: Section['overlay'], maxSlope: number): void {
-    if (!kind || this.quiet(d) || d < this.nextOverlayAt) return;
+    if (!kind || this.quiet(d) || d < this.nextOverlayAt || this.inChasm(d)) return;
     const jitter = maxSlope * STEP * 0.5;
     const land = this.theme === 'land';
     switch (kind) {
@@ -751,6 +800,7 @@ export class World {
   }
 
   private row(d: number): void {
+    this.rowLane(d);
     const level = this.levelAt(d);
     let theme = themeForLevel(level);
     let sub = (level - 1) % LPT;
@@ -826,6 +876,13 @@ export class World {
       this.splitStart = Infinity;
       this.splitEnd = -Infinity;
       this.nextBridgeAt = d + range(TH.canyon.bridgeSpacing) * 0.6;
+      this.chasmAt = d + TH.canyon.mouth + range(TH.canyon.chasm.firstAfter);
+      this.chasmStart = Infinity;
+      this.chasmEnd = -Infinity;
+      this.liftPending = false;
+      this.themeLevel = terrain.level;
+      this.levelReturned = false;
+      this.nextStepAt = d + TH.canyon.mouth + range(TH.canyon.elevation.spacing) * 0.5;
     } else if (theme === 'interior') {
       // The door goes where the path is (open ground doesn't keep a centre line like the canyon).
       this.cx = this.lane;
@@ -843,6 +900,9 @@ export class World {
         this.roomScript = [...this.roomQueue];
       }
       this.prevWallL = this.prevWallR = NaN;
+      this.themeLevel = terrain.level;
+      this.levelReturned = false;
+      this.nextStepAt = d + 60 + range(TH.interior.elevation.spacing) * 0.5;
     } else {
       this.laneTarget = this.lane;
       if (this.runStart !== null) this.setHills(d, this.themeEnd);
@@ -1086,7 +1146,11 @@ export class World {
 
   private canyon(d: number, sub: number, score: number, maxSlope: number): void {
     const c = TH.canyon;
-    this.steerCentre(d, maxSlope * c.centreSlopeFraction);
+    // A planned split holds the centre line straight, so its upper and lower
+    // routes rise and fall about one line.
+    this.steerCentre(d, this.splitStart !== Infinity ? 0 : maxSlope * c.centreSlopeFraction);
+    this.altNow = null;
+    this.floorN = -1;
     let hw = (c.halfWidthStart - c.halfWidthMin) * Math.exp(-score / c.widthRampPoints) + c.halfWidthMin;
     const left = this.themeEnd - d;
     hw = lerp(c.mouthHalfWidth, hw, ease((d - this.themeStart) / c.mouth));
@@ -1099,14 +1163,27 @@ export class World {
     const widen = split.wall;
     const hwAll = hw + widen;
     const maxOffset = hwAll - (LANE + 0.4);
+    const chasm = this.planChasm(d, hw, maxSlope, left, sub);
     if (split.active) {
       // Ride down the middle of our branch.
       this.laneTarget = this.splitSide * (this.splitHalf + hw / 2);
     } else if (left < c.exit + 60) this.laneTarget = 0; // line up with the interior door
+    else if (chasm && this.chasmKind === 2) this.laneTarget = -this.chasmSide * Math.min(1.5, maxOffset); // leave room for the fork
     else this.retargetOffset(d, maxOffset);
     this.moveLane(maxSlope, this.laneTarget, maxOffset);
     hw = hwAll;
     this.recordWalls(d, this.cx - hw, this.cx + hw);
+    this.elevate(d, left, c.elevation, c.exit + 130, !chasm);
+    // Upper and lower routes: once the island is up, one branch climbs and the other dips.
+    if (this.liftPending && d >= this.splitStart) {
+      this.liftPending = false;
+      const L = c.lift;
+      let a1 = this.splitStart + 4 + L.ease;
+      let b0 = this.splitEnd - 2 - L.ease;
+      if (b0 < a1) a1 = b0 = (a1 + b0) / 2;
+      terrain.setLift(this.splitStart + 4, a1, b0, this.splitEnd - 2, this.cx, this.splitHalf, L.up, L.down, -this.splitSide);
+    }
+
 
     // Walls: two staggered inner rocks per side so there are no gaps to slip
     // through, plus tall outer rocks for the canyon sides.
@@ -1132,6 +1209,13 @@ export class World {
         this.crystals.spawn(x, 0, d, s, s * (0.8 + rand() * 0.6), s, rand() * 6.28, false, false, 0, 0, false);
       }
     }
+
+    if (chasm) {
+      this.chasmRow(d, hw, maxSlope);
+      this.recordFloor(d);
+      return; // the chasm is the feature: no floor, so no pebbles or rocks either
+    }
+    this.recordFloor(d);
 
     // Pebbles on the floor: scenery.
     for (let i = 0; i < c.pebblesPerRow; i++) {
@@ -1219,6 +1303,10 @@ export class World {
         this.altLane = this.cx - this.splitSide * (this.splitHalf + hw / 2);
         this.altTarget = 0;
         this.altPickupsLeft = c.splitAltPickups;
+        this.liftPending = true;
+        this.altRoutes++;
+        // No chasm until well after it.
+        this.chasmAt = Math.max(this.chasmAt, this.splitEnd + c.splitWiden + c.splitRejoin + 60);
       } else {
         this.splitAt = d + 40; // try again a bit later
       }
@@ -1266,6 +1354,7 @@ export class World {
     const branchCentre = this.cx - this.splitSide * (this.splitHalf + (hw - this.splitHalf - 0.6) / 2);
     if (rand() < 0.08) this.altTarget = (rand() * 2 - 1) * 1.2;
     this.altLane += clamp(branchCentre + this.altTarget - this.altLane, -maxSlope * STEP * 0.6, maxSlope * STEP * 0.6);
+    if (d >= this.splitStart && d <= this.splitEnd) this.altNow = this.altLane;
     if (d < this.splitStart || d > this.splitEnd) return;
     if (rand() < c.splitAltRocks) {
       const r = 0.55 + rand() * 0.45;
@@ -1283,6 +1372,218 @@ export class World {
       this.pickups.spawn(this.altLane - this.shipX, CONFIG.boost.pickup.height, d, 1, 1, 1, 0, false, false, 0, 0);
     }
   }
+
+  // --- elevation -------------------------------------------------------------
+
+  /**
+   * Ramps, platforms and drops: every so often the floor climbs, holds, then
+   * drops back or ramps down, between `min` and `max` of where this theme
+   * began. `returnBefore` units from the end it heads back there, so the next
+   * theme starts level. Heights are looks only (see terrain.ts).
+   */
+  private elevate(d: number, left: number, E: ElevationConfig, returnBefore: number, allowed: boolean): void {
+    if (this.runStart === null) return;
+    if (left < returnBefore) {
+      if (this.levelReturned) return;
+      this.levelReturned = true;
+      const back = this.themeLevel - terrain.level;
+      if (Math.abs(back) > 0.01) terrain.addStep(d, d + Math.max(16, Math.abs(back) * E.returnSlope), back);
+      return;
+    }
+    if (d < this.nextStepAt || !allowed) return;
+    const lvl = terrain.level - this.themeLevel;
+    const up = lvl < E.min + 1 ? true : lvl > E.max - 1.5 ? false : rand() < 0.5;
+    let delta: number;
+    let len: number;
+    if (up) {
+      delta = Math.min(range(E.rise), E.max - lvl);
+      len = range(E.riseLength);
+    } else if (rand() < E.dropChance) {
+      // A drop: short and steep.
+      delta = -Math.min(range(E.drop), lvl - E.min);
+      len = range(E.dropLength);
+    } else {
+      delta = -Math.min(range(E.rise), lvl - E.min);
+      len = range(E.riseLength);
+    }
+    if (Math.abs(delta) > 0.3) terrain.addStep(d, d + len, delta);
+    this.nextStepAt = d + len + range(E.spacing); // the platform between
+  }
+
+  // --- chasms -----------------------------------------------------------------
+
+  private inChasm(d: number): boolean {
+    return d >= this.chasmStart && d <= this.chasmEnd;
+  }
+
+  /**
+   * Chasms: the canyon floor falls away and a bridge carries the lane across.
+   * Kinds: a railed rope bridge; a wide bridge with stretches of planks gone
+   * (off the lane, so it weaves); a bridge that forks, the second branch
+   * swinging out and back with pickups on it. Some climb or dip as they go.
+   * Off the planks you fall. Returns true for rows inside one.
+   */
+  private planChasm(d: number, hw: number, maxSlope: number, left: number, sub: number): boolean {
+    const c = TH.canyon;
+    const C = c.chasm;
+    if (this.chasmEnd !== -Infinity && d > this.chasmEnd + 10) {
+      this.chasmStart = Infinity;
+      this.chasmEnd = -Infinity;
+      this.chasmAt = d + range(C.spacing);
+    }
+    if (d >= this.chasmAt && this.chasmStart === Infinity && this.runStart !== null) {
+      const ok = this.splitStart === Infinity && left > c.exit + 200 && d - this.themeStart > c.mouth + 40 && hw >= 4.5;
+      if (!ok) {
+        this.chasmAt = d + 30; // try again a bit later
+        return false;
+      }
+      const r = rand();
+      let kind = sub === 0 ? 0 : sub === 1 ? (r < 0.5 ? 1 : 0) : r < 0.4 ? 2 : r < 0.75 ? 1 : 0;
+      // The fork needs room for both bridges.
+      const avail = hw - C.bridgeHalf - 0.8;
+      if (kind === 2 && avail < C.splitOffset * 0.7) kind = 1;
+      this.chasmKind = kind;
+      let len = range(C.length);
+      if (kind === 2) {
+        this.chasmSide = this.lane >= this.cx ? -1 : 1;
+        this.chasmOff = Math.min(C.splitOffset, avail + 1.5);
+        // Long enough that swinging out and back is well within steering.
+        len = Math.max(range(C.splitLength), (this.chasmOff * Math.PI) / (maxSlope * 1.4));
+        this.chasmPickups = C.altPickups;
+        this.altRoutes++;
+      }
+      this.chasmStart = d + 12;
+      this.chasmEnd = this.chasmStart + len;
+      this.holeAt = this.chasmStart + 4;
+      this.holeUntil = -Infinity;
+      terrain.addPit(this.chasmStart, this.chasmEnd);
+      // Some bridges climb or dip on their way across.
+      if (kind !== 2 && rand() < C.riseChance) {
+        const lvl = terrain.level - this.themeLevel;
+        const E = c.elevation;
+        const delta = (lvl < E.max - 3 && rand() < 0.6 ? 1 : -1) * (1.5 + rand() * 1.5);
+        terrain.addStep(this.chasmStart + 4, this.chasmEnd - 4, delta);
+      }
+      this.nextStepAt = Math.max(this.nextStepAt, this.chasmEnd + 25);
+      this.splitAt = Math.max(this.splitAt, this.chasmEnd + 90);
+    }
+    return this.inChasm(d);
+  }
+
+  /** One row of a chasm: the bridge decks (the only floor), rails, posts and supports. */
+  private chasmRow(d: number, hw: number, maxSlope: number): void {
+    const C = TH.canyon.chasm;
+    const P = CONFIG.terrain.pitDepth;
+    const bh = C.bridgeHalf;
+    const jitter = maxSlope * STEP * 0.5;
+    const wallL = this.cx - hw + 0.3;
+    const wallR = this.cx + hw - 0.3;
+    const row = Math.round(d / STEP);
+    const t = (d - this.chasmStart) / (this.chasmEnd - this.chasmStart);
+    const segs: [number, number, boolean, boolean][] = []; // x0, x1, rail on the left, rail on the right
+    if (this.chasmKind === 1) {
+      // Wide planks with stretches missing on one side, never across the lane.
+      let x0 = Math.max(wallL, this.lane - C.wideHalf);
+      let x1 = Math.min(wallR, this.lane + C.wideHalf);
+      if (d >= this.holeAt && d > this.holeUntil) {
+        this.holeUntil = d + range(C.holeLength);
+        this.holeAt = this.holeUntil + range(C.holeGap);
+        this.holeSide = rand() < 0.5 ? -1 : 1;
+      }
+      const broken = d <= this.holeUntil && rand() < 0.92;
+      const clear = LANE + jitter + 0.35;
+      if (broken && this.holeSide < 0) x0 = Math.max(x0, this.lane - clear);
+      if (broken && this.holeSide > 0) x1 = Math.min(x1, this.lane + clear);
+      segs.push([x0, x1, !(broken && this.holeSide < 0), !(broken && this.holeSide > 0)]);
+    } else {
+      segs.push([this.lane - bh, this.lane + bh, true, true]);
+      if (this.chasmKind === 2) {
+        const alt = clamp(this.lane + this.chasmSide * this.chasmOff * Math.sin(Math.PI * t), wallL + bh, wallR - bh);
+        this.altNow = alt;
+        if (Math.abs(alt - this.lane) < bh * 2 + 0.2) {
+          // Still joined: one wide deck.
+          segs[0] = [Math.min(alt, this.lane) - bh, Math.max(alt, this.lane) + bh, true, true];
+        } else {
+          segs.push([alt - bh, alt + bh, true, true]);
+        }
+        // The fork's reward: pickups out on the far branch.
+        if (this.chasmPickups > 0 && t > 0.35 && row % 3 === 0) {
+          this.chasmPickups--;
+          this.pickups.spawn(alt - this.shipX, CONFIG.boost.pickup.height, d, 1, 1, 1, 0, false, false, 0, 0);
+        }
+      }
+    }
+    this.floorBeginRow();
+    for (const [x0, x1, railL, railR] of segs) {
+      this.floorSeg(x0, x1);
+      // Planks with small gaps between them, darker every other one.
+      this.greebles.nextColor = row % 2 === 0 ? Decor.Wood : Decor.WoodDark;
+      this.greebles.nextTilt = true;
+      this.greebles.spawn((x0 + x1) / 2 - this.shipX, -0.12, d, x1 - x0, 0.12, STEP - 0.25, 0, false, false, 0, 0, false);
+      for (const [x, s, rail] of [[x0, -1, railL], [x1, 1, railR]] as const) {
+        if (rail) {
+          this.pipes.nextColor = Decor.Rope;
+          this.pipes.spawn(x - this.shipX, C.railHeight, d, 0.05, 0.05, STEP + 0.1, 0, false, false, 0, 0, false);
+          if (row % 3 === 0) {
+            this.greebles.nextColor = Decor.WoodDark;
+            this.greebles.spawn(x - s * 0.05 - this.shipX, 0, d, 0.12, C.railHeight + 0.15, 0.12, 0, false, false, 0, 0, false);
+          }
+        }
+        // Supports down into the dark.
+        if (row % 6 === 0) {
+          this.greebles.nextColor = Decor.WoodDark;
+          this.greebles.spawn(x - s * 0.2 - this.shipX, -P, d, 0.25, P - 0.2, 0.25, 0, false, false, 0, 0, false);
+        }
+      }
+    }
+    // The chasm's sides under the canyon walls: rock, then black further down. And a rocky lip at each end.
+    for (const s of [-1, 1]) {
+      const x = this.cx + s * (hw + 1.6) - this.shipX;
+      this.greebles.nextColor = Decor.Cliff;
+      this.greebles.spawn(x, -P * 0.45, d, 3.2, P * 0.45, STEP + 0.12, 0, false, false, 0, 0, false);
+      this.voids.spawn(x, -P, d, 3.2, P * 0.55, STEP + 0.12, 0, false, false, 0, 0, false);
+    }
+    if (d - this.chasmStart < STEP || this.chasmEnd - d < STEP) {
+      for (let x = wallL; x <= wallR; x += 1.1) {
+        if (segs.some(([x0, x1]) => x > x0 - 0.4 && x < x1 + 0.4)) continue;
+        const r = 0.3 + rand() * 0.35;
+        this.rocks.spawn(x - this.shipX, -0.1, d, r * 1.6, (r * 0.6) / BOULDER_HEIGHT, r, rand() * 6.28, false, false, 0, 0, false);
+      }
+    }
+  }
+
+  /** Start this row's floor list (anything not covered is a drop). */
+  private floorBeginRow(): void {
+    this.floorN = 0;
+  }
+
+  private floorSeg(x0: number, x1: number): void {
+    if (this.floorN >= 6 || x1 <= x0) return;
+    this.floorSegs[this.floorN * 2] = x0;
+    this.floorSegs[this.floorN * 2 + 1] = x1;
+    this.floorN++;
+  }
+
+  /** Remember the lane after each row (for the dev autopilot). */
+  private rowLane(d: number): void {
+    // Called at the start of the next row, so it stores the previous row's lane.
+    const slot = (((Math.round(this.laneLogD / STEP) % FLOOR_ROWS) + FLOOR_ROWS) % FLOOR_ROWS);
+    if (this.laneLogD !== -Infinity) {
+      this.laneRingD[slot] = this.laneLogD;
+      this.laneRing[slot] = this.lane;
+    }
+    this.laneLogD = d;
+  }
+
+  /** Dev: the safe lane at distance `d` (world x), or null if it isn't known. */
+  laneAt(d: number): number | null {
+    const slot = (((Math.round(d / STEP) % FLOOR_ROWS) + FLOOR_ROWS) % FLOOR_ROWS);
+    return Math.abs(this.laneRingD[slot] - d) <= STEP ? this.laneRing[slot] : null;
+  }
+
+  private laneLogD = -Infinity;
+  private readonly laneRingD = new Float64Array(FLOOR_ROWS).fill(-Infinity);
+  private readonly laneRing = new Float32Array(FLOOR_ROWS);
 
   /** Random x within cx ± halfRange at least `clear` from the lane, or null. */
   private offLane(halfRange: number, clear: number): number | null {
@@ -1364,6 +1665,10 @@ export class World {
     this.api.memo = 0;
     this.api.memo2 = 0;
     this.api.memoAt = d + taper;
+    this.api.start = d;
+    this.api.end = d + len;
+    this.api.taper = taper;
+    this.api.stage = 0;
     this.api.seed = rand();
     this.nextFeatureAt = d + taper + 4;
     this.framePending = true;
@@ -1395,6 +1700,7 @@ export class World {
     const open = taper > 0 ? ease(Math.min((d - this.roomStart) / taper, (this.roomEnd - d) / taper)) : 1;
     const hw = lerp(base, this.room === 'corridor' ? base : this.roomHw, open);
     this.recordWalls(d, this.cx - hw, this.cx + hw);
+    this.elevate(d, this.themeEnd - d, it.elevation, 170, !def.ownSteps);
     const H = lerp(it.wallHeight, this.room === 'corridor' ? it.wallHeight : this.roomH, open);
 
     // Centre line: the room's sideways shift (an S-bend) first; winding only once it's done.
@@ -1478,8 +1784,10 @@ export class World {
       if (k < 0) this.prevWallL = inner;
       else this.prevWallR = inner;
     }
+    this.hull.nextTilt = def.ceiling;
     if (def.ceiling) this.hullBox(this.cx, H, d, span, 0.35, depth, false);
     if (!pit) {
+      this.hull.nextTilt = true;
       this.hullBox(this.cx, -0.14, d, span, 0.14, depth, false);
     } else {
       // Floor pieces over a dark drop, with lit edges or railings.
@@ -1487,9 +1795,16 @@ export class World {
       for (let i = 0; i < this.floorN; i++) {
         const x0 = this.floorSegs[i * 2];
         const x1 = this.floorSegs[i * 2 + 1];
+        this.hull.nextTilt = true;
         this.hullBox((x0 + x1) / 2, -0.14, d, x1 - x0, 0.14, depth, false);
         for (const [edge, s] of [[x0, -1], [x1, 1]] as const) {
           if (Math.abs(edge - (this.cx + s * hw)) < 0.05) continue; // meets the wall: nothing to trim
+          // Inside another piece of floor (where walkways join): no edge here either.
+          let covered = false;
+          for (let j = 0; j < this.floorN && !covered; j++) {
+            if (j !== i && edge > this.floorSegs[j * 2] + 0.05 && edge < this.floorSegs[j * 2 + 1] - 0.05) covered = true;
+          }
+          if (covered) continue;
           // The drop's side: a steel lip, then black all the way down.
           this.hullBox(edge + s * 0.08, -PIT_LIP, d, 0.16, PIT_LIP - 0.14, depth, false);
           this.voids.spawn(edge + s * 0.08 - this.shipX, -P, d, 0.16, P - PIT_LIP, depth, 0, false, false, 0, 0, false);
@@ -1651,6 +1966,10 @@ export class World {
       memo2: 0,
       seed: 0,
       row: 0,
+      start: 0,
+      end: 0,
+      taper: 0,
+      stage: 0,
       pit: false,
       ceiling: true,
       due(spacing) {
@@ -1753,6 +2072,41 @@ export class World {
       fan(x, d, size) {
         w.fans.spawn(x - w.shipX, this.H - 0.35, d, size, size, size, 0, false, false, 0, 0, false);
       },
+      bigFan(x, y, d, size) {
+        w.fans.spawn(x - w.shipX, y, d, size, size * 0.5, size, rand() * 6.28, false, false, 0, 0, false);
+      },
+      piston(x, d, top) {
+        // Rod pumping up and down on a fixed rhythm, out of step with its neighbours.
+        w.greebles.setNextPulse(0.9, 7, rand() * 6.28);
+        w.greebles.nextColor = Decor.Steel;
+        w.greebles.spawn(x - w.shipX, 1.1, d, 0.35, Math.max(0.5, top - 2.2), 0.35, 0, false, false, 0, 0, false);
+        this.greeble(x, 0, d, 0.7, 0.9, 0.7, Decor.Copper); // cylinder block
+      },
+            step(a, b, delta) {
+        terrain.addStep(a, b, delta);
+      },
+      water(x, y, d, width) {
+        w.waters.nextTilt = true;
+        w.waters.spawn(x - w.shipX, y - 0.05, d, width, 0.05, STEP + 0.12, 0, false, false, 0, 0, false);
+      },
+      tank(x, d, r, h) {
+        w.tanks.nextColor = Math.floor(rand() * 3);
+        w.tanks.spawn(x - w.shipX, 0.3, d, r * 2, h - 0.6, r * 2, 0, true, false, r, r);
+        // Steel caps top and bottom.
+        this.greeble(x, 0, d, r * 2.2, 0.3, r * 2.2, Decor.Steel);
+        this.greeble(x, h - 0.3, d, r * 2.2, 0.3, r * 2.2, Decor.Steel);
+      },
+      hook(centre, amp, arriveX, d) {
+        const R = CONFIG.themes.interior.rooms.cargoLift;
+        const s = clamp((arriveX - centre) / amp, -1, 1);
+        const phase = rand() < 0.5 ? Math.asin(s) : Math.PI - Math.asin(s);
+        // The hook (solid) and its chain (scenery) swing together.
+        w.hull.setNextMotion(amp, R.hookFreq, phase);
+        w.hullBox(centre, R.hookY, d, 0.7, 0.6, 0.7, true, true);
+        w.greebles.setNextMotion(amp, R.hookFreq, phase);
+        w.greebles.nextColor = Decor.Dark;
+        w.greebles.spawn(centre - w.shipX, R.hookY + 0.6, d, 0.08, this.H - R.hookY - 0.6, 0.08, 0, false, false, 0, 0, false);
+      },
       vent(x, d, half, period) {
         // On (or near) the lane: down when the ship gets there. Elsewhere: any rhythm.
         const onLane = Math.abs(x - this.lane) < LANE + half + this.jitter + 0.3;
@@ -1814,6 +2168,7 @@ export class World {
   private light(x: number, y: number, d: number, w: number, h: number, depth: number, colour: Light, solid: boolean): void {
     const s = F.cubeSize;
     this.strips.nextColor = colour;
+    this.strips.nextTilt = !solid && h <= 0.06; // flat strips on floors and ceilings lean with the slope
     this.strips.spawn(x - this.shipX, y, d, w / s, h / s, depth / s, 0, solid, false, w / 2, depth / 2, solid);
   }
 

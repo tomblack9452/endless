@@ -32,7 +32,13 @@ export type RoomId =
   | 'vents'
   | 'foundry'
   | 'gantry'
-  | 'breach';
+  | 'breach'
+  | 'dropShaft'
+  | 'cargoLift'
+  | 'flooded'
+  | 'command'
+  | 'fanRoom'
+  | 'lab';
 
 /** Strip light colours (index into the strip colour table). */
 export enum Light {
@@ -54,6 +60,11 @@ export enum Decor {
   Yellow = 5,
   Panel = 6,
   Green = 7,
+  Wood = 8,
+  WoodDark = 9,
+  Rope = 10,
+  Glass = 11,
+  Cliff = 12,
 }
 
 /** What a room's build() can see and do. One object, reused every row. */
@@ -75,6 +86,10 @@ export interface RoomAPI {
   memo2: number;
   seed: number; // 0..1, fixed for the room: decor choices stay consistent along it
   row: number; // row counter, for repeating patterns
+  start: number; // where the room begins and ends (distances)
+  end: number;
+  taper: number; // length of the room's tapers at each end
+  stage: number; // free per-room counter for set pieces (0 at the start of each room)
   /** Inner face of the wall on `side` (-1 left, 1 right), world x. */
   wall(side: number): number;
   /** Pipe running along the wall on `side` at height y (centre). */
@@ -119,6 +134,18 @@ export interface RoomAPI {
   holo(x: number, y: number, d: number, w: number, h: number): void;
   /** A spinning ceiling fan. */
   fan(x: number, d: number, size: number): void;
+  /** A big fan turning at height y (down in a fan pit, say). */
+  bigFan(x: number, y: number, d: number, size: number): void;
+  /** Ease the floor (and everything on it) by `delta` between distances a and b. */
+  step(a: number, b: number, delta: number): void;
+  /** Water across the room at this row, `width` wide around x, its surface at y. */
+  water(x: number, y: number, d: number, width: number): void;
+  /** A glass tank of bubbling liquid (solid). */
+  tank(x: number, d: number, r: number, h: number): void;
+  /** A hook on a chain from the ceiling, swinging across; `arriveX` is where it is when the ship gets there. */
+  hook(centre: number, amp: number, arriveX: number, d: number): void;
+  /** An engine piston pumping up and down at x (scenery). */
+  piston(x: number, d: number, top: number): void;
   /** Steam vent in the floor (a hazard). Vents on the lane are always down as you arrive. */
   vent(x: number, d: number, half: number, period: number): void;
   /** A panel that throws sparks. */
@@ -164,6 +191,8 @@ export interface RoomDef {
   floor?(api: RoomAPI): void;
   /** Railings along custom floor edges (gantry) instead of hazard lights. */
   railings?: boolean;
+  /** The room makes its own ramps and drops (no random ones in it). */
+  ownSteps?: boolean;
 }
 
 const R = CONFIG.themes.interior.rooms;
@@ -176,6 +205,12 @@ function range(r: readonly number[]): number {
 export const ROOMS: Record<RoomId, RoomDef> = {
   gantry: null as unknown as RoomDef, // filled in below (defined after the helpers they use)
   breach: null as unknown as RoomDef,
+  dropShaft: null as unknown as RoomDef,
+  cargoLift: null as unknown as RoomDef,
+  flooded: null as unknown as RoomDef,
+  command: null as unknown as RoomDef,
+  fanRoom: null as unknown as RoomDef,
+  lab: null as unknown as RoomDef,
   corridor: {
     name: '',
     extraWidth: () => 0,
@@ -1007,6 +1042,320 @@ ROOMS.vents.decor = ventsDecor;
 ROOMS.foundry.decor = foundryDecor;
 ROOMS.deck.decor = deckDecor;
 ROOMS.shaft.decor = (api) => corridorDecor(api, 5);
+
+
+// --- landmark rooms ------------------------------------------------------------
+
+/**
+ * Railed catwalks over a drop: one on the lane, sometimes a second alongside
+ * joined to it at both ends. Shared by the drop shaft and the flooded section.
+ */
+function catwalks(api: RoomAPI, half: number, sideWalks: readonly number[], sideLength: readonly number[]): void {
+  api.floorBegin();
+  api.floor(api.lane - half, api.lane + half);
+  if (api.memoAt <= api.d && sideWalks.length && api.due(sideWalks)) {
+    const room = api.hw - 1.4;
+    const off = (rand() < 0.5 ? -1 : 1) * (half * 2 + 1 + rand() * Math.max(0, room - half * 2 - 1.5));
+    api.memo = Math.max(-room, Math.min(room, api.lane - api.cx + off));
+    api.memoAt = api.d + range(sideLength);
+    api.memo2 = api.d;
+  }
+  if (api.memoAt > api.d) {
+    const x = api.cx + api.memo;
+    api.floor(x - 1, x + 1);
+    if (api.d - api.memo2 < 2.3 || api.memoAt - api.d < 2.3) api.floor(Math.min(x, api.lane), Math.max(x, api.lane));
+  }
+}
+
+/** Drop shaft: a catwalk over a deep shaft, red beacons, then the deck drops away to the level below. */
+const dropShaft: RoomDef = {
+  name: 'drop shaft',
+  extraWidth: () => R.dropShaft.extraWidth,
+  height: R.dropShaft.height,
+  ceiling: true,
+  windows: false,
+  light: Light.Red,
+  wander: 0.3,
+  enclosure: 1,
+  railings: true,
+  ownSteps: true,
+  floor(api) {
+    const dropAt = api.start + (api.end - api.start) * R.dropShaft.dropAt;
+    // The shaft: a catwalk over the drop up to where the deck falls away.
+    if (api.d < dropAt - 4) catwalks(api, R.dropShaft.catwalkHalf, [], []);
+  },
+  build(api) {
+    const D = R.dropShaft;
+    const dropAt = api.start + (api.end - api.start) * D.dropAt;
+    if (api.stage === 0) {
+      api.stage = 1;
+      const len = range(D.dropLength);
+      api.step(dropAt, dropAt + len, -range(D.drop));
+    }
+    // Warning stripes and beacons at the edge of the drop.
+    if (Math.abs(api.d - dropAt) < 1.2) {
+      api.light(api.cx, 0.01, api.d, api.hw * 2, 0.01, 0.3, Light.Red);
+      for (const s of [-1, 1]) api.blinker(api.wall(s) - s * 0.15, 1.6, api.d, 0.12, 0.25, Light.Red);
+    }
+    // Hanging cables down the shaft.
+    if (api.d < dropAt && api.row % 4 === 0) {
+      const x = api.cx + (rand() * 2 - 1) * (api.hw - 0.4);
+      if (!api.clearOf(x, 0.4)) return;
+      api.greeble(x, -6, api.d, 0.05, api.H + 6, 0.05, Decor.Dark);
+    }
+  },
+  decor(api) {
+    corridorDecor(api);
+    if (api.row % 6 === 0) for (const s of [-1, 1]) api.blinker(api.wall(s) - s * 0.08, api.H - 1, api.d, 0.1, 0.2, Light.Red);
+  },
+};
+
+/** Cargo lift: the floor rises on a lift platform; hooks on chains swing across the bay. */
+const cargoLift: RoomDef = {
+  name: 'cargo lift',
+  extraWidth: () => R.cargoLift.extraWidth,
+  height: R.cargoLift.height,
+  ceiling: true,
+  windows: false,
+  light: Light.Amber,
+  wander: 0.2,
+  enclosure: 1,
+  ownSteps: true,
+  build(api) {
+    const C = R.cargoLift;
+    const liftAt = api.start + (api.end - api.start) * C.liftAt;
+    if (api.stage === 0) {
+      api.stage = 1;
+      api.memo2 = range(C.liftLength);
+      api.step(liftAt, liftAt + api.memo2, range(C.rise));
+    }
+    // The lift platform: hazard edges, rails up the walls.
+    const onLift = api.d >= liftAt - 1 && api.d <= liftAt + api.memo2 + 1;
+    if (onLift) {
+      if (Math.abs(api.d - liftAt) < 1.2 || Math.abs(api.d - liftAt - api.memo2) < 1.2) api.light(api.cx, 0.01, api.d, api.hw * 2, 0.01, 0.25, Light.Amber);
+      for (const s of [-1, 1]) api.greeble(api.wall(s) - s * 0.25, 0, api.d, 0.3, api.H, 2.3, Decor.Yellow);
+    }
+    // Swinging hooks, placed where they'll be off the lane when you get there.
+    if (!onLift && api.due(C.hookSpacing)) {
+      const amp = Math.min(api.hw - 0.8, 3.5);
+      for (let t = 0; t < 6; t++) {
+        const arrive = api.cx + (rand() * 2 - 1) * amp;
+        if (!api.clearOf(arrive, 0.35 + 0.45)) continue;
+        api.hook(api.cx, amp, arrive, api.d);
+        break;
+      }
+    }
+    // Crates stacked along the walls.
+    if (api.row % 3 === 0 && rand() < C.crates) {
+      const s = rand() < 0.5 ? -1 : 1;
+      const x = api.wall(s) - s * (0.8 + rand() * 0.6);
+      if (api.clearOf(x, 0.7)) api.crate(x, api.d, 1.3, 0.9 * (1 + Math.floor(rand() * 2)));
+    }
+  },
+  decor(api) {
+    corridorDecor(api, 1);
+    // Gantry crane beam overhead.
+    if (api.row % 9 === 0) api.greeble(api.cx, api.H - 0.7, api.d, api.hw * 2, 0.45, 0.6, Decor.Yellow);
+  },
+};
+
+/** Flooded section: water over the deck, railed catwalks above it, drips from the ceiling. */
+const flooded: RoomDef = {
+  name: 'flooded section',
+  extraWidth: () => R.flooded.extraWidth,
+  height: R.flooded.height,
+  ceiling: true,
+  windows: false,
+  light: Light.Teal,
+  wander: 0.4,
+  enclosure: 1,
+  railings: true,
+  floor(api) {
+    catwalks(api, R.flooded.catwalkHalf, R.flooded.sideWalks, R.flooded.sideLength);
+  },
+  build(api) {
+    // The water across the room (scenery: falling in is a fall).
+    if (api.pit) api.water(api.cx, R.flooded.level, api.d, api.hw * 2);
+    // Drips into it now and then, off the walkways.
+    if (api.row % 7 === 0) {
+      const x = api.cx + (rand() * 2 - 1) * (api.hw - 0.5);
+      if (api.clearOf(x, 0.5)) api.pour(x, api.d, 0.08, Liquid.Water, false);
+    }
+  },
+  decor(api) {
+    corridorDecor(api);
+    // Pipes half under the water.
+    if (api.row % 2 === 0) for (const s of [-1, 1]) api.pipe(s, -0.4, 0.22, Decor.Teal);
+  },
+};
+
+/** Command deck: tiers of consoles in rows under a big viewscreen; the floor is raised a step. */
+const command: RoomDef = {
+  name: 'command deck',
+  extraWidth: () => R.command.extraWidth,
+  height: R.command.height,
+  ceiling: true,
+  windows: true,
+  light: Light.Teal,
+  wander: 0,
+  enclosure: R.command.enclosure,
+  ownSteps: true,
+  build(api) {
+    const C = R.command;
+    if (api.stage === 0) {
+      // Up onto the deck, and down again before the exit.
+      api.stage = 1;
+      api.step(api.start + api.taper, api.start + api.taper + 8, C.tier);
+      api.step(api.end - api.taper - 8, api.end - api.taper, -C.tier);
+    }
+    // The viewscreen over the far end.
+    if (api.end - api.d < api.taper + 3 && api.end - api.d > api.taper + 0.5) api.holo(api.cx, 1.2, api.d, api.hw * 1.6, api.H - 1.6);
+    // A row of consoles across the deck with gaps, one on the lane.
+    if (!api.due(C.rowSpacing)) return;
+    const gap = C.gapWidth / 2 + api.jitter;
+    let from = api.wall(-1) + 0.4;
+    const to = api.wall(1) - 0.4;
+    while (from < to) {
+      const len = 1.6 + rand() * 2;
+      const x0 = from;
+      const x1 = Math.min(to, from + len);
+      from = x1 + 0.9 + rand() * 0.8;
+      // Keep the lane's gap: trim the console back from it.
+      for (const [p, q] of [[x0, Math.min(x1, api.lane - gap)], [Math.max(x0, api.lane + gap), x1]] as const) {
+        if (q - p < 0.6) continue;
+        const mid = (p + q) / 2;
+        api.box(mid, 0, api.d, q - p, 0.85, 0.9, true, true);
+        api.light(mid, 0.86, api.d, q - p - 0.1, 0.03, 0.5, Light.Teal);
+        api.blinker(mid, 0.88, api.d + 0.3, 0.12, 0.05, rand() < 0.5 ? Light.Amber : Light.Green);
+        if (rand() < 0.4) api.holo(mid, 0.95, api.d, Math.min(1.2, q - p), 0.7);
+      }
+    }
+  },
+  decor(api) {
+    corridorDecor(api, 1);
+  },
+};
+
+/** Ventilation: giant fans turn in pits under the deck; walkways between them. */
+const fanRoom: RoomDef = {
+  name: 'ventilation',
+  extraWidth: () => R.fanRoom.extraWidth,
+  height: R.fanRoom.height,
+  ceiling: true,
+  windows: false,
+  light: Light.White,
+  wander: 0.3,
+  enclosure: 1,
+  railings: true,
+  floor(api) {
+    const F = R.fanRoom;
+    // A fan pit off the lane every so often: the deck there is a walkway along the lane.
+    if (api.memoAt <= api.d && api.due(F.pitSpacing)) {
+      api.memoAt = api.d + range(F.pitLength);
+      api.memo = rand() < 0.5 ? -1 : 1; // which side the pit's on
+      api.memo2 = api.d;
+    }
+    if (api.memoAt <= api.d) return;
+    const clear = LANE + api.jitter + 0.3;
+    const left = api.wall(-1);
+    const right = api.wall(1);
+    api.floorBegin();
+    if (api.memo < 0) {
+      if (api.lane - clear - left < 2) return; // no room for a pit this side
+      api.floor(api.lane - clear, right);
+    } else {
+      if (right - api.lane - clear < 2) return;
+      api.floor(left, api.lane + clear);
+    }
+  },
+  build(api) {
+    const F = R.fanRoom;
+    if (!api.pit) return;
+    // The fan, once per pit, in the middle of it, turning below the deck.
+    const mid = api.memo2 + (api.memoAt - api.memo2) / 2;
+    if (Math.abs(api.d - mid) < 1.2 && api.stage !== Math.round(mid)) {
+      api.stage = Math.round(mid);
+      const edge = api.memo < 0 ? api.lane - LANE - api.jitter - 0.3 : api.lane + LANE + api.jitter + 0.3;
+      const wallX = api.wall(api.memo);
+      const x = (edge + wallX) / 2;
+      const size = Math.min(F.fanSize, Math.abs(wallX - edge) * 0.45);
+      api.bigFan(x, -1.6, api.d, size);
+      api.steam(x, -1.4, api.d, 3.5);
+    }
+  },
+  decor(api) {
+    corridorDecor(api);
+    // Big duct openings high on the walls.
+    if (api.row % 10 === 0) for (const s of [-1, 1]) api.greeble(api.wall(s) - s * 0.2, api.H - 2.2, api.d, 0.4, 1.6, 2.2, Decor.Dark);
+  },
+};
+
+/** Lab: rows of glass tanks of glowing liquid, benches with holograms. */
+const lab: RoomDef = {
+  name: 'lab',
+  extraWidth: () => R.lab.extraWidth,
+  height: R.lab.height,
+  ceiling: true,
+  windows: false,
+  light: Light.Green,
+  wander: 0.3,
+  enclosure: 1,
+  build(api) {
+    const L = R.lab;
+    if (!api.due(L.rowSpacing)) return;
+    const shift = rand() * L.pitch;
+    for (let x = api.cx - api.hw + 0.9 + shift; x < api.cx + api.hw - 0.7; x += L.pitch) {
+      if (rand() > L.fill || !api.clearOf(x, L.tankRadius + 0.15)) continue;
+      if (rand() < 0.7) {
+        api.tank(x, api.d, L.tankRadius, Math.min(api.H - 0.3, 2.4 + rand() * 0.8));
+      } else {
+        // A bench with a hologram over it.
+        api.box(x, 0, api.d, 1.1, 0.8, 0.7, true, true);
+        api.holo(x, 0.85, api.d, 0.8, 0.6);
+      }
+    }
+  },
+  decor(api) {
+    corridorDecor(api, 1);
+    if (api.row % 5 === 0) for (const s of [-1, 1]) api.blinker(api.wall(s) - s * 0.06, 1.4, api.d, 0.05, 0.08, Light.Green);
+  },
+};
+
+ROOMS.dropShaft = dropShaft;
+ROOMS.cargoLift = cargoLift;
+ROOMS.flooded = flooded;
+ROOMS.command = command;
+ROOMS.fanRoom = fanRoom;
+ROOMS.lab = lab;
+
+// The reactor: a glowing gap around the core (keep off it), steam and sparks.
+ROOMS.reactor.railings = true;
+ROOMS.reactor.floor = (api) => {
+  if (api.progress < 0.15 || api.progress > 0.85) return;
+  const ch = R.reactor.coreHalf;
+  api.floorBegin();
+  api.floor(api.wall(-1), api.cx - ch - 0.75);
+  api.floor(api.cx - ch - 0.05, api.cx + ch + 0.05);
+  api.floor(api.cx + ch + 0.75, api.wall(1));
+};
+const reactorBuild = ROOMS.reactor.build!;
+ROOMS.reactor.build = (api) => {
+  reactorBuild(api);
+  if (api.progress > 0.15 && api.progress < 0.85 && api.row % 5 === 0) {
+    const ch = R.reactor.coreHalf;
+    api.steam(api.cx + (rand() < 0.5 ? -1 : 1) * (ch + 0.45), -1.5, api.d, 4);
+  }
+};
+
+// The engine room (piston hall): pistons pumping up and down along the walls.
+const pistonsDecorBase = ROOMS.pistons.decor!;
+ROOMS.pistons.name = 'engine room';
+ROOMS.pistons.decor = (api) => {
+  pistonsDecorBase(api);
+  if (api.row % 3 === 0) {
+    for (const s of [-1, 1]) api.piston(api.wall(s) - s * 0.55, api.d, api.H);
+  }
+};
 
 export const ROOM_IDS = Object.keys(ROOMS) as RoomId[];
 

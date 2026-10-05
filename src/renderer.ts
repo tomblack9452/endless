@@ -17,7 +17,7 @@ import {
 } from 'three';
 import { CONFIG } from './config';
 import type { LivePalette } from './palette';
-import { MAX_BUMPS, terrain, TERRAIN_GLSL } from './terrain';
+import { MAX_BUMPS, MAX_PITS, MAX_STEPS, terrain, TERRAIN_GLSL } from './terrain';
 
 const DEG = Math.PI / 180;
 const PLANET_BODY = new Color(CONFIG.planet.body);
@@ -52,6 +52,11 @@ export class Stage {
   private readonly hillWindow = { value: new Vector4() };
   private readonly hillPhase = { value: new Vector2() };
   private readonly hillBumps = { value: Array.from({ length: MAX_BUMPS }, () => new Vector3()) };
+  private readonly hillSteps = { value: Array.from({ length: MAX_STEPS }, () => new Vector3()) };
+  private readonly liftD = { value: new Vector4() };
+  private readonly liftX = { value: new Vector4() };
+  private readonly pits = { value: Array.from({ length: MAX_PITS }, () => new Vector2()) };
+  private readonly shipX = { value: 0 };
   private readonly groundAt = { value: new Vector2() }; // world x and distance under the camera, wrapped
   private readonly groundStyle = { value: new Vector2() };
 
@@ -91,10 +96,15 @@ export class Stage {
       shader.uniforms.uHill = this.hillWindow;
       shader.uniforms.uPhase = this.hillPhase;
       shader.uniforms.uBumps = this.hillBumps;
+      shader.uniforms.uSteps = this.hillSteps;
+      shader.uniforms.uLiftD = this.liftD;
+      shader.uniforms.uLiftX = this.liftX;
+      shader.uniforms.uPits = this.pits;
+      shader.uniforms.uShipX = this.shipX;
       shader.uniforms.uGroundAt = this.groundAt;
       shader.uniforms.uGroundStyle = this.groundStyle;
       shader.vertexShader = shader.vertexShader
-        .replace('#include <common>', `#include <common>\n${TERRAIN_GLSL}\nvarying float vHillShade;\nvarying vec2 vGround;\nuniform vec2 uGroundAt;`)
+        .replace('#include <common>', `#include <common>\n${TERRAIN_GLSL}\nvarying float vHillShade;\nvarying float vPit;\nvarying vec2 vGround;\nuniform vec2 uGroundAt;`)
         .replace(
           '#include <begin_vertex>',
           `#include <begin_vertex>
@@ -102,13 +112,18 @@ export class Stage {
           // Ground-fixed coordinates (they move with the world, not the camera).
           vGround = vec2(groundWorld.x + uGroundAt.x, uGroundAt.y - groundWorld.z);
           float hillD = uDistance - groundWorld.z;
-          transformed.z += hillAt(hillD) - hillAt(uDistance);
+          float hillX = uShipX + groundWorld.x;
+          // Chasms drop away under the ground's own height (the ship never follows them down).
+          vPit = pitAt(hillD);
+          transformed.z += hillAt(hillD) + liftAt(hillD, hillX) - hillAt(uDistance) - liftAt(uDistance, uShipX)
+            - vPit * ${CONFIG.terrain.pitDepth.toFixed(1)};
           // Slopes facing the camera catch the light; the far sides fall into shade.
           vHillShade = clamp((hillAt(hillD + 1.0) - hillAt(hillD - 1.0)) * 0.5, -1.0, 1.0);`,
         );
       shader.fragmentShader = shader.fragmentShader
         .replace('#include <common>', `#include <common>
 varying float vHillShade;
+varying float vPit;
 varying vec2 vGround;
 uniform vec2 uGroundStyle; // grass and dirt patches, fine speckle
 float gHash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
@@ -130,9 +145,11 @@ float gNoise(vec2 p) {
           // Fine grain so the ground doesn't read as flat paint.
           float grain = gNoise(vGround * 1.6) * 0.6 + gNoise(vGround * 4.1) * 0.4;
           diffuseColor.rgb *= 1.0 + (grain - 0.5) * 0.09 * uGroundStyle.y;
-        }`);
+        }
+        // Chasm sides darken to black at the bottom.
+        diffuseColor.rgb *= 1.0 - 0.92 * smoothstep(0.05, 0.9, vPit);`);
     };
-    const ground = new Mesh(new PlaneGeometry(2000, 2000, 1, 800), this.groundMat);
+    const ground = new Mesh(groundGeometry(), this.groundMat);
     this.ground = ground;
     ground.rotation.x = -Math.PI / 2;
     ground.position.z = -600;
@@ -160,9 +177,14 @@ float gNoise(vec2 p) {
     window.visualViewport?.addEventListener('resize', this.resize);
   }
 
-  /** Hills for the current distance (call every frame before rendering). */
-  setTerrain(distance: number): void {
+  /** Heights for the current distance and ship x (call every frame before rendering). */
+  setTerrain(distance: number, shipX = 0): void {
     this.hillDistance.value = distance;
+    this.shipX.value = shipX;
+    for (let i = 0; i < MAX_STEPS; i++) this.hillSteps.value[i].fromArray(terrain.steps, i * 3);
+    this.liftD.value.fromArray(terrain.lift, 0);
+    this.liftX.value.fromArray(terrain.lift, 4);
+    for (let i = 0; i < MAX_PITS; i++) this.pits.value[i].fromArray(terrain.pits, i * 2);
     this.hillWindow.value.set(terrain.start, terrain.end, terrain.amp, 0);
     this.hillPhase.value.set(terrain.p, terrain.q);
     for (let i = 0; i < MAX_BUMPS; i++) this.hillBumps.value[i].fromArray(terrain.bumps, i * 3);
@@ -286,3 +308,21 @@ float gNoise(vec2 p) {
 }
 
 export { DEG };
+
+/**
+ * The ground: 2000 x 2000, finely divided along the run (hills, chasm edges)
+ * and across it near the middle only (the two sides of a split rise and fall
+ * separately), with a few wide columns out to the edges.
+ */
+function groundGeometry(): PlaneGeometry {
+  const xs: number[] = [];
+  for (let x = -36; x <= 36; x += 1.5) xs.push(x);
+  const outer = [48, 80, 150, 300, 600, 1000];
+  const cols = [...outer.map((x) => -x).reverse(), ...xs, ...outer];
+  const g = new PlaneGeometry(1, 2000, cols.length - 1, 800);
+  const pos = g.attributes.position;
+  for (let i = 0; i < pos.count; i++) pos.setX(i, cols[i % cols.length]);
+  pos.needsUpdate = true;
+  g.computeBoundingSphere();
+  return g;
+}

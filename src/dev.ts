@@ -62,7 +62,7 @@ function install(game: Game, title: HTMLElement): void {
     grid.appendChild(b);
   }
 
-  const toggle = (label: string, key: 'invincible' | 'fullBoost') => {
+  const toggle = (label: string, key: 'invincible' | 'fullBoost' | 'autopilot') => {
     const b = document.createElement('button');
     b.type = 'button';
     b.className = 'label dev-toggle';
@@ -77,6 +77,7 @@ function install(game: Game, title: HTMLElement): void {
   };
   toggle('invincible', 'invincible');
   toggle('full boost', 'fullBoost');
+  toggle('autopilot', 'autopilot');
 
   // Replay the last course exactly (same seed).
   const replay = document.createElement('button');

@@ -154,7 +154,7 @@ export class Game {
   seed = 0;
 
   /** Dev-only switches, set from the dev panel (never shown in production builds). */
-  readonly dev = { invincible: false, fullBoost: false, unlockedAll: false };
+  readonly dev = { invincible: false, fullBoost: false, autopilot: false, unlockedAll: false };
 
   private boostMeter = 0; // 0..1
   private boosting = false;
@@ -678,6 +678,13 @@ export class Game {
     this.openInfo('record');
   }
 
+  /** Dev: steer down the safe lane, as the fairness tests do. */
+  private autopilot(): number {
+    const lane = this.world.laneAt(this.world.distance + 3);
+    if (lane === null) return this.input.steering();
+    return Math.max(-1, Math.min(1, (lane - this.world.lateral) * 1.5));
+  }
+
   /** Assist mode works everywhere but ranked. */
   private assistOn(): boolean {
     return this.settings.assist && this.mode !== 'ranked';
@@ -1175,7 +1182,7 @@ export class Game {
 
   private frame = (now: number): void => {
     requestAnimationFrame(this.frame);
-    this.stage.setTerrain(this.world.distance);
+    this.stage.setTerrain(this.world.distance, this.world.lateral);
     // Interior animation: shared clock and distance, fans, sparks.
     const fxDt = Math.max(0, Math.min((now - this.lastTime) / 1000, 0.05));
     fxTime.value += fxDt;
@@ -1280,10 +1287,11 @@ export class Game {
     const speed = this.currentSpeed();
     // Nose up and down with the hills ahead.
     const dist = this.world.distance;
-    const slope = (terrain.heightAt(dist + 6) - terrain.heightAt(dist)) / 6;
+    const sx = this.world.lateral;
+    const slope = (terrain.heightAtX(dist + 6, sx) - terrain.heightAtX(dist, sx)) / 6;
     // Positive pitch dips the nose, so climbing subtracts.
     const pitch = this.boostLevel * CONFIG.boost.shipPitchDeg * DEG - Math.atan(slope) * CONFIG.terrain.shipPitch;
-    this.player.update(dt, this.input.steering(), lateralSpeedAt(speed) * this.ship.steer, pitch);
+    this.player.update(dt, this.dev.autopilot ? this.autopilot() : this.input.steering(), lateralSpeedAt(speed) * this.ship.steer, pitch);
     this.speedLines.update(dt, speed, this.settings.reduceMotion ? 0 : this.boostLevel);
     this.trail.update(dt, this.boostLevel, this.player.engineHalfSpan);
     if (this.boosting) {

@@ -41,6 +41,9 @@ export class InstancedField {
   readonly freq: Float32Array;
   readonly phase: Float32Array;
   readonly colorIdx: Uint8Array;
+  readonly tilt: Uint8Array; // floors, ceilings and planks lean with the slope they're on
+  /** Set before spawn(): make the next instance lean with the slope (see terrain.ts). */
+  nextTilt = false;
   private colorTable: Color[] | null = null;
   private colorAttr: InstancedBufferAttribute | null = null;
   /** Set before spawn(): colour table index for the next instance. */
@@ -81,6 +84,7 @@ export class InstancedField {
     this.freq = new Float32Array(max);
     this.phase = new Float32Array(max);
     this.colorIdx = new Uint8Array(max);
+    this.tilt = new Uint8Array(max);
     this.free = new Int32Array(max);
 
     this.mesh = new InstancedMesh(geometry, material, max);
@@ -166,6 +170,8 @@ export class InstancedField {
     this.scores[i] = scores && solid ? 1 : 0;
     this.colorIdx[i] = this.nextColor;
     this.nextColor = 0;
+    this.tilt[i] = this.nextTilt ? 1 : 0;
+    this.nextTilt = false;
     if (this.nextAmp !== 0) {
       this.moving[i] = this.nextRamp || 1;
       this.amp[i] = this.nextAmp;
@@ -300,11 +306,11 @@ export class InstancedField {
     }
     return n;
   }
-  /** Write instance matrices for every active instance. */
-  sync(distance: number): void {
+  /** Write instance matrices for every active instance (`shipX`: the ship's world x, for split heights). */
+  sync(distance: number, shipX = 0): void {
     const a = this.mesh.instanceMatrix.array as Float32Array;
-    const hills = terrain.amp !== 0;
-    const h0 = hills ? terrain.heightAt(distance) : 0;
+    const hills = terrain.active;
+    const h0 = hills ? terrain.heightAtX(distance, shipX) : 0;
     let n = 0;
     for (let i = 0; i < this.max; i++) {
       if (!this.active[i]) continue;
@@ -323,7 +329,24 @@ export class InstancedField {
       a[o + 9] = 0;
       a[o + 10] = c * sz;
       a[o + 12] = this.x[i];
-      a[o + 13] = hills ? this.y[i] + terrain.heightAt(this.d[i]) - h0 : this.y[i];
+      if (hills) {
+        const wx = shipX + this.x[i];
+        const di = this.d[i];
+        a[o + 13] = this.y[i] + terrain.heightAtX(di, wx) - h0;
+        if (this.tilt[i]) {
+          // Lean about x to the slope here, so neighbouring rows meet without steps.
+          // (Tilted pieces are laid square to the run: no turn about y.)
+          const slope = (terrain.heightAtX(di + 0.6, wx) - terrain.heightAtX(di - 0.6, wx)) / 1.2;
+          const k = 1 / Math.sqrt(1 + slope * slope); // cos, and slope * k is sin
+          const sy = this.sy[i];
+          a[o + 5] = k * sy;
+          a[o + 6] = slope * k * sy;
+          a[o + 9] = -slope * k * sz;
+          a[o + 10] = k * sz;
+        }
+      } else {
+        a[o + 13] = this.y[i];
+      }
       a[o + 14] = distance - this.d[i];
       if (this.colorTable) {
         const col = this.colorTable[this.colorIdx[i]];
