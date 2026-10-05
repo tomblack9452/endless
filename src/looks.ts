@@ -46,6 +46,8 @@ export const LOOKS: readonly LookItem[] = [
   { slot: 'hull', id: 'manta', name: 'manta', unlock: { by: 'mission' } },
   { slot: 'hull', id: 'arrow', name: 'arrow', unlock: credits(1500) },
   { slot: 'hull', id: 'talon', name: 'talon', unlock: credits(4000) },
+  { slot: 'hull', id: 'nova', name: 'nova', unlock: cores(400) },
+  { slot: 'hull', id: 'raptor', name: 'raptor', unlock: { by: 'reward', from: 'pass' } },
 
   { slot: 'paint', id: 'standard', name: 'standard', unlock: free },
   { slot: 'paint', id: 'slate', name: 'slate', unlock: credits(200), colors: ['#66707a', '#454c54'] },
@@ -71,6 +73,10 @@ export const LOOKS: readonly LookItem[] = [
   { slot: 'paint', id: 'aurora', name: 'aurora', unlock: { by: 'reward', from: 'login' }, colors: ['#5fd6a8', '#3a6fb0'] },
   { slot: 'paint', id: 'frost', name: 'frost', unlock: pass, colors: ['#d8eef6', '#8fbcd4'] },
   { slot: 'paint', id: 'ember', name: 'ember', unlock: pass, colors: ['#d4522f', '#5a1c14'] },
+  { slot: 'paint', id: 'mint', name: 'mint', unlock: credits(600), colors: ['#8fd3b6', '#5b9c82'] },
+  { slot: 'paint', id: 'rose', name: 'rose gold', unlock: credits(900), colors: ['#e2a99a', '#a8706a'] },
+  { slot: 'paint', id: 'midnight', name: 'midnight', unlock: cores(100), colors: ['#253a6e', '#121c38'] },
+  { slot: 'paint', id: 'glacier', name: 'glacier', unlock: cores(140), colors: ['#a6dcef', '#4f8fb3'] },
 
   { slot: 'markings', id: 'none', name: 'none', unlock: free },
   { slot: 'markings', id: 'stripe', name: 'stripe', unlock: credits(250) },
@@ -93,6 +99,8 @@ export const LOOKS: readonly LookItem[] = [
   { slot: 'engine', id: 'red', name: 'red', unlock: rank(7), colors: ['#e0503f', '#e0503f'] },
   { slot: 'engine', id: 'plasma', name: 'plasma', unlock: cores(60), colors: ['#ff5fd2', '#7a6bff'] },
   { slot: 'engine', id: 'solar', name: 'solar', unlock: pass, colors: ['#ffd25a', '#ff7a2e'] },
+  { slot: 'engine', id: 'ice', name: 'ice', unlock: credits(350), colors: ['#bfeaff', '#bfeaff'] },
+  { slot: 'engine', id: 'gold', name: 'gold', unlock: cores(80), colors: ['#ffcf4a', '#ffcf4a'] },
 
   { slot: 'decal', id: 'none', name: 'none', unlock: free },
   { slot: 'decal', id: 'rank', name: 'rank insignia', unlock: free },

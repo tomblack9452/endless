@@ -94,6 +94,34 @@ function shipShape(id: ShipId): { light: Vector3[]; shade: Vector3[]; outline: V
         outline: [nose, v(-w * 1.1, 0, l * 0.45), v(w * 1.1, 0, l * 0.45)],
       };
     }
+    case 'nova': {
+      // A four-pointed star: short side blades and a long tail spike.
+      const nose = v(0, 0, -l * 0.7);
+      const lt = v(-w * 1.45, 0, l * 0.12);
+      const rt = v(w * 1.45, 0, l * 0.12);
+      const tail = v(0, 0, l * 0.62);
+      const ridge = v(0, h * 1.25, l * 0.02);
+      return {
+        light: [nose, lt, ridge, lt, tail, ridge],
+        shade: [nose, ridge, rt, rt, ridge, tail],
+        outline: [nose, lt, rt, lt, tail, rt],
+      };
+    }
+    case 'raptor': {
+      // Long swept wings with the tips turned forward, and a split tail.
+      const nose = v(0, 0, -l * 0.78);
+      const lw = v(-w * 1.5, 0, l * 0.18);
+      const rw = v(w * 1.5, 0, l * 0.18);
+      const lt = v(-w * 0.55, 0, l * 0.55);
+      const rt = v(w * 0.55, 0, l * 0.55);
+      const notch = v(0, 0, l * 0.28);
+      const ridge = v(0, h * 1.35, -l * 0.05);
+      return {
+        light: [nose, lw, ridge, lw, lt, ridge, lt, notch, ridge],
+        shade: [nose, ridge, rw, rw, ridge, rt, rt, ridge, notch],
+        outline: [nose, lw, rw, lw, lt, notch, rw, notch, rt],
+      };
+    }
     default: {
       // Dart: the original low pyramid.
       return { light: [NOSE, LEFT, RIDGE], shade: [NOSE, RIDGE, RIGHT, LEFT, RIGHT, RIDGE], outline: [NOSE, LEFT, RIGHT] };
