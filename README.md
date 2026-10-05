@@ -21,8 +21,7 @@ Play it at https://tomblack9452.github.io/endless/.
 - [Modes](#modes)
 - [Ranked](#ranked)
 - [Leagues](#leagues)
-- [Solo: set levels](#solo-set-levels)
-- [Solo: sectors and stars](#solo-sectors-and-stars)
+- [Solo and endless](#solo-and-endless)
 - [Credits, upgrades and looks](#credits-upgrades-and-looks)
 - [Missions](#missions)
 - [Settings](#settings)
@@ -67,10 +66,16 @@ Accept the certificate warning once on the phone.
 | | Phone | Desktop |
 |---|---|---|
 | Steer | Drag anywhere, tap the sides, or tilt | Arrow keys or A / D |
-| Boost | Hold the boost corner (bottom right, or left in settings) | Shift, W, Up or Space |
+| Boost | Hold the boost button, or double-tap and hold anywhere | Shift, W, Up or Space |
 | Pause | `pause`, top right | Esc or P |
-| Start | `ranked` or `solo` on the title screen | Space or Enter (ranked) |
+| Start | `ranked`, `solo` or `endless` on the title screen | Space or Enter (ranked) |
 | Retry | Tap | Space or Enter |
+
+The boost button is a dial whose ring fills with the meter. It sits bottom
+right by default; settings move it to the left or the middle. Double-tap and
+hold: a quick tap, then a press within 250 ms near the same spot, boosts for
+as long as you hold it and still steers. A drag isn't a tap, and taps on
+opposite sides (tap-sides steering) don't count, so it never gets in the way.
 
 Tilt steering is calibrated to however you're holding the phone when a run
 starts, with a small deadzone. On iOS the game asks for motion permission on
@@ -130,17 +135,36 @@ walls. Rocks run from small floor pebbles to huge cliffs towering over the
 walls; bands mix small, medium and big boulders; natural bridges span the
 canyon overhead.
 
-**Split paths:** now and then a low rocky island (with crystals along it)
-divides the canyon in two. Your lane runs down one branch. The other has its
-own clear line, more rocks and bonus pickups: the reward for taking it. Both
-are guaranteed passable, with clear stretches before and after to cross.
+**Ramps and drops:** the canyon floor climbs up ramps onto platforms, then
+drops back down short steep drops or ramps down again (up to about 7 units
+above where it started and 4 below, and level again by the exit). The ship
+and camera follow the floor, and the ship noses up and down with it.
+
+**Chasms:** now and then the floor falls away into a dark chasm and a bridge
+carries the lane across. Fly off the planks and you fall.
+
+- level 1 of the canyon: railed rope bridges
+- from level 2: wide bridges with stretches of planks missing on one side or
+  the other, so you weave across
+- from level 3: bridges that fork, the second branch swinging out over the
+  drop and back, with pickups on it
+
+Some bridges climb or dip as they cross.
+
+**Upper and lower routes:** now and then a low rocky island (with crystals
+along it) divides the canyon in two, and the two sides part ways: the branch
+with the bonus line climbs onto a ledge while the other dips. Your lane runs
+down one branch. The other has its own clear line, more rocks and bonus
+pickups: the reward for taking it. Both are guaranteed passable, with clear
+stretches before and after to cross.
 
 - *Asteroid belt:* the same layout in space. The ground falls away, the sky
   opens to stars and the galaxy, and the rock turns grey.
 
 **Interior.** A chain of rooms joined by corridors. Rooms vary in width,
 height and offset, with S-bends, corridor jogs and splits where the path
-forks:
+forks. Decks are joined by gentle ramps, and floors and ceilings lean with
+them. The rooms:
 
 - cargo bay
 - server hall
@@ -153,8 +177,8 @@ forks:
 - chicane
 - hydroponics
 - laser gates
-- reactor
-- piston hall (sliding blocks)
+- reactor (a glowing gap around the core, steam rising out of it)
+- engine room (blocks sliding across on rails, pistons pumping on the walls)
 - hangar (ends in blast doors that close down to the lane as you arrive)
 - reactor collapse (debris crashes down around you)
 - maintenance gantry and hull breach (big holes in the floor against the
@@ -164,6 +188,15 @@ forks:
   down as you arrive, because their timing is tied to distance, not the
   clock)
 - foundry (molten metal pours, molten curtains, sparks)
+- drop shaft (a railed catwalk over a deep shaft, then the deck drops away
+  steeply to the level below)
+- cargo lift (the floor rises on a lift platform; hooks on chains swing
+  across the bay)
+- flooded section (water over the deck; railed catwalks above it, one on
+  the lane)
+- command deck (rows of consoles under a big viewscreen, on a raised tier)
+- ventilation (giant fans turning in pits beside the walkway)
+- lab (rows of glass tanks of bubbling liquid, benches with holograms)
 
 Walls are dressed with pipes, panels, cables and canisters, and the ship's
 outer hull shows outside the windows. Every room also gets animated detail:
@@ -203,31 +236,41 @@ Events change the look and sound only, never the course.
 
 ## Modes
 
-| | Ranked | Solo | Daily run |
+The title screen leads with **ranked**, a big button showing the weekly
+level and your best on it. **Solo** and **endless** sit under it, then
+record, missions and stats; the hangar is bottom left and settings bottom
+right.
+
+| | Ranked | Solo | Endless |
 |---|---|---|---|
-| Starts at | Level 1 | Any sector you've reached | Level 1 |
-| Course | Same for everyone all week (new every Monday) | Fresh every run, or a set level | Same for everyone that day |
-| Ship | Your upgrades, up to your league's cap | Your upgrades, no cap | Standard |
-| Assist mode | Off | Allowed | Off |
-| Earns | XP, skill, league points, credits | Stars, credits at half rate | XP, skill, credits |
-| Best score | Ranked best | Solo best | Daily best |
+| Course | The weekly level: the same for everyone, new every Monday | An environment, endless; or a set level | Every area in turn, forever |
+| Ship | Your upgrades, up to your league's cap | Your upgrades, no cap | Your upgrades, no cap |
+| Assist mode | Off | Allowed | Allowed |
+| Earns | XP, skill, league points, full credits | Credits at half rate | Credits at half rate |
+| Best score | Your best this week | One per environment (and set level) | Endless best |
+| Missions | Ranked missions | Solo missions | Solo missions |
+
+**The weekly level** is a hand-built-style run about three minutes long with
+a finish line. It's generated from the week: each week starts in a different
+environment (open ground, canyon, ship, ice field, asteroid belt, volcanic
+plain, in turn) and runs through the next two, with set pieces along the way.
+Play it as often as you like; your best counts.
 
 Ranked is played in leagues (below), so everyone in a league flies a ship
-with about the same upgrades. The daily run always flies the standard ship,
-the one pure test of skill. That's the ground work for leaderboards (per
-league, and for the daily run: best of the day, week and all time); every
-ranked and daily run is already kept with its score, date and seed. Looks are
-allowed everywhere, because every hull shares one hitbox.
+with about the same upgrades. Every ranked run is kept with its score, date,
+week and seed, the ground work for leaderboards. Looks are allowed
+everywhere, because every hull shares one hitbox.
 
 ## Ranked
 
 Ranks follow the Halo 3 ladder, and like Halo 3 there are two numbers:
 
-- **XP:** every ranked or daily run earns 1 + 1 per 400 points (nothing for
-  a run under 500). Your first 3 runs each day earn double.
+- **XP:** every ranked run earns 1 + 1 per 400 points (nothing for a run
+  under 500). Your first 3 runs each day earn double.
 - **Skill (1-50):** each run is compared with the par score for your current
-  skill. Par is 1,200 at skill 1 and rises 7.5% a level (about 41,000 at 50).
-  Beat par for +1, beat it by half again for +2, score under half of it for -1.
+  skill on that week's level: 35% of the level's score target at skill 1,
+  rising to 120% at skill 50. Beat par for +1, beat it by half again for +2,
+  score under half of it for -1.
 
 A rank needs enough XP **and** a high enough highest-ever skill, so your rank
 never drops even when your skill does.
@@ -248,30 +291,35 @@ never drops even when your skill does.
 | Brigadier, G2, G3 | 20,000, 24,000, 28,000 | 43, 44, 45 |
 | General, G2, G3, G4 | 33,000, 38,000, 44,000, 50,000 | 47, 48, 49, 50 |
 
-General Grade 4 is roughly 1,200 strong runs, and skill 50 needs consistent
-40,000+ point runs. Every promotion pays credits (50 x the new rank's place
-on the ladder) and shows on the game-over screen.
+General Grade 4 is roughly 1,200 strong runs, and skill 50 means beating
+the weekly target consistently. Every promotion pays credits (50 x the new
+rank's place on the ladder) and gets its own moment: a full-screen card with
+the new insignia, turning rays and what it gave you.
 
 Insignia are drawn in code: chevrons for enlisted ranks (with rockers for
 sergeants), bars and diamonds for officers, stars for generals, and pips for
-grades. The **service record** (tap your rank on the title screen) shows
-your rank, XP bar, skill, par, what the next rank needs, double-XP runs left
-today, your best today, this week and ever, recent runs and the whole ladder.
+grades. The **service record** (tap your rank on the title screen) leads
+with the XP you need for the next rank, big, with a bar and roughly how many
+runs that is. Under it: the skill the next rank needs (ticked once you have
+it), what the next rank gives (credits, a new insignia, any looks), a chart of
+the XP from your last 20 runs, your skill par this week, double-XP runs left
+today, your bests, and the whole ladder in its own scrolling box, opened at
+your rank, with what every rank needs and gives.
 
 ## Leagues
 
 Your personal rank is your lifetime level; **leagues** are brackets by ship
 power. Every upgrade tier you own is one **upgrade point** (30 at most).
 
-| League | Active points allowed | Get in by | Par | Promotion reward |
+| League | Active points allowed | Get in by | Par (of the weekly target) | Promotion reward |
 |---|---|---|---|---|
-| Bronze | 0-4 | starting | 3,000 | - |
-| Silver | 5-9 | finish Bronze 3, own 5 points | 5,000 | 2,000 |
-| Gold | 10-14 | finish Silver 3, own 10 | 7,500 | 5,000 |
-| Platinum | 15-19 | finish Gold 3, own 15 | 11,000 | 10,000 |
-| Diamond | 20-24 | finish Platinum 3, own 20 | 16,000 | 20,000 |
-| Champion | 25-29 | finish Diamond 3, own 25 | 23,000 | 35,000 |
-| Grand Champion | 30 | finish Champion 3, own 30 | 32,000 | 50,000 |
+| Bronze | 0-4 | starting | 55% | - |
+| Silver | 5-9 | finish Bronze 3, own 5 points | 65% | 2,000 |
+| Gold | 10-14 | finish Silver 3, own 10 | 75% | 5,000 |
+| Platinum | 15-19 | finish Gold 3, own 15 | 85% | 10,000 |
+| Diamond | 20-24 | finish Platinum 3, own 20 | 95% | 20,000 |
+| Champion | 25-29 | finish Diamond 3, own 25 | 105% | 35,000 |
+| Grand Champion | 30 | finish Champion 3, own 30 | 115% | 50,000 |
 
 - **Cap:** in a league your switched-on upgrades can't be over its top. If
   they are, ranked opens the hangar to switch some off first.
@@ -284,17 +332,28 @@ power. Every upgrade tier you own is one **upgrade point** (30 at most).
 - **Weekly reward:** credits for the highest division you reach each week
   (1,000 in Bronze 1 up to 15,000 in Grand Champion), paid when the next week
   starts.
-- Personal-rank skill par rises 5% per league, since stronger ships score more.
 - Each league above Bronze unlocks a paint, and the wing decal can show your
   league emblem.
+- The **league screen** (tap your league on the title screen) works like the
+  service record: the LP to your next division, big; the upgrade points the
+  next league needs; what the next division and league give; a chart of the
+  LP won and lost over your last 20 runs; this week's par; and every league.
+  Moving up a division or a league gets the same full-screen moment as a
+  rank.
 
-## Solo: set levels
+## Solo and endless
 
-Solo has two tabs: **levels** and **random run** (the sector map below).
-Set levels are hand-built runs, the same every time, with a finish line.
-Each is a script of named sections: an area, how hard it is, and set pieces
-(slaloms, stone gates, arch runs, pickup trails, forced events, a chosen
-order of ship rooms).
+Solo has two tabs.
+
+**Environments:** pick open ground, canyon, ship interior, ice field,
+asteroid belt or volcanic plain and fly it endlessly. It stays there and
+keeps getting harder, through its three flavours. Each has its own high
+score.
+
+**Levels:** the set levels, hand-built runs that are the same every time,
+with a finish line. Each is a script of named sections: an area, how hard it
+is, and set pieces (slaloms, stone gates, arch runs, pickup trails, forced
+events, a chosen order of ship rooms).
 
 | # | Level | Where |
 |---|---|---|
@@ -313,27 +372,17 @@ shield save counts as a hit) and **beat the score target**. Your best time
 and score are kept. Finishing a level opens the next. New stars are worth 50
 credits each.
 
-## Solo: sectors and stars
-
-A **sector** is one theme's three levels: alien ground (levels 1-3), canyon
-(4-6), interior (7-9), ice field (10-12) and on through the loops. Reaching a
-sector in any mode unlocks it on the solo sector map. Starting a solo run
-part-way gives you half the points you skipped.
-
-Each sector has three stars, earned in any mode when you leave it:
-
-1. clear it
-2. clear it without taking a hit (a shield save counts as a hit)
-3. hit a near-miss chain of x5 in it (x6 in loop 2, rising each loop)
-
-Each new star is worth 25 credits, and star totals unlock looks.
+**Endless** runs through every area in turn, forever: open ground, canyon,
+ship, then the next loop's biomes. It has its own high score.
 
 ## Credits, upgrades and looks
 
-**Credits** come from runs (1 per 100 points in ranked and daily, 1 per 200
-in solo), promotions and stars. Spend them in the **hangar**.
+**Credits** come from runs (1 per 100 points in ranked, 1 per 200 in solo
+and endless), promotions, league rewards and set level stars. Spend them in
+the **hangar**.
 
-**Upgrades** work in solo (no cap) and ranked (up to your league's cap).
+**Upgrades** work everywhere: solo and endless have no cap, ranked is up to
+your league's cap.
 Five tiers each at 500 / 1,500 / 4,000 / 10,000 / 25,000 credits: 41,000 a
 system, 246,000 for the whole ship. Tier 3 needs Gold, tier 4 Platinum and
 tier 5 Diamond. Any bought system can be switched off in the hangar.
@@ -363,31 +412,26 @@ Missions still unlock trail styles and world colour palettes.
 
 ## Missions
 
-Three missions are active at a time, drawn from:
+Missions come in two pools, three active at a time in each.
 
-- reach a level
-- score in one run
-- near misses
-- chain length
-- pickups
-- boost time
-- ship rooms passed
-- daily runs played
-- score without boosting
+- **Ranked** (the weekly level): score in a run, near misses, chain length,
+  beat your league's par, finish the weekly level, finish it without a hit,
+  ranked runs played.
+- **Solo** (environments, set levels and endless): reach a level, score in a
+  run, near misses, chain length, pickups, boost time, ship rooms passed,
+  score without boosting, set level stars.
 
-Each one gets harder every time you complete it.
-
-Level missions only count runs that start from level 1. Every completed
-mission unlocks the next item, in a fixed order:
+Each one gets harder every time you complete it. Every completed mission
+unlocks the next item, in a fixed order:
 
 - **Hulls:** wing, needle, manta.
 - **Trails:** line, dashes, ion. Short engine flames behind the ship.
 - **World colours:** tidewater, clay, lichen, ink, ember. At each loop of the
   themes the world fades to your next unlocked palette.
 
-**Stats** (title screen) show runs, time played, distance, ranked and solo
-bests, furthest level, best chain, near misses, pickups, and where you crash
-most. Every run has a seed, and the same seed always builds the same course.
+**Stats** (title screen) show runs, time played, distance, your best this
+week, your endless best and your best in each solo environment, furthest
+level, best chain, near misses, pickups, and where you crash most. Every run has a seed, and the same seed always builds the same course.
 
 ## Settings
 
@@ -399,7 +443,8 @@ are saved on the device.
   - tilt to steer, and tilt sensitivity
   - touch steering: drag, or tap sides
   - drag sensitivity
-  - which corner the boost button sits in
+  - where the boost button sits: right, left or middle
+  - double-tap and hold to boost, on or off
   - vibration
 - **Display:**
   - reduce motion: no shake, roll or speed lines
@@ -447,8 +492,17 @@ the transitions between rooms.
 world space through a material patch. Props are low-poly meshes with shading
 baked into vertex colours, so there's no lighting cost. Colours come from
 one live palette. Time of day, theme blends, biome tints, events and palette
-cross-fades all write into it each frame. Rolling hills are one height
-function, used by both the instance matrices and a ground vertex shader.
+cross-fades all write into it each frame.
+
+**Heights** (`terrain.ts`). Hills, ramps, platforms and drops are one height
+function of distance, plus a sideways part for a split's upper and lower
+routes and a list of chasms. The instance matrices and a ground vertex shader
+both use it, drawing everything relative to the ship's own height, so the
+ship stays put while the floor ahead climbs and drops. Floors, ceilings and
+bridge planks lean with the slope so neighbouring rows meet. Collision never
+sees heights: everything at one spot rises together, so ramps can't make a
+course unfair. Chasms are the one place the floor matters: off a bridge, the
+fall check finds nothing under the ship.
 
 **Performance.**
 - All the obstacles draw in a few dozen calls.
@@ -471,7 +525,7 @@ manifest, so the game installs to a home screen and works offline.
 | `src/field.ts` | Instanced pool: collision, sine and ramp motion |
 | `src/props.ts` | Low-poly trees, rocks, crystals, shuttles, pipes, gems |
 | `src/biomes.ts` | Biome looks and names |
-| `src/terrain.ts` | Rolling hills (JS and GLSL) |
+| `src/terrain.ts` | Hills, ramps, split heights and chasms (JS and GLSL) |
 | `src/events.ts` | Meteor shower, sandstorm, red alert |
 | `src/player.ts` | Ship shapes, shield, banking, crash and fall |
 | `src/trail.ts` | Ship trails |
@@ -488,8 +542,8 @@ manifest, so the game installs to a home screen and works offline.
 | `src/upgrades.ts` | Ship upgrade systems, points and the standard ship |
 | `src/leagues.ts` | Leagues, divisions, league points, weekly rewards, emblems |
 | `src/looks.ts` | Ship looks catalogue and ownership |
-| `src/progress.ts` | Stats, sectors, stars, set level results, daily and weekly seeds |
-| `src/courses.ts` | The set levels |
+| `src/progress.ts` | Stats, set level results, weekly, endless and environment bests |
+| `src/courses.ts` | The set levels, the solo environments and the weekly level |
 | `src/fx.ts` | Animated interior detail: liquids, steam, blinkers, holograms, sparks |
 | `src/settings.ts` | Settings table and storage |
 | `src/hints.ts`, `src/haptics.ts` | First-run hints, vibration |
@@ -499,7 +553,8 @@ manifest, so the game installs to a home screen and works offline.
 | `src/dev.ts` | Dev-only panel |
 | `tests/fairness.test.ts` | Headless survivability test |
 | `tests/ranks.test.ts` | Rank ladder, XP, skill and credit maths |
-| `tests/courses.test.ts` | Every set level can be flown to the finish |
+| `tests/courses.test.ts` | Set levels and twelve weeks of weekly levels fly to the finish; every environment is survivable |
+| `tests/input.test.ts` | Double-tap and hold to boost |
 | `tests/leagues.test.ts` | League brackets, LP, divisions, promotion, weekly rewards, prices |
 | `public/` | Icons, manifest, service worker |
 
@@ -509,11 +564,12 @@ Nearly every number lives in `src/config.ts`, grouped by system:
 
 - `speed` and `score`: pace, level length, near-miss rules
 - `field`: spawn depth and pool sizes
-- `themes`: lane rules, open ground, canyon, every interior room
+- `themes`: lane rules, open ground, canyon (ramps, chasms, bridges,
+  upper and lower routes), every interior room and the ship's ramps
 - `boost` and `powers`: pickups and power-ups
 - `events`, `biomes`, `terrain`: weather, biome looks, hills
 - `assist`: assist mode
-- `sectors`: credits per star (rank, upgrade and look tables live in
+- `courses`: credits per set level star (rank, upgrade and look tables live in
   `ranks.ts`, `upgrades.ts` and `looks.ts`)
 - `audio`: every gain, the music and the engine
 - `render`: pixel ratio and adaptive-resolution thresholds
@@ -526,11 +582,13 @@ A `dev` link (top left, on the live site too while the game's in testing) opens 
 
 - **Start just before** any level from 1 to 27
 - **Invincible** and **full boost** toggles
+- **Autopilot:** flies the safe lane for you, as the fairness tests do, to
+  watch a level play
 - **Replay seed:** replays the last run's course
 - **Ship room:** forces every interior room to one type
-- **Unlock all:** General Grade 4, Grand Champion, every sector to loop 9
-  with all stars, every look, every upgrade maxed and 100,000 credits (saved
-  in that browser), and every set level open until you reload
+- **Unlock all:** General Grade 4, Grand Champion, every look, every
+  upgrade maxed and 100,000 credits (saved in that browser), and every set
+  level open until you reload
 - **Reset all progress:** clears ranks, credits, unlocks and stats (keeps
   settings)
 - an FPS readout with the pixel ratio and draw calls
@@ -545,12 +603,20 @@ seeds, an autopilot follows the recorded safe lane from the start of every
 theme across the first two and a half loops. That covers every biome. It
 steers at the normal limit with no boost, and any crash or fall fails the
 test. A guard test checks that a ship that never steers does crash, so the
-harness can't pass by accident. A second pilot takes the other branch of
-every canyon split, looking well ahead as a player would, to prove both
-branches are survivable.
+harness can't pass by accident. A second pilot takes the other way at every
+fork, both canyon splits (the upper or lower branch) and forked bridges over
+chasms, looking well ahead as a player would; it also checks that splits and
+chasms really happen. Every ship room is flown on its own, back to back, for
+four seeds.
 
-`tests/courses.test.ts` flies every set level from start to finish at each
-section's speed, and checks each runs 100-260 seconds.
+`tests/courses.test.ts` flies every set level and twelve weeks of weekly
+levels from start to finish at each section's speed, checks each runs
+100-260 seconds and that the weeks start in a different environment each
+time, and flies every solo environment for 40 seconds on three seeds.
+
+`tests/input.test.ts` checks double-tap and hold: a quick double-tap boosts,
+a slow one, a long press, a drag or taps on opposite sides don't, and the
+ship still steers while boosting.
 
 `tests/ranks.test.ts` checks the rank ladder, that ranks need both XP and
 skill, the XP and skill rules, the length of the grind and credit rates.
