@@ -33,6 +33,6 @@ void document.fonts.ready.then(() => {
   game.start();
   // Exposed for debugging from the console during development only.
   if (import.meta.env.DEV) (window as unknown as { game: Game }).game = game;
-  // Dev panel (level skip, unlock all etc), on the live site too while the game is in testing.
-  void import('./dev').then((m) => m.installDevPanel(game));
+  // Dev panel (level skip, unlock all etc), on the dev server only (npm run dev).
+  if (import.meta.env.DEV) void import('./dev').then((m) => m.installDevPanel(game));
 });
