@@ -233,6 +233,13 @@ export class InstancedField {
     while (this.top > 0 && !this.active[this.top - 1]) this.top--;
   }
 
+  /** Remove every instance `drop(i)` picks (a revive clearing the way). */
+  releaseWhere(drop: (i: number) => boolean): void {
+    for (let i = 0; i < this.top; i++) {
+      if (this.active[i] && drop(i)) this.release(i);
+    }
+  }
+
   /** Remove everything with d below `limit`. */
   clearBefore(limit: number): void {
     for (let i = 0; i < this.top; i++) {

@@ -617,6 +617,30 @@ export class World {
     return true;
   }
 
+  /**
+   * A revive: put the ship back on the safe lane and clear anything solid
+   * near the lane from just behind to `ahead` units in front, so the run can
+   * pick up again fairly. Walls stay.
+   */
+  revive(ahead: number): void {
+    const lane = this.laneAt(this.distance) ?? this.shipX;
+    const dx = lane - this.shipX;
+    this.shipX = lane;
+    for (const f of this.fields) f.advance(dx, -Infinity);
+    this.lastDx = 0;
+    const from = this.distance - 4;
+    const to = this.distance + ahead;
+    const clear = 2;
+    for (const f of this.solids) {
+      f.releaseWhere((i) => {
+        const d = f.d[i];
+        if (d < from || d > to || !f.solid[i] || !f.scores[i]) return false; // obstacles only, never walls
+        const x = (this.laneAt(d) ?? lane) - this.shipX; // the lane there, ship-relative
+        return Math.abs(f.x[i] - x) - f.hx[i] < clear || Math.abs(f.arrivalX(i) - x) - f.hx[i] < clear;
+      });
+    }
+  }
+
   /** Remember a row's inner wall faces (world x) for clampToWalls. */
   private recordWalls(d: number, left: number, right: number): void {
     const slot = (((Math.round(d / STEP) % FLOOR_ROWS) + FLOOR_ROWS) % FLOOR_ROWS);
@@ -1838,7 +1862,7 @@ export class World {
     this.laneLogD = d;
   }
 
-  /** Dev: the safe lane at distance `d` (world x), or null if it isn't known. */
+  /** The safe lane at distance `d` (world x), or null if it isn't known (autopilot, revive). */
   laneAt(d: number): number | null {
     const slot = (((Math.round(d / STEP) % FLOOR_ROWS) + FLOOR_ROWS) % FLOOR_ROWS);
     return Math.abs(this.laneRingD[slot] - d) <= STEP ? this.laneRing[slot] : null;

@@ -8,8 +8,8 @@ import type { Reward } from './reward';
 // are paid as tiers are reached; unlocking premium pays every premium tier
 // already reached.
 
-/** Monday 5 Jan 2026 (UTC): season 1 starts here. */
-const EPOCH = Date.UTC(2026, 0, 5);
+/** Monday 14 Sep 2026 (UTC): season 1 starts here. */
+const EPOCH = Date.UTC(2026, 8, 14);
 const WEEK = 7 * 86_400_000;
 
 export function seasonAt(ms: number): { season: number; start: number; end: number } {

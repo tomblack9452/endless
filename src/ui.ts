@@ -1,7 +1,7 @@
 import { CONFIG } from './config';
 import { label, type SettingKey, type Settings } from './settings';
 
-export type ScreenName = 'title' | 'paused' | 'over' | 'settings' | 'stats' | 'missions' | 'hangar' | 'record' | 'solo' | 'league';
+export type ScreenName = 'title' | 'paused' | 'over' | 'settings' | 'stats' | 'missions' | 'hangar' | 'record' | 'solo' | 'league' | 'shop' | 'pass' | 'daily';
 
 /** Everything the league screen shows. */
 /** The service record and league screens share one layout. */
@@ -130,6 +130,9 @@ export class UI {
     record: $('screen-record'),
     solo: $('screen-sectors'),
     league: $('screen-league'),
+    shop: $('screen-shop'),
+    pass: $('screen-pass'),
+    daily: $('screen-daily'),
   };
   readonly titleLeague = $('title-league');
   private readonly hudMode = $('hud-mode');

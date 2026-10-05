@@ -1922,3 +1922,377 @@ body {
 .reduce-motion .promo.show .promo-lines {
   animation: none;
 }
+
+/* --- Economy ----------------------------------------------------------------- */
+
+/* Wallet bar, top right of the title: credits, cores, ranked tickets. */
+.wallet-bar {
+  position: absolute;
+  top: calc(var(--safe-top) + 12px);
+  right: calc(var(--safe-right) + 16px);
+  z-index: 2;
+  display: flex;
+  gap: 6px;
+}
+
+.coin {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: calc(30px * var(--ui-scale));
+  padding: 0 10px 0 7px;
+  font: inherit;
+  font-size: calc(12px * var(--ui-scale));
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  color: inherit;
+  background: color-mix(in srgb, var(--sky, #f1ede4) 70%, transparent);
+  border: 1px solid color-mix(in srgb, currentColor 30%, transparent);
+  border-radius: 999px;
+  pointer-events: auto;
+  cursor: pointer;
+}
+
+.coin svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linejoin: round;
+}
+
+.coin.premium svg {
+  stroke: #8a63d2;
+}
+
+.coin-wait {
+  font-weight: 400;
+  opacity: 0.6;
+}
+
+.coin-wait:empty {
+  display: none;
+}
+
+.coin.bump {
+  animation: coin-bump 420ms ease-out;
+}
+
+@keyframes coin-bump {
+  30% {
+    transform: scale(1.18);
+  }
+  100% {
+    transform: none;
+  }
+}
+
+/* A dot on a title chip: something to claim. */
+.chip .news {
+  display: none;
+  width: 6px;
+  height: 6px;
+  margin-left: 5px;
+  vertical-align: 2px;
+  border-radius: 50%;
+  background: #e0503f;
+}
+
+.chip .news.on {
+  display: inline-block;
+}
+
+.group-note {
+  float: right;
+  text-transform: none;
+  letter-spacing: 0.06em;
+  font-weight: 400;
+}
+
+/* Shop */
+.shop-wallet {
+  margin: 4px 0 0;
+  text-align: center;
+}
+
+.shop-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: calc(58px * var(--ui-scale));
+  padding: 8px 0;
+  border-bottom: 1px solid color-mix(in srgb, currentColor 25%, transparent);
+  cursor: pointer;
+}
+
+.shop-row.trying .shop-text .label:first-child::after {
+  content: ' · trying on';
+  opacity: 0.6;
+}
+
+.swatch {
+  flex: none;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: 1px solid color-mix(in srgb, currentColor 30%, transparent);
+}
+
+.swatch.empty {
+  background: repeating-linear-gradient(45deg, color-mix(in srgb, currentColor 18%, transparent) 0 3px, transparent 3px 7px);
+}
+
+.shop-text {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.shop-slot {
+  font-size: calc(11px * var(--ui-scale));
+}
+
+.pill.shop-buy {
+  flex: none;
+  min-width: 0;
+  min-height: calc(38px * var(--ui-scale));
+  padding: 0 16px;
+  font-size: calc(12px * var(--ui-scale));
+  letter-spacing: 0.08em;
+}
+
+.pill:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.shop-buy .was {
+  opacity: 0.55;
+}
+
+/* Season pass */
+.pill.pass-premium {
+  width: 100%;
+  margin-top: 14px;
+}
+
+.pass-head,
+.pass-tier {
+  display: grid;
+  grid-template-columns: 40px 1fr 1fr;
+  gap: 8px;
+  align-items: center;
+}
+
+.pass-head {
+  margin: 20px 0 4px;
+  font-size: calc(11px * var(--ui-scale));
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+
+.pass-tier {
+  min-height: calc(46px * var(--ui-scale));
+  border-bottom: 1px solid color-mix(in srgb, currentColor 18%, transparent);
+  opacity: 0.6;
+}
+
+.pass-tier.reached {
+  opacity: 1;
+}
+
+.pass-tier.current {
+  opacity: 1;
+  border-bottom-color: currentColor;
+}
+
+.pass-num {
+  font-size: calc(15px * var(--ui-scale));
+  font-weight: 500;
+  text-align: center;
+}
+
+.pass-tier.reached .pass-num::after {
+  content: ' ✓';
+  font-size: 0.75em;
+}
+
+.pass-cell {
+  font-size: calc(12px * var(--ui-scale));
+  line-height: 1.35;
+}
+
+.pass-cell.premium {
+  color: #8a63d2;
+}
+
+.pass-cell.premium.locked {
+  opacity: 0.55;
+}
+
+/* Daily: a week of login rewards, then quests. */
+.calendar {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.cal-day {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 6px;
+  text-align: center;
+  border: 1px solid color-mix(in srgb, currentColor 25%, transparent);
+  border-radius: 12px;
+}
+
+.cal-day:last-child {
+  grid-column: span 2;
+}
+
+.cal-day.claimed {
+  opacity: 0.45;
+}
+
+.cal-day.today {
+  border-color: currentColor;
+  background: color-mix(in srgb, currentColor 8%, transparent);
+}
+
+.cal-num {
+  font-size: calc(10px * var(--ui-scale));
+  letter-spacing: 0.16em;
+}
+
+.cal-reward {
+  font-size: calc(11px * var(--ui-scale));
+  line-height: 1.3;
+}
+
+.pill.daily-claim {
+  width: 100%;
+  margin-top: 12px;
+}
+
+.quest {
+  padding: 12px 0 10px;
+  border-bottom: 1px solid color-mix(in srgb, currentColor 25%, transparent);
+}
+
+.quest-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.quest .xp-track {
+  margin: 8px 0 4px;
+}
+
+.quest.done {
+  opacity: 0.55;
+}
+
+.quest-reward {
+  font-size: calc(11px * var(--ui-scale));
+}
+
+.over-rewards {
+  margin-top: 12px;
+  line-height: 1.8;
+}
+
+.over-rewards:empty {
+  display: none;
+}
+
+/* The offer dialog (revive, a ticket for cores): the promotion card's look. */
+.offer {
+  cursor: default;
+}
+
+.offer-ring {
+  --left: 1;
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 84px;
+  height: 84px;
+  margin: 18px 0 8px;
+  border-radius: 50%;
+  background: conic-gradient(var(--text) calc(var(--left) * 360deg), color-mix(in srgb, var(--text) 14%, transparent) 0);
+  font-size: calc(28px * var(--ui-scale));
+}
+
+.offer-ring::before {
+  content: '';
+  position: absolute;
+  inset: 5px;
+  border-radius: 50%;
+  background: var(--sky, #f1ede4);
+}
+
+.offer-ring span {
+  position: relative;
+}
+
+.offer-ring[hidden] {
+  display: none;
+}
+
+.pill.offer-yes {
+  margin-top: 22px;
+  min-width: 220px;
+}
+
+.offer-no {
+  margin-top: 16px;
+  padding: 8px 16px;
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+
+/* 3-2-1 before a revived (or resumed) run carries on. */
+.countdown {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  place-items: center;
+  font-size: calc(96px * var(--ui-scale));
+  font-weight: 300;
+  pointer-events: none;
+  text-shadow:
+    0 0 2px var(--sky, transparent),
+    0 0 18px var(--sky, transparent);
+}
+
+.countdown:empty {
+  display: none;
+}
+
+.countdown.tick {
+  animation: count-tick 1s ease-out;
+}
+
+@keyframes count-tick {
+  0% {
+    transform: scale(1.5);
+  }
+  25% {
+    transform: none;
+  }
+}
+
+.reduce-motion .countdown.tick,
+.reduce-motion .coin.bump {
+  animation: none;
+}
