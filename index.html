@@ -60,6 +60,21 @@
       </div>
 
       <div id="screen-title" class="layer screen">
+        <div class="wallet-bar">
+          <button class="coin" type="button" data-title="shop" aria-label="credits">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" /><path d="M14.8 9.2a4 4 0 1 0 0 5.6" /></svg>
+            <span id="bar-credits">0</span>
+          </button>
+          <button class="coin premium" type="button" data-title="shop" aria-label="cores">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l7.5 4.5v9L12 21l-7.5-4.5v-9z" /><path d="M12 8l3.5 2v4L12 16l-3.5-2v-4z" /></svg>
+            <span id="bar-cores">0</span>
+          </button>
+          <button class="coin" type="button" data-title="shop" aria-label="ranked tickets">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 8V6.5h17V8a2.5 2.5 0 0 0 0 5v4.5h-17V13a2.5 2.5 0 0 0 0-5z" /><path d="M14 7v2M14 11.5v2M14 16v1" /></svg>
+            <span id="bar-tickets">5</span>
+            <span id="bar-ticket-wait" class="coin-wait"></span>
+          </button>
+        </div>
         <div class="title-top">
         <div class="title-mark">
           <div class="title-word">endless</div>
@@ -93,6 +108,9 @@
             <span class="chip link" data-title="record">record</span>
             <span class="chip link" data-title="missions">missions</span>
             <span class="chip link" data-title="stats">stats</span>
+            <span class="chip link" data-title="daily">daily<i class="news"></i></span>
+            <span class="chip link" data-title="shop">shop</span>
+            <span class="chip link" data-title="pass">pass</span>
           </div>
           <div id="title-best" class="label dim title-best"></div>
           <div class="title-corners">
@@ -276,6 +294,57 @@
         </div>
       </div>
 
+      <div id="screen-shop" class="layer screen panel">
+        <div class="panel-head">
+          <button class="label link back" type="button" data-action="back">back</button>
+          <div class="panel-title">shop</div>
+        </div>
+        <div class="settings">
+          <div class="shop-wallet label dim" id="shop-wallet"></div>
+          <div class="settings-group">today's looks <span id="shop-reset" class="group-note"></span></div>
+          <div id="shop-offers"></div>
+          <div class="label dim setting-note">tap a look to try it on. new looks every day.</div>
+          <div class="settings-group">ranked tickets</div>
+          <div id="shop-tickets"></div>
+          <div class="settings-group">cores</div>
+          <div id="shop-cores"></div>
+        </div>
+      </div>
+
+      <div id="screen-pass" class="layer screen panel">
+        <div class="panel-head">
+          <button class="label link back" type="button" data-action="back">back</button>
+          <div class="panel-title">season pass</div>
+        </div>
+        <div class="settings prog">
+          <div class="prog-goal">
+            <div id="pass-big" class="prog-big"></div>
+            <div id="pass-goal" class="label prog-goal-label"></div>
+            <div class="xp-track"><div id="pass-fill" class="xp-fill"></div></div>
+            <div id="pass-detail" class="label dim prog-detail"></div>
+          </div>
+          <button id="pass-premium" class="pill primary pass-premium" type="button"></button>
+          <div class="pass-head label dim"><span>tier</span><span>free</span><span>premium</span></div>
+          <div id="pass-tiers" class="pass-tiers"></div>
+          <div class="label dim setting-note">every run earns xp (more for higher scores), and so does each daily quest. rewards are paid as you reach each tier.</div>
+        </div>
+      </div>
+
+      <div id="screen-daily" class="layer screen panel">
+        <div class="panel-head">
+          <button class="label link back" type="button" data-action="back">back</button>
+          <div class="panel-title">daily</div>
+        </div>
+        <div class="settings">
+          <div class="settings-group">login rewards</div>
+          <div id="daily-calendar" class="calendar"></div>
+          <button id="daily-claim" class="pill primary daily-claim" type="button"></button>
+          <div class="settings-group">today's quests <span id="daily-reset" class="group-note"></span></div>
+          <div id="daily-quests"></div>
+          <div id="daily-bonus" class="label dim setting-note"></div>
+        </div>
+      </div>
+
       <div id="screen-over" class="layer screen panel">
         <div class="screen-center">
           <div id="over-heading" class="screen-heading">crashed</div>
@@ -286,6 +355,7 @@
           <div id="over-extra" class="label dim"></div>
           <div id="over-rank" class="over-rank"></div>
           <div id="over-missions" class="label dim over-missions"></div>
+          <div id="over-rewards" class="label over-rewards"></div>
           <div class="menu">
             <div class="pill primary">tap to retry</div>
             <button class="pill" type="button" data-action="menu">main menu</button>
@@ -304,6 +374,19 @@
         <div class="label dim promo-tap">tap to continue</div>
       </div>
     </div>
+
+    <div id="offer" class="promo offer" role="dialog" aria-live="assertive">
+      <div class="promo-card offer-card">
+        <div id="offer-kicker" class="label promo-kicker"></div>
+        <div id="offer-ring" class="offer-ring"><span id="offer-count"></span></div>
+        <div id="offer-name" class="promo-name"></div>
+        <div id="offer-lines" class="promo-lines"></div>
+        <button id="offer-yes" class="pill primary offer-yes" type="button"></button>
+        <button id="offer-no" class="label link offer-no" type="button"></button>
+      </div>
+    </div>
+
+    <div id="countdown" class="countdown" aria-live="assertive"></div>
 
     <script type="module" src="/src/main.ts"></script>
   </body>

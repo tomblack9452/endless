@@ -148,6 +148,9 @@ function install(game: Game, title: HTMLElement): void {
     b.addEventListener('click', run);
     panel.appendChild(b);
   };
+  // Stand-ins for purchases until the store is in.
+  action('add 500 cores', () => game.devAddCores(500));
+  action('add 5 tickets', () => game.devAddTickets(5));
   action('unlock all', () => {
     game.devUnlockAll();
     show(false);

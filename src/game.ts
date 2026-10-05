@@ -21,6 +21,13 @@ import { Missions, type RunMetrics } from './missions';
 import { Progress } from './progress';
 import { creditsFor, insignia, par, promotionBonus, Ranked, rankName, RANKS, type RunMode, xpToRank } from './ranks';
 import { Wallet } from './wallet';
+import { Daily, questText } from './economy/daily';
+import { Pass, premiumReward, freeReward, runXp, seasonAt } from './economy/pass';
+import { type Reward, rewardLook, rewardParts, rewardText } from './economy/reward';
+import { shopFor } from './economy/shop';
+import { Tickets } from './economy/tickets';
+import { dayKey, formatWait, untilTomorrow } from './economy/time';
+import { EconomyView } from './economy/view';
 import { fxDistance, fxTime } from './fx';
 import { type Course, COURSES, courseLength, type Environment, ENVIRONMENTS, weeklyCourse } from './courses';
 import { DIVISIONS, divisionReward, emblem, LEAGUES, leagueName, leaguePar, Leagues, LP_PER_DIVISION, weekKey } from './leagues';
@@ -36,9 +43,11 @@ import { biomeForLevel, type PowerKind, themeForLevel, themeName, World } from '
 import { tintBiome } from './biomes';
 import { terrain } from './terrain';
 
-type State = 'title' | 'playing' | 'paused' | 'crashed' | 'finished';
+type State = 'title' | 'playing' | 'paused' | 'countdown' | 'crashed' | 'finished';
 
 const DEG = Math.PI / 180;
+
+type InfoScreen = 'stats' | 'missions' | 'hangar' | 'record' | 'solo' | 'league' | 'shop' | 'pass' | 'daily';
 
 /** "5 oct": the Monday this week's ranked course started. */
 /** "1:23.4" */
@@ -61,6 +70,13 @@ function musicFor(level: number): MusicId {
 }
 
 const POWER_NOTICE = ['shield. takes one hit', 'magnet. pulls in boost', 'slow-mo'];
+
+/** A wrapped present, for the daily reward. */
+const GIFT_ICON =
+  '<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round"><rect x="12" y="26" width="40" height="28" rx="3"/><rect x="8" y="18" width="48" height="10" rx="2"/><path d="M32 18v36"/><path d="M32 18c-4-8-14-10-14-4s10 4 14 4c4 0 14 2 14-4s-10-4-14 4z"/></svg>';
+/** A season pass badge. */
+const PASS_ICON =
+  '<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round"><path d="M32 6l22 10v16c0 13-9 22-22 26C19 54 10 45 10 32V16z"/><path d="M32 20l4 8 9 1-7 6 2 9-8-5-8 5 2-9-7-6 9-1z"/></svg>';
 
 export class Game {
   private readonly basePalette = new LivePalette(); // the level's palette
@@ -109,6 +125,16 @@ export class Game {
   private scoreBase = 0; // solo starts: score begins at half the skipped points
   private readonly ranked = new Ranked();
   private readonly wallet = new Wallet();
+  private readonly tickets = new Tickets();
+  private readonly daily = new Daily();
+  private readonly pass = new Pass();
+  private readonly econ = new EconomyView();
+  private economyTimer = 0;
+  // Revive (not in ranked): once a run. While the offer is up the run isn't recorded yet.
+  private revived = false;
+  private revivePending = false;
+  private reviveAsked = false;
+  private countdownT = 0; // seconds of 3-2-1 left
   // A set level (courses.ts) being played, if any.
   private course: Course | null = null;
   private sectionIdx = -1;
@@ -131,7 +157,7 @@ export class Game {
   private readonly rankedMissions = new Missions('ranked', 'endless.missions.ranked');
   private readonly soloMissions = new Missions('solo', 'endless.missions');
   /** Which info screen is open from the title (stats, missions, hangar), if any. */
-  private infoOpen: 'stats' | 'missions' | 'hangar' | 'record' | 'solo' | 'league' | null = null;
+  private infoOpen: InfoScreen | null = null;
   // Run metrics for missions.
   private boostSeconds = 0;
   private boosted = false;
@@ -221,7 +247,20 @@ export class Game {
 
     this.ui.bindCelebration();
     this.ui.bindTitleLinks(this.onTitleLink);
-    void Promise.all([this.progress.load(), this.ranked.load(), this.wallet.load(), this.leagues.load(), this.upgrades.load()]).then(() => {
+    const now = Date.now();
+    // Looks load once; a login reward can give one, so it waits for them.
+    const looksReady = Promise.all([this.cosmetics.load(), this.looks.load()]);
+    void Promise.all([
+      this.progress.load(),
+      this.ranked.load(),
+      this.wallet.load(),
+      this.leagues.load(),
+      this.upgrades.load(),
+      this.tickets.load(now),
+      this.daily.load(dayKey(now)),
+      this.pass.load(now),
+      looksReady,
+    ]).then(() => {
       // A new week: pay last week's league reward.
       const weekly = this.leagues.rollWeek();
       if (weekly > 0) {
@@ -229,7 +268,11 @@ export class Game {
         this.ui.showNotice(`weekly league reward +${formatScore(weekly)} credits`);
       }
       this.refreshTitle();
+      this.claimLogin();
     });
+    this.econ.bindShop(this.onShopOffer, this.onShopBuy, this.onShopTicket, this.onShopCores);
+    this.econ.bindPass(this.onPassPremium);
+    this.econ.bindDaily(() => this.claimLogin());
     this.ui.titleLeague.addEventListener('pointerdown', (e) => e.stopPropagation());
     this.ui.titleLeague.addEventListener('click', () => this.openLeague());
     this.ui.bindLooks(this.onLookRow, this.onLookBuy);
@@ -245,7 +288,7 @@ export class Game {
     });
     void this.rankedMissions.load();
     void this.soloMissions.load();
-    void Promise.all([this.cosmetics.load(), this.looks.load()]).then(() => {
+    void looksReady.then(() => {
       // Saves from before the hangar had looks: carry the mission hull across.
       if (this.looks.equipped.hull === 'dart' && this.cosmetics.ship !== 'dart') this.looks.equip('hull', this.cosmetics.ship);
       this.applyCosmetics();
@@ -274,6 +317,11 @@ export class Game {
    */
   private beginRun(startScore = 0, seed = newSeed(), mode: RunMode = 'endless', course: Course | null = null, env: Environment | null = null): void {
     this.ui.clearCelebration();
+    this.econ.dismissOffer();
+    this.econ.setCountdown(0);
+    this.econ.setOverRewards([]);
+    this.revived = this.revivePending = this.reviveAsked = false;
+    this.preview = null;
     this.seed = seed;
     this.mode = mode;
     this.course = course;
@@ -374,6 +422,14 @@ export class Game {
     this.sound.setWind(0);
     this.player.setShield(false);
     this.ui.setPower('');
+    this.revivePending = this.canRevive();
+    this.reviveAsked = false;
+    if (!this.revivePending) this.settleCrash();
+  }
+
+  /** Record a crashed run and fill the game-over screen (after any revive offer is turned down). */
+  private settleCrash(): void {
+    this.revivePending = false;
     const { best, isNew } = this.recordBest(false);
     this.ui.setGameOver(this.score, best, isNew, this.nearMissCount, this.bestChain, this.seed);
     const where = themeForLevel(this.level) === 'interior' ? this.world.roomName || 'corridor' : this.areaName(this.level);
@@ -438,8 +494,345 @@ export class Game {
     }
     this.wallet.add(credits);
     lines.push(`+${formatScore(credits)} credits`);
+    this.econ.setOverRewards(this.runRewards());
     this.refreshTitle();
     return lines.join(' · ');
+  }
+
+  /** Daily quests and season pass XP for the run just recorded; lines for the end screen. */
+  private runRewards(): string[] {
+    const now = Date.now();
+    const score = this.assisted ? 0 : this.score;
+    const out: string[] = [];
+    const q = this.daily.recordRun(dayKey(now), {
+      ranked: this.mode === 'ranked',
+      score,
+      level: this.level,
+      nearMisses: this.nearMissCount,
+      pickups: this.pickupCount,
+      boostSeconds: this.boostSeconds,
+      rooms: this.roomsEntered,
+    });
+    let xp = runXp(score);
+    for (const done of q.done) {
+      this.wallet.add(done.credits);
+      xp += CONFIG.economy.quests.passXp;
+      out.push(`quest done: ${questText(done)} · +${formatScore(done.credits)} credits`);
+    }
+    if (q.allDone > 0) {
+      this.wallet.addCores(q.allDone);
+      out.push(`all daily quests done · +${q.allDone} cores`);
+    }
+    const before = this.pass.tier;
+    const paid = this.pass.addXp(now, xp);
+    for (const r of paid) this.grant(r);
+    const tier = this.pass.tier;
+    if (tier > before) out.push(`season pass: tier ${tier} reached`);
+    else if (xp > 0) out.push(`season pass +${xp} xp · tier ${tier}`);
+    if (paid.length > 0) out.push(paid.map(rewardText).join(' · '));
+    return out;
+  }
+
+  /** Pay a reward into the wallet, tickets or looks; returns it in words. */
+  private grant(r: Reward): string[] {
+    if (r.credits) {
+      this.wallet.add(r.credits);
+      this.econ.bump('credits');
+    }
+    if (r.cores) {
+      this.wallet.addCores(r.cores);
+      this.econ.bump('cores');
+    }
+    if (r.tickets) {
+      this.tickets.add(r.tickets);
+      this.econ.bump('tickets');
+    }
+    const look = rewardLook(r);
+    if (look) this.looks.give(`${look.slot}:${look.id}`);
+    return rewardParts(r);
+  }
+
+  // --- economy screens -------------------------------------------------------
+
+  /** Today's login reward, if it's not claimed yet: paid and shown. */
+  private claimLogin(): void {
+    const day = dayKey(Date.now());
+    const step = this.daily.loginDue(day);
+    if (step < 0) return;
+    const r = this.daily.claimLogin(day);
+    if (!r) return;
+    const lines = this.grant(r);
+    this.ui.celebrate([{ kicker: `day ${step + 1} of ${CONFIG.economy.login.length}`, icon: GIFT_ICON, name: 'daily reward', lines }]);
+    this.sound.power();
+    this.haptics.pickup();
+    this.refreshTitle();
+    if (this.infoOpen === 'daily') this.openDaily();
+  }
+
+  private openDaily(): void {
+    const now = Date.now();
+    const day = dayKey(now);
+    this.daily.turn(day);
+    const due = this.daily.loginDue(day);
+    const step = this.daily.loginStep;
+    const login = CONFIG.economy.login as readonly Reward[];
+    const claimedUpTo = due >= 0 ? step : step === 0 ? login.length : step;
+    const qs = this.daily.quests;
+    const allDone = qs.every((q) => q.done);
+    this.econ.renderDaily({
+      calendar: login.map((r, i) => ({
+        day: i + 1,
+        reward: rewardParts(r).map((p) => p.replace(/^\+/, '')).join(', '),
+        state: i < claimedUpTo ? 'claimed' : i === step && due >= 0 ? 'today' : 'next',
+      })),
+      claim: due >= 0 ? { text: `claim day ${step + 1}`, enabled: true } : { text: `next reward in ${formatWait(untilTomorrow(now))}`, enabled: false },
+      reset: `new in ${formatWait(untilTomorrow(now))}`,
+      quests: qs.map((q) => ({
+        text: questText(q),
+        reward: `+${formatScore(q.credits)} credits · +${CONFIG.economy.quests.passXp} pass xp`,
+        progress: `${formatScore(q.progress)} / ${formatScore(q.target)}`,
+        fraction: q.progress / q.target,
+        done: q.done,
+      })),
+      bonus: allDone ? `all done: +${CONFIG.economy.quests.allDoneCores} cores collected` : `finish all three for +${CONFIG.economy.quests.allDoneCores} cores`,
+    });
+    this.openInfo('daily');
+  }
+
+  private openShop(): void {
+    const now = Date.now();
+    const o = this.owner();
+    const T = CONFIG.economy.tickets;
+    const offers = shopFor(dayKey(now));
+    this.tickets.refill(now);
+    this.econ.renderShop({
+      wallet: `${formatScore(this.wallet.credits)} credits · ${formatScore(this.wallet.cores)} cores · ${this.tickets.count} tickets`,
+      reset: `new in ${formatWait(untilTomorrow(now))}`,
+      offers: offers.map((f) => {
+        const colors = f.item.colors;
+        return {
+          name: f.item.name,
+          slot: `${SLOT_NAMES[f.item.slot]}${f.deal ? ' · deal of the day' : ''}`,
+          swatch: colors ? `linear-gradient(135deg, ${colors[0]} 50%, ${colors[1]} 50%)` : null,
+          price: `${formatScore(f.price)} ${f.currency}`,
+          was: f.deal ? formatScore(f.full) : '',
+          owned: this.looks.owns(f.item, o),
+          trying: this.preview?.slot === f.item.slot && this.preview.id === f.item.id,
+          canAfford: (f.currency === 'cores' ? this.wallet.cores : this.wallet.credits) >= f.price,
+        };
+      }),
+      tickets: {
+        label: this.tickets.count >= T.max ? `one ranked ticket · ${this.tickets.count} now` : `one ranked ticket · next free in ${formatWait(this.tickets.nextIn(now))}`,
+        button: `${T.coreCost} cores`,
+        enabled: this.wallet.cores >= T.coreCost,
+      },
+      cores: import.meta.env.DEV
+        ? [{ label: 'dev: add cores (purchases stand-in)', button: '+500', enabled: true }]
+        : [{ label: 'packs of cores arrive with the app store release', button: 'soon', enabled: false }],
+    });
+    this.player.reset();
+    this.player.setVisible(true);
+    this.trail.setVisible(true);
+    this.openInfo('shop');
+  }
+
+  /** Tap a shop look: try it on the ship (tap again to take it off). */
+  private onShopOffer = (i: number): void => {
+    const f = shopFor(dayKey(Date.now()))[i];
+    if (!f) return;
+    const same = this.preview?.slot === f.item.slot && this.preview.id === f.item.id;
+    this.preview = same || this.looks.owns(f.item, this.owner()) ? null : { slot: f.item.slot, id: f.item.id };
+    this.applyLooks();
+    this.openShop();
+  };
+
+  private onShopBuy = (i: number): void => {
+    const f = shopFor(dayKey(Date.now()))[i];
+    if (!f || this.looks.owns(f.item, this.owner())) return;
+    const paid = f.currency === 'cores' ? this.wallet.spendCores(f.price) : this.wallet.spend(f.price);
+    if (!paid) return;
+    this.looks.buy(f.item);
+    this.looks.equip(f.item.slot, f.item.id);
+    this.preview = null;
+    this.sound.pickup();
+    this.haptics.pickup();
+    this.ui.showNotice(`${f.item.name} bought and on your ship`);
+    this.applyLooks();
+    this.refreshTitle();
+    this.openShop();
+  };
+
+  private onShopTicket = (): void => {
+    if (!this.buyTicket()) return;
+    this.openShop();
+  };
+
+  /** One ranked ticket for cores; false if there aren't enough. */
+  private buyTicket(): boolean {
+    if (!this.wallet.spendCores(CONFIG.economy.tickets.coreCost)) return false;
+    this.tickets.add(1);
+    this.econ.bump('tickets');
+    this.sound.pickup();
+    this.haptics.pickup();
+    this.refreshTitle();
+    return true;
+  }
+
+  /** Cores packs: real purchases come with the store (stage D); the dev build adds them free. */
+  private onShopCores = (): void => {
+    if (!import.meta.env.DEV) return;
+    this.devAddCores(500);
+    this.openShop();
+  };
+
+  private openPass(): void {
+    const now = Date.now();
+    this.pass.turn(now);
+    const P = CONFIG.economy.pass;
+    const tier = this.pass.tier;
+    const s = seasonAt(now);
+    const maxed = tier >= P.tiers;
+    this.econ.renderPass({
+      big: maxed ? 'complete' : String(P.xpPerTier - (this.pass.xp % P.xpPerTier)),
+      goal: maxed ? `all ${P.tiers} tiers` : `xp to tier ${tier + 1}`,
+      fraction: this.pass.tierFraction,
+      detail: `season ${s.season} · tier ${tier} of ${P.tiers} · ends in ${formatWait(s.end - now)}`,
+      premium: this.pass.premium ? null : { text: `unlock premium · ${formatScore(P.premiumCores)} cores`, enabled: this.wallet.cores >= P.premiumCores },
+      premiumOwned: this.pass.premium,
+      tiers: Array.from({ length: P.tiers }, (_, i) => ({
+        tier: i + 1,
+        free: rewardText(freeReward(i + 1)),
+        premium: rewardText(premiumReward(i + 1)),
+        reached: i < tier,
+        current: i === tier || (maxed && i === P.tiers - 1),
+      })),
+    });
+    this.openInfo('pass');
+  }
+
+  private onPassPremium = (): void => {
+    if (this.pass.premium || !this.wallet.spendCores(CONFIG.economy.pass.premiumCores)) return;
+    const paid = this.pass.unlockPremium();
+    const lines = paid.flatMap((r) => this.grant(r));
+    this.ui.celebrate([{ kicker: 'season pass', icon: PASS_ICON, name: 'premium unlocked', lines: lines.length > 0 ? mergeCredits(lines) : ['premium rewards from every tier you reach'] }]);
+    this.sound.power();
+    this.refreshTitle();
+    this.openPass();
+  };
+
+  /** Ranked with no tickets left: offer one for cores, or the wait. */
+  private offerTicket(): void {
+    const now = Date.now();
+    const cost = CONFIG.economy.tickets.coreCost;
+    this.econ.offer(
+      {
+        kicker: 'out of tickets',
+        name: 'ranked tickets',
+        lines: [`next free ticket in ${formatWait(this.tickets.nextIn(now))}`, `you have ${formatScore(this.wallet.cores)} cores`],
+        yes: `buy one · ${cost} cores`,
+        yesEnabled: this.wallet.cores >= cost,
+        no: 'not now',
+        seconds: 0,
+      },
+      () => {
+        if (this.buyTicket()) this.startRanked();
+      },
+      () => {},
+    );
+  }
+
+  // --- revive ----------------------------------------------------------------
+
+  /** A revive is offered once a run, outside ranked, where the lane is known. */
+  private canRevive(): boolean {
+    return this.mode !== 'ranked' && !this.revived && this.world.laneAt(this.world.distance) !== null;
+  }
+
+  private offerRevive(): void {
+    const day = dayKey(Date.now());
+    const free = this.daily.freeRevive(day);
+    const cost = CONFIG.economy.revive.coreCost;
+    this.econ.offer(
+      {
+        kicker: 'crashed',
+        name: 'keep going?',
+        lines: [free ? 'your free revive today' : `you have ${formatScore(this.wallet.cores)} cores`, `score so far ${formatScore(this.score)}`],
+        yes: free ? 'revive · free' : `revive · ${cost} cores`,
+        yesEnabled: free || this.wallet.cores >= cost,
+        no: 'no thanks',
+        seconds: 6,
+      },
+      () => {
+        if (free) this.daily.useFreeRevive(day);
+        else if (!this.wallet.spendCores(cost)) return this.settleCrash();
+        this.revive();
+      },
+      () => this.settleCrash(),
+    );
+  }
+
+  /** Back on the lane with the way ahead cleared, a shield on, and a 3-2-1. */
+  private revive(): void {
+    const R = CONFIG.economy.revive;
+    this.revivePending = false;
+    this.revived = true;
+    this.hitThisRun = true;
+    this.world.revive(R.clearAhead);
+    this.world.sync();
+    this.player.reset();
+    this.player.setVisible(true);
+    this.trail.setVisible(true);
+    this.shield = true;
+    this.player.setShield(true);
+    this.graceT = R.graceSeconds;
+    this.stage.shakeX = this.stage.shakeY = 0;
+    this.stage.roll = 0;
+    this.refreshTitle();
+    this.ui.show(null);
+    this.ui.showHud(true);
+    this.startCountdown();
+  }
+
+  /** Hold everything still for a 3-2-1, then play. */
+  private startCountdown(): void {
+    this.state = 'countdown';
+    this.countdownT = CONFIG.economy.revive.countdown;
+    this.input.enabled = false;
+    this.input.releaseAll();
+    this.econ.setCountdown(Math.ceil(this.countdownT));
+  }
+
+  private updateCountdown(dt: number): void {
+    this.countdownT -= dt;
+    this.econ.setCountdown(Math.ceil(this.countdownT));
+    this.feedAudio(dt, false, this.speed);
+    if (this.countdownT > 0) return;
+    this.econ.setCountdown(0);
+    this.state = 'playing';
+    this.input.enabled = true;
+    this.input.releaseAll();
+    this.input.calibrate();
+    this.sound.ignite();
+  }
+
+  /** The wallet bar, ticket refills and the day turning, about once a second on the title. */
+  private tickEconomy(dt: number): void {
+    this.economyTimer -= dt;
+    if (this.economyTimer > 0) return;
+    this.economyTimer = 1;
+    const now = Date.now();
+    const before = this.tickets.count;
+    this.tickets.refill(now);
+    this.daily.turn(dayKey(now));
+    this.pass.turn(now);
+    if (this.tickets.count !== before) this.refreshTitle();
+    else this.refreshBar(now);
+  }
+
+  private refreshBar(now = Date.now()): void {
+    const wait = this.tickets.count < CONFIG.economy.tickets.max ? formatWait(this.tickets.nextIn(now)) : '';
+    this.econ.setBar(this.wallet.credits, this.wallet.cores, this.tickets.count, wait);
+    this.econ.setNews('daily', this.daily.loginDue(dayKey(now)) >= 0);
   }
 
   /** Fold a ranked run into the rank and league; fills the game-over block. Returns bonus credits. */
@@ -812,7 +1205,8 @@ export class Game {
   private onLookBuy = (): void => {
     if (!this.preview) return;
     const item = find(this.preview.slot, this.preview.id);
-    if (item.unlock.by !== 'credits' || !this.wallet.spend(item.unlock.cost)) return;
+    const u = item.unlock;
+    if (u.by === 'credits' ? !this.wallet.spend(u.cost) : u.by === 'cores' ? !this.wallet.spendCores(u.cost) : true) return;
     this.looks.buy(item);
     this.looks.equip(item.slot, item.id);
     this.preview = null;
@@ -846,10 +1240,9 @@ export class Game {
     let buy: { text: string; enabled: boolean } | null = null;
     if (this.preview) {
       const item = find(this.preview.slot, this.preview.id);
-      if (item.unlock.by === 'credits') {
-        const cost = item.unlock.cost;
-        buy = { text: `buy ${item.name} · ${formatScore(cost)} credits`, enabled: this.wallet.credits >= cost };
-      }
+      const u = item.unlock;
+      if (u.by === 'credits') buy = { text: `buy ${item.name} · ${formatScore(u.cost)} credits`, enabled: this.wallet.credits >= u.cost };
+      else if (u.by === 'cores') buy = { text: `buy ${item.name} · ${formatScore(u.cost)} cores`, enabled: this.wallet.cores >= u.cost };
     }
     const owned = LOOKS.filter((l) => this.looks.owns(l, o)).length;
     this.ui.renderLooks(rows, buy, `${owned} of ${LOOKS.length} looks unlocked · missions unlock trails, hulls and world colours`);
@@ -910,7 +1303,7 @@ export class Game {
     this.openInfo('missions');
   }
 
-  private openInfo(which: 'stats' | 'missions' | 'hangar' | 'record' | 'solo' | 'league'): void {
+  private openInfo(which: InfoScreen): void {
     this.infoOpen = which;
     this.ui.show(which);
   }
@@ -934,6 +1327,11 @@ export class Game {
       this.hangarTab = 'upgrades';
       if (this.state === 'crashed') this.toMainMenu();
       this.openHangar();
+      return;
+    }
+    // One ticket per attempt.
+    if (!this.tickets.use(Date.now())) {
+      this.offerTicket();
       return;
     }
     // The week may have turned since the game started.
@@ -968,6 +1366,9 @@ export class Game {
     else if (name === 'stats') this.openStats();
     else if (name === 'missions') this.openMissions();
     else if (name === 'hangar') this.openHangar();
+    else if (name === 'shop') this.openShop();
+    else if (name === 'pass') this.openPass();
+    else if (name === 'daily') this.openDaily();
   };
 
   private refreshTitle(): void {
@@ -977,7 +1378,12 @@ export class Game {
     this.ui.setTitleLeague(emblem(lg.league, lg.division), `${leagueName(lg.league, lg.division)} · ${lg.lp} lp`, lg.lp / LP_PER_DIVISION);
     this.ui.setTitleRank(insignia(i), rankName(i), `${formatScore(this.wallet.credits)} credits`);
     const wb = this.progress.weeklyBest(this.weekly.id);
-    this.ui.setRankedSub(wb > 0 ? `best this week ${formatScore(wb)}` : 'new level every week');
+    const now = Date.now();
+    this.tickets.refill(now);
+    const t = this.tickets.count;
+    const tickets = t > 0 ? `${t} ticket${t === 1 ? '' : 's'}` : `no tickets · next in ${formatWait(this.tickets.nextIn(now))}`;
+    this.ui.setRankedSub(`${wb > 0 ? `best this week ${formatScore(wb)}` : 'new level every week'} · ${tickets}`);
+    this.refreshBar(now);
     this.ui.setBests([['endless', this.progress.endlessBest]]);
   }
 
@@ -1003,7 +1409,8 @@ export class Game {
   }
 
   private pause(): void {
-    if (this.state !== 'playing') return;
+    if (this.state !== 'playing' && this.state !== 'countdown') return;
+    this.econ.setCountdown(0);
     this.state = 'paused';
     this.input.releaseAll();
     this.sound.suspend();
@@ -1012,12 +1419,10 @@ export class Game {
 
   private resume(): void {
     if (this.state !== 'paused') return;
-    this.state = 'playing';
-    this.input.releaseAll();
     this.lastTime = performance.now();
-    this.input.calibrate();
     this.sound.resume();
     this.ui.show(null);
+    this.startCountdown(); // a moment to get ready before control comes back
   }
 
   private onTap = (): void => {
@@ -1026,10 +1431,10 @@ export class Game {
       case 'title':
         break; // pick a mode with the buttons
       case 'crashed':
-        if (this.crashMs >= CONFIG.crash.retryLockMs) this.retry();
+        if (this.crashMs >= CONFIG.crash.retryLockMs && !this.revivePending && !this.econ.offerOpen) this.retry();
         break;
       case 'finished':
-        if (this.overShown) this.retry();
+        if (this.overShown && !this.econ.offerOpen) this.retry();
         break;
     }
   };
@@ -1066,7 +1471,7 @@ export class Game {
   };
 
   private closeInfo(): void {
-    if (this.infoOpen === 'hangar') {
+    if (this.infoOpen === 'hangar' || this.infoOpen === 'shop') {
       // Leaving the hangar takes off anything only being tried on.
       this.preview = null;
       this.applyLooks();
@@ -1115,6 +1520,8 @@ export class Game {
   /** Abandon the run and go back to the live title scene. Best score still counts. */
   private toMainMenu(): void {
     if (this.state === 'paused') this.finishRun(null); // abandoned mid-run: still counts for stats
+    this.econ.setCountdown(0);
+    this.econ.dismissOffer();
 
     this.state = 'title';
     this.input.enabled = false;
@@ -1143,6 +1550,7 @@ export class Game {
     this.ui.hideBanner();
     this.ui.showHud(false);
     this.ui.show('title');
+    this.refreshTitle();
     this.lastTime = performance.now();
   }
 
@@ -1181,6 +1589,20 @@ export class Game {
     this.wallet.add(100000);
     this.refreshTitle();
     this.ui.showNotice('dev: everything unlocked');
+  }
+
+  /** Dev: cores, standing in for purchases until the store is in. */
+  devAddCores(n: number): void {
+    this.wallet.addCores(n);
+    this.econ.bump('cores');
+    this.refreshTitle();
+  }
+
+  /** Dev: ranked tickets. */
+  devAddTickets(n: number): void {
+    this.tickets.add(n);
+    this.econ.bump('tickets');
+    this.refreshTitle();
   }
 
   /** Dev: replay the last run's course from where it started (same seed). */
@@ -1229,11 +1651,16 @@ export class Game {
       case 'finished':
         this.updateFinished(dt);
         break;
+      case 'countdown':
+        this.updateCountdown(dt);
+        break;
       case 'paused':
         break;
     }
+    this.econ.tickOffer(dt);
+    if (this.state === 'title') this.tickEconomy(dt);
     // Off a run (title, crash, finish) the area's weather fades out rather than freezing in the air.
-    if (this.state !== 'playing' && this.state !== 'paused') {
+    if (this.state !== 'playing' && this.state !== 'paused' && this.state !== 'countdown') {
       this.weather.set('none', 0);
       this.weather.update(dt, 0);
     }
@@ -1760,6 +2187,13 @@ export class Game {
     this.stage.roll *= 1 - Math.min(1, dt * 3);
 
     if (!this.overShown && this.crashMs >= c.overDelayMs) {
+      if (this.revivePending) {
+        if (!this.reviveAsked) {
+          this.reviveAsked = true;
+          this.offerRevive();
+        }
+        return;
+      }
       this.overShown = true;
       this.ui.showHud(false);
       this.ui.hideBanner();

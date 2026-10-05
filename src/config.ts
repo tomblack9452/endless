@@ -631,6 +631,34 @@ export const CONFIG = {
     markerEvery: 3, // rows between safe-line markers
   },
 
+  // The economy (src/economy/): two currencies, ranked tickets, revives, daily
+  // rewards and quests, the shop and the season pass. Credits are earned by
+  // playing; cores are the premium currency (bought later; for now earned from
+  // daily rewards, quests and the pass). Nothing here can make a ship stronger
+  // in ranked: purchases are looks, tickets, revives and the pass.
+  economy: {
+    tickets: { max: 5, refillMinutes: 120, coreCost: 30 },
+    // Revive (not in ranked): once a run, free once a day, otherwise cores. The ship
+    // moves onto the lane, the way ahead is cleared, and a countdown starts it again.
+    revive: { coreCost: 20, clearAhead: 34, countdown: 3, graceSeconds: 2.5 },
+    // The 7-day login calendar: one claim a day (UTC), looping after day 7. A
+    // missed day just waits: the next claim is the next day on the calendar.
+    login: [
+      { credits: 200 },
+      { cores: 10 },
+      { tickets: 2 },
+      { credits: 500 },
+      { cores: 20 },
+      { tickets: 3 },
+      { cores: 40, look: 'paint:aurora' },
+    ],
+    // Three a day (UTC), the same for everyone. Each pays credits and pass XP;
+    // finishing all three pays cores.
+    quests: { count: 3, credits: [150, 400], allDoneCores: 10, passXp: 60 },
+    shop: { slots: 4 },
+    pass: { weeks: 6, tiers: 30, xpPerTier: 120, premiumCores: 950, runXpPer: 250, runXpMax: 60 },
+  },
+
   // Ice field and volcanic plain hazards (see world.ts: land()).
   hazards: {
     // Ice lakes: open ice the lane runs across. On it you slow a little and slide.
