@@ -13,6 +13,7 @@ import { SpeedLines } from './speedLines';
 import { Trail } from './trail';
 import { cycle, DEFAULT_SETTINGS, LEVEL_GAIN, loadSettings, saveSettings, type SettingKey, STEERING_RANGE, TEXT_SCALE, TILT_GAIN } from './settings';
 import { EVENT_NOTICE, Events } from './events';
+import { Weather } from './weather';
 import { Cosmetics, describe } from './cosmetics';
 import { Haptics } from './haptics';
 import { Hints } from './hints';
@@ -79,6 +80,8 @@ export class Game {
   private readonly sky: Sky;
   private readonly trail: Trail;
   private readonly events: Events;
+  private readonly weather: Weather;
+  private onIce = false;
   private readonly sound = new Sound();
   private readonly audio: AudioState = {
     playing: false,
@@ -187,6 +190,7 @@ export class Game {
     this.speedLines = new SpeedLines(this.stage.scene, this.palette);
     this.trail = new Trail(this.player.engine, this.palette);
     this.events = new Events(this.stage.scene);
+    this.weather = new Weather(this.stage.scene);
     this.sky = new Sky(this.stage.scene);
     this.input = new Input(document.body);
     this.input.bindBoostControl(this.ui.boostControl);
@@ -325,6 +329,7 @@ export class Game {
     this.player.setVisible(true);
     this.trail.setVisible(true);
     this.events.clear();
+    this.weather.clear();
     this.input.releaseAll();
     this.input.calibrate(); // however you're holding the phone now is straight ahead
     this.input.enabled = true;
@@ -1242,8 +1247,9 @@ export class Game {
     if (!this.settings.contrast) {
       tintBiome(this.palette, w.biome, w.biomeMix);
       this.events.tint(this.palette);
+      this.weather.tint(this.palette);
     }
-    this.stage.fog.density = CONFIG.fog.density * this.events.fogScale();
+    this.stage.fog.density = CONFIG.fog.density * this.events.fogScale() * this.weather.fogScale();
     // Stars: full over the deck, faint outside at night.
     const sky = this.palette.sky;
     const daylight = Math.pow(0.2126 * sky.r + 0.7152 * sky.g + 0.0722 * sky.b, 1 / 2.2);
@@ -1296,7 +1302,9 @@ export class Game {
     this.offerHints();
     // A set level runs at its sections' difficulty; otherwise speed follows the score.
     const section = this.course ? this.world.sectionAt(this.world.distance) : null;
-    const target = speedAt(section ? section.difficulty : this.distanceScore);
+    // On ice you slow down a little (and slide: see the steering below).
+    this.onIce = this.world.onIce();
+    const target = speedAt(section ? section.difficulty : this.distanceScore) * (this.onIce ? CONFIG.hazards.ice.slow : 1);
     this.speed += (target - this.speed) * (1 - Math.exp(-CONFIG.speed.ease * dt));
     this.updateBoost(dt);
     const speed = this.currentSpeed();
@@ -1306,7 +1314,8 @@ export class Game {
     const slope = (terrain.heightAtX(dist + 6, sx) - terrain.heightAtX(dist, sx)) / 6;
     // Positive pitch dips the nose, so climbing subtracts.
     const pitch = this.boostLevel * CONFIG.boost.shipPitchDeg * DEG - Math.atan(slope) * CONFIG.terrain.shipPitch;
-    this.player.update(dt, this.dev.autopilot ? this.autopilot() : this.input.steering(), lateralSpeedAt(speed) * this.ship.steer, pitch);
+    this.player.update(dt, this.dev.autopilot ? this.autopilot() : this.input.steering(), lateralSpeedAt(speed) * this.ship.steer, pitch, this.onIce ? CONFIG.hazards.ice.grip : 1);
+    this.weather.update(dt, speed);
     this.speedLines.update(dt, speed, this.settings.reduceMotion ? 0 : this.boostLevel);
     this.trail.update(dt, this.boostLevel, this.player.engineHalfSpan);
     if (this.boosting) {
@@ -1364,6 +1373,12 @@ export class Game {
       return;
     }
 
+    // Lava: the run ends, whatever shield you have.
+    if (this.world.inLava() && !this.dev.invincible) {
+      this.crash(false);
+      this.world.sync();
+      return;
+    }
     const fell = this.world.overPit();
     // Shielded (or just saved by a shield), the walls still hold you in: steer
     // into one and you slide along it instead of out of the course. Touching
@@ -1624,7 +1639,20 @@ export class Game {
     this.ui.showNotice(EVENT_NOTICE[kind]);
   }
 
+  /** The area's own weather: snow on the ice field, ash on the volcanic plain, heavier deeper in. */
+  private updateWeather(): void {
+    const w = this.world;
+    const W = CONFIG.weather;
+    const sub = (this.level - 1) % CONFIG.themes.levelsPerTheme;
+    const loop = Math.floor((this.level - 1) / (CONFIG.themes.levelsPerTheme * 3));
+    const outside = (1 - w.insideMix) * w.biomeMix;
+    if (w.biome === 'ice') this.weather.set('snow', (W.snow[sub] + loop * W.loopStep) * outside);
+    else if (w.biome === 'volcanic') this.weather.set('ash', (W.ash[sub] + loop * W.loopStep) * outside);
+    else this.weather.set('none', 0);
+  }
+
   private updateEvents(dt: number, dz: number): void {
+    this.updateWeather();
     const ev = this.events;
     // An event ends early if the theme changes under it.
     // Set levels choose their events per section; otherwise an event ends if the area changes under it.
