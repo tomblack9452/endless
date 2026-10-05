@@ -105,6 +105,25 @@ function install(game: Game, title: HTMLElement): void {
   renderRoom();
   renders.push(renderRoom);
   panel.appendChild(roomBtn);
+
+  // Unlock everything (saved, so it sticks in this browser) and the way back.
+  const action = (text: string, run: () => void) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'label dev-toggle';
+    b.textContent = text;
+    b.addEventListener('click', run);
+    panel.appendChild(b);
+  };
+  action('unlock all', () => {
+    game.devUnlockAll();
+    show(false);
+  });
+  action('reset all progress', () => {
+    if (!window.confirm('reset all progress, ranks, credits and unlocks in this browser?')) return;
+    for (const k of Object.keys(localStorage)) if (k.startsWith('endless.') && k !== 'endless.settings') localStorage.removeItem(k);
+    location.reload();
+  });
 }
 
 /** Small FPS / render scale / draw call readout, bottom-left above the boost text. */

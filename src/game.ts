@@ -903,6 +903,23 @@ export class Game {
     this.world.devRoom = id;
   }
 
+  /** Dev: unlock everything: top rank, every sector and star, all looks and upgrades, plenty of credits. */
+  devUnlockAll(): void {
+    this.ranked.xp = Math.max(this.ranked.xp, RANKS[RANKS.length - 1].xp);
+    this.ranked.skill = this.ranked.highestSkill = 50;
+    this.ranked.save();
+    this.progress.reachedLevel(sectorStart(26)); // loop 9
+    for (let s = 0; s <= 26; s++) this.progress.addStars(s, STAR_CLEAR | STAR_NO_HITS | STAR_CHAIN);
+    while (this.cosmetics.unlockNext()) {
+      // every mission unlock
+    }
+    this.looks.buyAll();
+    for (const s of SYSTEMS) while (this.upgrades.tier(s.id) < MAX_TIER) this.upgrades.raise(s.id);
+    this.wallet.add(100000);
+    this.refreshTitle();
+    this.ui.showNotice('dev: everything unlocked');
+  }
+
   /** Dev: replay the last run's course from the start. */
   devReplay(): void {
     this.beginRun(0, this.seed);
