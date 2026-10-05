@@ -660,7 +660,7 @@ export class UI {
   setGameOver(score: number, best: number, isNewBest: boolean, nearMisses: number, bestCombo: number, seed: number): void {
     this.overStats.textContent =
       (nearMisses > 0 ? `near misses ${nearMisses}, best chain x${bestCombo}` : 'no near misses') +
-      (import.meta.env.DEV ? ` · seed ${seed}` : ''); // dev builds: for reporting a layout
+      ` · seed ${seed}`; // for reporting a layout
     this.overScore.textContent = formatScore(score);
     this.overBest.textContent = isNewBest ? 'new best' : `best ${formatScore(best)}`;
   }
