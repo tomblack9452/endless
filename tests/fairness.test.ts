@@ -51,12 +51,15 @@ function drive(seed: number, level: number, autopilot = true, room: RoomId | nul
     return best;
   };
 
+  let eased = 0; // steering as the ship eases into it
+
   for (let t = 0; t < seconds; t += DT) {
     const score = (world.distance - runStart) * CONFIG.score.pointsPerUnit;
     const speed = speedAt(score);
     const steer = autopilot ? Math.max(-1, Math.min(1, (laneAt(world.distance + 3) - hooked.shipX) * 1.5)) : 0;
     const prev = world.distance;
-    world.advance(DT, speed, steer * lateralSpeedAt(speed));
+    eased += (steer - eased) * (1 - Math.exp(-CONFIG.steering.response * DT));
+    world.advance(DT, speed, eased * lateralSpeedAt(speed));
     if (world.overPit() || world.hitTest(prev)) return { crashed: true, at: Math.round(score), room: world.roomName };
   }
   return { crashed: false, at: 0, room: '' };
@@ -133,6 +136,7 @@ function driveAlt(seed: number, level: number): { crashed: boolean; at: number; 
     }
     return best;
   };
+  let eased = 0; // steering as the ship eases into it
   for (let t = 0; t < SECONDS; t += DT) {
     const score = (world.distance - runStart) * CONFIG.score.pointsPerUnit;
     const speed = speedAt(score);
@@ -148,7 +152,8 @@ function driveAlt(seed: number, level: number): { crashed: boolean; at: number; 
     }
     const steer = Math.max(-1, Math.min(1, (target - hooked.shipX) * 1.5));
     const prev = world.distance;
-    world.advance(DT, speed, steer * lateralSpeedAt(speed));
+    eased += (steer - eased) * (1 - Math.exp(-CONFIG.steering.response * DT));
+    world.advance(DT, speed, eased * lateralSpeedAt(speed));
     if (world.overPit() || world.hitTest(prev)) return { crashed: true, at: Math.round(score), splits: hooked.altRoutes, chasms: chasms.size };
   }
   return { crashed: false, at: 0, splits: hooked.altRoutes, chasms: chasms.size };
