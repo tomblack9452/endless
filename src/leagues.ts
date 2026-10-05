@@ -56,13 +56,14 @@ export function leagueName(l: number, division: number): string {
   return l >= LEAGUES.length - 1 ? LEAGUES[l].name : `${LEAGUES[l].name} ${DIVISIONS[division]}`;
 }
 
-/** Monday-based week key for the local date, e.g. "2026-10-05". */
+/**
+ * Monday-based week key in UTC, e.g. "2026-10-05". UTC so everyone, in every
+ * time zone, is on the same weekly level and league week at the same moment.
+ */
 export function weekKey(ms: number): string {
   const d = new Date(ms);
-  d.setHours(0, 0, 0, 0);
-  d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  const back = (d.getUTCDay() + 6) % 7; // days since Monday
+  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() - back)).toISOString().slice(0, 10);
 }
 
 export interface LeagueResult {
