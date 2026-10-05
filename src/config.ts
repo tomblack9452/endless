@@ -469,6 +469,11 @@ export const CONFIG = {
     },
   },
 
+  // Sectors (solo start points) and their stars.
+  sectors: {
+    starCredits: 25, // per new star
+  },
+
   // Assist mode (settings): a gentler way to play.
   assist: {
     speed: 0.8, // forward speed multiplier

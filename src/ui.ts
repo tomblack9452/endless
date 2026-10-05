@@ -1,7 +1,16 @@
 import { CONFIG } from './config';
 import { label, type SettingKey, type Settings } from './settings';
 
-export type ScreenName = 'title' | 'paused' | 'over' | 'settings' | 'stats' | 'missions' | 'hangar' | 'record';
+export type ScreenName = 'title' | 'paused' | 'over' | 'settings' | 'stats' | 'missions' | 'hangar' | 'record' | 'sectors';
+
+/** One tile on the sector map. */
+export interface SectorTile {
+  index: number;
+  name: string;
+  levels: string;
+  stars: number; // star bits
+  locked: boolean;
+}
 
 /** Everything the service record screen shows. */
 export interface RecordView {
@@ -70,6 +79,7 @@ export class UI {
     missions: $('screen-missions'),
     hangar: $('screen-hangar'),
     record: $('screen-record'),
+    sectors: $('screen-sectors'),
   };
   private readonly hudMode = $('hud-mode');
   private readonly overMode = $('over-mode');
@@ -239,6 +249,47 @@ export class UI {
   setMode(text: string): void {
     this.hudMode.textContent = text;
     this.overMode.textContent = text;
+  }
+
+  /** Taps on unlocked sector tiles call `onPick` with the sector index. */
+  bindSectors(onPick: (sector: number) => void): void {
+    const grid = $('sectors-grid');
+    grid.addEventListener('pointerdown', (e) => e.stopPropagation());
+    grid.addEventListener('click', (e) => {
+      const tile = (e.target as HTMLElement).closest<HTMLElement>('.sector');
+      if (tile && !tile.classList.contains('locked')) onPick(Number(tile.dataset.sector));
+    });
+  }
+
+  renderSectors(tiles: SectorTile[], summary: string): void {
+    $('sectors-summary').textContent = summary;
+    const rows: HTMLElement[] = [];
+    for (let i = 0; i < tiles.length; i += 3) {
+      const head = document.createElement('div');
+      head.className = 'settings-group sector-loop';
+      head.textContent = `loop ${i / 3 + 1}`;
+      const row = document.createElement('div');
+      row.className = 'sector-row';
+      for (const t of tiles.slice(i, i + 3)) {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = `sector${t.locked ? ' locked' : ''}`;
+        b.dataset.sector = String(t.index);
+        const name = document.createElement('span');
+        name.className = 'sector-name';
+        name.textContent = t.locked ? 'locked' : t.name;
+        const levels = document.createElement('span');
+        levels.className = 'sector-levels';
+        levels.textContent = t.levels;
+        const stars = document.createElement('span');
+        stars.className = 'sector-stars';
+        stars.textContent = [1, 2, 4].map((bit) => (t.stars & bit ? '★' : '☆')).join('');
+        b.append(name, levels, stars);
+        row.append(b);
+      }
+      rows.push(head, row);
+    }
+    $('sectors-grid').replaceChildren(...rows);
   }
 
   /** Rank badge on the title screen. */

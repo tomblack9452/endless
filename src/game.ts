@@ -17,7 +17,7 @@ import { Cosmetics, describe, UNLOCK_ORDER } from './cosmetics';
 import { Haptics } from './haptics';
 import { Hints } from './hints';
 import { Missions, type RunMetrics } from './missions';
-import { dailySeed, Progress } from './progress';
+import { chainTarget, dailySeed, Progress, sectorOf, sectorStart, STAR_CHAIN, STAR_CLEAR, STAR_NO_HITS } from './progress';
 import { creditsFor, insignia, par, Ranked, rankName, RANKS, type RunMode } from './ranks';
 import { Wallet } from './wallet';
 import { newSeed } from './rng';
@@ -91,7 +91,12 @@ export class Game {
   private readonly cosmetics = new Cosmetics();
   private readonly missions = new Missions();
   /** Which info screen is open from the title (stats, missions, hangar), if any. */
-  private infoOpen: 'stats' | 'missions' | 'hangar' | 'record' | null = null;
+  private infoOpen: 'stats' | 'missions' | 'hangar' | 'record' | 'sectors' | null = null;
+  // The sector the ship is in and how it's going there (for stars).
+  private sector = 0;
+  private sectorFromStart = false; // entered at its start (not a dev skip mid-sector)
+  private sectorHit = false;
+  private sectorChain = 0;
   // Run metrics for missions.
   private boostSeconds = 0;
   private boosted = false;
@@ -182,6 +187,7 @@ export class Game {
     void Promise.all([this.progress.load(), this.ranked.load(), this.wallet.load()]).then(() => this.refreshTitle());
     void loadNumber(SOLO_BEST, 0).then((b) => (this.soloBest = b));
     this.ui.bindHangar(this.onHangar);
+    this.ui.bindSectors(this.onSectorPick);
     void this.missions.load();
     void this.cosmetics.load().then(() => this.applyCosmetics());
     void loadSettings().then((s) => {
@@ -251,6 +257,10 @@ export class Game {
     this.input.calibrate(); // however you're holding the phone now is straight ahead
     this.input.enabled = true;
     this.level = level;
+    this.sector = sectorOf(level);
+    this.sectorFromStart = startScore === (sectorStart(this.sector) - 1) * CONFIG.score.levelLength;
+    this.sectorHit = false;
+    this.sectorChain = 0;
     const progress = startScore / CONFIG.score.levelLength;
     this.ui.setScore(this.score);
     this.progress.reachedLevel(level);
@@ -502,10 +512,57 @@ export class Game {
     this.openInfo('missions');
   }
 
-  private openInfo(which: 'stats' | 'missions' | 'hangar' | 'record'): void {
+  private openInfo(which: 'stats' | 'missions' | 'hangar' | 'record' | 'sectors'): void {
     this.infoOpen = which;
     this.ui.show(which);
   }
+
+  /** Crossing into sector `next`: award the stars for the one just finished. */
+  private leaveSector(next: number): void {
+    const done = this.sector;
+    if (this.sectorFromStart) {
+      let bits = STAR_CLEAR;
+      if (!this.sectorHit && !this.assisted) bits |= STAR_NO_HITS;
+      if (this.sectorChain >= chainTarget(done)) bits |= STAR_CHAIN;
+      const earned = this.progress.addStars(done, bits);
+      if (earned > 0) {
+        const credits = earned * CONFIG.sectors.starCredits;
+        this.wallet.add(credits);
+        const all = this.progress.starsIn(done);
+        const stars = [STAR_CLEAR, STAR_NO_HITS, STAR_CHAIN].map((b) => (all & b ? '★' : '☆')).join('');
+        this.ui.showNotice(`${themeName(sectorStart(done))} ${stars}  +${credits} credits`);
+      }
+    }
+    this.sector = next;
+    this.sectorFromStart = true;
+    this.sectorHit = false;
+    this.sectorChain = 0;
+  }
+
+  /** Solo: the sector map. */
+  private openSectors(): void {
+    const reached = this.progress.sector;
+    // Every loop row up to the one after your furthest sector.
+    const shown = (Math.floor((reached + 1) / 3) + 1) * 3;
+    const tiles = [];
+    for (let s = 0; s < shown; s++) {
+      const first = sectorStart(s);
+      tiles.push({
+        index: s,
+        name: themeName(first),
+        levels: `levels ${first}-${first + 2}`,
+        stars: this.progress.starsIn(s),
+        locked: s > reached,
+      });
+    }
+    this.ui.renderSectors(tiles, `${this.progress.totalStars()} stars · third star needs a x${chainTarget(0)} chain in loop 1, rising each loop`);
+    this.openInfo('sectors');
+  }
+
+  private onSectorPick = (s: number): void => {
+    this.fromLevel = sectorStart(s);
+    this.startSolo();
+  };
 
   /** Ranked: level 1, standard ship, fresh course. */
   private startRanked(): void {
@@ -530,7 +587,7 @@ export class Game {
 
   private onTitleLink = (name: string): void => {
     if (name === 'daily') this.startDaily();
-    else if (name === 'solo') this.startSolo();
+    else if (name === 'solo') this.openSectors();
     else if (name === 'record') this.openRecord();
     else if (name === 'stats') this.openStats();
     else if (name === 'missions') this.openMissions();
@@ -855,6 +912,7 @@ export class Game {
       this.level = level;
       this.ui.setLevel(level);
       this.progress.reachedLevel(level);
+      if (sectorOf(level) !== this.sector) this.leaveSector(sectorOf(level));
       this.ui.announceLevel(level, themeName(level));
       this.sound.level(themeChange, musicFor(level));
       this.haptics.level(themeChange);
@@ -875,6 +933,7 @@ export class Game {
       this.shield = false;
       this.player.setShield(false);
       this.graceT = CONFIG.powers.shield.graceSeconds;
+      this.sectorHit = true; // a shield save still counts as a hit for stars
       this.sound.shieldHit();
       this.haptics.crash();
       this.nudgeMs = CONFIG.score.nearMiss.nudgeMs * 2;
@@ -923,6 +982,7 @@ export class Game {
       this.bonus += points;
       this.nearMissCount++;
       if (this.chain > this.bestChain) this.bestChain = this.chain;
+      if (this.chain > this.sectorChain) this.sectorChain = this.chain;
       this.chainTimer = nm.comboWindow;
       this.nudgeMs = nm.nudgeMs;
       this.ui.showCombo(this.chain, points);

@@ -1,8 +1,11 @@
 import { CONFIG } from './config';
 import { storage } from './storage';
 
-// Long-term progress: lifetime stats, which themes you've reached (for
-// checkpoints), and the daily run's best. Saved as one JSON value.
+// Long-term progress: lifetime stats, the furthest sector reached (solo start
+// points), stars per sector, and the daily run's best. Saved as one JSON value.
+//
+// A sector is one theme's three levels: sector 0 is levels 1-3, sector 1 is
+// 4-6 and so on, through the biome loops forever.
 
 export interface Stats {
   runs: number;
@@ -30,9 +33,30 @@ export interface RunResult {
 
 interface Saved {
   stats: Stats;
-  reached: number; // highest theme start level reached (1, 4, 7)
+  reached?: number; // older saves: highest theme start level reached (1, 4, 7)
+  sector: number; // furthest sector reached
+  stars: number[]; // per sector: bit 0 cleared, bit 1 no hits, bit 2 chain
   daily: { date: string; best: number };
 }
+
+/** Sector a level belongs to. */
+export function sectorOf(level: number): number {
+  return Math.floor((level - 1) / LPT);
+}
+
+/** First level of a sector. */
+export function sectorStart(sector: number): number {
+  return sector * LPT + 1;
+}
+
+/** Near-miss chain needed for a sector's third star: x5, rising by one each loop. */
+export function chainTarget(sector: number): number {
+  return 5 + Math.floor(sector / 3);
+}
+
+export const STAR_CLEAR = 1;
+export const STAR_NO_HITS = 2;
+export const STAR_CHAIN = 4;
 
 const KEY = 'endless.progress';
 const LPT = CONFIG.themes.levelsPerTheme;
@@ -58,10 +82,16 @@ export function dailySeed(date = today()): number {
   return h >>> 0;
 }
 
+function countBits(n: number): number {
+  return (n & 1) + ((n >> 1) & 1) + ((n >> 2) & 1);
+}
+
 export class Progress {
   stats: Stats = blankStats();
-  /** Highest theme start level reached: 1 (open ground), 4 (canyon), 7 (interior). */
-  reached = 1;
+  /** Furthest sector reached in any mode. */
+  sector = 0;
+  /** Star bits per sector (see STAR_*). */
+  stars: number[] = [];
   private daily = { date: '', best: 0 };
 
   async load(): Promise<void> {
@@ -70,7 +100,8 @@ export class Progress {
     try {
       const s = JSON.parse(raw) as Partial<Saved>;
       this.stats = { ...blankStats(), ...s.stats };
-      this.reached = s.reached ?? 1;
+      this.sector = s.sector ?? sectorOf(s.reached ?? 1);
+      this.stars = s.stars ?? [];
       if (s.daily) this.daily = s.daily;
     } catch {
       // Corrupt value: start fresh.
@@ -78,28 +109,42 @@ export class Progress {
   }
 
   private save(): void {
-    void storage.set(KEY, JSON.stringify({ stats: this.stats, reached: this.reached, daily: this.daily }));
+    const s: Saved = { stats: this.stats, sector: this.sector, stars: this.stars, daily: this.daily };
+    void storage.set(KEY, JSON.stringify(s));
   }
 
   get dailyBest(): number {
     return this.daily.date === today() ? this.daily.best : 0;
   }
 
-  /** Theme start levels you can begin from: always 1, plus 4 and 7 once reached. */
-  checkpoints(): number[] {
-    const out = [1];
-    for (let l = 1 + LPT; l <= this.reached && out.length < 3; l += LPT) out.push(l);
-    return out;
-  }
-
-  /** Note that the run reached `level` (unlocks checkpoints straight away). */
+  /** Note that a run reached `level` (unlocks its sector as a solo start straight away). */
   reachedLevel(level: number): void {
-    const themeStart = level - ((level - 1) % LPT);
-    const capped = Math.min(themeStart, 1 + LPT * 2); // checkpoints stop at the first interior
-    if (capped > this.reached) {
-      this.reached = capped;
+    const s = sectorOf(level);
+    if (s > this.sector) {
+      this.sector = s;
       this.save();
     }
+  }
+
+  starsIn(sector: number): number {
+    return this.stars[sector] ?? 0;
+  }
+
+  /** Add star bits for a sector; returns how many are new. */
+  addStars(sector: number, bits: number): number {
+    const had = this.starsIn(sector);
+    const now = had | bits;
+    if (now === had) return 0;
+    while (this.stars.length <= sector) this.stars.push(0);
+    this.stars[sector] = now;
+    this.save();
+    return countBits(now) - countBits(had);
+  }
+
+  totalStars(): number {
+    let n = 0;
+    for (const s of this.stars) n += countBits(s ?? 0);
+    return n;
   }
 
   /** Fold a finished run into the stats; returns true for a new daily best. */
