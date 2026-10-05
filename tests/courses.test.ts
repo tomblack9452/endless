@@ -41,12 +41,14 @@ function fly(course: Course): { finished: boolean; at: number; section: string; 
   };
   const DT = 1 / 60;
   const start = world.distance;
+  let eased = 0; // steering as the ship eases into it
   for (let t = 0; t < 600 && world.distance < world.finishAt; t += DT) {
     const section = world.sectionAt(world.distance)!;
     const speed = speedAt(section.difficulty);
     const steer = Math.max(-1, Math.min(1, (laneAt(world.distance + 3) - hooked.shipX) * 1.5));
     const prev = world.distance;
-    world.advance(DT, speed, steer * lateralSpeedAt(speed));
+    eased += (steer - eased) * (1 - Math.exp(-CONFIG.steering.response * DT));
+    world.advance(DT, speed, eased * lateralSpeedAt(speed));
     if (world.overPit() || world.hitTest(prev)) {
       return { finished: false, at: Math.round(world.distance - start), section: section.name, room: world.roomName };
     }
@@ -130,6 +132,7 @@ describe('solo environments', () => {
         world.reset(CONFIG.field.startClearance, true, 0, seed);
         const start = world.distance;
         let crashed = false;
+        let eased = 0; // steering as the ship eases into it
         for (let t = 0; t < 40 && !crashed; t += 1 / 60) {
           const score = (world.distance - start) * CONFIG.score.pointsPerUnit;
           const speed = speedAt(score);
@@ -143,7 +146,8 @@ describe('solo environments', () => {
             }
           }
           const prev = world.distance;
-          world.advance(1 / 60, speed, Math.max(-1, Math.min(1, (target - hooked.shipX) * 1.5)) * lateralSpeedAt(speed));
+          eased += (Math.max(-1, Math.min(1, (target - hooked.shipX) * 1.5)) - eased) * (1 - Math.exp(-CONFIG.steering.response / 60));
+          world.advance(1 / 60, speed, eased * lateralSpeedAt(speed));
           crashed = world.overPit() || world.hitTest(prev);
         }
         expect(crashed, `${env.name}, seed ${seed}`).toBe(false);
