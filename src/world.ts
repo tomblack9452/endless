@@ -303,6 +303,9 @@ export class World {
     this.roomShift = 0;
     this.prevWallL = this.prevWallR = NaN;
     this.floorD.fill(-Infinity);
+    // Forget the last run's look too: the title applies it straight after a reset.
+    this.canyonMix = this.interiorMix = this.insideMix = this.deckMix = this.biomeMix = this.asteroidMix = 0;
+    this.roomName = '';
     // startScore > 0 (dev skip) places the run part-way along.
     this.runStart = run ? this.distance - startScore / CONFIG.score.pointsPerUnit : null;
     this.theme = 'land';
