@@ -818,8 +818,171 @@ body {
   outline-offset: 3px;
 }
 
-#title-start {
-  min-width: 100%;
+.title-modes {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.title-modes .pill {
+  min-width: 0;
+}
+
+/* Rank badge under the wordmark: opens the service record. */
+.title-rank {
+  position: absolute;
+  left: calc(var(--safe-left) + 24px);
+  top: calc(var(--safe-top) + 16% + 92px);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 14px 6px 6px;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  background: color-mix(in srgb, var(--sky, transparent) 60%, transparent);
+  border: 1px solid color-mix(in srgb, currentColor 30%, transparent);
+  border-radius: 999px;
+  pointer-events: auto;
+  cursor: pointer;
+  text-shadow: none;
+}
+
+.title-rank-text {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.3;
+}
+
+.title-rank-text .label {
+  line-height: 1.4;
+}
+
+.insignia {
+  display: inline-block;
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+}
+
+.insignia svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.insignia.big {
+  width: 84px;
+  height: 84px;
+}
+
+.insignia.small {
+  width: 28px;
+  height: 28px;
+}
+
+.hud-mode {
+  font-size: calc(10px * var(--ui-scale));
+  letter-spacing: 0.2em;
+  margin-top: 4px;
+}
+
+/* Service record. */
+.record-top {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 10px 0 4px;
+}
+
+.record-rank {
+  font-size: calc(20px * var(--ui-scale));
+  letter-spacing: 0.14em;
+  margin-top: 8px;
+}
+
+.xp-track {
+  position: relative;
+  height: 6px;
+  margin: 16px 0 6px;
+  border-radius: 3px;
+  background: color-mix(in srgb, currentColor 14%, transparent);
+  overflow: hidden;
+}
+
+.xp-fill {
+  position: absolute;
+  inset: 0;
+  background: currentColor;
+  transform-origin: left center;
+  transform: scaleX(0);
+  transition: transform 600ms ease-out;
+}
+
+.ladder-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-height: 46px;
+  border-bottom: 1px solid color-mix(in srgb, currentColor 18%, transparent);
+}
+
+.ladder-row .ladder-name {
+  flex: 1;
+}
+
+.ladder-row.locked {
+  opacity: 0.38;
+}
+
+.ladder-row.current {
+  font-weight: 500;
+}
+
+/* Game over: rank result. */
+.over-rank {
+  margin: 18px auto 0;
+  max-width: 320px;
+}
+
+.over-rank:empty {
+  display: none;
+}
+
+.over-rank-head {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+}
+
+.over-rank.promoted .over-rank-head {
+  animation: promoted 900ms ease-out;
+}
+
+.promoted-label {
+  font-size: calc(12px * var(--ui-scale));
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+}
+
+@keyframes promoted {
+  0% {
+    transform: scale(1.3);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(0.97);
+    opacity: 1;
+  }
+  100% {
+    transform: none;
+  }
+}
+
+.over-rank .xp-track {
+  margin: 10px 0 4px;
 }
 
 /* Smaller outlined links (title screen). */
