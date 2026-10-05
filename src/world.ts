@@ -140,6 +140,16 @@ export class World {
   private readonly mesas: InstancedField; // horizon scenery
   private readonly arches: InstancedField; // rock arches over the path (pillars collide via rocks)
   private nextRockFaceAt = 0;
+  // Canyon split (see canyon()).
+  private splitAt = Infinity; // when the next split starts widening
+  private splitStart = Infinity; // island start
+  private splitEnd = -Infinity; // island end
+  private splitHalf = 0; // island half-width
+  private splitSide = 1; // which branch the lane takes
+  private altLane = 0; // the other branch's own clear line (world x)
+  private altTarget = 0;
+  private altPickupsLeft = 0;
+  private nextBridgeAt = 0;
   private rockFaceUntil = -Infinity;
   private rockFaceSide = 1;
   private nextArchAt = 0;
@@ -581,6 +591,10 @@ export class World {
       // roam far from the lane. Nothing is placed in the run-up, so the lane can
       // jump here safely.
       this.cx = this.lane = this.shipX;
+      this.splitAt = d + range(TH.canyon.splitSpacing);
+      this.splitStart = Infinity;
+      this.splitEnd = -Infinity;
+      this.nextBridgeAt = d + range(TH.canyon.bridgeSpacing) * 0.6;
     } else if (theme === 'interior') {
       this.entrancePending = true;
       this.room = this.lastRoom = 'corridor';
@@ -829,10 +843,20 @@ export class World {
     hw = lerp(c.mouthHalfWidth, hw, ease((d - this.themeStart) / c.mouth));
     hw = lerp(this.interiorHalfWidth(score) + TH.interior.doorExtra, hw, ease(left / c.exit));
 
-    const maxOffset = hw - (LANE + 0.4);
-    if (left < c.exit + 60) this.laneTarget = 0; // line up with the interior door
+    // Split paths: plan one when due (not in the mouth or near the exit).
+    const split = this.planSplit(d, hw, maxSlope, left);
+    // The walls widen by the island's width either side of it, so each branch
+    // keeps the canyon's normal width.
+    const widen = split.wall;
+    const hwAll = hw + widen;
+    const maxOffset = hwAll - (LANE + 0.4);
+    if (split.active) {
+      // Ride down the middle of our branch.
+      this.laneTarget = this.splitSide * (this.splitHalf + hw / 2);
+    } else if (left < c.exit + 60) this.laneTarget = 0; // line up with the interior door
     else this.retargetOffset(d, maxOffset);
     this.moveLane(maxSlope, this.laneTarget, maxOffset);
+    hw = hwAll;
 
     // Walls: two staggered inner rocks per side so there are no gaps to slip
     // through, plus tall outer rocks for the canyon sides.
@@ -846,6 +870,11 @@ export class World {
         const off = hw + 2 + k * 6 + rand() * 6;
         this.rock(this.cx + side * off, d + (rand() - 0.5) * STEP, r, 4 + rand() * 7);
       }
+      // Now and then a huge rock towers over the wall.
+      if (rand() < c.cliffChance) {
+        const r = 4 + rand() * 3.5;
+        this.rock(this.cx + side * (hw + 3 + r), d, r, 12 + rand() * 12);
+      }
       // Crystals growing out of the canyon sides (scenery: behind the wall rocks, never hit).
       if (rand() < c.wallCrystals) {
         const s = 1.1 + rand() * 1.1;
@@ -854,7 +883,25 @@ export class World {
       }
     }
 
+    // Pebbles on the floor: scenery.
+    for (let i = 0; i < c.pebblesPerRow; i++) {
+      const r = 0.05 + rand() * 0.1; // small and flat: never mistaken for an obstacle
+      const x = this.cx + (rand() * 2 - 1) * (hw - 0.3) - this.shipX;
+      this.rocks.spawn(x, 0, d + (rand() - 0.5) * STEP, r * 1.4, (r * 0.5) / BOULDER_HEIGHT, r, rand() * 6.28, false, false, 0, 0, false);
+    }
+    // A natural bridge spanning the canyon overhead (its feet are in the walls).
+    if (d >= this.nextBridgeAt && !this.quiet(d)) {
+      this.nextBridgeAt = d + range(c.bridgeSpacing);
+      const sx = (hw + 1.2) / ARCH_PILLAR_X;
+      const sy = 1.3 + rand() * 0.5;
+      this.arches.spawn(this.cx - this.shipX, 0, d, sx, sy, 1 + rand() * 0.4, 0, false, false, 0, 0, false);
+    }
+
     if (this.quiet(d)) return;
+    if (split.active) {
+      this.splitRow(d, hw, split.island, maxSlope);
+      return; // the split is the feature
+    }
 
     // Obstacles: dark rocks, laid out so the way through reads from a distance.
     if (d < this.nextFeatureAt) return;
@@ -890,10 +937,100 @@ export class World {
 
   /** A row of boulders across the canyon, leaving a gap of half-width `gapHalf` on the lane. */
   private band(d: number, hw: number, gapHalf: number): void {
-    for (let x = this.cx - hw + 0.8; x < this.cx + hw - 0.5; x += 1.7) {
-      const r = 0.75 + rand() * 0.2;
-      if (Math.abs(x - this.lane) < gapHalf + r * 0.8) continue;
-      this.obstacle(x, d + (rand() - 0.5) * 0.6, r, 0.9 + rand() * 0.7);
+    let x = this.cx - hw + 0.6;
+    while (x < this.cx + hw - 0.4) {
+      // Mixed sizes: mostly mid boulders, some small, the odd big one.
+      const roll = rand();
+      const r = roll < 0.25 ? 0.45 + rand() * 0.2 : roll < 0.85 ? 0.7 + rand() * 0.3 : 1.1 + rand() * 0.4;
+      const cxr = x + r;
+      if (Math.abs(cxr - this.lane) >= gapHalf + r * 0.8) this.obstacle(cxr, d + (rand() - 0.5) * 0.8, r, r * (1 + rand() * 1.6));
+      x += r * 2 + 0.15 + rand() * 0.4;
+    }
+  }
+
+  /**
+   * Split paths. Timeline from splitAt: the walls widen, the lane moves into
+   * the middle of its branch, the island rises between the branches for its
+   * length, then everything closes up again.
+   */
+  private planSplit(d: number, hw: number, maxSlope: number, left: number): { active: boolean; wall: number; island: number } {
+    const c = TH.canyon;
+    if (d >= this.splitAt && this.splitStart === Infinity && this.runStart !== null) {
+      const room = left - c.exit - 120;
+      const sinceStart = d - this.themeStart;
+      if (room > 0 && sinceStart > c.mouth + 30 && hw >= 5.5) {
+        this.splitHalf = range(c.splitIsland);
+        this.splitSide = this.lane >= this.cx ? 1 : -1;
+        // Long enough for the lane to cross to its branch centre at the steering budget.
+        const travel = Math.abs(this.splitSide * (this.splitHalf + hw / 2) - (this.lane - this.cx)) + this.splitHalf;
+        const lead = Math.max(c.splitWiden, travel / (maxSlope * 0.7)) + 6;
+        this.splitStart = d + lead;
+        this.splitEnd = this.splitStart + Math.min(range(c.splitLength), room - lead);
+        this.altLane = this.cx - this.splitSide * (this.splitHalf + hw / 2);
+        this.altTarget = 0;
+        this.altPickupsLeft = c.splitAltPickups;
+      } else {
+        this.splitAt = d + 40; // try again a bit later
+      }
+    }
+    if (this.splitStart === Infinity) return { active: false, wall: 0, island: 0 };
+    const open = this.splitStart - c.splitWiden - 6;
+    // After the island, a clear stretch long enough to cross back from the other branch.
+    const close = this.splitEnd + c.splitWiden + c.splitRejoin;
+    if (d > close + c.splitWiden) {
+      // Done: plan the next one.
+      this.splitStart = Infinity;
+      this.splitEnd = -Infinity;
+      this.splitAt = d + range(c.splitSpacing);
+      this.nextFeatureAt = Math.max(this.nextFeatureAt, d + 15);
+      return { active: false, wall: 0, island: 0 };
+    }
+    const wall = (this.splitHalf + 0.6) * ease((d - open) / c.splitWiden) * ease((close + c.splitWiden - d) / c.splitWiden);
+    const island = this.splitHalf * ease((d - this.splitStart) / 8) * ease((this.splitEnd - d) / 8);
+    // From planning to rejoining it's a clear stretch: the lane heads for its branch and nothing
+    // else is placed, so crossing to the other branch (and back) is always possible.
+    return { active: d <= close, wall, island };
+  }
+
+  /** One row of a split: the island, and rocks (and pickups) in the other branch. */
+  private splitRow(d: number, hw: number, island: number, maxSlope: number): void {
+    const c = TH.canyon;
+    const jitter = maxSlope * STEP * 0.5;
+    if (island > 0.2) {
+      // Island: rock wall rocks across its width. Kept clear of our lane, whatever happens.
+      for (let x = -island; x <= island; x += 1.4) {
+        const r = Math.min(island, 0.9 + rand() * 0.9);
+        const wx = this.cx + x;
+        if (Math.abs(wx - this.lane) < LANE + r * 0.8 + jitter) continue;
+        // Low, so the other branch (and its pickups) can be seen over it.
+        this.rock(wx, d + (rand() - 0.5) * STEP, r, 1.1 + rand() * 1.6);
+      }
+      // Crystals along the island's spine mark it out as a fork, not a wall.
+      if (island > this.splitHalf * 0.6 && rand() < 0.35) {
+        const s = 0.9 + rand() * 0.8;
+        const wx = this.cx + (rand() - 0.5) * island;
+        if (Math.abs(wx - this.lane) > LANE + s + jitter) this.crystals.spawn(wx - this.shipX, 0, d, s, s * (1 + rand() * 0.6), s, rand() * 6.28, true, false, s * 0.45, s * 0.45);
+      }
+    }
+    // The other branch: its own line wanders a little, and rocks stay off it.
+    const branchCentre = this.cx - this.splitSide * (this.splitHalf + (hw - this.splitHalf - 0.6) / 2);
+    if (rand() < 0.08) this.altTarget = (rand() * 2 - 1) * 1.2;
+    this.altLane += clamp(branchCentre + this.altTarget - this.altLane, -maxSlope * STEP * 0.6, maxSlope * STEP * 0.6);
+    if (d < this.splitStart || d > this.splitEnd) return;
+    if (rand() < c.splitAltRocks) {
+      const r = 0.55 + rand() * 0.45;
+      const lo = this.cx - this.splitSide * (island + 0.4);
+      const hi = this.cx - this.splitSide * (hw - 0.4);
+      const x = lo + (hi - lo) * rand();
+      if (Math.abs(x - this.altLane) >= LANE + r * 0.8 + jitter && Math.abs(x - this.lane) >= LANE + r * 0.8 + jitter) {
+        this.obstacle(x, d, r, 0.9 + rand() * 1.2);
+      }
+    }
+    // Bonus pickups down the other branch's line: the reward for taking it.
+    const mid = (this.splitStart + this.splitEnd) / 2;
+    if (this.altPickupsLeft > 0 && d >= mid - this.altPickupsLeft * 6) {
+      this.altPickupsLeft--;
+      this.pickups.spawn(this.altLane - this.shipX, CONFIG.boost.pickup.height, d, 1, 1, 1, 0, false, false, 0, 0);
     }
   }
 

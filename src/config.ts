@@ -226,7 +226,7 @@ export const CONFIG = {
     // Instance pool sizes per kind.
     maxBlocks: 2800,
     maxHull: 2400,
-    maxRocks: 1800,
+    maxRocks: 2800,
     maxStrips: 1600,
     maxObstacleRocks: 1400,
     maxBushes: 900,
@@ -360,6 +360,20 @@ export const CONFIG = {
       halfWidthMin: 6, // never narrower than this
       widthRampPoints: 22000,
       mouthHalfWidth: 34, // wide entrance that funnels down
+      // Variety: pebbles on the floor, towering cliffs, natural bridges overhead.
+      pebblesPerRow: 4,
+      cliffChance: 0.12, // per row per side: a huge rock towering over the wall
+      bridgeSpacing: [260, 480],
+      // Split paths: a rock island divides the canyon into two branches. The lane
+      // runs down one; the other has its own guaranteed line, more rocks and
+      // bonus pickups.
+      splitSpacing: [420, 700],
+      splitLength: [45, 85], // island length
+      splitIsland: [1.4, 2.6], // island half-width
+      splitWiden: 22, // units to widen the walls before (and narrow after)
+      splitRejoin: 30, // clear stretch after the island, to cross back from the other branch
+      splitAltRocks: 0.55, // chance per row of a rock in the other branch
+      splitAltPickups: 3,
       mouth: 90, // funnel length
       exit: 80, // funnel to the interior door at the end
       centreSlopeFraction: 0.45, // walls wind at this fraction of the lane's max slope

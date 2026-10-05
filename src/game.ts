@@ -1316,7 +1316,7 @@ export class Game {
   private groundStyle(): [number, number] {
     const w = this.world;
     const outside = (1 - w.insideMix) * (1 - w.asteroidMix);
-    const grass: Record<string, number> = { alien: 1, ice: 0.25, volcanic: 0.4, canyon: 0.45 };
+    const grass: Record<string, number> = { alien: 1, ice: 0.25, volcanic: 0.4, canyon: 0.15 };
     return [(grass[w.biome] ?? 0) * outside, outside];
   }
 
