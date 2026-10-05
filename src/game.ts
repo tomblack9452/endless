@@ -269,6 +269,7 @@ export class Game {
    * known course; otherwise every run gets a fresh one.
    */
   private beginRun(startScore = 0, seed = newSeed(), mode: RunMode = 'endless', course: Course | null = null, env: Environment | null = null): void {
+    this.ui.clearCelebration();
     this.seed = seed;
     this.mode = mode;
     this.course = course;

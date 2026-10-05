@@ -598,6 +598,12 @@ export class UI {
     this.promoShownAt = performance.now();
   }
 
+  /** Drop any promotions still showing (a new run is starting). */
+  clearCelebration(): void {
+    this.promoQueue = [];
+    this.promo.classList.remove('show');
+  }
+
   /** Taps on the promotion never reach the game (so they can't start a retry). */
   bindCelebration(): void {
     const stop = (e: Event) => e.stopPropagation();

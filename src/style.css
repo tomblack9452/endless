@@ -1815,17 +1815,13 @@ body {
   background: color-mix(in srgb, var(--sky, #f1ede4) 82%, transparent);
   -webkit-backdrop-filter: blur(10px);
   backdrop-filter: blur(10px);
-  opacity: 0;
-  visibility: hidden;
   pointer-events: auto;
   cursor: pointer;
-  transition: opacity 250ms ease-out, visibility 0s 250ms;
 }
 
-.promo.show {
-  opacity: 1;
-  visibility: visible;
-  transition: opacity 250ms ease-out, visibility 0s;
+/* No fades: it's either fully there or gone, so it can never be left half-shown. */
+.promo:not(.show) {
+  display: none;
 }
 
 /* Slowly turning rays behind the badge. */
@@ -1874,7 +1870,6 @@ body {
 
 .promo-tap {
   margin-top: 26px;
-  animation: promo-breathe 1600ms ease-in-out infinite;
 }
 
 .promo.show .promo-icon {
@@ -1895,37 +1890,28 @@ body {
   animation-delay: 300ms;
 }
 
+/* Movement only, never opacity: the card is readable even if an animation stalls. */
 @keyframes promo-pop {
   0% {
     transform: scale(0.3) rotate(-12deg);
-    opacity: 0;
   }
   100% {
     transform: none;
-    opacity: 1;
   }
 }
 
 @keyframes promo-rise {
   0% {
-    transform: translateY(10px);
-    opacity: 0;
+    transform: translateY(14px);
   }
   100% {
     transform: none;
-    opacity: 1;
   }
 }
 
 @keyframes promo-spin {
   to {
     transform: rotate(360deg);
-  }
-}
-
-@keyframes promo-breathe {
-  50% {
-    opacity: 0.35;
   }
 }
 
