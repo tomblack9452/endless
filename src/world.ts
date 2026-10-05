@@ -521,6 +521,8 @@ export class World {
     this.fill();
     this.hull.animate(this.distance); // pistons
     this.vents.animate(this.distance); // steam vents
+    this.tumbleweeds.animate(this.distance); // rolling across
+    this.greebles.animate(this.distance); // hook chains, engine pistons
     this.updateMix(dt);
   }
 
