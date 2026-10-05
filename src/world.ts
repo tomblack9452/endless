@@ -854,7 +854,7 @@ export class World {
     // Grass tufts (alien ground only): scenery, so anywhere.
     if (biome === 'alien') {
       for (let i = 0; i < lt.tuftsPerRow; i++) {
-        const s = 0.7 + rand() * 0.9;
+        const s = 0.6 + rand() * 0.6;
         this.tufts.spawn((rand() * 2 - 1) * W, 0, d + (rand() - 0.5) * STEP, s, s * (0.8 + rand() * 0.5), s, rand() * 6.28, false, true, 0, 0, false);
       }
     }

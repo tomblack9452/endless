@@ -125,8 +125,8 @@ float gNoise(vec2 p) {
           float patchN = gNoise(vGround * 0.045) * 0.65 + gNoise(vGround * 0.13 + 7.0) * 0.35;
           float grass = smoothstep(0.56, 0.7, patchN) * uGroundStyle.x;
           float dirt = smoothstep(0.42, 0.3, patchN) * uGroundStyle.x;
-          diffuseColor.rgb *= mix(vec3(1.0), vec3(0.86, 1.0, 0.8), grass);
-          diffuseColor.rgb *= mix(vec3(1.0), vec3(1.06, 0.95, 0.85), dirt);
+          diffuseColor.rgb *= mix(vec3(1.0), vec3(0.9, 1.0, 0.86), grass);
+          diffuseColor.rgb *= mix(vec3(1.0), vec3(1.02, 0.97, 0.92), dirt);
           // Fine grain so the ground doesn't read as flat paint.
           float grain = gNoise(vGround * 1.6) * 0.6 + gNoise(vGround * 4.1) * 0.4;
           diffuseColor.rgb *= 1.0 + (grain - 0.5) * 0.09 * uGroundStyle.y;
@@ -258,6 +258,16 @@ float gNoise(vec2 p) {
     v = v < c.minVfov ? c.minVfov : v > c.maxVfov ? c.maxVfov : v;
     // Never so narrow that the ship falls below shipY on screen.
     return Math.max(v, SHIP_MIN_VFOV);
+  }
+
+  /**
+   * Compile every material up front (in the background), so the first trip into
+   * the canyon or the ship doesn't stutter while its shaders build.
+   */
+  warmUp(): void {
+    void this.renderer.compileAsync(this.scene, this.camera).catch(() => {
+      // Older browsers: shaders just compile on first use.
+    });
   }
 
   render(): void {
