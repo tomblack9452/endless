@@ -34,9 +34,14 @@
           </div>
           <div class="hud-side right"><span id="hud-pause" class="label link">pause</span></div>
         </div>
-        <div id="hud-boost" class="hud-boost"><span class="label">hold to boost</span></div>
-        <div id="boost-pct" class="label boost-pct">boost 0</div>
-        <div id="hud-power" class="label boost-pct power-label"></div>
+        <div id="hud-boost" class="hud-boost" role="button" aria-label="boost (hold)">
+          <div class="boost-dial">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 17l7-6 7 6" /><path d="M5 11l7-6 7 6" /></svg>
+            <span id="boost-pct" class="boost-num">0</span>
+          </div>
+          <span class="label boost-caption">boost</span>
+        </div>
+        <div id="hud-power" class="label power-label"></div>
         <div id="boost-bar" class="boost-bar"><div id="boost-fill" class="boost-fill"></div></div>
       </div>
 
@@ -55,6 +60,7 @@
       </div>
 
       <div id="screen-title" class="layer screen">
+        <div class="title-top">
         <div class="title-mark">
           <div class="title-word">endless</div>
           <div class="title-word sub">space</div>
@@ -73,6 +79,7 @@
             <span class="lp-track"><span id="title-league-lp" class="lp-fill"></span></span>
           </span>
         </button>
+        </div>
         <div class="screen-foot">
           <button id="title-start" class="pill primary title-ranked" type="button">
             <span class="title-ranked-name">ranked</span>
@@ -128,6 +135,7 @@
           <button class="setting-row" type="button" data-setting="touch"><span class="label">touch steering</span><span class="value"></span></button>
           <button class="setting-row" type="button" data-setting="steering"><span class="label">drag sensitivity</span><span class="value"></span></button>
           <button class="setting-row" type="button" data-setting="boostSide"><span class="label">boost button</span><span class="value"></span></button>
+          <button class="setting-row" type="button" data-setting="doubleTapBoost"><span class="label">double-tap and hold to boost</span><span class="value"></span></button>
           <button class="setting-row" type="button" data-setting="haptics"><span class="label">vibration</span><span class="value"></span></button>
           <div class="settings-group">display</div>
           <button class="setting-row" type="button" data-setting="reduceMotion"><span class="label">reduce motion</span><span class="value"></span></button>
