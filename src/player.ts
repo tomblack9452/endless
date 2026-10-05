@@ -1,19 +1,25 @@
 import {
   BufferGeometry,
+  CanvasTexture,
+  Color,
   DoubleSide,
   Float32BufferAttribute,
   Group,
   IcosahedronGeometry,
   Mesh,
   MeshBasicMaterial,
+  PlaneGeometry,
+  Raycaster,
   Scene,
   Vector3,
 } from 'three';
+import type { Fin, Marking } from './looks';
 import { CONFIG } from './config';
 import type { ShipId } from './cosmetics';
 import type { LivePalette } from './palette';
 
 const DEG = Math.PI / 180;
+const WHITE = new Color(1, 1, 1);
 const S = CONFIG.ship;
 
 // Outline in the ground plane (x, z). Nose points to -z.
@@ -65,6 +71,29 @@ function shipShape(id: ShipId): { light: Vector3[]; shade: Vector3[]; outline: V
         outline: [nose, lt, rt],
       };
     }
+    case 'arrow': {
+      // Long, slim dart with a deep notch between two tail points.
+      const nose = v(0, 0, -l * 0.8);
+      const lt = v(-w * 0.95, 0, l * 0.5);
+      const rt = v(w * 0.95, 0, l * 0.5);
+      const ridge = v(0, h * 1.3, l * 0.05);
+      const notch = v(0, 0, l * 0.15);
+      return { light: [nose, lt, ridge, ridge, notch, rt], shade: [nose, ridge, rt, lt, notch, ridge], outline: [nose, lt, rt] };
+    }
+    case 'talon': {
+      // Wings swept forward from a narrow tail.
+      const nose = v(0, 0, -l * 0.6);
+      const lt = v(-w * 1.35, 0, -l * 0.02);
+      const rt = v(w * 1.35, 0, -l * 0.02);
+      const tl = v(-w * 0.45, 0, l * 0.5);
+      const tr = v(w * 0.45, 0, l * 0.5);
+      const ridge = v(0, h * 1.2, l * 0.12);
+      return {
+        light: [nose, lt, ridge, lt, tl, ridge, tl, tr, ridge],
+        shade: [nose, ridge, rt, rt, ridge, tr],
+        outline: [nose, v(-w * 1.1, 0, l * 0.45), v(w * 1.1, 0, l * 0.45)],
+      };
+    }
     default: {
       // Dart: the original low pyramid.
       return { light: [NOSE, LEFT, RIDGE], shade: [NOSE, RIDGE, RIGHT, LEFT, RIGHT, RIDGE], outline: [NOSE, LEFT, RIGHT] };
@@ -79,6 +108,126 @@ function shipGeometry(id: ShipId): BufferGeometry {
   g.addGroup(0, s.light.length, 0);
   g.addGroup(s.light.length, s.shade.length, 1);
   return g;
+}
+
+// --- dressing: markings, fins and the wing decal --------------------------------
+
+const DOWN = new Vector3(0, -1, 0);
+const UP_Z = new Vector3(0, 0, 1);
+const raycaster = new Raycaster();
+const probeMat = new MeshBasicMaterial({ side: DoubleSide });
+const SURFACE_LIFT = 0.006;
+
+/** Where the hull's top surface is above (x, z), in ship space, or null if off the hull. */
+function surface(geometry: BufferGeometry, x: number, z: number): { y: number; normal: Vector3 } | null {
+  const probe = new Mesh(geometry, probeMat);
+  probe.updateMatrixWorld();
+  raycaster.set(new Vector3(x, 1, z), DOWN);
+  const hit = raycaster.intersectObject(probe)[0];
+  if (!hit) return null;
+  const normal = hit.face ? hit.face.normal.clone() : new Vector3(0, 1, 0);
+  if (normal.y < 0) normal.negate();
+  return { y: hit.point.y, normal };
+}
+
+/** A quad in hull space: `a` runs tail (0) to nose (1), `b` across (-1 left edge, 1 right edge). */
+type Quad = [number, number][];
+
+const MARKINGS: Record<Exclude<Marking, 'none'>, Quad[]> = {
+  stripe: [[[0.04, -0.16], [0.04, 0.16], [0.92, 0.16], [0.92, -0.16]]],
+  twin: [
+    [[0.04, -0.55], [0.04, -0.34], [0.85, -0.34], [0.85, -0.55]],
+    [[0.04, 0.34], [0.04, 0.55], [0.85, 0.55], [0.85, 0.34]],
+  ],
+  split: [[[0.01, -0.97], [0.01, 0], [0.97, 0], [0.97, -0.97]]],
+  twotone: [[[0.01, -0.97], [0.01, 0.97], [0.38, 0.97], [0.38, -0.97]]],
+  chevron: [
+    [[0.3, -0.85], [0.45, -0.85], [0.66, 0], [0.51, 0]],
+    [[0.51, 0], [0.66, 0], [0.45, 0.85], [0.3, 0.85]],
+  ],
+};
+
+interface Frame {
+  nose: Vector3;
+  left: Vector3;
+}
+
+/** Hull space (a, b) to ship x, z. */
+function hullPoint(f: Frame, a: number, b: number): [number, number] {
+  const tailZ = f.left.z;
+  const halfW = Math.abs(f.left.x);
+  return [b * halfW * (1 - a), tailZ + (f.nose.z - tailZ) * a];
+}
+
+/** Lay a quad onto the hull's top surface as a grid of small triangles. */
+function drape(geometry: BufferGeometry, f: Frame, q: Quad, out: number[]): void {
+  const N = 6;
+  const at = (s: number, t: number): number[] | null => {
+    const a0 = q[0][0] + (q[1][0] - q[0][0]) * s;
+    const b0 = q[0][1] + (q[1][1] - q[0][1]) * s;
+    const a1 = q[3][0] + (q[2][0] - q[3][0]) * s;
+    const b1 = q[3][1] + (q[2][1] - q[3][1]) * s;
+    const [x, z] = hullPoint(f, a0 + (a1 - a0) * t, b0 + (b1 - b0) * t);
+    const hit = surface(geometry, x, z);
+    return hit ? [x, hit.y + SURFACE_LIFT, z] : null;
+  };
+  for (let i = 0; i < N; i++) {
+    for (let j = 0; j < N; j++) {
+      const p00 = at(i / N, j / N);
+      const p10 = at((i + 1) / N, j / N);
+      const p11 = at((i + 1) / N, (j + 1) / N);
+      const p01 = at(i / N, (j + 1) / N);
+      if (!p00 || !p10 || !p11 || !p01) continue;
+      out.push(...p00, ...p10, ...p11, ...p00, ...p11, ...p01);
+    }
+  }
+}
+
+function finGeometry(geometry: BufferGeometry, f: Frame, fin: Exclude<Fin, 'none'>): BufferGeometry {
+  const pos: number[] = [];
+  const tri = (a: Vector3, b: Vector3, c: Vector3) => pos.push(a.x, a.y, a.z, b.x, b.y, b.z, c.x, c.y, c.z);
+  const len = f.left.z - f.nose.z;
+  const on = (x: number, z: number) => new Vector3(x, (surface(geometry, x, z)?.y ?? 0) - 0.002, z);
+  if (fin === 'tail' || fin === 'twin') {
+    const xs = fin === 'tail' ? [0] : [-Math.abs(f.left.x) * 0.4, Math.abs(f.left.x) * 0.4];
+    for (const x of xs) {
+      const back = on(x * 0.8, f.left.z - len * 0.06);
+      const front = on(x, f.left.z - len * 0.4);
+      const top = back.clone().add(new Vector3(0, fin === 'tail' ? 0.15 : 0.11, len * 0.02));
+      tri(back, front, top);
+    }
+  } else {
+    for (const side of [-1, 1]) {
+      const tip = new Vector3(Math.abs(f.left.x) * side, 0, f.left.z);
+      const along = tip.clone().lerp(new Vector3(0, 0, f.nose.z), 0.28);
+      const base0 = on(tip.x * 0.97, tip.z - 0.01);
+      const base1 = on(along.x, along.z);
+      const top = base0.clone().add(new Vector3(side * 0.035, 0.1, 0));
+      tri(base0, base1, top);
+    }
+  }
+  const g = new BufferGeometry();
+  g.setAttribute('position', new Float32BufferAttribute(pos, 3));
+  return g;
+}
+
+/** Draw an SVG (in white) into a texture, asynchronously. */
+function svgTexture(svg: string, texture: CanvasTexture): void {
+  const canvas = texture.image as HTMLCanvasElement;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return;
+  const img = new Image();
+  img.onload = () => {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    texture.needsUpdate = true;
+  };
+  img.src = 'data:image/svg+xml;utf8,' + encodeURIComponent(svg.replace(/currentColor/g, '#ffffff'));
+}
+
+/** Perceived brightness 0..1. */
+function luma(c: Color): number {
+  return 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b;
 }
 
 interface Fragment {
@@ -96,6 +245,17 @@ export class Player {
   private readonly matTop: MeshBasicMaterial;
   private readonly matShade: MeshBasicMaterial;
   private readonly matShadow: MeshBasicMaterial;
+  // Dressing (see looks.ts), all children of the body so they bank and blink with it.
+  private readonly decor = new Group();
+  private readonly matMarking = new MeshBasicMaterial({ side: DoubleSide, polygonOffset: true, polygonOffsetFactor: -2 });
+  private readonly matDecal: MeshBasicMaterial;
+  private readonly decalTexture: CanvasTexture;
+  private shape: ShipId = 'dart';
+  private shaped = false;
+  private marking: Marking = 'none';
+  private fin: Fin = 'none';
+  private decalSvg: string | null = null;
+  private paint: [Color, Color] | null = null;
   private readonly fragments: Fragment[] = [];
 
   lateral = 0; // sideways speed, units/s, + = right
@@ -116,6 +276,11 @@ export class Player {
 
     this.body = new Mesh(shipGeometry('dart'), [this.matTop, this.matShade]);
     this.root.add(this.body);
+    this.body.add(this.decor);
+    const canvas = document.createElement('canvas');
+    canvas.width = canvas.height = 128;
+    this.decalTexture = new CanvasTexture(canvas);
+    this.matDecal = new MeshBasicMaterial({ map: this.decalTexture, transparent: true, depthWrite: false, side: DoubleSide });
     this.root.position.y = S.hoverY;
     scene.add(this.root);
     // Shield bubble: a faint wireframe shell, shown while a shield is held.
@@ -155,8 +320,58 @@ export class Player {
     this.body.visible = blink <= 0 || Math.floor(blink * 14) % 2 === 0;
   }
 
+  /** Paint colours (top, shade), or null for the palette's own. */
+  setPaint(colors: [string, string] | null): void {
+    this.paint = colors ? [new Color(colors[0]), new Color(colors[1])] : null;
+    this.applyPalette();
+  }
+
+  /** Markings, fins and the wing decal (an insignia SVG, or null). */
+  setDressing(marking: Marking, fin: Fin, decalSvg: string | null): void {
+    if (marking === this.marking && fin === this.fin && decalSvg === this.decalSvg) return;
+    this.marking = marking;
+    this.fin = fin;
+    this.decalSvg = decalSvg;
+    this.buildDecor();
+  }
+
+  /** Rebuild the dressing for the current hull. */
+  private buildDecor(): void {
+    for (const child of [...this.decor.children]) {
+      (child as Mesh).geometry.dispose();
+      this.decor.remove(child);
+    }
+    const geometry = this.body.geometry;
+    const s = shipShape(this.shape);
+    const frame: Frame = { nose: s.outline[0], left: s.outline[1] };
+    if (this.marking !== 'none') {
+      const pos: number[] = [];
+      for (const q of MARKINGS[this.marking]) drape(geometry, frame, q, pos);
+      const g = new BufferGeometry();
+      g.setAttribute('position', new Float32BufferAttribute(pos, 3));
+      this.decor.add(new Mesh(g, this.matMarking));
+    }
+    if (this.fin !== 'none') this.decor.add(new Mesh(finGeometry(geometry, frame, this.fin), this.matShade));
+    if (this.decalSvg) {
+      const [x, z] = hullPoint(frame, 0.32, -0.55);
+      const hit = surface(geometry, x, z);
+      if (hit) {
+        svgTexture(this.decalSvg, this.decalTexture);
+        const size = Math.min(0.11, Math.abs(frame.left.x) * 0.45);
+        const decal = new Mesh(new PlaneGeometry(size, size), this.matDecal);
+        decal.position.set(x, hit.y + SURFACE_LIFT * 1.5, z);
+        decal.quaternion.setFromUnitVectors(UP_Z, hit.normal);
+        decal.rotateZ(Math.PI); // nose up the insignia, seen from behind
+        this.decor.add(decal);
+      }
+    }
+  }
+
   /** Swap the ship's shape (cosmetic). */
   setShape(id: ShipId): void {
+    if (id === this.shape && this.shaped) return; // same hull: nothing to rebuild
+    this.shaped = true;
+    this.shape = id;
     const s = shipShape(id);
     this.body.geometry.dispose();
     this.body.geometry = shipGeometry(id);
@@ -164,11 +379,24 @@ export class Player {
     const sg = new BufferGeometry();
     sg.setAttribute('position', new Float32BufferAttribute(s.outline.flatMap(xyz), 3));
     this.shadow.geometry = sg;
+    this.buildDecor();
   }
 
   applyPalette(): void {
-    this.matTop.color.copy(this.palette.ship);
-    this.matShade.color.copy(this.palette.shipShade);
+    if (this.paint) {
+      // Paint keeps its hue but still dims a little with the light.
+      const k = 0.7 + 0.3 * Math.min(1, luma(this.palette.light));
+      this.matTop.color.copy(this.paint[0]).multiplyScalar(k);
+      this.matShade.color.copy(this.paint[1]).multiplyScalar(k);
+    } else {
+      this.matTop.color.copy(this.palette.ship);
+      this.matShade.color.copy(this.palette.shipShade);
+    }
+    // Markings and decal contrast with the hull: dark on light paint, light on dark.
+    const light = luma(this.matTop.color) > 0.42;
+    if (light) this.matMarking.color.copy(this.matTop.color).multiplyScalar(0.38);
+    else this.matMarking.color.copy(this.matTop.color).lerp(WHITE, 0.62);
+    this.matDecal.color.copy(this.matMarking.color);
     this.matShadow.color.copy(this.palette.text);
   }
 

@@ -13,17 +13,20 @@ import { SpeedLines } from './speedLines';
 import { Trail } from './trail';
 import { cycle, DEFAULT_SETTINGS, LEVEL_GAIN, loadSettings, saveSettings, type SettingKey, STEERING_RANGE, TEXT_SCALE, TILT_GAIN } from './settings';
 import { EVENT_NOTICE, Events } from './events';
-import { Cosmetics, describe, UNLOCK_ORDER } from './cosmetics';
+import { Cosmetics, describe } from './cosmetics';
 import { Haptics } from './haptics';
 import { Hints } from './hints';
 import { Missions, type RunMetrics } from './missions';
 import { chainTarget, dailySeed, Progress, sectorOf, sectorStart, STAR_CHAIN, STAR_CLEAR, STAR_NO_HITS } from './progress';
 import { creditsFor, insignia, par, Ranked, rankName, RANKS, type RunMode } from './ranks';
 import { Wallet } from './wallet';
+import { find, itemsIn, LOOKS, Looks, type Owner, type Slot, SLOT_NAMES, SLOTS, unlockText } from './looks';
+import type { Fin, Marking } from './looks';
+import type { ShipId } from './cosmetics';
 import { MAX_TIER, type ShipStats, STANDARD, SYSTEMS, type SystemId, TIER_COST, Upgrades } from './upgrades';
 import { newSeed } from './rng';
 import { loadNumber, saveNumber } from './storage';
-import { formatScore, type RankResultView, UI } from './ui';
+import { formatScore, type LookRow, type RankResultView, UI } from './ui';
 import type { RoomId } from './interior';
 import { biomeForLevel, type PowerKind, themeForLevel, themeName, World } from './world';
 import { tintBiome } from './biomes';
@@ -90,6 +93,9 @@ export class Game {
   /** This run's ship systems: the standard ship unless it's a solo run. */
   private ship: ShipStats = STANDARD;
   private hangarTab: 'ship' | 'upgrades' = 'ship';
+  private readonly looks = new Looks();
+  /** A locked look being tried on in the hangar (not yet owned). */
+  private preview: { slot: Slot; id: string } | null = null;
   private pickupCount = 0;
   private recorded = false; // this run's stats are saved
   private assisted = false; // assist mode was on at some point this run
@@ -191,7 +197,7 @@ export class Game {
     this.ui.bindTitleLinks(this.onTitleLink);
     void Promise.all([this.progress.load(), this.ranked.load(), this.wallet.load()]).then(() => this.refreshTitle());
     void loadNumber(SOLO_BEST, 0).then((b) => (this.soloBest = b));
-    this.ui.bindHangar(this.onHangar);
+    this.ui.bindLooks(this.onLookRow, this.onLookBuy);
     this.ui.bindSectors(this.onSectorPick);
     this.ui.bindHangarTabs((tab) => {
       this.hangarTab = tab;
@@ -200,7 +206,11 @@ export class Game {
     this.ui.bindUpgrades(this.onBuyUpgrade);
     void this.upgrades.load();
     void this.missions.load();
-    void this.cosmetics.load().then(() => this.applyCosmetics());
+    void Promise.all([this.cosmetics.load(), this.looks.load()]).then(() => {
+      // Saves from before the hangar had looks: carry the mission hull across.
+      if (this.looks.equipped.hull === 'dart' && this.cosmetics.ship !== 'dart') this.looks.equip('hull', this.cosmetics.ship);
+      this.applyCosmetics();
+    });
     void loadSettings().then((s) => {
       this.settings = s;
       this.applySettings();
@@ -486,7 +496,7 @@ export class Game {
   /** Ship shape, trail and the chosen palette (outside a run's later loops). */
   private applyCosmetics(): void {
     const c = this.cosmetics;
-    this.player.setShape(c.ship);
+    this.applyLooks();
     this.trail.setStyle(c.trail);
     this.basePalette.set(PALETTES.find((p) => p.name === c.palette) ?? PALETTES[0]);
     this.applyLook(this.distanceScore / CONFIG.score.levelLength);
@@ -502,11 +512,89 @@ export class Game {
     this.fadeT = 0;
   }
 
-  private onHangar = (kind: 'ship' | 'trail' | 'palette'): void => {
-    this.cosmetics.cycle(kind);
-    this.applyCosmetics();
+  /** What the player has, for unlocking looks. */
+  private owner(): Owner {
+    return { rank: this.ranked.rank, stars: this.progress.totalStars(), missionHulls: this.cosmetics.ships() };
+  }
+
+  /** Put the equipped looks (plus any preview) on the ship. */
+  private applyLooks(): void {
+    const eq = { ...this.looks.equipped };
+    if (this.preview) eq[this.preview.slot] = this.preview.id;
+    this.player.setShape(eq.hull as ShipId);
+    this.player.setPaint(find('paint', eq.paint).colors ?? null);
+    this.player.setDressing(eq.markings as Marking, eq.fins as Fin, eq.decal === 'rank' ? insignia(this.ranked.rank) : null);
+    this.trail.setTint(find('engine', eq.engine).colors?.[0] ?? null);
+  }
+
+  /** Ship tab rows: the looks slots, then trail style and world colours (from missions). */
+  private onLookRow = (key: string): void => {
+    if (key === 'trail' || key === 'palette') {
+      this.preview = null;
+      this.cosmetics.cycle(key);
+      this.applyCosmetics();
+      this.openHangar();
+      return;
+    }
+    const slot = key as Slot;
+    const items = itemsIn(slot);
+    const current = this.preview?.slot === slot ? this.preview.id : this.looks.equipped[slot];
+    const next = items[(items.findIndex((i) => i.id === current) + 1) % items.length];
+    if (this.looks.owns(next, this.owner())) {
+      this.preview = null;
+      this.looks.equip(slot, next.id);
+    } else {
+      this.preview = { slot, id: next.id };
+    }
+    this.applyLooks();
     this.openHangar();
   };
+
+  private onLookBuy = (): void => {
+    if (!this.preview) return;
+    const item = find(this.preview.slot, this.preview.id);
+    if (item.unlock.by !== 'credits' || !this.wallet.spend(item.unlock.cost)) return;
+    this.looks.buy(item);
+    this.looks.equip(item.slot, item.id);
+    this.preview = null;
+    this.sound.pickup();
+    this.haptics.pickup();
+    this.refreshTitle();
+    this.applyLooks();
+    this.openHangar();
+  };
+
+  private renderLooks(): void {
+    const o = this.owner();
+    const rows = SLOTS.map((slot): LookRow => {
+      const id = this.preview?.slot === slot ? this.preview.id : this.looks.equipped[slot];
+      const item = find(slot, id);
+      const owned = this.looks.owns(item, o);
+      const count = itemsIn(slot).filter((i) => this.looks.owns(i, o)).length;
+      return {
+        key: slot,
+        label: SLOT_NAMES[slot],
+        value: owned ? `${item.name} (${count}/${itemsIn(slot).length})` : item.name,
+        locked: !owned,
+        note: unlockText(item.unlock),
+      };
+    });
+    const c = this.cosmetics;
+    rows.push(
+      { key: 'trail', label: 'trail', value: `${c.trail} (${c.trails().length})`, locked: false, note: '' },
+      { key: 'palette', label: 'world colours', value: `${c.palette} (${c.palettes().length})`, locked: false, note: '' },
+    );
+    let buy: { text: string; enabled: boolean } | null = null;
+    if (this.preview) {
+      const item = find(this.preview.slot, this.preview.id);
+      if (item.unlock.by === 'credits') {
+        const cost = item.unlock.cost;
+        buy = { text: `buy ${item.name} · ${formatScore(cost)} credits`, enabled: this.wallet.credits >= cost };
+      }
+    }
+    const owned = LOOKS.filter((l) => this.looks.owns(l, o)).length;
+    this.ui.renderLooks(rows, buy, `${owned} of ${LOOKS.length} looks unlocked · missions unlock trails, hulls and world colours`);
+  }
 
   private onBuyUpgrade = (id: string): void => {
     const sys = id as SystemId;
@@ -541,15 +629,7 @@ export class Game {
   private openHangar(): void {
     this.renderUpgrades();
     this.ui.setHangarTab(this.hangarTab, `${formatScore(this.wallet.credits)} credits`);
-    const c = this.cosmetics;
-    this.ui.renderHangar(
-      {
-        ship: [c.ship, c.ships().length],
-        trail: [c.trail, c.trails().length],
-        palette: [c.palette, c.palettes().length],
-      },
-      c.next() ? `missions unlock more (${c.unlocked} of ${UNLOCK_ORDER.length})` : 'everything unlocked',
-    );
+    this.renderLooks();
     // Show the ship over the title scene while choosing.
     this.player.reset();
     this.player.setVisible(true);
@@ -646,6 +726,7 @@ export class Game {
 
   private refreshTitle(): void {
     const i = this.ranked.rank;
+    this.applyLooks(); // the wing decal follows your rank
     this.ui.setTitleRank(insignia(i), rankName(i), `${formatScore(this.wallet.credits)} credits`);
     const db = this.progress.dailyBest;
     this.ui.setTitleLink('daily', db > 0 ? `daily run (best ${formatScore(db)})` : 'daily run');
@@ -732,7 +813,12 @@ export class Game {
   };
 
   private closeInfo(): void {
-    if (this.infoOpen === 'hangar' && this.state === 'title') this.player.setVisible(false);
+    if (this.infoOpen === 'hangar') {
+      // Leaving the hangar takes off anything only being tried on.
+      this.preview = null;
+      this.applyLooks();
+      if (this.state === 'title') this.player.setVisible(false);
+    }
     this.infoOpen = null;
     this.ui.show('title');
   }

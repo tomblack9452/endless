@@ -1,0 +1,179 @@
+import type { ShipId } from './cosmetics';
+import { rankName } from './ranks';
+import { storage } from './storage';
+
+// Ship looks: what the ship wears. Purely cosmetic (every hull shares one
+// hitbox), so they're allowed in ranked too. Items unlock four ways: free,
+// credits, a rank, or a total of sector stars. Hull shapes beyond the
+// starter also come from missions (see cosmetics.ts).
+
+export type Slot = 'hull' | 'paint' | 'markings' | 'fins' | 'engine' | 'decal';
+export type Marking = 'none' | 'stripe' | 'twin' | 'chevron' | 'twotone' | 'split';
+export type Fin = 'none' | 'tail' | 'twin' | 'winglets';
+
+export type Unlock =
+  | { by: 'free' }
+  | { by: 'mission' } // hull shapes unlocked by missions
+  | { by: 'credits'; cost: number }
+  | { by: 'rank'; rank: number }
+  | { by: 'stars'; stars: number };
+
+export interface LookItem {
+  slot: Slot;
+  id: string;
+  name: string;
+  unlock: Unlock;
+  colors?: [string, string]; // paint: top and shade; engine: [colour, colour]
+}
+
+const free: Unlock = { by: 'free' };
+const credits = (cost: number): Unlock => ({ by: 'credits', cost });
+const rank = (r: number): Unlock => ({ by: 'rank', rank: r });
+const stars = (n: number): Unlock => ({ by: 'stars', stars: n });
+
+export const LOOKS: readonly LookItem[] = [
+  { slot: 'hull', id: 'dart', name: 'dart', unlock: free },
+  { slot: 'hull', id: 'wing', name: 'wing', unlock: { by: 'mission' } },
+  { slot: 'hull', id: 'needle', name: 'needle', unlock: { by: 'mission' } },
+  { slot: 'hull', id: 'manta', name: 'manta', unlock: { by: 'mission' } },
+  { slot: 'hull', id: 'arrow', name: 'arrow', unlock: credits(1500) },
+  { slot: 'hull', id: 'talon', name: 'talon', unlock: credits(4000) },
+
+  { slot: 'paint', id: 'standard', name: 'standard', unlock: free },
+  { slot: 'paint', id: 'slate', name: 'slate', unlock: credits(200), colors: ['#66707a', '#454c54'] },
+  { slot: 'paint', id: 'crimson', name: 'crimson', unlock: credits(300), colors: ['#b8403c', '#812a28'] },
+  { slot: 'paint', id: 'cobalt', name: 'cobalt', unlock: credits(300), colors: ['#3f63b8', '#2a4482'] },
+  { slot: 'paint', id: 'olive', name: 'olive', unlock: credits(300), colors: ['#717f3e', '#4e582a'] },
+  { slot: 'paint', id: 'sand', name: 'sand', unlock: credits(400), colors: ['#cdb68d', '#9d8a64'] },
+  { slot: 'paint', id: 'white', name: 'white', unlock: credits(500), colors: ['#efefeb', '#bfc0bb'] },
+  { slot: 'paint', id: 'carbon', name: 'carbon', unlock: credits(800), colors: ['#2e2e31', '#1a1a1c'] },
+  { slot: 'paint', id: 'gold', name: 'gold', unlock: rank(25), colors: ['#d9ab3d', '#a17b24'] },
+  { slot: 'paint', id: 'chrome', name: 'chrome', unlock: rank(31), colors: ['#dde1e6', '#9ba3ac'] },
+
+  { slot: 'markings', id: 'none', name: 'none', unlock: free },
+  { slot: 'markings', id: 'stripe', name: 'stripe', unlock: credits(250) },
+  { slot: 'markings', id: 'twin', name: 'twin stripes', unlock: credits(400) },
+  { slot: 'markings', id: 'split', name: 'split', unlock: credits(600) },
+  { slot: 'markings', id: 'chevron', name: 'chevron', unlock: stars(10) },
+  { slot: 'markings', id: 'twotone', name: 'two-tone', unlock: stars(25) },
+
+  { slot: 'fins', id: 'none', name: 'none', unlock: free },
+  { slot: 'fins', id: 'tail', name: 'tail fin', unlock: credits(300) },
+  { slot: 'fins', id: 'twin', name: 'twin fins', unlock: stars(15) },
+  { slot: 'fins', id: 'winglets', name: 'winglets', unlock: credits(800) },
+
+  { slot: 'engine', id: 'standard', name: 'standard', unlock: free },
+  { slot: 'engine', id: 'amber', name: 'amber', unlock: credits(150), colors: ['#e2a64e', '#e2a64e'] },
+  { slot: 'engine', id: 'cyan', name: 'cyan', unlock: credits(150), colors: ['#4fc3d9', '#4fc3d9'] },
+  { slot: 'engine', id: 'violet', name: 'violet', unlock: credits(250), colors: ['#a07ae0', '#a07ae0'] },
+  { slot: 'engine', id: 'green', name: 'green', unlock: credits(250), colors: ['#6ccf7c', '#6ccf7c'] },
+  { slot: 'engine', id: 'white', name: 'white', unlock: credits(400), colors: ['#f4f4f0', '#f4f4f0'] },
+  { slot: 'engine', id: 'red', name: 'red', unlock: rank(7), colors: ['#e0503f', '#e0503f'] },
+
+  { slot: 'decal', id: 'none', name: 'none', unlock: free },
+  { slot: 'decal', id: 'rank', name: 'rank insignia', unlock: free },
+];
+
+export const SLOTS: Slot[] = ['hull', 'paint', 'markings', 'fins', 'engine', 'decal'];
+export const SLOT_NAMES: Record<Slot, string> = {
+  hull: 'hull',
+  paint: 'paint',
+  markings: 'markings',
+  fins: 'fins',
+  engine: 'engine colour',
+  decal: 'wing decal',
+};
+
+export function itemsIn(slot: Slot): LookItem[] {
+  return LOOKS.filter((l) => l.slot === slot);
+}
+
+export function find(slot: Slot, id: string): LookItem {
+  return LOOKS.find((l) => l.slot === slot && l.id === id) ?? itemsIn(slot)[0];
+}
+
+/** What the player has to unlock an item, for checking it. */
+export interface Owner {
+  rank: number;
+  stars: number;
+  missionHulls: ShipId[];
+}
+
+/** How an item unlocks, in words (for the hangar). */
+export function unlockText(u: Unlock): string {
+  switch (u.by) {
+    case 'free':
+      return '';
+    case 'mission':
+      return 'from missions';
+    case 'credits':
+      return `${u.cost.toLocaleString('en-US')} credits`;
+    case 'rank':
+      return `rank ${rankName(u.rank)}`;
+    case 'stars':
+      return `${u.stars} stars`;
+  }
+}
+
+const KEY = 'endless.looks';
+
+type Equipped = Record<Slot, string>;
+
+export class Looks {
+  /** Bought with credits (rank, star, mission and free items are owned when earned). */
+  private bought = new Set<string>();
+  equipped: Equipped = { hull: 'dart', paint: 'standard', markings: 'none', fins: 'none', engine: 'standard', decal: 'none' };
+
+  async load(): Promise<void> {
+    const raw = await storage.get(KEY);
+    if (!raw) return;
+    try {
+      const s = JSON.parse(raw) as { bought?: string[]; equipped?: Partial<Equipped> };
+      this.bought = new Set(s.bought ?? []);
+      this.equipped = { ...this.equipped, ...s.equipped };
+    } catch {
+      // Corrupt value: keep defaults.
+    }
+  }
+
+  save(): void {
+    void storage.set(KEY, JSON.stringify({ bought: [...this.bought], equipped: this.equipped }));
+  }
+
+  owns(item: LookItem, o: Owner): boolean {
+    const u = item.unlock;
+    switch (u.by) {
+      case 'free':
+        return true;
+      case 'mission':
+        return o.missionHulls.includes(item.id as ShipId);
+      case 'credits':
+        return this.bought.has(`${item.slot}:${item.id}`);
+      case 'rank':
+        return o.rank >= u.rank;
+      case 'stars':
+        return o.stars >= u.stars;
+    }
+  }
+
+  buy(item: LookItem): void {
+    this.bought.add(`${item.slot}:${item.id}`);
+    this.save();
+  }
+
+  /** Mark everything bought (dev). */
+  buyAll(): void {
+    for (const l of LOOKS) if (l.unlock.by === 'credits') this.bought.add(`${l.slot}:${l.id}`);
+    this.save();
+  }
+
+  equip(slot: Slot, id: string): void {
+    this.equipped[slot] = id;
+    this.save();
+  }
+
+  /** Put anything no longer owned back to the slot's default. */
+  validate(o: Owner): void {
+    for (const slot of SLOTS) if (!this.owns(find(slot, this.equipped[slot]), o)) this.equipped[slot] = itemsIn(slot)[0].id;
+  }
+}
