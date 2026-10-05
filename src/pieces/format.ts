@@ -28,7 +28,16 @@ export type Part =
   | 'rack' // server rack
   | 'tank'
   | 'console'
-  | 'pillar';
+  | 'pillar'
+  | 'water' // flooded: no floor (a fall), water across
+  | 'tree' // planter with an alien tree (the trunk collides)
+  | 'laser' // a security beam (posts at its ends)
+  | 'core' // reactor core
+  | 'shuttle' // a parked shuttle, drawn once in the middle of its block
+  | 'vent' // a steam vent firing on a rhythm
+  | 'coolant' // a curtain of falling coolant
+  | 'molten' // a curtain of molten metal
+  | 'debris'; // wreckage on the floor
 
 const SOLID: Record<Part, boolean> = {
   floor: false,
@@ -42,6 +51,15 @@ const SOLID: Record<Part, boolean> = {
   tank: true,
   console: true,
   pillar: true,
+  water: false,
+  tree: true,
+  laser: true,
+  core: true,
+  shuttle: true,
+  vent: true,
+  coolant: true,
+  molten: true,
+  debris: true,
 };
 
 /** The shared ship legend. Pieces can add their own characters. */
@@ -57,6 +75,15 @@ export const SHIP_LEGEND: Record<string, Part> = {
   T: 'tank',
   K: 'console',
   P: 'pillar',
+  '~': 'water',
+  H: 'tree',
+  L: 'laser',
+  o: 'core',
+  s: 'shuttle',
+  v: 'vent',
+  w: 'coolant',
+  m: 'molten',
+  x: 'debris',
 };
 
 export function isSolid(p: Part): boolean {
@@ -89,7 +116,17 @@ export type Overlay =
   /** A hologram panel facing down the room. */
   | { at: number; kind: 'holo'; x: number; y: number; w: number; h: number }
   /** A thin pour of liquid from the ceiling (scenery). */
-  | { at: number; kind: 'drip'; x: number };
+  | { at: number; kind: 'drip'; x: number }
+  /** Blast doors closing across the room as you come, leaving a gap at x (half-width `half`). */
+  | { at: number; kind: 'door'; x: number; half: number }
+  /** Wreckage falling from the ceiling to land at x (solid once down). */
+  | { at: number; kind: 'debris'; x: number; w: number }
+  /** A big fan turning at height y (in a pit, say). */
+  | { at: number; kind: 'fan'; x: number; y: number; size: number }
+  /** A plume of steam (scenery). */
+  | { at: number; kind: 'steam'; x: number; y: number; h: number }
+  /** A panel throwing sparks (scenery). */
+  | { at: number; kind: 'sparks'; x: number; y: number };
 
 export interface Piece {
   id: string;
@@ -123,6 +160,8 @@ export interface ParsedRow {
   floor: [number, number][] | null;
   /** True if the floor here has catwalk edges (railings). */
   catwalk: boolean;
+  /** True if there's water under the gaps in the floor. */
+  water: boolean;
 }
 
 export interface Parsed {
@@ -167,6 +206,7 @@ export function parse(piece: Piece): Parsed {
     const floor: [number, number][] = [];
     let pits = false;
     let catwalk = false;
+    let water = false;
     let runStart = -1;
     const runs: Block[] = [];
     let runPart: Part | null = null;
@@ -175,8 +215,9 @@ export function parse(piece: Piece): Parsed {
       const part = legend[ch];
       if (!part) throw new Error(`${piece.id}: row ${r} has '${ch}', which isn't in the legend`);
       const x = j - mid;
-      const isFloor = part !== 'pit';
+      const isFloor = part !== 'pit' && part !== 'water';
       if (part === 'catwalk') catwalk = true;
+      if (part === 'water') water = true;
       if (!isFloor) pits = true;
       // Floor segments.
       if (isFloor && runStart < 0) runStart = j;
@@ -194,7 +235,7 @@ export function parse(piece: Piece): Parsed {
     }
     if (runPart) runs[runs.length - 1].x1 = last - mid - 0.5;
     if (runStart >= 0) floor.push([runStart - mid - 0.5, last - mid - 0.5]);
-    rows.push({ hw, floor: pits ? floor : null, catwalk });
+    rows.push({ hw, floor: pits ? floor : null, catwalk, water });
     // Merge with the block above when it's the same part over the same span.
     for (const run of runs) {
       const above = open.find((b) => b.r1 === r - 1 && b.part === run.part && b.x0 === run.x0 && b.x1 === run.x1);
@@ -278,6 +319,18 @@ export function check(piece: Piece): string[] {
     }
     // Moving parts, where they are when you arrive.
     for (const o of piece.overlays ?? []) {
+      if (o.kind === 'door') {
+        const x = routeX(rt, o.at);
+        if (Math.abs(x - o.x) > o.half - margin) out.push(`${name}: the door at row ${o.at} closes on the route (x ${x.toFixed(2)})`);
+        continue;
+      }
+      if (o.kind === 'debris') {
+        for (let r = o.at - 1; r <= o.at + 1; r++) {
+          const x = routeX(rt, r);
+          if (Math.abs(x - o.x) < margin + o.w / 2) out.push(`${name}: debris at row ${o.at} lands on the route`);
+        }
+        continue;
+      }
       if (o.kind !== 'hook' && o.kind !== 'slider') continue;
       const half = o.kind === 'hook' ? 0.35 : o.w / 2;
       const x = routeX(rt, o.at);
@@ -285,5 +338,14 @@ export function check(piece: Piece): string[] {
     }
   }
   if (!piece.routes.some((r) => r.tag === 'main')) out.push(`${piece.id} has no main route`);
+  // Every route starts and ends where the main one does: the lead-in and lead-out
+  // around a piece only keep room for one way in and one way out.
+  const main = piece.routes.find((r) => r.tag === 'main');
+  if (main) {
+    for (const [k, rt] of piece.routes.entries()) {
+      if (rt.points[0][1] !== main.points[0][1]) out.push(`${piece.id} route ${k} doesn't start where the main route does`);
+      if (rt.points[rt.points.length - 1][1] !== main.points[main.points.length - 1][1]) out.push(`${piece.id} route ${k} doesn't end where the main route does`);
+    }
+  }
   return [...new Set(out)];
 }

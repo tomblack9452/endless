@@ -282,8 +282,8 @@ export class World {
   private sectionStarts: number[] = []; // offsets from the run start
   private themeRuns: Span[] = []; // contiguous sections in one theme
   private biomeGroups: Span[] = []; // ...and in one biome
-  private roomQueue: RoomId[] = [];
-  private roomScript: RoomId[] = []; // the course's rooms for this stretch, repeated if it runs long
+  private roomQueue: string[] = []; // piece ids or room families
+  private roomScript: string[] = []; // the course's rooms for this stretch, repeated if it runs long
   private nextOverlayAt = 0;
   private overlaySide = 1;
   /** Name of the room the ship is in ('' for corridors and outside). */
@@ -1830,7 +1830,14 @@ export class World {
       else if (o.kind === 'slider') api.slider(this.cx + (o.x[0] + o.x[1]) / 2, (o.x[1] - o.x[0]) / 2, this.cx + o.arrive, d, o.w, o.h, o.depth);
       else if (o.kind === 'holo') api.holo(this.cx + o.x, o.y, d, o.w, o.h);
       else if (o.kind === 'drip') api.pour(this.cx + o.x, d, 0.08, 1, false);
+      else if (o.kind === 'door') api.door(d, this.cx + o.x, o.half);
+      else if (o.kind === 'debris') api.debris(this.cx + o.x, d, o.w, 0.8, 1.0, 12);
+      else if (o.kind === 'fan') api.bigFan(this.cx + o.x, o.y, d, o.size);
+      else if (o.kind === 'steam') api.steam(this.cx + o.x, o.y, d, o.h);
+      else if (o.kind === 'sparks') api.sparks(this.cx + o.x, o.y, d);
     }
+    // Water across a flooded row.
+    if (p.rows[r].water) api.water(this.cx, -0.45, d, p.rows[r].hw * 2);
     // Dev: the routes, as lines on the floor.
     if (this.showRoutes) {
       const colour = { main: Light.White, alt: Light.Teal, risky: Light.Amber } as const;
@@ -1886,6 +1893,40 @@ export class World {
         for (let k = 0; k < Math.round(w); k++) {
           for (let j = 0; j < n; j += 2) this.api.tank(this.cx + b.x0 + k + 0.5, d + j * STEP, 0.45, Math.min(H - 0.3, 2.6));
         }
+        break;
+      case 'tree':
+        // A planter the length of the block, a tree every other row.
+        this.blocks.spawn(x - this.shipX, 0, dc, w, 0.35, depth, 0, true, false, w / 2, depth / 2);
+        for (let j = 0; j < n; j += 2) this.api.tree(x, d + j * STEP, 0.75 + vary(5 + j) * 0.35);
+        break;
+      case 'laser':
+        // Posts at each end and two beams between, every row of the block.
+        for (let j = 0; j < n; j++) {
+          const dj = d + j * STEP;
+          this.light(x, 0.28, dj, w, 0.07, 0.12, Light.Red, true);
+          this.light(x, 0.62, dj, w, 0.05, 0.1, Light.Red, true);
+          this.hullBox(this.cx + b.x0 + 0.12, 0, dj, 0.24, 1.1, 0.3, true, true);
+          this.hullBox(this.cx + b.x1 - 0.12, 0, dj, 0.24, 1.1, 0.3, true, true);
+        }
+        break;
+      case 'core':
+        this.hullBox(x, 0, dc, w, H - 0.4, depth, true, false);
+        for (let j = 0; j < n; j += 2) this.light(x, 1.2, d + j * STEP, w + 0.06, 0.16, 0.4, Light.Teal, false);
+        break;
+      case 'shuttle':
+        this.api.shuttle(x, dc, vary(6) < 0.3);
+        break;
+      case 'vent':
+        for (let k = 0; k < Math.round(w); k++) {
+          for (let j = 0; j < n; j++) this.api.vent(this.cx + b.x0 + k + 0.5, d + j * STEP, 0.45, CONFIG.themes.interior.rooms.vents.period);
+        }
+        break;
+      case 'coolant':
+      case 'molten':
+        for (let j = 0; j < n; j++) this.api.pour(x, d + j * STEP, w, b.part === 'coolant' ? 0 : 2, true);
+        break;
+      case 'debris':
+        this.hullBox(x, 0, dc, w, 0.5 + vary(7) * 0.5, depth, true, true);
         break;
       default:
         break;
@@ -1976,13 +2017,17 @@ export class World {
       this.startRoom('corridor', d, base, maxSlope, false);
     } else if (d >= this.roomEnd) {
       let next: RoomId = 'corridor';
+      let named: Piece | undefined;
       if (this.room === 'corridor') {
         // A course's rooms come round again rather than falling back to random ones.
         if (this.roomQueue.length === 0 && this.roomScript.length > 0) this.roomQueue = [...this.roomScript];
-        next = this.devRoom ?? this.roomQueue.shift() ?? pickRoom(sub, this.lastRoom);
+        const entry = this.devRoom ?? this.roomQueue.shift() ?? pickRoom(sub, this.lastRoom);
+        // A course names a piece by id, or just a room family.
+        named = pieceById(entry);
+        next = named ? named.family : (entry as RoomId);
       }
       else this.lastRoom = this.room;
-      const piece = this.choosePiece(next, sub);
+      const piece = named ?? this.choosePiece(next, sub);
       if (!piece || !this.startPiece(piece, d, base, maxSlope)) this.startRoom(next, d, base, maxSlope);
     }
 
