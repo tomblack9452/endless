@@ -407,11 +407,6 @@ export class InstancedField {
   }
 }
 
-export function randomHeight(): number {
-  const f = CONFIG.field;
-  return f.minHeight + (f.maxHeight - f.minHeight) * Math.pow(Math.random(), f.heightBias);
-}
-
 const W = CONFIG.field.halfWidth;
 const SPAN = W * 2;
 

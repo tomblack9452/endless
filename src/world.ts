@@ -949,12 +949,10 @@ export class World {
     this.laneRetargetAt = d;
     this.hullLook = 0;
     if (theme === 'canyon') {
-      // Centre the mouth on the ship, not the lane: on open ground the player can
-      // roam far from the lane. The lane carries on from where it was (the mouth is
-      // wide) and drifts in from there, so following it never needs a sudden swerve.
-      this.cx = this.shipX;
-      const m = TH.canyon.mouthHalfWidth - LANE - 0.4;
-      this.lane = clamp(this.lane, this.cx - m, this.cx + m);
+      // Centre the mouth on the lane. Never on the ship: the course must depend only
+      // on its seed (the weekly level is the same for everyone, however they steer).
+      // The mouth is wide, so a ship roaming off the lane still funnels in.
+      this.cx = this.lane;
       this.splitAt = d + range(TH.canyon.splitSpacing);
       this.splitStart = Infinity;
       this.splitEnd = -Infinity;
@@ -1020,7 +1018,7 @@ export class World {
     if (biome === 'alien') {
       for (let i = 0; i < lt.tuftsPerRow; i++) {
         const s = 0.6 + rand() * 0.6;
-        this.tufts.spawn((rand() * 2 - 1) * W, 0, d + (rand() - 0.5) * STEP, s, s * (0.8 + rand() * 0.5), s, rand() * 6.28, false, true, 0, 0, false);
+        this.tufts.spawn(wrap(laneRel + (rand() * 2 - 1) * W), 0, d + (rand() - 0.5) * STEP, s, s * (0.8 + rand() * 0.5), s, rand() * 6.28, false, true, 0, 0, false);
       }
     }
     // Tumbleweeds rolling across (not on the ice).
@@ -1107,7 +1105,7 @@ export class World {
     // Level 2: rock clusters, well clear of the lane.
     if (sub === 1 && d >= this.nextFeatureAt) {
       this.nextFeatureAt = d + range(lt.clusterSpacing);
-      const centre = (rand() * 2 - 1) * W;
+      const centre = wrap(laneRel + (rand() * 2 - 1) * W); // around the lane, not the ship: the course depends only on its seed
       const size = Math.round(range(lt.clusterSize));
       for (let i = 0; i < size; i++) {
         const r = 0.5 + rand() * 0.6;
@@ -1127,7 +1125,7 @@ export class World {
     for (let i = 0; i < tries; i++) {
       if (rand() >= p) continue;
       this.pickProp();
-      const x = (rand() * 2 - 1) * W;
+      const x = wrap(laneRel + (rand() * 2 - 1) * W); // around the lane, not the ship: the course depends only on its seed
       if (Math.abs(wrap(x - laneRel)) < clear + this.propHit) continue;
       this.placeProp(x, d + (rand() - 0.5) * STEP, true);
     }
@@ -1136,8 +1134,8 @@ export class World {
   /** Volcanic plain: a glowing crack in the ground now and then, off the lane (scenery). */
   private lavaCrack(d: number, laneRel: number, jitter: number): void {
     if (rand() > CONFIG.biomes.lavaChance) return;
-    const x = (rand() * 2 - 1) * W;
-    if (Math.abs(x - laneRel) < LANE + jitter + 0.5) return;
+    const x = wrap(laneRel + (rand() * 2 - 1) * W);
+    if (Math.abs(wrap(x - laneRel)) < LANE + jitter + 0.5) return;
     const len = 1.5 + rand() * 4;
     this.light(x + this.shipX, 0.01, d, 0.15 + rand() * 0.25, 0.01, len, Light.Red, false);
     if (rand() < 0.5) this.light(x + this.shipX + (rand() - 0.5) * 0.8, 0.01, d + len * 0.6, 0.12, 0.01, len * 0.5, Light.Amber, false);
