@@ -7,7 +7,14 @@ and is set up for Capacitor packaging (app id `com.tomblack.endlessspace`).
 
 Everything is procedural: the courses, the textures, the props, the sound
 effects and the music. There are no image or audio files apart from the app
-icons.
+icons. The ship's interior is built from a pack of hand-made sections drawn
+as text grids.
+
+There's a light free-to-play layer on top: ranked tickets, daily rewards and
+quests, a daily shop of ship looks, a season pass and a premium currency
+(cores). It all works on the device; a Supabase server and RevenueCat store
+plug in behind it when their keys are set (see [Server and store](#server-and-store)).
+Nothing you can buy makes a ship faster in ranked.
 
 Play it at https://tomblack9452.github.io/endless/.
 
@@ -23,6 +30,7 @@ Play it at https://tomblack9452.github.io/endless/.
 - [Leagues](#leagues)
 - [Solo and endless](#solo-and-endless)
 - [Credits, upgrades and looks](#credits-upgrades-and-looks)
+- [Cores, tickets and daily rewards](#cores-tickets-and-daily-rewards)
 - [Missions](#missions)
 - [Settings](#settings)
 - [Sound](#sound)
@@ -31,6 +39,7 @@ Play it at https://tomblack9452.github.io/endless/.
 - [Tuning](#tuning)
 - [Dev tools](#dev-tools)
 - [Testing](#testing)
+- [Server and store](#server-and-store)
 - [Deploying](#deploying)
 
 ## Running it
@@ -67,7 +76,7 @@ Accept the certificate warning once on the phone.
 |---|---|---|
 | Steer | Drag anywhere, tap the sides, or tilt | Arrow keys or A / D |
 | Boost | Hold the boost button, or double-tap and hold anywhere | Shift, W, Up or Space |
-| Pause | `pause`, top right | Esc or P |
+| Pause | `pause`, top right (play resumes after a 3-2-1) | Esc or P |
 | Start | `ranked`, `solo` or `endless` on the title screen | Space or Enter (ranked) |
 | Retry | Tap | Space or Enter |
 
@@ -125,12 +134,25 @@ a winding, clear path. Around them:
 - natural rock arches over the path
 - flat-topped mesas on the horizon
 
-- *Ice field:* pale ground and sky, mostly crystals and spires.
+- *Ice field:* pale ground and sky, mostly crystals and spires, and denser
+  and harder than other open ground.
+  - **Ice lakes:** sheets of open ice the lane runs across. On the ice you
+    slow down a little and slide: steering takes a moment to bite.
+  - **Snow** gets heavier through the field: light at level 1, medium at
+    level 2, a blizzard at level 3 (thicker fog, white-out, gusting wind), and
+    heavier again on later loops.
 - *Volcanic plain:* dark basalt, a smoky sky, glowing lava cracks, and a
   light ship so it stays visible.
+  - **Lava lakes:** glowing pools beside the lane. Touch one and the run
+    ends, shield or not.
+  - **Lava bombs:** from level 2, chunks of lava thrown up by eruptions fall
+    in front of you. A glowing ring marks where each will land, with time to
+    steer clear; they never land on the lane.
+  - **Ash and smoke** thicken the deeper you go, so you can see less far.
 
 **Canyon.** Rock walls that wind, with bands of rocks and pillars across
-the floor and gaps through them. Obstacles are dark so they read against the
+the floor and gaps through them. Alien cacti stand along the floor and
+tumbleweeds roll across it (both solid). Obstacles are dark so they read against the
 walls. Rocks run from small floor pebbles to huge cliffs towering over the
 walls; bands mix small, medium and big boulders; natural bridges span the
 canyon overhead.
@@ -149,6 +171,9 @@ carries the lane across. Fly off the planks and you fall.
 - from level 3: bridges that fork, the second branch swinging out over the
   drop and back, with pickups on it
 
+Bridges get longer and chasms more frequent as the canyon goes on. The rails
+are joined from plank to plank, and the chasm's dark sides follow the walls.
+
 Some bridges climb or dip as they cross.
 
 **Upper and lower routes:** now and then a low rocky island (with crystals
@@ -161,48 +186,36 @@ stretches before and after to cross.
 - *Asteroid belt:* the same layout in space. The ground falls away, the sky
   opens to stars and the galaxy, and the rock turns grey.
 
-**Interior.** A chain of rooms joined by corridors. Rooms vary in width,
-height and offset, with S-bends, corridor jogs and splits where the path
-forks. Decks are joined by gentle ramps, and floors and ceilings lean with
-them. The rooms:
+**Interior.** A chain of rooms joined by corridors, built from a pack of
+about 40 hand-made **sections** (`src/pieces/`). Each section is drawn as a
+text grid, one character per unit and one line per row, with a legend:
 
-- cargo bay
-- server hall
-- observation deck (open to space, with a galaxy and shooting stars)
-- maintenance shaft
-- junction
-- three-way fork
-- split
-- bulkhead maze
-- chicane
-- hydroponics
-- laser gates
-- reactor (a glowing gap around the core, steam rising out of it)
-- engine room (blocks sliding across on rails, pistons pumping on the walls)
-- hangar (ends in blast doors that close down to the lane as you arrive)
-- reactor collapse (debris crashes down around you)
-- maintenance gantry and hull breach (big holes in the floor against the
-  walls; fall in and the run ends)
-- coolant plant (curtains of falling coolant with a gap on the lane)
-- steam vents (floor vents firing on a rhythm; any on the lane are always
-  down as you arrive, because their timing is tied to distance, not the
-  clock)
-- foundry (molten metal pours, molten curtains, sparks)
-- drop shaft (a railed catwalk over a deep shaft, then the deck drops away
-  steeply to the level below)
-- cargo lift (the floor rises on a lift platform; hooks on chains swing
-  across the bay)
-- flooded section (water over the deck; railed catwalks above it, one on
-  the lane)
-- command deck (rows of consoles under a big viewscreen, on a raised tier)
-- ventilation (giant fans turning in pits beside the walkway)
-- lab (rows of glass tanks of bubbling liquid, benches with holograms)
+```
+.  floor        #  wall           c  crate       L  laser
+   pit (space)  |  divider        C  crate stack o  reactor core
+=  catwalk      S  server rack    T  tank        v  steam vent
+~  water        K  console        P  pillar      m  molten metal
+```
+
+plus overlays for moving and animated parts (hooks, sliders, pistons, doors,
+fans, debris, steam, sparks, holograms, drips). A section lists its routes
+(main, alternative and risky, with pickups as the reward) and which ship
+levels it suits. Every section is checked on paper (symmetric walls, every
+route clear and on floor, routes starting and ending together) and flown in
+the tests, on its own and next to every other section.
+
+The families: cargo bays, cargo lifts, server halls, the command deck,
+observation decks, labs, hydroponics, laser gates, the reactor and reactor
+collapse, the engine room's pistons, the foundry, coolant plant, steam vents
+and ventilation fans, the flooded section, gantries and hull breaches, the
+drop shaft, the hangar with its blast doors, junctions, forks, chicanes,
+islands and uneven decks, joined by corridors. Ship level 1 uses the easier
+sections, levels 2 and 3 the harder ones.
 
 Walls are dressed with pipes, panels, cables and canisters, and the ship's
-outer hull shows outside the windows. Every room also gets animated detail:
-leaks dripping into puddles, burst pipes venting steam, panels throwing
-sparks, blinking console lights, ceiling fans in tall rooms and holograms in
-the server halls.
+outer hull shows outside the windows. Crates, racks and walls use eight wall
+textures and four top textures (plates, grates, ribs, hazard stripes,
+hatches, treads), varied by family.
 
 **Theme events.** As the middle level of a theme begins, there's a chance
 (the same for a given seed) of an event:
@@ -237,15 +250,17 @@ Events change the look and sound only, never the course.
 ## Modes
 
 The title screen leads with **ranked**, a big button showing the weekly
-level and your best on it. **Solo** and **endless** sit under it, then
-record, missions and stats; the hangar is bottom left and settings bottom
-right.
+level, your best on it and your tickets. **Solo** and **endless** sit under
+it, then record, missions, stats, daily, shop and pass; the hangar is bottom
+left and settings bottom right. Credits, cores and tickets sit top right.
 
 | | Ranked | Solo | Endless |
 |---|---|---|---|
 | Course | The weekly level: the same for everyone, new every Monday | An environment, endless; or a set level | Every area in turn, forever |
 | Ship | Your upgrades, up to your league's cap | Your upgrades, no cap | Your upgrades, no cap |
 | Assist mode | Off | Allowed | Allowed |
+| Revive | No | Once a run | Once a run |
+| Ghost | Your weekly best | - | - |
 | Earns | XP, skill, league points, full credits | Credits at half rate | Credits at half rate |
 | Best score | Your best this week | One per environment (and set level) | Endless best |
 | Missions | Ranked missions | Solo missions | Solo missions |
@@ -254,11 +269,15 @@ right.
 a finish line. It's generated from the week: each week starts in a different
 environment (open ground, canyon, ship, ice field, asteroid belt, volcanic
 plain, in turn) and runs through the next two, with set pieces along the way.
-Play it as often as you like; your best counts.
+Each attempt uses a ranked ticket (see below); your best counts.
 
 Ranked is played in leagues (below), so everyone in a league flies a ship
 with about the same upgrades. Every ranked run is kept with its score, date,
-week and seed, the ground work for leaderboards. Looks are allowed
+week and seed, and its path (the ship's sideways position every 4 units).
+Your best run of the week is flown as a faint **ghost** ship next to you, and
+with the server on, runs go to the **weekly leaderboard** for your league
+(on the league screen). After a ranked run, **share** makes a picture of it
+for the share sheet. Looks are allowed
 everywhere, because every hull shares one hitbox.
 
 ## Ranked
@@ -401,14 +420,46 @@ items are tried on the ship with a buy button or what unlocks them.
 
 | Slot | Options |
 |---|---|
-| Hull | dart, wing, needle, manta (missions), arrow (1,500), talon (4,000) |
-| Paint | standard, slate, crimson, cobalt, olive, sand, white, carbon (credits), gunmetal (Colonel), chrome (General), silver, gold, platinum, diamond, champion, supernova (leagues) |
+| Hull | dart, wing, needle, manta (missions), arrow (1,500), talon (4,000), nova (400 cores, or the starter pack), raptor (season pass) |
+| Paint | standard, slate, crimson, cobalt, olive, sand, white, carbon, mint, rose gold (credits), gunmetal (Colonel), chrome (General), silver, gold, platinum, diamond, champion, supernova (leagues), nebula, solar, void, midnight, glacier (cores), aurora (day 7 login reward), frost, ember (season pass) |
 | Markings | stripe, twin stripes, split (credits), chevron (10 stars), two-tone (25 stars) |
 | Fins | tail fin, winglets (credits), twin fins (15 stars) |
-| Engine colour | amber, cyan, violet, green, white (credits), red (Sergeant); colours the engine flames |
+| Engine colour | amber, cyan, violet, green, white, ice (credits), red (Sergeant), plasma, gold (cores), solar (season pass); colours the engine flames |
 | Wing decal | your rank insignia, or your league emblem |
 
 Missions still unlock trail styles and world colour palettes.
+
+## Cores, tickets and daily rewards
+
+Everything here is in `src/economy/` and tuned in `CONFIG.economy`. Days
+turn over at midnight UTC, the same moment for everyone.
+
+- **Cores** are the premium currency. They come slowly from play (login
+  rewards, quests, the season pass) and, in the apps, from the store. They buy
+  premium looks, ranked tickets, revives and the pass's premium track.
+- **Ranked tickets:** each ranked attempt uses one. You hold up to 5, and one
+  refills every 2 hours. Out of tickets, the ranked button offers one for 30
+  cores, or shows the wait. Tickets from rewards can take you over 5.
+- **Revive:** outside ranked, once a run, a crash offers to carry on (with a
+  6 s timer). The first each day is free, then 20 cores. The ship goes back
+  onto the safe lane, obstacles near the lane just ahead are cleared, it gets
+  a shield and a moment of grace, and a 3-2-1 starts it again.
+- **Daily:** a 7-day login calendar (credits, cores, tickets, and the aurora
+  paint on day 7), collected with a card when you open the game. A missed day
+  just waits. Three **daily quests**, the same for everyone that day (play
+  runs, score, reach a level, near misses, pickups, boost time, ranked runs,
+  ship rooms), each paying credits and pass XP; all three pay 10 cores.
+- **Shop:** four looks a day, the same for everyone, at least one premium.
+  One is the deal of the day at a quarter off. Tap a look to try it on the
+  ship. Also: a ranked ticket for cores, and core packs in the apps.
+- **Season pass:** six weeks (six weekly levels), 30 tiers of 120 XP. Runs
+  earn XP (1 per 250 points, up to 60) and each quest 60. The free track pays
+  credits, cores and tickets; the premium track (950 cores, or a purchase in
+  the apps) pays more, with the frost and ember paints, the solar engine and
+  the raptor hull. Rewards are paid as you reach each tier, and unlocking
+  premium pays every premium tier already reached.
+- After a run, the end screen lists any quests finished and the pass XP
+  earned, and the counters in the top bar bump as things land.
 
 ## Missions
 
@@ -450,6 +501,9 @@ are saved on the device.
   - reduce motion: no shake, roll or speed lines
   - text size
   - high contrast
+  - ghost of your weekly best, on or off
+  - performance mode: a lower render scale and lighter snow and ash, for
+    older phones
 - **Assist mode:** 80% speed and teal markers along the safe line. Assisted
   runs never count as a best score.
 
@@ -483,16 +537,24 @@ of debris will be when the ship reaches it, at any speed.
 
 **The generator** (`world.ts`) builds rows 230 units ahead. It steers the
 safe lane within the slope limit, then places a theme's obstacles with
-`clearOf` checks against the lane. Interior rooms are reusable templates
-(`interior.ts`). Each room supplies its width, lighting, layout and decor
-through a small API, and the world handles walls, floors, pits, splits and
-the transitions between rooms.
+`clearOf` checks against the lane. Inside the ship, each room is a
+hand-made section (`src/pieces/`) read row by row from its grid; the room's
+look (light, height, windows, decor) comes from `interior.ts`, and the world
+handles walls, floors, pits, splits and the joins between rooms. Bridges,
+rails and other set pieces outside are built as whole assets too, never from
+random parts, so they always fit together.
 
 **Look.** Block textures are drawn to canvases at startup and mapped in
 world space through a material patch. Props are low-poly meshes with shading
 baked into vertex colours, so there's no lighting cost. Colours come from
 one live palette. Time of day, theme blends, biome tints, events and palette
 cross-fades all write into it each frame.
+
+**A course is its seed.** Generation only uses the seeded `rand()`, never
+`Math.random`, the clock or frame timing, and nothing is placed relative to
+where the ship is: canyon mouths, scatter and props all follow the lane. So
+the weekly level is the same for everyone however they steer, and a server
+can check a run from its inputs. A test enforces both.
 
 **Heights** (`terrain.ts`). Hills, ramps, platforms and drops are one height
 function of distance, plus a sideways part for a split's upper and lower
@@ -512,7 +574,8 @@ fall check finds nothing under the ship.
 - The build includes Latin font files only.
 
 **Offline.** The production build registers a service worker and a web
-manifest, so the game installs to a home screen and works offline.
+manifest, so the game installs to a home screen and works offline. Each
+new build drops the old build's cached scripts and styles.
 
 ## Project layout
 
@@ -521,12 +584,14 @@ manifest, so the game installs to a home screen and works offline.
 | `src/config.ts` | Every tunable value |
 | `src/game.ts` | State machine, main loop, scoring, boost, power-ups, menus |
 | `src/world.ts` | Pools, theme generators, safe lane, pits, rooms |
-| `src/interior.ts` | Ship room templates and wall decor |
+| `src/interior.ts` | Ship room looks (name, light, height, windows, decor) and the room API sections build with |
+| `src/pieces/` | The hand-made ship sections: format and checks, the grid builder, and the pack by family |
 | `src/field.ts` | Instanced pool: collision, sine and ramp motion |
 | `src/props.ts` | Low-poly trees, rocks, crystals, shuttles, pipes, gems |
 | `src/biomes.ts` | Biome looks and names |
 | `src/terrain.ts` | Hills, ramps, split heights and chasms (JS and GLSL) |
 | `src/events.ts` | Meteor shower, sandstorm, red alert |
+| `src/weather.ts` | Snow and ash: particles, fog and tint |
 | `src/player.ts` | Ship shapes, shield, banking, crash and fall |
 | `src/trail.ts` | Ship trails |
 | `src/renderer.ts` | Renderer, camera, ground, planet, adaptive resolution |
@@ -538,7 +603,12 @@ manifest, so the game installs to a home screen and works offline.
 | `src/input.ts` | Drag, side taps, tilt, keyboard, boost control |
 | `src/missions.ts`, `src/cosmetics.ts` | Missions and mission unlocks |
 | `src/ranks.ts` | Rank ladder, XP, skill, par, insignia, run history |
-| `src/wallet.ts` | Credits |
+| `src/wallet.ts` | Credits and cores |
+| `src/economy/` | Tickets, daily rewards and quests, the shop, the season pass, and their screens |
+| `src/server/` | The server behind one interface: Supabase, or the device alone; cloud save |
+| `src/store/` | In-app purchases (RevenueCat in the apps, nothing on the web) |
+| `src/ghost.ts` | The ghost of your weekly best |
+| `src/share.ts` | The share card |
 | `src/upgrades.ts` | Ship upgrade systems, points and the standard ship |
 | `src/leagues.ts` | Leagues, divisions, league points, weekly rewards, emblems |
 | `src/looks.ts` | Ship looks catalogue and ownership |
@@ -552,11 +622,17 @@ manifest, so the game installs to a home screen and works offline.
 | `src/ui.ts`, `src/style.css`, `index.html` | HUD and screens |
 | `src/dev.ts` | Dev-only panel |
 | `tests/fairness.test.ts` | Headless survivability test |
+| `tests/pieces.test.ts`, `tests/pieces-pairs.test.ts` | Every ship section on paper, every route flown, every pair back to back |
+| `tests/determinism.test.ts` | No unseeded randomness or clock in course generation |
+| `tests/economy.test.ts` | Tickets, the calendar, quests, the shop, the pass and the revive |
+| `tests/server.test.ts` | Offline fallback, and the server functions agree with the game |
 | `tests/ranks.test.ts` | Rank ladder, XP, skill and credit maths |
 | `tests/courses.test.ts` | Set levels and twelve weeks of weekly levels fly to the finish; every environment is survivable |
 | `tests/input.test.ts` | Double-tap and hold to boost |
 | `tests/leagues.test.ts` | League brackets, LP, divisions, promotion, weekly rewards, prices |
 | `public/` | Icons, manifest, service worker |
+| `supabase/` | Database schema and server functions |
+| `docs/store.md` | Server, store and app setup, and the store listing |
 
 ## Tuning
 
@@ -572,29 +648,35 @@ Nearly every number lives in `src/config.ts`, grouped by system:
 - `courses`: credits per set level star (rank, upgrade and look tables live in
   `ranks.ts`, `upgrades.ts` and `looks.ts`)
 - `audio`: every gain, the music and the engine
-- `render`: pixel ratio and adaptive-resolution thresholds
+- `hazards`, `weather`: ice and lava lakes, lava bombs, snow and ash
+- `economy`: tickets, revives, the login calendar, quests, the shop, the
+  pass and the store's products
+- `render`: pixel ratio, adaptive-resolution thresholds and performance mode
 
 After changing anything in `themes`, run `npm test`.
 
 ## Dev tools
 
-A `dev` link (top left, on the live site too while the game's in testing) opens a panel with:
+`npm run dev` adds a `dev` link (top left of the title and end screens)
+that opens a panel. It isn't in production builds.
 
-- **Start just before** any level from 1 to 27
-- **Invincible** and **full boost** toggles
-- **Autopilot:** flies the safe lane for you, as the fairness tests do, to
-  watch a level play
-- **Replay seed:** replays the last run's course
-- **Ship room:** forces every interior room to one type
+- **Start just before** any level from 1 to 12
+- **Invincible**, **full boost** and **autopilot** (flies the safe lane, as
+  the tests do) toggles
+- **Replay seed:** replays the last run's course from where it started
+- **Ship room:** forces every interior room to one family
+- **Section:** forces one hand-made ship section wherever it fits
+- **Show routes:** draws each section's routes on the floor (main white,
+  alternative teal, risky amber)
+- **Add 500 cores**, **add 5 tickets:** stand-ins for purchases
 - **Unlock all:** General Grade 4, Grand Champion, every look, every
   upgrade maxed and 100,000 credits (saved in that browser), and every set
   level open until you reload
-- **Reset all progress:** clears ranks, credits, unlocks and stats (keeps
-  settings)
+- **Reset all progress:** clears everything but settings
 - an FPS readout with the pixel ratio and draw calls
 
-`window.game` is exposed in dev builds (not the live site) for poking at
-state from the console.
+The shop's cores section also has a free "+500" in dev. `window.game` is
+exposed in dev for poking at state from the console.
 
 ## Testing
 
@@ -620,6 +702,44 @@ ship still steers while boosting.
 
 `tests/ranks.test.ts` checks the rank ladder, that ranks need both XP and
 skill, the XP and skill rules, the length of the grind and credit rates.
+
+The pilots steer the way the ship really does: through its easing, sliding on
+ice, and dying in lava or pits as a player would. Courses also have to be the
+same however they're flown: one test flies a weekly level twice, once on the
+lane and once weaving, and checks the lane matches row for row.
+
+`tests/pieces.test.ts` checks every ship section on paper and flies each of
+its routes slow and fast; `tests/pieces-pairs.test.ts` flies every pair of
+sections back to back. `tests/determinism.test.ts` bans `Math.random`,
+`Date.now` and `performance.now` from the generator files.
+`tests/economy.test.ts` covers ticket refills, the login calendar, quests,
+the shop, the pass, and that a revive leaves a clear lane.
+`tests/server.test.ts` checks the game runs without a server and that the
+server functions' numbers match the game's.
+
+## Server and store
+
+Without keys, everything lives on the device. With them:
+
+- **Supabase** (`src/server/`, `supabase/`): an anonymous account per
+  player (linkable to Apple or Google later), a cloud save of every saved
+  setting and stat (the newer save wins; a fresh install takes the cloud's),
+  cores held on the server (earned cores capped per day, spending checked),
+  ranked runs submitted and checked (the score has to fit the distance and
+  time, and the path the distance), and weekly leaderboards per league.
+- **RevenueCat** (`src/store/`) in the iOS and Android apps: core packs
+  (100, 550, 1,200, 2,500), a one-time starter pack (500 cores, 3 tickets and
+  the nova hull) and the season pass. Purchases are paid into the server
+  wallet by a webhook. The web build sells nothing.
+
+What has to be set up by hand (projects, products, keys and the app builds)
+is in [docs/store.md](docs/store.md), with the store listing text and the
+screenshot list. Keys go in `.env` (copy `.env.example`), which is never
+committed.
+
+Still to do on the server: a full re-fly of submitted runs with the game's
+own code (it needs the run simulation pulled out of `game.ts` first), and
+linking accounts to Apple or Google sign-in.
 
 ## Deploying
 
