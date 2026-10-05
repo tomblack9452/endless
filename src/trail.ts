@@ -11,15 +11,17 @@ import { CONFIG } from './config';
 import type { TrailId } from './cosmetics';
 import type { LivePalette } from './palette';
 
-// A ribbon behind the ship tracing where it has actually been. Points are kept
+// A short exhaust ribbon behind the ship tracing where it has actually been. Points are kept
 // ship-relative (like the world): each frame they slide back by the forward
 // distance and sideways against the ship's movement. Styles:
-//   line   - one solid ribbon from the tail, fading out
-//   dashes - the same ribbon broken into dashes fixed to the ground
-//   ion    - two thin ribbons from the wing tips in the pickup colour
+//   line   - one flame from the tail, fading out
+//   dashes - the same flame, pulsing
+//   ion    - two thin streams from the wing tips in the pickup colour
 
-const COUNT = 24; // samples per ribbon
-const SPACING = 0.13; // world units between samples (the camera is only ~2.5 behind)
+const COUNT = 10; // samples per ribbon
+// The camera sits ~2.5 behind and above the ship, so anything longer than about a unit
+// runs off the bottom of the screen as a straight bar. Trails are short engine flames.
+const SPACING = 0.035; // ~0.35 long
 const S = CONFIG.ship;
 
 class Ribbon {
@@ -58,7 +60,7 @@ export class Trail {
   });
   private readonly ribbons: Ribbon[];
   private readonly offsets = [0, -S.halfWidth * 0.9, S.halfWidth * 0.9]; // tail, left tip, right tip
-  private head = 0; // index of the newest sample
+  private head = 0; // index of the newest fixed sample (the live point is the next slot)
   private sinceSample = 0;
   private travelled = 0; // for dash phase
   private readonly colour = new Color();
@@ -101,17 +103,22 @@ export class Trail {
   update(dx: number, dz: number, bank: number): void {
     if (this.style === 'none') return;
     this.travelled += dz;
+    // Fixed samples are laid exactly SPACING apart along the ground. At speed
+    // the ship covers several per frame, so the new ones are filled in along
+    // the line from last frame's emitter position to this one's. The slot
+    // after the newest fixed sample is a live point that sits on the emitter.
     this.sinceSample += dz;
-    const newSample = this.sinceSample >= SPACING;
-    if (newSample) {
-      this.sinceSample = 0;
-      this.head = (this.head + 1) % COUNT;
-    }
+    const total = Math.floor(this.sinceSample / SPACING);
+    this.sinceSample -= total * SPACING; // travel since the newest fixed sample
+    const added = Math.min(COUNT - 2, total); // only the most recent ones fit
     const ion = this.style === 'ion';
     this.colour.copy(ion ? this.palette.pickup : this.palette.text);
-    const width = ion ? 0.022 : 0.045;
-    const alpha = ion ? 0.95 : 0.55;
+    const width = ion ? 0.016 : 0.07;
+    const alpha = ion ? 0.9 : 0.6;
     const cos = Math.cos(bank);
+    const emitZ = S.length * 0.4;
+    const y0 = S.hoverY + 0.02; // at engine height, not on the ground
+    let head = this.head;
     for (let r = 0; r < this.ribbons.length; r++) {
       const rb = this.ribbons[r];
       if (!rb.mesh.visible) continue;
@@ -119,21 +126,38 @@ export class Trail {
         rb.x[i] -= dx;
         rb.z[i] += dz;
       }
-      // The newest sample sits on the emitter (tail or wing tip, which tilts with the bank).
-      const emitZ = S.length * 0.4;
-      rb.x[this.head] = this.offsets[r] * cos;
-      rb.z[this.head] = emitZ;
-      const y = S.hoverY + (ion ? this.offsets[r] * -Math.sin(bank) : 0) - 0.02;
+      const live = (this.head + 1) % COUNT;
+      const fromX = rb.x[live]; // last frame's emitter point, now dz further back
+      const toX = this.offsets[r] * cos;
+      head = this.head;
+      for (let j = 1; j <= added; j++) {
+        const back = this.sinceSample + (added - j) * SPACING; // how far behind the emitter, oldest first
+        const f = dz > 0 ? Math.min(1, back / dz) : 0;
+        head = (head + 1) % COUNT;
+        rb.x[head] = toX + (fromX - toX) * f;
+        rb.z[head] = emitZ + back;
+      }
+      const now = (head + 1) % COUNT;
+      rb.x[now] = toX;
+      rb.z[now] = emitZ;
+      // Wing tips rise and fall with the bank.
+      const y = y0 + (ion ? this.offsets[r] * -Math.sin(bank) : 0);
       for (let k = 0; k < COUNT; k++) {
-        const i = (this.head - k + COUNT) % COUNT;
+        const i = (now - k + COUNT) % COUNT;
         const t = k / (COUNT - 1); // 0 at the ship, 1 at the end
         let a = alpha * (1 - t) * (1 - t);
-        if (this.style === 'dashes') {
-          // Dashes fixed to the ground: on for about half of each 0.5-unit stretch.
-          const along = this.travelled - (rb.z[i] - emitZ);
-          if (((along % 0.5) + 0.5) % 0.5 > 0.28) a = 0;
+        // Samples left from earlier frames can lie further back than the flame is long: fold them in.
+        const maxZ = emitZ + (COUNT - 1) * SPACING;
+        if (rb.z[i] > maxZ) {
+          rb.z[i] = maxZ;
+          a = 0;
         }
-        const w = width * (1 - t * 0.6);
+        if (this.style === 'dashes') {
+          // Dashes fixed to the ground: pulses along the flame.
+          const along = this.travelled - (rb.z[i] - emitZ);
+          if (((along % 0.12) + 0.12) % 0.12 > 0.06) a = 0;
+        }
+        const w = width * (1 - t); // tapers to a point
         const o = k * 6;
         rb.pos[o] = rb.x[i] - w;
         rb.pos[o + 1] = y;
@@ -152,5 +176,6 @@ export class Trail {
       (rb.geometry.getAttribute('position') as BufferAttribute).needsUpdate = true;
       (rb.geometry.getAttribute('color') as BufferAttribute).needsUpdate = true;
     }
+    this.head = head;
   }
 }
