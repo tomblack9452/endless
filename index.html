@@ -147,11 +147,22 @@
           <button class="label link back" type="button" data-action="back">back</button>
           <div class="panel-title">hangar</div>
         </div>
-        <div class="settings short">
+        <div class="tabs">
+          <button class="tab on" type="button" data-tab="ship">ship</button>
+          <button class="tab" type="button" data-tab="upgrades">upgrades</button>
+          <span id="hangar-credits" class="label dim tabs-credits"></span>
+        </div>
+        <div class="settings short tabbed" data-pane="ship">
           <button class="setting-row" type="button" data-hangar="ship"><span class="label">ship</span><span class="value"></span></button>
           <button class="setting-row" type="button" data-hangar="trail"><span class="label">trail</span><span class="value"></span></button>
           <button class="setting-row" type="button" data-hangar="palette"><span class="label">colours</span><span class="value"></span></button>
           <div id="hangar-count" class="label dim setting-note"></div>
+        </div>
+        <div class="settings tabbed" data-pane="upgrades" hidden>
+          <div class="label dim setting-note">
+            upgrades work in solo. ranked and daily runs fly the standard ship so every score is comparable.
+          </div>
+          <div id="upgrade-rows"></div>
         </div>
       </div>
 
