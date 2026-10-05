@@ -4,6 +4,8 @@
 export interface KeyValueStore {
   get(key: string): Promise<string | null>;
   set(key: string, value: string): Promise<void>;
+  /** Every key starting with `prefix`, with its value (the cloud save). */
+  entries(prefix: string): Promise<Record<string, string>>;
 }
 
 class LocalStore implements KeyValueStore {
@@ -21,6 +23,19 @@ class LocalStore implements KeyValueStore {
     } catch {
       // Storage blocked (private mode etc). Nothing to do.
     }
+  }
+
+  async entries(prefix: string): Promise<Record<string, string>> {
+    const out: Record<string, string> = {};
+    try {
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && k.startsWith(prefix)) out[k] = localStorage.getItem(k) ?? '';
+      }
+    } catch {
+      // Storage blocked: nothing saved.
+    }
+    return out;
   }
 }
 

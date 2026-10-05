@@ -298,6 +298,17 @@ export class UI {
     if (el) el.textContent = text;
   }
 
+  /** The league screen's weekly leaderboard. */
+  renderBoard(rows: [string, string][], note: string): void {
+    this.fillRows($('league-board'), rows);
+    $('league-board-note').textContent = note;
+  }
+
+  /** The share button on the end screen (ranked runs). */
+  showShare(on: boolean): void {
+    $('over-share').hidden = !on;
+  }
+
   renderStats(rows: [string, string][]): void {
     this.fillRows(this.statsRows, rows);
   }
