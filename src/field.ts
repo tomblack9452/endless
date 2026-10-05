@@ -42,6 +42,12 @@ export class InstancedField {
   readonly phase: Float32Array;
   readonly colorIdx: Uint8Array;
   readonly tilt: Uint8Array; // floors, ceilings and planks lean with the slope they're on
+  /**
+   * Rolling pieces (tumbleweeds): sideways movers that turn over as they go, by
+   * the distance they've travelled over this radius per unit of scale, and hop
+   * a little. Their geometry is centred on the origin; y is the centre height.
+   */
+  rollRadius = 0;
   /** Set before spawn(): make the next instance lean with the slope (see terrain.ts). */
   nextTilt = false;
   private colorTable: Color[] | null = null;
@@ -353,6 +359,22 @@ export class InstancedField {
         a[o + 13] = this.y[i];
       }
       a[o + 14] = distance - this.d[i];
+      if (this.rollRadius > 0 && this.moving[i] === 2) {
+        // Turn about z by how far it has rolled, and bounce along.
+        const angle = -(this.x[i] - this.bx[i]) / (this.rollRadius * sx);
+        const rc = Math.cos(angle);
+        const rs = Math.sin(angle);
+        a[o] = rc * sx;
+        a[o + 1] = rs * sx;
+        a[o + 2] = 0;
+        a[o + 4] = -rs * this.sy[i];
+        a[o + 5] = rc * this.sy[i];
+        a[o + 6] = 0;
+        a[o + 8] = 0;
+        a[o + 9] = 0;
+        a[o + 10] = sz;
+        a[o + 13] += Math.abs(Math.sin(angle * 0.5)) * 0.35 * this.sy[i];
+      }
       if (this.colorTable) {
         const col = this.colorTable[this.colorIdx[i]];
         const ca = this.colorAttr!.array as Float32Array;

@@ -21,7 +21,7 @@ const DEFAULT_BIOME: Record<ThemeId, Biome> = { land: 'alien', canyon: 'canyon',
 import { Decor, decorate, Light, pickRoom, ROOM_IDS, ROOMS, roomLength, type RoomAPI, type RoomId, type RoomPlan } from './interior';
 import { fxMaterial, LIQUID_COLOURS, Sparks } from './fx';
 import { ceilingFan } from './props';
-import { ARCH_PILLAR_X, bush, deadTree, grassTuft, mesa, rockArch, rockSpire } from './props';
+import { alienCactus, ARCH_PILLAR_X, bush, deadTree, grassTuft, mesa, rockArch, rockSpire, tumbleweed } from './props';
 import { BOULDER_HEIGHT, boulder, canister, crystalCluster, greebleBox, mushroomTree, pipeSegment, powerGem, shuttle, spireTree } from './props';
 
 // The world ahead of the ship: obstacle pools plus the generator that lays
@@ -73,6 +73,7 @@ const enum Prop {
   Bush,
   DeadTree,
   RockSpire,
+  Cactus,
 }
 
 /** Collision radius per unit of size, by prop kind (trees collide at the trunk only). */
@@ -84,6 +85,7 @@ const PROP_HIT: Record<Prop, number> = {
   [Prop.Bush]: 0.45,
   [Prop.DeadTree]: 0.16,
   [Prop.RockSpire]: 0.6,
+  [Prop.Cactus]: 0.24,
 };
 
 function clamp(v: number, lo: number, hi: number): number {
@@ -163,6 +165,8 @@ export class World {
   private readonly bushes: InstancedField;
   private readonly deadTrees: InstancedField;
   private readonly rockSpires: InstancedField;
+  private readonly cacti: InstancedField;
+  private readonly tumbleweeds: InstancedField; // scenery rolling across
   private readonly tufts: InstancedField; // grass, scenery
   // Interior animation (fx.ts).
   private readonly pours: InstancedField; // liquid falling from the ceiling (curtains are solid)
@@ -336,6 +340,9 @@ export class World {
     this.rockSpires = new InstancedField(scene, rockSpire(), this.propMat, F.maxRockSpires);
     this.tufts = new InstancedField(scene, grassTuft(), this.propMat, F.maxTufts);
     this.mesas = new InstancedField(scene, mesa(), this.propMat, F.maxMesas);
+    this.cacti = new InstancedField(scene, alienCactus(), this.propMat, F.maxCacti);
+    this.tumbleweeds = new InstancedField(scene, tumbleweed(), this.propMat, F.maxTumbleweeds);
+    this.tumbleweeds.rollRadius = 0.5;
     this.arches = new InstancedField(scene, rockArch(), this.propMat, F.maxArches);
     this.stripMat = new MeshBasicMaterial();
     this.strips = new InstancedField(scene, box, this.stripMat, F.maxStrips);
@@ -390,13 +397,14 @@ export class World {
       this.bushes,
       this.deadTrees,
       this.rockSpires,
+      this.cacti,
       this.shuttles,
       this.strips,
       this.pours,
       this.vents,
       this.tanks,
     ];
-    this.fields = [...this.solids, this.pools, this.steamPlumes, this.blinkers, this.holos, this.fans, this.tufts, this.mesas, this.arches, this.pickups, this.powers, this.pipes, this.greebles, this.voids, this.canisters, this.waters];
+    this.fields = [...this.solids, this.pools, this.steamPlumes, this.blinkers, this.holos, this.fans, this.tufts, this.mesas, this.arches, this.pickups, this.powers, this.pipes, this.greebles, this.voids, this.canisters, this.waters, this.tumbleweeds];
     this.applyPalette();
   }
 
@@ -946,6 +954,8 @@ export class World {
         this.tufts.spawn((rand() * 2 - 1) * W, 0, d + (rand() - 0.5) * STEP, s, s * (0.8 + rand() * 0.5), s, rand() * 6.28, false, true, 0, 0, false);
       }
     }
+    // Tumbleweeds rolling across (not on the ice).
+    if (biome !== 'ice' && this.runStart !== null && rand() < lt.tumbleweedChance) this.rollTumbleweed(d, laneRel + this.shipX, 14, true);
     // Mesas on the horizon.
     if (rand() < lt.mesaChance) {
       const side = rand() < 0.5 ? -1 : 1;
@@ -1074,6 +1084,7 @@ export class World {
       [Prop.Bush, m.bush, 0.8, 0.6],
       [Prop.DeadTree, m.deadTree, 0.8, 0.5],
       [Prop.RockSpire, m.rockSpire, 0.7, 0.6],
+      [Prop.Cactus, m.cactus, 0.8, 0.5],
     ];
     let total = 0;
     for (const w of weights) total += w[1];
@@ -1112,6 +1123,8 @@ export class World {
         return this.deadTrees;
       case Prop.RockSpire:
         return this.rockSpires;
+      case Prop.Cactus:
+        return this.cacti;
       default:
         return this.crystals;
     }
@@ -1228,6 +1241,20 @@ export class World {
       return; // the chasm is the feature: no floor, so no pebbles or rocks either
     }
     this.recordFloor(d);
+
+    // Alien cacti by the walls (not in the asteroid belt), and tumbleweeds across the floor.
+    if (this.genBiome !== 'asteroids') {
+      for (const s of [-1, 1]) {
+        if (this.splitStart !== Infinity || chasm) break;
+        if (rand() >= c.wallCacti) continue;
+        const size = 0.8 + rand() * 0.4;
+        const x = this.cx + s * (hw - 0.4 - rand() * 0.6);
+        const hit = PROP_HIT[Prop.Cactus] * size;
+        if (Math.abs(x - this.lane) < LANE + hit + maxSlope * STEP * 0.5 + 0.3) continue;
+        this.cacti.spawn(x - this.shipX, 0, d, size, size * (0.85 + rand() * 0.3), size, rand() * 6.28, true, false, hit, hit);
+      }
+      if (this.runStart !== null && rand() < c.tumbleweedChance) this.rollTumbleweed(d, this.cx, hw, false);
+    }
 
     // Pebbles on the floor: scenery.
     for (let i = 0; i < c.pebblesPerRow; i++) {
@@ -1613,6 +1640,19 @@ export class World {
     this.floorSegs[this.floorN * 2] = x0;
     this.floorSegs[this.floorN * 2 + 1] = x1;
     this.floorN++;
+  }
+
+  /** A tumbleweed that rolls across ahead of you, `half` either side of world x `centre`. Scenery. */
+  private rollTumbleweed(d: number, centre: number, half: number, wraps: boolean): void {
+    const T = CONFIG.tumbleweed;
+    const dir = rand() < 0.5 ? -1 : 1;
+    const s = range(T.size);
+    // It starts off to one side and has rolled across by the time you reach it,
+    // staying between the walls (half: how far either side of centre it may go).
+    const travel = Math.min(range(T.travel), Math.max(0, 2 * (half - s * 0.6)));
+    const from = centre - (dir * travel) / 2;
+    this.tumbleweeds.setNextRamp(dir * travel, range(T.over), 0, false);
+    this.tumbleweeds.spawn(from - this.shipX, 0.5 * s, d, s, s, s, 0, false, wraps, 0, 0, false);
   }
 
   /** Remember the lane after each row (for the dev autopilot). */
