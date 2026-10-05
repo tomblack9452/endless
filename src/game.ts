@@ -205,6 +205,7 @@ export class Game {
     this.applyLook(0);
 
     this.world.reset(0, false);
+    this.stage.warmUp();
     this.ui.show('title');
     this.ui.showHud(false);
 

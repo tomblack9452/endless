@@ -260,6 +260,16 @@ float gNoise(vec2 p) {
     return Math.max(v, SHIP_MIN_VFOV);
   }
 
+  /**
+   * Compile every material up front (in the background), so the first trip into
+   * the canyon or the ship doesn't stutter while its shaders build.
+   */
+  warmUp(): void {
+    void this.renderer.compileAsync(this.scene, this.camera).catch(() => {
+      // Older browsers: shaders just compile on first use.
+    });
+  }
+
   render(): void {
     const c = CONFIG.camera;
     const cam = this.camera;
