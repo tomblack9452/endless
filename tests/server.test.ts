@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import WEBHOOK from '../supabase/functions/revenuecat-webhook/index.ts?raw';
 import SUBMIT from '../supabase/functions/submit-run/index.ts?raw';
 import { CONFIG } from '../src/config';
 import { createBackend } from '../src/server/backend';
@@ -23,5 +24,14 @@ describe('server', () => {
     expect(constant('POINTS_PER_UNIT')).toBe(CONFIG.score.pointsPerUnit);
     expect(constant('TOP_SPEED')).toBeGreaterThan(CONFIG.speed.max * CONFIG.boost.speedMultiplier);
     expect(constant('PATH_STEP')).toBe(4);
+  });
+});
+
+describe('store', () => {
+  it("the webhook pays the cores the game's products promise", () => {
+    for (const p of CONFIG.economy.store.products) {
+      if (!('cores' in p)) continue;
+      expect(WEBHOOK, p.id).toMatch(new RegExp(`${p.id}: ${p.cores},`));
+    }
   });
 });

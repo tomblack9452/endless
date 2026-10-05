@@ -657,6 +657,21 @@ export const CONFIG = {
     quests: { count: 3, credits: [150, 400], allDoneCores: 10, passXp: 60 },
     shop: { slots: 4 },
     pass: { weeks: 6, tiers: 30, xpPerTier: 120, premiumCores: 950, runXpPer: 250, runXpMax: 60 },
+    // Real-money products (src/store): create these ids in App Store Connect,
+    // Google Play and RevenueCat. Prices are set in the stores. Bonus sizes:
+    // 550 is +10%, 1,200 +20%, 2,500 +25% over the 100 pack.
+    store: {
+      products: [
+        { id: 'cores_100', cores: 100 },
+        { id: 'cores_550', cores: 550 },
+        { id: 'cores_1200', cores: 1200 },
+        { id: 'cores_2500', cores: 2500 },
+        // Once per account: cores, tickets and a premium paint.
+        { id: 'starter_pack', cores: 500, tickets: 3, look: 'paint:void', once: true },
+        // The season pass's premium track, for money instead of cores.
+        { id: 'season_pass', pass: true },
+      ],
+    },
   },
 
   // Ice field and volcanic plain hazards (see world.ts: land()).
