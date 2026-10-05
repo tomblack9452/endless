@@ -20,6 +20,7 @@ import { Missions, type RunMetrics } from './missions';
 import { chainTarget, dailySeed, Progress, sectorOf, sectorStart, STAR_CHAIN, STAR_CLEAR, STAR_NO_HITS } from './progress';
 import { creditsFor, insignia, par, Ranked, rankName, RANKS, type RunMode } from './ranks';
 import { Wallet } from './wallet';
+import { DIVISIONS, emblem, LEAGUES, leagueName, Leagues, LP_PER_DIVISION, skillParScale } from './leagues';
 import { find, itemsIn, LOOKS, Looks, type Owner, type Slot, SLOT_NAMES, SLOTS, unlockText } from './looks';
 import type { Fin, Marking } from './looks';
 import type { ShipId } from './cosmetics';
@@ -90,6 +91,7 @@ export class Game {
   private readonly wallet = new Wallet();
   private soloBest = 0;
   private readonly upgrades = new Upgrades();
+  private readonly leagues = new Leagues();
   /** This run's ship systems: the standard ship unless it's a solo run. */
   private ship: ShipStats = STANDARD;
   private hangarTab: 'ship' | 'upgrades' = 'ship';
@@ -102,7 +104,7 @@ export class Game {
   private readonly cosmetics = new Cosmetics();
   private readonly missions = new Missions();
   /** Which info screen is open from the title (stats, missions, hangar), if any. */
-  private infoOpen: 'stats' | 'missions' | 'hangar' | 'record' | 'sectors' | null = null;
+  private infoOpen: 'stats' | 'missions' | 'hangar' | 'record' | 'sectors' | 'league' | null = null;
   // The sector the ship is in and how it's going there (for stars).
   private sector = 0;
   private sectorFromStart = false; // entered at its start (not a dev skip mid-sector)
@@ -195,7 +197,17 @@ export class Game {
     window.addEventListener('blur', () => this.pause());
 
     this.ui.bindTitleLinks(this.onTitleLink);
-    void Promise.all([this.progress.load(), this.ranked.load(), this.wallet.load()]).then(() => this.refreshTitle());
+    void Promise.all([this.progress.load(), this.ranked.load(), this.wallet.load(), this.leagues.load(), this.upgrades.load()]).then(() => {
+      // A new week: pay last week's league reward.
+      const weekly = this.leagues.rollWeek();
+      if (weekly > 0) {
+        this.wallet.add(weekly);
+        this.ui.showNotice(`weekly league reward +${formatScore(weekly)} credits`);
+      }
+      this.refreshTitle();
+    });
+    this.ui.titleLeague.addEventListener('pointerdown', (e) => e.stopPropagation());
+    this.ui.titleLeague.addEventListener('click', () => this.openLeague());
     void loadNumber(SOLO_BEST, 0).then((b) => (this.soloBest = b));
     this.ui.bindLooks(this.onLookRow, this.onLookBuy);
     this.ui.bindSectors(this.onSectorPick);
@@ -208,7 +220,6 @@ export class Game {
       this.haptics.pickup();
       this.openHangar();
     });
-    void this.upgrades.load();
     void this.missions.load();
     void Promise.all([this.cosmetics.load(), this.looks.load()]).then(() => {
       // Saves from before the hangar had looks: carry the mission hull across.
@@ -242,7 +253,8 @@ export class Game {
     // Solo starts part-way along begin with half the points they skipped.
     this.scoreBase = mode === 'solo' ? startScore / 2 : 0;
     this.world.assist = this.assistOn();
-    this.ship = mode === 'solo' ? this.upgrades.stats() : STANDARD;
+    // Daily runs fly the standard ship; ranked uses your (capped) upgrades; solo anything.
+    this.ship = mode === 'daily' ? STANDARD : this.upgrades.stats();
     this.world.collectScale = this.ship.collect;
     this.world.powerRate = this.ship.powerRate;
     this.ui.setMode(mode === 'solo' ? 'solo' : mode === 'daily' ? 'daily run' : 'ranked');
@@ -388,16 +400,29 @@ export class Game {
     return lines.join(' · ');
   }
 
-  /** Fold a ranked or daily run into the rank; fills the game-over rank block. Returns promotion credits. */
+  /** Fold a ranked or daily run into the rank (and league); fills the game-over block. Returns bonus credits. */
   private recordRanked(): number {
-    const r = this.ranked.record(this.mode, this.score, this.level, this.seed);
+    const lg = this.leagues;
+    const parScale = this.mode === 'ranked' ? skillParScale(lg.league) : 1;
+    const r = this.ranked.record(this.mode, this.score, this.level, this.seed, Date.now(), parScale);
     const promoted = r.rankAfter > r.rankBefore;
+    const leagueLines: string[] = [];
+    let bonus = r.credits;
+    if (this.mode === 'ranked') {
+      const res = lg.record(this.score);
+      bonus += res.credits;
+      leagueLines.push(`${leagueName(lg.league, lg.division)} · ${res.lp >= 0 ? '+' : ''}${res.lp} lp (${lg.lp}/${LP_PER_DIVISION})`);
+      if (res.divisionUp) leagueLines.push(`division up: +${formatScore(res.credits)} credits`);
+      if (res.divisionDown) leagueLines.push('dropped a division');
+      bonus += this.promoteLeague(leagueLines);
+    }
     const lines = [
+      ...leagueLines,
       `+${r.xp} xp${r.doubled ? ' (double)' : ''}`,
       r.skillAfter === r.skillBefore ? `skill ${r.skillAfter}` : `skill ${r.skillBefore} → ${r.skillAfter}`,
       `par for skill ${r.skillAfter}: ${formatScore(par(r.skillAfter))}`,
     ];
-    if (promoted) lines.unshift(`+${formatScore(r.credits)} promotion credits`);
+    if (promoted) lines.splice(leagueLines.length, 0, `+${formatScore(r.credits)} promotion credits`);
     const view: RankResultView = {
       icon: insignia(r.rankAfter),
       rank: rankName(r.rankAfter),
@@ -411,7 +436,57 @@ export class Game {
       this.haptics.level(true);
       if (this.state !== 'crashed') this.ui.showNotice(`promoted to ${rankName(r.rankAfter)}`);
     }
-    return r.credits;
+    return bonus;
+  }
+
+  /** Promote to the next league if ready and enough upgrade points are owned. Returns credits. */
+  private promoteLeague(lines: string[] | null): number {
+    const lg = this.leagues;
+    const credits = lg.tryPromote(this.upgrades.points());
+    if (credits > 0) {
+      const text = `promoted to ${lg.current.name} league: +${formatScore(credits)} credits`;
+      if (lines) lines.push(text);
+      else this.ui.showNotice(text);
+      this.sound.level(true, musicFor(this.level));
+      this.haptics.level(true);
+    } else if (lg.promotionReady && lines) {
+      lines.push(`promotion ready: own ${LEAGUES[lg.league + 1].min} upgrade points`);
+    }
+    return credits;
+  }
+
+  private openLeague(): void {
+    const lg = this.leagues;
+    const l = lg.league;
+    const next = LEAGUES[l + 1];
+    const owned = this.upgrades.points();
+    let nextText = 'top league';
+    if (next) {
+      if (lg.promotionReady) nextText = owned >= next.min ? 'promotion ready' : `promotion ready: own ${next.min} upgrade points (${owned} now)`;
+      else nextText = `fill division ${DIVISIONS[DIVISIONS.length - 1]}, then own ${next.min} upgrade points`;
+    }
+    this.ui.renderLeague({
+      icon: emblem(l, lg.division),
+      name: leagueName(l, lg.division),
+      next: nextText,
+      lpFraction: lg.lp / LP_PER_DIVISION,
+      rows: [
+        ['league points', `${lg.lp} / ${LP_PER_DIVISION}`],
+        ['league par', formatScore(lg.current.par)],
+        ['active upgrade points', `${this.upgrades.activePoints()} (cap ${lg.current.max})`],
+        ['upgrade points owned', String(owned)],
+        ['weekly reward so far', formatScore(lg.weeklySoFar())],
+        ['next division reward', formatScore(300 * (l + 1))],
+        ['credits', formatScore(this.wallet.credits)],
+      ],
+      ladder: LEAGUES.map((x, k) => ({
+        icon: emblem(k, k < l ? 2 : k === l ? lg.division : -1),
+        name: x.name,
+        needs: x.min === x.max ? `${x.max} points · par ${formatScore(x.par)}` : `${x.min}-${x.max} points · par ${formatScore(x.par)}`,
+        state: k < l ? 'done' : k === l ? 'current' : 'locked',
+      })),
+    });
+    this.openInfo('league');
   }
 
   /** How far through the current rank's XP band the player is (0..1). */
@@ -517,7 +592,7 @@ export class Game {
 
   /** What the player has, for unlocking looks. */
   private owner(): Owner {
-    return { rank: this.ranked.rank, stars: this.progress.totalStars(), missionHulls: this.cosmetics.ships() };
+    return { rank: this.ranked.rank, stars: this.progress.totalStars(), league: this.leagues.league, missionHulls: this.cosmetics.ships() };
   }
 
   /** Put the equipped looks (plus any preview) on the ship. */
@@ -526,7 +601,8 @@ export class Game {
     if (this.preview) eq[this.preview.slot] = this.preview.id;
     this.player.setShape(eq.hull as ShipId);
     this.player.setPaint(find('paint', eq.paint).colors ?? null);
-    this.player.setDressing(eq.markings as Marking, eq.fins as Fin, eq.decal === 'rank' ? insignia(this.ranked.rank) : null);
+    const decal = eq.decal === 'rank' ? insignia(this.ranked.rank) : eq.decal === 'league' ? emblem(this.leagues.league, this.leagues.division) : null;
+    this.player.setDressing(eq.markings as Marking, eq.fins as Fin, decal);
     this.trail.setTint(find('engine', eq.engine).colors?.[0] ?? null);
   }
 
@@ -601,9 +677,10 @@ export class Game {
 
   private onBuyUpgrade = (id: string): void => {
     const sys = id as SystemId;
-    const check = this.upgrades.check(sys, this.wallet.credits, this.ranked.rank);
+    const check = this.upgrades.check(sys, this.wallet.credits, this.leagues.league);
     if (!check.ok || !this.wallet.spend(check.cost)) return;
     this.upgrades.raise(sys);
+    this.wallet.add(this.promoteLeague(null)); // buying the last points may complete a promotion
     this.sound.pickup();
     this.haptics.pickup();
     this.refreshTitle();
@@ -614,7 +691,7 @@ export class Game {
     this.ui.renderUpgrades(
       SYSTEMS.map((s) => {
         const tier = this.upgrades.tier(s.id);
-        const check = this.upgrades.check(s.id, this.wallet.credits, this.ranked.rank);
+        const check = this.upgrades.check(s.id, this.wallet.credits, this.leagues.league);
         const next = Math.min(MAX_TIER, tier + 1);
         return {
           id: s.id,
@@ -632,6 +709,11 @@ export class Game {
 
   private openHangar(): void {
     this.renderUpgrades();
+    const lg = this.leagues.current;
+    const active = this.upgrades.activePoints();
+    this.ui.setUpgradeNote(
+      `${active} of ${this.upgrades.points()} points on · ${lg.name} league cap ${lg.max}${active > lg.max ? ' (over: switch some off for ranked)' : ''}. solo has no cap; daily runs fly the standard ship.`,
+    );
     this.ui.setHangarTab(this.hangarTab, `${formatScore(this.wallet.credits)} credits`);
     this.renderLooks();
     // Show the ship (and its engine) over the title scene while choosing.
@@ -647,7 +729,7 @@ export class Game {
     this.openInfo('missions');
   }
 
-  private openInfo(which: 'stats' | 'missions' | 'hangar' | 'record' | 'sectors'): void {
+  private openInfo(which: 'stats' | 'missions' | 'hangar' | 'record' | 'sectors' | 'league'): void {
     this.infoOpen = which;
     this.ui.show(which);
   }
@@ -699,8 +781,18 @@ export class Game {
     this.startSolo();
   };
 
-  /** Ranked: level 1, standard ship, fresh course. */
+  /** Ranked: level 1, fresh course, your upgrades up to the league's cap. */
   private startRanked(): void {
+    const active = this.upgrades.activePoints();
+    const cap = this.leagues.current.max;
+    if (active > cap) {
+      // Over the cap: choose which systems to switch off first.
+      this.ui.showNotice(`${active} upgrade points on, ${this.leagues.current.name} allows ${cap}. switch some off`);
+      this.hangarTab = 'upgrades';
+      if (this.state === 'crashed') this.toMainMenu();
+      this.openHangar();
+      return;
+    }
     this.beginRun(0, newSeed(), 'ranked');
   }
 
@@ -731,7 +823,9 @@ export class Game {
 
   private refreshTitle(): void {
     const i = this.ranked.rank;
-    this.applyLooks(); // the wing decal follows your rank
+    this.applyLooks(); // the wing decal follows your rank and league
+    const lg = this.leagues;
+    this.ui.setTitleLeague(emblem(lg.league, lg.division), `${leagueName(lg.league, lg.division)} · ${lg.lp} lp`, lg.lp / LP_PER_DIVISION);
     this.ui.setTitleRank(insignia(i), rankName(i), `${formatScore(this.wallet.credits)} credits`);
     const db = this.progress.dailyBest;
     this.ui.setTitleLink('daily', 'daily run');
@@ -923,6 +1017,7 @@ export class Game {
       // every mission unlock
     }
     this.looks.buyAll();
+    this.leagues.devTop();
     for (const s of SYSTEMS) while (this.upgrades.tier(s.id) < MAX_TIER) this.upgrades.raise(s.id);
     this.wallet.add(100000);
     this.refreshTitle();

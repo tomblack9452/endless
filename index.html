@@ -66,6 +66,13 @@
             <span id="title-credits" class="label dim"></span>
           </span>
         </button>
+        <button id="title-league" class="title-rank title-league" type="button">
+          <span id="title-league-icon" class="insignia"></span>
+          <span class="title-rank-text">
+            <span id="title-league-name" class="label"></span>
+            <span class="lp-track"><span id="title-league-lp" class="lp-fill"></span></span>
+          </span>
+        </button>
         <div class="screen-foot">
           <div class="title-modes">
             <button id="title-start" class="pill primary" type="button">ranked</button>
@@ -159,7 +166,7 @@
         </div>
         <div class="settings tabbed" data-pane="upgrades" hidden>
           <div class="label dim setting-note">
-            upgrades work in solo. ranked and daily runs fly the standard ship so every score is comparable.
+            <span id="upgrade-note">upgrades work in solo and in ranked, up to your league's cap. daily runs fly the standard ship.</span>
           </div>
           <div id="upgrade-rows"></div>
         </div>
@@ -176,6 +183,29 @@
           <div class="label dim setting-note">
             stars: clear the sector · clear it without a hit · a near-miss chain there. reach a sector in any mode to start
             from it here. starting part-way gives you half the points you skip.
+          </div>
+        </div>
+      </div>
+
+      <div id="screen-league" class="layer screen panel">
+        <div class="panel-head">
+          <button class="label link back" type="button" data-action="back">back</button>
+          <div class="panel-title">league</div>
+        </div>
+        <div class="settings">
+          <div class="record-top">
+            <span id="league-icon" class="insignia big"></span>
+            <div id="league-name" class="record-rank"></div>
+            <div id="league-next" class="label dim"></div>
+          </div>
+          <div class="xp-track"><div id="league-lp" class="xp-fill"></div></div>
+          <div id="league-rows"></div>
+          <div class="settings-group">leagues</div>
+          <div id="league-ladder" class="ladder"></div>
+          <div class="label dim setting-note">
+            ranked runs earn league points against your league's par. fill a division to move up; finish division 3 and
+            own the next league's upgrade points to be promoted. divisions can drop, leagues never do. in a league your
+            active upgrades can't be over its cap. daily runs always fly the standard ship.
           </div>
         </div>
       </div>

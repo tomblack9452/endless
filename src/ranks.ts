@@ -88,9 +88,9 @@ export function xpFor(score: number): number {
   return score < MIN_SCORE_FOR_XP ? 0 : 1 + Math.floor(score / 400);
 }
 
-/** Skill change for one run at `skill`. */
-export function skillDelta(score: number, skill: number): number {
-  const p = par(skill);
+/** Skill change for one run at `skill`. `parScale` > 1 in higher leagues, where ships are stronger. */
+export function skillDelta(score: number, skill: number, parScale = 1): number {
+  const p = par(skill) * parScale;
   if (score >= p * 1.5) return Math.min(2, MAX_SKILL - skill);
   if (score >= p) return Math.min(1, MAX_SKILL - skill);
   if (score < p * 0.5 && skill > 1) return -1;
@@ -185,7 +185,7 @@ export class Ranked {
   }
 
   /** Fold a finished ranked or daily run in. */
-  record(mode: RunMode, score: number, level: number, seed: number, now = Date.now()): RankedResult {
+  record(mode: RunMode, score: number, level: number, seed: number, now = Date.now(), parScale = 1): RankedResult {
     const rankBefore = this.rank;
     const skillBefore = this.skill;
     const today = localDate(now);
@@ -195,7 +195,7 @@ export class Ranked {
     if (doubled) xp *= 2;
     if (xp > 0) this.day.runs++;
     this.xp += xp;
-    this.skill = Math.max(1, Math.min(MAX_SKILL, this.skill + skillDelta(score, this.skill)));
+    this.skill = Math.max(1, Math.min(MAX_SKILL, this.skill + skillDelta(score, this.skill, parScale)));
     this.highestSkill = Math.max(this.highestSkill, this.skill);
     const rankAfter = this.rank;
     let credits = 0;

@@ -20,6 +20,7 @@ Play it at https://tomblack9452.github.io/endless/.
 - [Scoring, boost and power-ups](#scoring-boost-and-power-ups)
 - [Modes](#modes)
 - [Ranked](#ranked)
+- [Leagues](#leagues)
 - [Solo: sectors and stars](#solo-sectors-and-stars)
 - [Credits, upgrades and looks](#credits-upgrades-and-looks)
 - [Missions](#missions)
@@ -182,16 +183,17 @@ Events change the look and sound only, never the course.
 |---|---|---|---|
 | Starts at | Level 1 | Any sector you've reached | Level 1 |
 | Course | Fresh every run | Fresh every run | Same for everyone that day |
-| Ship | Standard | Your upgrades | Standard |
+| Ship | Your upgrades, up to your league's cap | Your upgrades, no cap | Standard |
 | Assist mode | Off | Allowed | Off |
-| Earns | XP, skill, credits | Stars, credits at half rate | XP, skill, credits |
+| Earns | XP, skill, league points, credits | Stars, credits at half rate | XP, skill, credits |
 | Best score | Ranked best | Solo best | Daily best |
 
-Ranked and daily runs always fly the standard ship, so their scores are
-comparable between players. That's the ground work for leaderboards (best of
-the day, week and all time); every ranked and daily run is already kept with
-its score, date and seed. Looks are allowed everywhere, because every hull
-shares one hitbox.
+Ranked is played in leagues (below), so everyone in a league flies a ship
+with about the same upgrades. The daily run always flies the standard ship,
+the one pure test of skill. That's the ground work for leaderboards (per
+league, and for the daily run: best of the day, week and all time); every
+ranked and daily run is already kept with its score, date and seed. Looks are
+allowed everywhere, because every hull shares one hitbox.
 
 ## Ranked
 
@@ -232,6 +234,36 @@ grades. The **service record** (tap your rank on the title screen) shows
 your rank, XP bar, skill, par, what the next rank needs, double-XP runs left
 today, your best today, this week and ever, recent runs and the whole ladder.
 
+## Leagues
+
+Your personal rank is your lifetime level; **leagues** are brackets by ship
+power. Every upgrade tier you own is one **upgrade point** (30 at most).
+
+| League | Active points allowed | Get in by | Par | Promotion reward |
+|---|---|---|---|---|
+| Bronze | 0-4 | starting | 3,000 | - |
+| Silver | 5-9 | finish Bronze 3, own 5 points | 5,000 | 2,000 |
+| Gold | 10-14 | finish Silver 3, own 10 | 7,500 | 5,000 |
+| Platinum | 15-19 | finish Gold 3, own 15 | 11,000 | 10,000 |
+| Diamond | 20-24 | finish Platinum 3, own 20 | 16,000 | 20,000 |
+| Champion | 25-29 | finish Diamond 3, own 25 | 23,000 | 35,000 |
+| Grand Champion | 30 | finish Champion 3, own 30 | 32,000 | 50,000 |
+
+- **Cap:** in a league your switched-on upgrades can't be over its top. If
+  they are, ranked opens the hangar to switch some off first.
+- **Divisions** 1-3, 100 league points (LP) each. A run earns LP against the
+  league's par: +10 at par, up to +25 at 150%, 0 at 75%, down to -15 under 50%.
+  Moving up a division pays 300 x the league number in credits.
+- Divisions can drop; leagues never do. Finishing division 3 without the next
+  league's points leaves you "promotion ready" until you buy them (buying the
+  last one promotes you straight away).
+- **Weekly reward:** credits for the highest division you reach each week
+  (1,000 in Bronze 1 up to 15,000 in Grand Champion), paid when the next week
+  starts.
+- Personal-rank skill par rises 5% per league, since stronger ships score more.
+- Each league above Bronze unlocks a paint, and the wing decal can show your
+  league emblem.
+
 ## Solo: sectors and stars
 
 A **sector** is one theme's three levels: alien ground (levels 1-3), canyon
@@ -252,9 +284,10 @@ Each new star is worth 25 credits, and star totals unlock looks.
 **Credits** come from runs (1 per 100 points in ranked and daily, 1 per 200
 in solo), promotions and stars. Spend them in the **hangar**.
 
-**Upgrades** (solo only), five tiers each at 150 / 400 / 1,000 / 2,500 /
-6,000 credits. Tier 4 needs Sergeant and tier 5 needs Lieutenant. Any bought
-system can be switched off in the hangar for a harder solo run.
+**Upgrades** work in solo (no cap) and ranked (up to your league's cap).
+Five tiers each at 500 / 1,500 / 4,000 / 10,000 / 25,000 credits: 41,000 a
+system, 246,000 for the whole ship. Tier 3 needs Gold, tier 4 Platinum and
+tier 5 Diamond. Any bought system can be switched off in the hangar.
 
 | System | Per tier | At tier 5 |
 |---|---|---|
@@ -271,11 +304,11 @@ items are tried on the ship with a buy button or what unlocks them.
 | Slot | Options |
 |---|---|
 | Hull | dart, wing, needle, manta (missions), arrow (1,500), talon (4,000) |
-| Paint | standard, slate, crimson, cobalt, olive, sand, white, carbon (credits), gold (Colonel), chrome (General) |
+| Paint | standard, slate, crimson, cobalt, olive, sand, white, carbon (credits), gunmetal (Colonel), chrome (General), silver, gold, platinum, diamond, champion, supernova (leagues) |
 | Markings | stripe, twin stripes, split (credits), chevron (10 stars), two-tone (25 stars) |
 | Fins | tail fin, winglets (credits), twin fins (15 stars) |
 | Engine colour | amber, cyan, violet, green, white (credits), red (Sergeant); colours the engine flames |
-| Wing decal | your rank insignia |
+| Wing decal | your rank insignia, or your league emblem |
 
 Missions still unlock trail styles and world colour palettes.
 
@@ -403,7 +436,8 @@ manifest, so the game installs to a home screen and works offline.
 | `src/missions.ts`, `src/cosmetics.ts` | Missions and mission unlocks |
 | `src/ranks.ts` | Rank ladder, XP, skill, par, insignia, run history |
 | `src/wallet.ts` | Credits |
-| `src/upgrades.ts` | Ship upgrade systems and the standard ship |
+| `src/upgrades.ts` | Ship upgrade systems, points and the standard ship |
+| `src/leagues.ts` | Leagues, divisions, league points, weekly rewards, emblems |
 | `src/looks.ts` | Ship looks catalogue and ownership |
 | `src/progress.ts` | Stats, sectors, stars, daily seed |
 | `src/settings.ts` | Settings table and storage |
@@ -414,6 +448,7 @@ manifest, so the game installs to a home screen and works offline.
 | `src/dev.ts` | Dev-only panel |
 | `tests/fairness.test.ts` | Headless survivability test |
 | `tests/ranks.test.ts` | Rank ladder, XP, skill and credit maths |
+| `tests/leagues.test.ts` | League brackets, LP, divisions, promotion, weekly rewards, prices |
 | `public/` | Icons, manifest, service worker |
 
 ## Tuning
@@ -441,8 +476,9 @@ On the dev server only, a `dev` link opens a panel with:
 - **Invincible** and **full boost** toggles
 - **Replay seed:** replays the last run's course
 - **Ship room:** forces every interior room to one type
-- **Unlock all:** General Grade 4, every sector to loop 9 with all stars,
-  every look, every upgrade maxed and 100,000 credits (saved in that browser)
+- **Unlock all:** General Grade 4, Grand Champion, every sector to loop 9
+  with all stars, every look, every upgrade maxed and 100,000 credits (saved
+  in that browser)
 - **Reset all progress:** clears ranks, credits, unlocks and stats (keeps
   settings)
 - an FPS readout with the pixel ratio and draw calls

@@ -848,6 +848,28 @@ body {
   text-shadow: none;
 }
 
+.title-league {
+  top: calc(var(--safe-top) + 16% + 150px);
+}
+
+.lp-track {
+  display: block;
+  width: 120px;
+  height: 3px;
+  margin-top: 5px;
+  border-radius: 2px;
+  background: color-mix(in srgb, currentColor 18%, transparent);
+  overflow: hidden;
+}
+
+.lp-fill {
+  display: block;
+  height: 100%;
+  background: currentColor;
+  transform-origin: left center;
+  transform: scaleX(0);
+}
+
 .title-rank-text {
   display: flex;
   flex-direction: column;
