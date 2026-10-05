@@ -188,3 +188,138 @@ export function courseLength(c: Course): number {
 export function findCourse(id: string): Course | undefined {
   return COURSES.find((c) => c.id === id);
 }
+
+// --- the weekly ranked level ---------------------------------------------------------
+// One hand-built-style level a week, the same for everyone, new every Monday.
+// It's assembled from the section library below, seeded by the week, starting
+// in a different environment each week and running on through the next two.
+
+/** The environments a run can be set in (solo picks one; the weekly level starts in one). */
+export interface Environment {
+  id: string;
+  name: string;
+  theme: ThemeId;
+  biome: Biome;
+}
+
+export const ENVIRONMENTS: readonly Environment[] = [
+  { id: 'open-ground', name: 'open ground', theme: 'land', biome: 'alien' },
+  { id: 'canyon', name: 'canyon', theme: 'canyon', biome: 'canyon' },
+  { id: 'ship', name: 'ship interior', theme: 'interior', biome: 'interior' },
+  { id: 'ice', name: 'ice field', theme: 'land', biome: 'ice' },
+  { id: 'asteroids', name: 'asteroid belt', theme: 'canyon', biome: 'asteroids' },
+  { id: 'volcanic', name: 'volcanic plain', theme: 'land', biome: 'volcanic' },
+];
+
+type Template = Omit<Section, 'length' | 'difficulty' | 'theme' | 'biome'>;
+
+const LAND_SECTIONS: Template[] = [
+  { name: 'the plains', sub: 0 },
+  { name: 'arch run', sub: 0, overlay: 'arches' },
+  { name: 'pickup trail', sub: 0, overlay: 'pickups' },
+  { name: 'spire slalom', sub: 1, overlay: 'slalom' },
+  { name: 'stone gates', sub: 1, overlay: 'gates' },
+  { name: 'the rockfields', sub: 1 },
+  { name: 'meteor field', sub: 1, event: 'meteors' },
+  { name: 'the forest path', sub: 2 },
+];
+
+const CANYON_SECTIONS: Template[] = [
+  { name: 'the gorge', sub: 0 },
+  { name: 'rockfall', sub: 1 },
+  { name: 'stone gates', sub: 1, overlay: 'gates' },
+  { name: 'the narrows', sub: 2 },
+  { name: 'pillar run', sub: 2, overlay: 'slalom' },
+];
+
+const SHIP_ROOMS: RoomId[] = [
+  'cargo',
+  'servers',
+  'lasers',
+  'coolant',
+  'hydroponics',
+  'vents',
+  'gantry',
+  'pistons',
+  'foundry',
+  'breach',
+  'chicane',
+  'reactor',
+  'hangar',
+  'junction',
+  'fork',
+  'islands',
+];
+
+const WEEK_MS = 7 * 24 * 3600 * 1000;
+
+function hash(text: string): number {
+  let h = 0x811c9dc5;
+  for (const ch of text) {
+    h ^= ch.charCodeAt(0);
+    h = Math.imul(h, 0x01000193);
+  }
+  return h >>> 0;
+}
+
+/** mulberry32: a small seeded random source, separate from the world's. */
+function seeded(n: number): () => number {
+  let s = n >>> 0;
+  return () => {
+    s = (s + 0x6d2b79f5) >>> 0;
+    let t = s;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/** The weekly ranked level for the week starting `monday` ("2026-10-05"). */
+export function weeklyCourse(monday: string): Course {
+  const [y, m, d] = monday.split('-').map(Number);
+  const start = new Date(y, m - 1, d);
+  const week = Math.floor(start.getTime() / WEEK_MS);
+  const seed = hash(`endless-week-${monday}`);
+  const rnd = seeded(seed);
+  const pick = <T>(list: readonly T[]): T => list[Math.floor(rnd() * list.length)];
+  const first = ((week % ENVIRONMENTS.length) + ENVIRONMENTS.length) % ENVIRONMENTS.length;
+  // Three areas: this week's environment, then the next two in the cycle.
+  const areas = [0, 1, 2].map((k) => ENVIRONMENTS[(first + k) % ENVIRONMENTS.length]);
+  const lengths = [2600, 2200, 1900];
+  const sections: Section[] = [];
+  let difficulty = 4000;
+  const step = 5000 / 5; // ramps from 4,000 to about 9,000 across the level
+  areas.forEach((env, a) => {
+    if (env.theme === 'interior') {
+      // A run of ship rooms, in a fixed order for the week.
+      const rooms: RoomId[] = [];
+      while (rooms.length < 5) {
+        const r = pick(SHIP_ROOMS);
+        if (rooms[rooms.length - 1] !== r) rooms.push(r);
+      }
+      sections.push({ name: 'the ship', theme: 'interior', biome: 'interior', rooms, length: lengths[a], sub: 1, difficulty, event: rnd() < 0.35 ? 'redAlert' : undefined });
+      difficulty += step * 2;
+      return;
+    }
+    const library = env.theme === 'land' ? LAND_SECTIONS : CANYON_SECTIONS;
+    // Two sections per area, the second a little harder.
+    const one = pick(library);
+    let two = pick(library);
+    while (two.name === one.name) two = pick(library);
+    for (const [k, t] of [one, two].entries()) {
+      const event = env.biome === 'asteroids' && t.event === undefined && rnd() < 0.25 ? 'meteors' : t.event;
+      sections.push({ ...t, name: k === 0 && a > 0 ? `${env.name}: ${t.name}` : t.name, theme: env.theme, biome: env.biome, length: Math.round(lengths[a] / 2), difficulty, event });
+      difficulty += step;
+    }
+  });
+  const length = sections.reduce((n, s) => n + s.length, 0);
+  const label = start.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }).toLowerCase();
+  return {
+    id: `week-${monday}`,
+    name: `week of ${label}`,
+    blurb: `starts in the ${areas[0].name}, then the ${areas[1].name} and the ${areas[2].name}`,
+    seed,
+    target: Math.round((length * 1.6) / 100) * 100,
+    sections,
+  };
+}
