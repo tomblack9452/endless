@@ -25,6 +25,7 @@
           <div class="hud-side">
             <div class="label dim">level</div>
             <div id="hud-level" class="level-num">1</div>
+            <div id="hud-mode" class="label dim hud-mode"></div>
           </div>
           <div class="hud-centre">
             <div id="hud-score" class="score">0</div>
@@ -59,11 +60,21 @@
           <div class="title-word">endless</div>
           <div class="title-word sub">space</div>
         </div>
+        <button id="title-rank" class="title-rank" type="button">
+          <span id="title-rank-icon" class="insignia"></span>
+          <span class="title-rank-text">
+            <span id="title-rank-name" class="label"></span>
+            <span id="title-credits" class="label dim"></span>
+          </span>
+        </button>
         <div class="screen-foot">
-          <button id="title-start" class="pill primary" type="button">play</button>
+          <div class="title-modes">
+            <button id="title-start" class="pill primary" type="button">ranked</button>
+            <button class="pill" type="button" data-title="solo">solo</button>
+          </div>
           <div class="title-links">
-            <span class="chip link" data-title="from">start: open ground</span>
             <span class="chip link" data-title="daily">daily run</span>
+            <span class="chip link" data-title="record">service record</span>
             <span class="chip link" data-title="missions">missions</span>
             <span class="chip link" data-title="hangar">hangar</span>
             <span class="chip link" data-title="stats">stats</span>
@@ -144,13 +155,35 @@
         </div>
       </div>
 
+      <div id="screen-record" class="layer screen panel">
+        <div class="panel-head">
+          <button class="label link back" type="button" data-action="back">back</button>
+          <div class="panel-title">service record</div>
+        </div>
+        <div class="settings">
+          <div class="record-top">
+            <span id="record-icon" class="insignia big"></span>
+            <div id="record-rank" class="record-rank"></div>
+            <div id="record-next" class="label dim"></div>
+          </div>
+          <div class="xp-track"><div id="record-xp" class="xp-fill"></div></div>
+          <div id="record-rows"></div>
+          <div class="settings-group">recent runs</div>
+          <div id="record-runs"></div>
+          <div class="settings-group">ranks</div>
+          <div id="record-ladder" class="ladder"></div>
+        </div>
+      </div>
+
       <div id="screen-over" class="layer screen panel">
         <div class="screen-center">
           <div class="screen-heading">crashed</div>
+          <div id="over-mode" class="label dim"></div>
           <div id="over-score" class="score big">0</div>
           <div id="over-best" class="label"></div>
           <div id="over-stats" class="label dim"></div>
           <div id="over-extra" class="label dim"></div>
+          <div id="over-rank" class="over-rank"></div>
           <div id="over-missions" class="label dim over-missions"></div>
           <div class="menu">
             <div class="pill primary">tap to retry</div>

@@ -1,7 +1,27 @@
 import { CONFIG } from './config';
 import { label, type SettingKey, type Settings } from './settings';
 
-export type ScreenName = 'title' | 'paused' | 'over' | 'settings' | 'stats' | 'missions' | 'hangar';
+export type ScreenName = 'title' | 'paused' | 'over' | 'settings' | 'stats' | 'missions' | 'hangar' | 'record';
+
+/** Everything the service record screen shows. */
+export interface RecordView {
+  icon: string; // insignia SVG
+  rank: string;
+  next: string;
+  xpFraction: number; // 0..1 towards the next rank
+  rows: [string, string][];
+  runs: [string, string][];
+  ladder: { icon: string; name: string; needs: string; state: 'done' | 'current' | 'locked' }[];
+}
+
+/** The rank block on the game-over screen. */
+export interface RankResultView {
+  icon: string;
+  rank: string;
+  promoted: boolean;
+  xpFraction: number;
+  lines: string[];
+}
 
 const fmt = new Intl.NumberFormat('en-US');
 
@@ -49,7 +69,12 @@ export class UI {
     stats: $('screen-stats'),
     missions: $('screen-missions'),
     hangar: $('screen-hangar'),
+    record: $('screen-record'),
   };
+  private readonly hudMode = $('hud-mode');
+  private readonly overMode = $('over-mode');
+  private readonly overRank = $('over-rank');
+  readonly titleRank = $('title-rank');
   private readonly missionsRows = $('missions-rows');
   private readonly missionsNext = $('missions-next');
   private readonly hangarCount = $('hangar-count');
@@ -210,6 +235,88 @@ export class UI {
     this.missionsNext.textContent = next;
   }
 
+  /** Run mode under the level number and above the game-over score. */
+  setMode(text: string): void {
+    this.hudMode.textContent = text;
+    this.overMode.textContent = text;
+  }
+
+  /** Rank badge on the title screen. */
+  setTitleRank(icon: string, name: string, credits: string): void {
+    $('title-rank-icon').innerHTML = icon;
+    $('title-rank-name').textContent = name;
+    $('title-credits').textContent = credits;
+  }
+
+  renderRecord(v: RecordView): void {
+    $('record-icon').innerHTML = v.icon;
+    $('record-rank').textContent = v.rank;
+    $('record-next').textContent = v.next;
+    $('record-xp').style.transform = `scaleX(${Math.max(0, Math.min(1, v.xpFraction))})`;
+    this.fillRows($('record-rows'), v.rows);
+    this.fillRows($('record-runs'), v.runs);
+    $('record-ladder').replaceChildren(
+      ...v.ladder.map((l) => {
+        const row = document.createElement('div');
+        row.className = `ladder-row ${l.state === 'locked' ? 'locked' : l.state === 'current' ? 'current' : ''}`;
+        const icon = document.createElement('span');
+        icon.className = 'insignia small';
+        icon.innerHTML = l.icon;
+        const name = document.createElement('span');
+        name.className = 'label ladder-name';
+        name.textContent = l.name;
+        const needs = document.createElement('span');
+        needs.className = 'label dim';
+        needs.textContent = l.needs;
+        row.append(icon, name, needs);
+        return row;
+      }),
+    );
+  }
+
+  /** Rank result on the game-over screen (null clears it, e.g. solo runs). */
+  setGameOverRank(v: RankResultView | null): void {
+    this.overRank.classList.remove('promoted');
+    if (!v) {
+      this.overRank.replaceChildren();
+      return;
+    }
+    const head = document.createElement('div');
+    head.className = 'over-rank-head';
+    const icon = document.createElement('span');
+    icon.className = 'insignia';
+    icon.innerHTML = v.icon;
+    const text = document.createElement('div');
+    text.style.textAlign = 'left';
+    if (v.promoted) {
+      const p = document.createElement('div');
+      p.className = 'promoted-label';
+      p.textContent = 'promoted';
+      text.append(p);
+    }
+    const name = document.createElement('div');
+    name.className = 'label';
+    name.textContent = v.rank;
+    text.append(name);
+    head.append(icon, text);
+    const track = document.createElement('div');
+    track.className = 'xp-track';
+    const fill = document.createElement('div');
+    fill.className = 'xp-fill';
+    track.append(fill);
+    const lines = v.lines.map((l) => {
+      const d = document.createElement('div');
+      d.className = 'label dim';
+      d.textContent = l;
+      return d;
+    });
+    this.overRank.replaceChildren(head, track, ...lines);
+    void this.overRank.offsetWidth;
+    if (v.promoted) this.overRank.classList.add('promoted');
+    // Fill after layout so the bar animates up.
+    requestAnimationFrame(() => (fill.style.transform = `scaleX(${Math.max(0, Math.min(1, v.xpFraction))})`));
+  }
+
   /** Active power-up line in the HUD ('' hides it). */
   setPower(text: string): void {
     if (text === this.shownPower) return;
@@ -252,7 +359,7 @@ export class UI {
     this.hangarCount.textContent = count;
   }
 
-  private fillRows(into: HTMLElement, rows: [string, string][]): void {
+  fillRows(into: HTMLElement, rows: [string, string][]): void {
     into.replaceChildren(
       ...rows.map(([k, v]) => {
         const row = document.createElement('div');
