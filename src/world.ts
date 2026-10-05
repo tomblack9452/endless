@@ -1,4 +1,4 @@
-import { BoxGeometry, Color, CylinderGeometry, MeshBasicMaterial, PlaneGeometry, OctahedronGeometry, Scene, type Texture } from 'three';
+import { BoxGeometry, Color, CylinderGeometry, MeshBasicMaterial, PlaneGeometry, OctahedronGeometry, RingGeometry, Scene, type Texture } from 'three';
 import { patchBlockMaterial } from './blockTextures';
 import { CONFIG } from './config';
 import { rand, seed as seedRandom } from './rng';
@@ -19,7 +19,7 @@ interface Span {
 
 const DEFAULT_BIOME: Record<ThemeId, Biome> = { land: 'alien', canyon: 'canyon', interior: 'interior' };
 import { Decor, decorate, Light, pickRoom, ROOM_IDS, ROOMS, roomLength, type RoomAPI, type RoomId, type RoomPlan } from './interior';
-import { fxMaterial, LIQUID_COLOURS, Sparks } from './fx';
+import { fxMaterial, Liquid, LIQUID_COLOURS, Sparks } from './fx';
 import { type Block, type Parsed, parse, type Piece, routeX } from './pieces/format';
 import { FAMILIES, pickPiece, pieceById } from './pieces';
 import { ceilingFan } from './props';
@@ -41,6 +41,14 @@ export type ThemeId = 'land' | 'canyon' | 'interior';
 /** Power-up kinds: 0 shield, 1 magnet, 2 slow-mo. */
 export type PowerKind = 0 | 1 | 2;
 const THEMES: ThemeId[] = ['land', 'canyon', 'interior'];
+
+/** An ice or lava lake: centre (world x, distance) and half-sizes across and along. */
+interface Lake {
+  x: number;
+  d: number;
+  rx: number;
+  rd: number;
+}
 
 /** Ramps and drops for a theme (CONFIG.themes.*.elevation). */
 interface ElevationConfig {
@@ -172,6 +180,16 @@ export class World {
   private readonly rockSpires: InstancedField;
   private readonly cacti: InstancedField;
   private readonly tumbleweeds: InstancedField; // scenery rolling across
+  // Ice field and volcanic plain hazards.
+  private readonly iceSheets: InstancedField;
+  private readonly lavaSheets: InstancedField;
+  private readonly lavaBombs: InstancedField;
+  private readonly marks: InstancedField; // where lava bombs will land
+  private iceLakes: Lake[] = [];
+  private lavaLakes: Lake[] = [];
+  private nextIceAt = Infinity;
+  private nextLavaAt = Infinity;
+  private nextBombAt = Infinity;
   private readonly tufts: InstancedField; // grass, scenery
   // Interior animation (fx.ts).
   private readonly pours: InstancedField; // liquid falling from the ceiling (curtains are solid)
@@ -373,6 +391,14 @@ export class World {
     this.cacti = new InstancedField(scene, alienCactus(), this.propMat, F.maxCacti);
     this.tumbleweeds = new InstancedField(scene, tumbleweed(), this.propMat, F.maxTumbleweeds);
     this.tumbleweeds.rollRadius = 0.5;
+    // Lakes are built a row at a time (slices that lean with the hills), so they lie on the ground.
+    this.iceSheets = new InstancedField(scene, new BoxGeometry(1, 0.04, 1).translate(0, 0.02, 0), fxMaterial('ice'), F.maxIceSheets);
+    this.lavaSheets = new InstancedField(scene, new BoxGeometry(1, 0.04, 1).translate(0, 0.02, 0), fxMaterial('pool'), F.maxIceSheets);
+    this.lavaSheets.setColorTable([LIQUID_COLOURS[Liquid.Molten]]);
+    this.iceSheets.setColorTable([new Color(CONFIG.biomes.iceLake)]);
+    this.lavaBombs = new InstancedField(scene, rock, new MeshBasicMaterial({ color: CONFIG.biomes.lavaBomb, fog: false }), F.maxLavaBombs);
+    this.marks = new InstancedField(scene, new RingGeometry(0.75, 1, 24).rotateX(-Math.PI / 2), fxMaterial('blink'), F.maxMarks);
+    this.marks.setColorTable([new Color(TH.interior.lights.red)]);
     this.arches = new InstancedField(scene, rockArch(), this.propMat, F.maxArches);
     this.stripMat = new MeshBasicMaterial();
     this.strips = new InstancedField(scene, box, this.stripMat, F.maxStrips);
@@ -428,13 +454,14 @@ export class World {
       this.deadTrees,
       this.rockSpires,
       this.cacti,
+      this.lavaBombs,
       this.shuttles,
       this.strips,
       this.pours,
       this.vents,
       this.tanks,
     ];
-    this.fields = [...this.solids, this.pools, this.steamPlumes, this.blinkers, this.holos, this.fans, this.tufts, this.mesas, this.arches, this.pickups, this.powers, this.pipes, this.greebles, this.voids, this.canisters, this.waters, this.tumbleweeds];
+    this.fields = [...this.solids, this.pools, this.steamPlumes, this.blinkers, this.holos, this.fans, this.tufts, this.mesas, this.arches, this.pickups, this.powers, this.pipes, this.greebles, this.voids, this.canisters, this.waters, this.tumbleweeds, this.iceSheets, this.lavaSheets, this.marks];
     this.applyPalette();
   }
 
@@ -518,6 +545,9 @@ export class World {
     this.liftPending = false;
     this.altNow = null;
     this.altRoutes = 0;
+    this.iceLakes = [];
+    this.lavaLakes = [];
+    this.nextIceAt = this.nextLavaAt = this.nextBombAt = this.distance + clearance + CONFIG.hazards.ice.firstAfter;
     const level = this.levelAt(this.distance);
     this.themeEnd = run ? this.levelStart(level - ((level - 1) % LPT) + LPT) : Infinity;
     if (run && this.course) {
@@ -555,6 +585,7 @@ export class World {
     this.hull.animate(this.distance); // pistons
     this.vents.animate(this.distance); // steam vents
     this.tumbleweeds.animate(this.distance); // rolling across
+    this.lavaBombs.animate(this.distance); // falling
     this.greebles.animate(this.distance); // hook chains, engine pistons
     this.updateMix(dt);
   }
@@ -1048,6 +1079,8 @@ export class World {
     const laneRel = this.lane - this.shipX;
     // Props are jittered half a row forwards/back, where the lane may have moved.
     const jitter = maxSlope * STEP * 0.5;
+    if (this.runStart !== null) this.landHazards(d, sub, maxSlope, jitter);
+    this.lakeSlices(d);
     this.landDressing(d, laneRel, jitter);
 
     if (sub === 2) {
@@ -1065,7 +1098,8 @@ export class World {
       return;
     }
 
-    this.scatter(d, densityAt(score) * (sub === 1 ? lt.denseFactor : 1), laneRel, LANE + jitter);
+    const hard = (CONFIG.hazards.density as Record<string, number>)[this.genBiome] ?? 1;
+    this.scatter(d, densityAt(score) * (sub === 1 ? lt.denseFactor : 1) * hard, laneRel, LANE + jitter);
     if (this.genBiome === 'volcanic') this.lavaCrack(d, laneRel, jitter);
 
     // Level 2: rock clusters, well clear of the lane.
@@ -1107,6 +1141,104 @@ export class World {
     if (rand() < 0.5) this.light(x + this.shipX + (rand() - 0.5) * 0.8, 0.01, d + len * 0.6, 0.12, 0.01, len * 0.5, Light.Amber, false);
   }
 
+  /**
+   * Ice lakes (the lane runs across them: open ice, no obstacles, a clear
+   * run-off after), lava lakes off the lane, and lava bombs that fall beside it.
+   */
+  private landHazards(d: number, sub: number, maxSlope: number, jitter: number): void {
+    const H = CONFIG.hazards;
+    const b = this.genBiome;
+    const ahead = this.distance - 60;
+    this.iceLakes = this.iceLakes.filter((l) => l.d + l.rd + H.ice.runoff > ahead);
+    this.lavaLakes = this.lavaLakes.filter((l) => l.d + l.rd > ahead);
+    if (this.quiet(d)) return;
+    const room = this.themeEnd - d - TH.lane.beforeChange - 10; // lakes finish before the area does
+    if (b === 'ice' && d >= this.nextIceAt && room > 2 * H.ice.halfLength[1] + H.ice.runoff) {
+      const rx = range(H.ice.halfWidth);
+      const rd = range(H.ice.halfLength);
+      // Centred near the lane, so the way runs across the ice.
+      const x = this.lane + (rand() - 0.5) * rx * 0.6;
+      const lake = { x, d: d + rd, rx, rd };
+      this.iceLakes.push(lake);
+      this.nextIceAt = d + 2 * rd + H.ice.runoff + range(H.ice.spacing);
+      this.nextFeatureAt = Math.max(this.nextFeatureAt, d + 2 * rd + H.ice.runoff);
+    }
+    if (b === 'volcanic') {
+      if (d >= this.nextLavaAt && room > 2 * H.lava.halfLength[1]) {
+        this.nextLavaAt = d + range(H.lava.spacing[Math.min(2, sub)]);
+        const rx = range(H.lava.halfWidth);
+        const rd = range(H.lava.halfLength);
+        // Off the lane by its own size, how far the lane can move over its length, and a gap.
+        const off = LANE + rx + jitter + 2 * maxSlope * rd + range(H.lava.gap);
+        const side = rand() < 0.5 ? -1 : 1;
+        const lake = { x: this.lane + side * off, d: d + rd, rx, rd };
+        if (!this.onLake(this.iceLakes, lake.x, lake.d, rx, 0)) {
+          this.lavaLakes.push(lake);
+        }
+      }
+      const spacing = H.bombs.spacing[Math.min(2, sub)];
+      if (spacing[1] > 0 && d >= this.nextBombAt) {
+        this.nextBombAt = d + range(spacing);
+        const r = range(H.bombs.radius);
+        const side = rand() < 0.5 ? -1 : 1;
+        const x = this.lane + side * (LANE + r * 0.8 + jitter + maxSlope * STEP + range(H.bombs.gap));
+        const hit = r * 0.8;
+        // It falls as you approach and is down well before you reach it.
+        this.lavaBombs.setNextRamp(H.bombs.height, H.bombs.fallOver, range(H.bombs.landAhead), true);
+        this.lavaBombs.spawn(wrap(x - this.shipX), 0, d, r, (r * 1.1) / BOULDER_HEIGHT, r, rand() * 6.28, true, true, hit, hit);
+        this.marks.spawn(wrap(x - this.shipX), 0.03, d, r * 1.3, 1, r * 1.3, 0, false, true, 0, 0, false);
+      }
+    }
+  }
+
+  /** This row's slice of every lake it crosses. */
+  private lakeSlices(d: number): void {
+    for (const [lakes, field, crust] of [[this.iceLakes, this.iceSheets, false], [this.lavaLakes, this.lavaSheets, true]] as const) {
+      for (const l of lakes) {
+        const t = (d - l.d) / l.rd;
+        if (t <= -1 || t >= 1) continue;
+        const w = 2 * l.rx * Math.sqrt(1 - t * t);
+        if (crust) this.light(l.x, 0.012, d, w + 0.8, 0.01, STEP + 0.1, Light.Dark, false); // a dark crust round the lava
+        field.nextColor = 0;
+        field.nextTilt = true;
+        field.spawn(wrap(l.x - this.shipX), 0.015, d, w, 1, STEP + 0.12, 0, false, true, 0, 0, false);
+      }
+    }
+  }
+
+  /** True if world x, distance d is within `margin` of a lake (plus `after` beyond its far end). */
+  private onLake(lakes: Lake[], x: number, d: number, margin: number, after: number): boolean {
+    for (const l of lakes) {
+      const dz = d - l.d;
+      const dx = wrap(x - l.x);
+      // Past the far end: a run-off strip as wide as the lake.
+      if (dz > 0 && dz <= l.rd + after && Math.abs(dx) <= l.rx + margin) return true;
+      const nx = dx / (l.rx + margin);
+      const nz = dz / (l.rd + margin);
+      if (nx * nx + nz * nz <= 1) return true;
+    }
+    return false;
+  }
+
+  /** The ship is on an ice lake (it slides). */
+  onIce(): boolean {
+    return this.lakeAtShip(this.iceLakes, 0.95);
+  }
+
+  /** The ship is over lava (the run ends, shield or not). */
+  inLava(): boolean {
+    return this.lakeAtShip(this.lavaLakes, 0.8);
+  }
+
+  private lakeAtShip(lakes: Lake[], inside: number): boolean {
+    for (const l of lakes) {
+      const dx = wrap(this.shipX - l.x) / l.rx;
+      const dz = (this.distance - l.d) / l.rd;
+      if (dx * dx + dz * dz < inside) return true;
+    }
+    return false;
+  }
+
   /** Choose the next open-ground prop's kind and size (sets propKind/propSize/propHit). */
   private pickProp(): void {
     const b = this.genBiome;
@@ -1137,6 +1269,8 @@ export class World {
 
   /** Place the prop chosen by pickProp() at ship-relative `x`. Trees collide at the trunk only. */
   private placeProp(x: number, d: number, wraps: boolean): void {
+    if (this.onLake(this.iceLakes, x + this.shipX, d, this.propHit + 1, CONFIG.hazards.ice.runoff)) return; // the ice stays open
+    if (this.onLake(this.lavaLakes, x + this.shipX, d, this.propHit, 0)) return;
     const s = this.propSize;
     const h = this.propHit;
     const rot = rand() * Math.PI * 2;
