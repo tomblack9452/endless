@@ -11,12 +11,13 @@ import {
   RingGeometry,
   Scene,
   Vector2,
+  Vector3,
   Vector4,
   WebGLRenderer,
 } from 'three';
 import { CONFIG } from './config';
 import type { LivePalette } from './palette';
-import { terrain, TERRAIN_GLSL } from './terrain';
+import { MAX_BUMPS, terrain, TERRAIN_GLSL } from './terrain';
 
 const DEG = Math.PI / 180;
 const PLANET_BODY = new Color(CONFIG.planet.body);
@@ -50,6 +51,9 @@ export class Stage {
   private readonly hillDistance = { value: 0 };
   private readonly hillWindow = { value: new Vector4() };
   private readonly hillPhase = { value: new Vector2() };
+  private readonly hillBumps = { value: Array.from({ length: MAX_BUMPS }, () => new Vector3()) };
+  private readonly groundAt = { value: new Vector2() }; // world x and distance under the camera, wrapped
+  private readonly groundStyle = { value: new Vector2() };
 
   // Camera state driven by the game.
   roll = 0; // radians
@@ -86,20 +90,47 @@ export class Stage {
       shader.uniforms.uDistance = this.hillDistance;
       shader.uniforms.uHill = this.hillWindow;
       shader.uniforms.uPhase = this.hillPhase;
+      shader.uniforms.uBumps = this.hillBumps;
+      shader.uniforms.uGroundAt = this.groundAt;
+      shader.uniforms.uGroundStyle = this.groundStyle;
       shader.vertexShader = shader.vertexShader
-        .replace('#include <common>', `#include <common>\n${TERRAIN_GLSL}\nvarying float vHillShade;`)
+        .replace('#include <common>', `#include <common>\n${TERRAIN_GLSL}\nvarying float vHillShade;\nvarying vec2 vGround;\nuniform vec2 uGroundAt;`)
         .replace(
           '#include <begin_vertex>',
           `#include <begin_vertex>
-          float hillD = uDistance - (modelMatrix * vec4(transformed, 1.0)).z;
+          vec4 groundWorld = modelMatrix * vec4(transformed, 1.0);
+          // Ground-fixed coordinates (they move with the world, not the camera).
+          vGround = vec2(groundWorld.x + uGroundAt.x, uGroundAt.y - groundWorld.z);
+          float hillD = uDistance - groundWorld.z;
           transformed.z += hillAt(hillD) - hillAt(uDistance);
           // Slopes facing the camera catch the light; the far sides fall into shade.
           vHillShade = clamp((hillAt(hillD + 1.0) - hillAt(hillD - 1.0)) * 0.5, -1.0, 1.0);`,
         );
       shader.fragmentShader = shader.fragmentShader
-        .replace('#include <common>', '#include <common>\nvarying float vHillShade;')
+        .replace('#include <common>', `#include <common>
+varying float vHillShade;
+varying vec2 vGround;
+uniform vec2 uGroundStyle; // grass and dirt patches, fine speckle
+float gHash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+float gNoise(vec2 p) {
+  vec2 i = floor(p);
+  vec2 f = fract(p);
+  f = f * f * (3.0 - 2.0 * f);
+  return mix(mix(gHash(i), gHash(i + vec2(1.0, 0.0)), f.x), mix(gHash(i + vec2(0.0, 1.0)), gHash(i + vec2(1.0, 1.0)), f.x), f.y);
+}`)
         .replace('#include <color_fragment>', `#include <color_fragment>
-        diffuseColor.rgb *= 1.0 + vHillShade * ${CONFIG.terrain.shade.toFixed(2)};`);
+        diffuseColor.rgb *= 1.0 + vHillShade * ${CONFIG.terrain.shade.toFixed(2)};
+        if (uGroundStyle.x > 0.0 || uGroundStyle.y > 0.0) {
+          // Broad patches: greener grass and warmer bare dirt, tinting whatever the ground colour is.
+          float patchN = gNoise(vGround * 0.045) * 0.65 + gNoise(vGround * 0.13 + 7.0) * 0.35;
+          float grass = smoothstep(0.56, 0.7, patchN) * uGroundStyle.x;
+          float dirt = smoothstep(0.42, 0.3, patchN) * uGroundStyle.x;
+          diffuseColor.rgb *= mix(vec3(1.0), vec3(0.86, 1.0, 0.8), grass);
+          diffuseColor.rgb *= mix(vec3(1.0), vec3(1.06, 0.95, 0.85), dirt);
+          // Fine grain so the ground doesn't read as flat paint.
+          float grain = gNoise(vGround * 1.6) * 0.6 + gNoise(vGround * 4.1) * 0.4;
+          diffuseColor.rgb *= 1.0 + (grain - 0.5) * 0.09 * uGroundStyle.y;
+        }`);
     };
     const ground = new Mesh(new PlaneGeometry(2000, 2000, 1, 800), this.groundMat);
     this.ground = ground;
@@ -134,6 +165,17 @@ export class Stage {
     this.hillDistance.value = distance;
     this.hillWindow.value.set(terrain.start, terrain.end, terrain.amp, 0);
     this.hillPhase.value.set(terrain.p, terrain.q);
+    for (let i = 0; i < MAX_BUMPS; i++) this.hillBumps.value[i].fromArray(terrain.bumps, i * 3);
+  }
+
+  /**
+   * Ground styling: `grass` 0..1 for grass and dirt patches, `grain` 0..1 for
+   * speckle. `shipX` and `distance` place the pattern so it moves with the
+   * world (wrapped, so floats stay precise on long runs).
+   */
+  setGroundStyle(grass: number, grain: number, shipX: number, distance: number): void {
+    this.groundStyle.value.set(grass, grain);
+    this.groundAt.value.set(shipX % 4096, distance % 4096);
   }
 
   applyPalette(): void {

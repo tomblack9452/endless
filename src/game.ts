@@ -1046,6 +1046,7 @@ export class Game {
   private frame = (now: number): void => {
     requestAnimationFrame(this.frame);
     this.stage.setTerrain(this.world.distance);
+    this.stage.setGroundStyle(...this.groundStyle(), this.world.lateral, this.world.distance);
     if (this.state === 'playing' || this.state === 'title') this.stage.adapt(now - this.lastTime);
     const dt = Math.max(0, Math.min((now - this.lastTime) / 1000, 1 / 20));
     this.lastTime = now;
@@ -1309,6 +1310,14 @@ export class Game {
     const speedNorm = (this.speed - CONFIG.speed.base) / (CONFIG.speed.max - CONFIG.speed.base);
     a.intensity = playing ? Math.min(1, 0.25 + sub * 0.25 + speedNorm * 0.5) : 0;
     this.sound.update(dt, a);
+  }
+
+  /** Ground patches and grain for the current biome: lush on alien ground, faint elsewhere, none indoors. */
+  private groundStyle(): [number, number] {
+    const w = this.world;
+    const outside = (1 - w.insideMix) * (1 - w.asteroidMix);
+    const grass: Record<string, number> = { alien: 1, ice: 0.25, volcanic: 0.4, canyon: 0.45 };
+    return [(grass[w.biome] ?? 0) * outside, outside];
   }
 
   /** Forward speed including boost and slow-mo. */
