@@ -1151,6 +1151,16 @@ export class Game {
     this.world.devRoom = id;
   }
 
+  /** Dev: build this hand-made section everywhere it fits (null: as normal). */
+  devSetPiece(id: string | null): void {
+    this.world.devPieces = id ? [id] : [];
+  }
+
+  /** Dev: draw sections' routes on the floor. */
+  devShowRoutes(on: boolean): void {
+    this.world.showRoutes = on;
+  }
+
   /** Dev: unlock everything: top rank, every sector and star, all looks and upgrades, plenty of credits. */
   devUnlockAll(): void {
     this.ranked.xp = Math.max(this.ranked.xp, RANKS[RANKS.length - 1].xp);

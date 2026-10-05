@@ -1,6 +1,7 @@
 import { CONFIG } from './config';
 import type { Game } from './game';
 import { ROOM_IDS, type RoomId } from './interior';
+import { PIECE_IDS } from './pieces';
 import { themeForLevel } from './world';
 
 // Dev tools. Only loaded by the dev server (see main.ts), so they
@@ -11,6 +12,8 @@ import { themeForLevel } from './world';
 
 const LEVELS = CONFIG.themes.levelsPerTheme * 4; // four full theme loops
 let forcedRoom: RoomId | null = null; // shared by both panels
+let forcedPiece: string | null = null;
+let showRoutes = false;
 
 export function installDevPanel(game: Game): void {
   installFps(game);
@@ -106,6 +109,35 @@ function install(game: Game, title: HTMLElement): void {
   renderRoom();
   renders.push(renderRoom);
   panel.appendChild(roomBtn);
+
+  // Force one hand-made section everywhere it fits (pair with "8 inte").
+  const pieces: (string | null)[] = [null, ...PIECE_IDS];
+  const pieceBtn = document.createElement('button');
+  pieceBtn.type = 'button';
+  pieceBtn.className = 'label dev-toggle';
+  const renderPiece = () => (pieceBtn.textContent = `section ${forcedPiece ?? 'random'}`);
+  pieceBtn.addEventListener('click', () => {
+    forcedPiece = pieces[(pieces.indexOf(forcedPiece) + 1) % pieces.length];
+    game.devSetPiece(forcedPiece);
+    for (const r of renders) r();
+  });
+  renderPiece();
+  renders.push(renderPiece);
+  panel.appendChild(pieceBtn);
+
+  // Draw sections' routes on the floor: main white, alt teal, risky amber.
+  const routesBtn = document.createElement('button');
+  routesBtn.type = 'button';
+  routesBtn.className = 'label dev-toggle';
+  const renderRoutes = () => (routesBtn.textContent = `show routes ${showRoutes ? 'on' : 'off'}`);
+  routesBtn.addEventListener('click', () => {
+    showRoutes = !showRoutes;
+    game.devShowRoutes(showRoutes);
+    for (const r of renders) r();
+  });
+  renderRoutes();
+  renders.push(renderRoutes);
+  panel.appendChild(routesBtn);
 
   // Unlock everything (saved, so it sticks in this browser) and the way back.
   const action = (text: string, run: () => void) => {
