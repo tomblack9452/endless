@@ -4,7 +4,7 @@ import { storage } from './storage';
 // Cosmetic unlocks: ship shapes, trails and world palettes. Missions unlock
 // them one at a time in UNLOCK_ORDER; the hangar screen picks among unlocked.
 
-export type ShipId = 'dart' | 'wing' | 'needle' | 'manta';
+export type ShipId = 'dart' | 'wing' | 'needle' | 'manta' | 'arrow' | 'talon';
 export type TrailId = 'none' | 'line' | 'dashes' | 'ion';
 
 export const SHIPS: ShipId[] = ['dart', 'wing', 'needle', 'manta'];
