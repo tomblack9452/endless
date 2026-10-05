@@ -680,9 +680,10 @@ export class Game {
 
   /** Dev: steer down the safe lane, as the fairness tests do. */
   private autopilot(): number {
-    const lane = this.world.laneAt(this.world.distance + 3);
+    // A little further ahead and firmer than the tests' pilot: the real ship eases into its turns.
+    const lane = this.world.laneAt(this.world.distance + 5);
     if (lane === null) return this.input.steering();
-    return Math.max(-1, Math.min(1, (lane - this.world.lateral) * 1.5));
+    return Math.max(-1, Math.min(1, (lane - this.world.lateral) * 3));
   }
 
   /** Assist mode works everywhere but ranked. */
@@ -1167,15 +1168,18 @@ export class Game {
     this.ui.showNotice('dev: everything unlocked');
   }
 
-  /** Dev: replay the last run's course from the start. */
+  /** Dev: replay the last run's course from where it started (same seed). */
   devReplay(): void {
-    this.beginRun(0, this.seed);
+    this.beginRun(this.devStart, this.seed);
   }
+
+  private devStart = 0;
 
   /** Dev: start a run a little before `level` begins. */
   devStartAt(level: number): void {
     const lead = 60; // points before the level starts, so you see the change
-    this.beginRun(Math.max(0, (level - 1) * CONFIG.score.levelLength - lead));
+    this.devStart = Math.max(0, (level - 1) * CONFIG.score.levelLength - lead);
+    this.beginRun(this.devStart);
   }
 
   // --- loop ----------------------------------------------------------------
