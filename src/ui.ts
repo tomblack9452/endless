@@ -21,6 +21,7 @@ export interface UpgradeRow {
   max: number;
   button: string;
   canBuy: boolean;
+  on: boolean | null; // switch state once bought, null before
 }
 
 /** One tile on the sector map. */
@@ -286,11 +287,17 @@ export class UI {
     $('hangar-credits').textContent = credits;
   }
 
-  bindUpgrades(onBuy: (id: string) => void): void {
+  bindUpgrades(onBuy: (id: string) => void, onToggle: (id: string) => void): void {
     const rows = $('upgrade-rows');
     rows.addEventListener('pointerdown', (e) => e.stopPropagation());
     rows.addEventListener('click', (e) => {
-      const b = (e.target as HTMLElement).closest<HTMLButtonElement>('button[data-upgrade]');
+      const target = e.target as HTMLElement;
+      const toggle = target.closest<HTMLButtonElement>('button[data-toggle]');
+      if (toggle) {
+        onToggle(toggle.dataset.toggle ?? '');
+        return;
+      }
+      const b = target.closest<HTMLButtonElement>('button[data-upgrade]');
       if (b && !b.disabled) onBuy(b.dataset.upgrade ?? '');
     });
   }
@@ -318,7 +325,18 @@ export class UI {
         b.dataset.upgrade = r.id;
         b.disabled = !r.canBuy;
         b.textContent = r.button;
-        row.append(info, b);
+        row.append(info);
+        if (r.on !== null) {
+          const t = document.createElement('button');
+          t.type = 'button';
+          t.className = `pill small toggle${r.on ? ' on' : ''}`;
+          t.dataset.toggle = r.id;
+          t.textContent = r.on ? 'on' : 'off';
+          t.setAttribute('aria-pressed', String(r.on));
+          row.append(t);
+        }
+        if (r.button !== 'maxed') row.append(b); // a maxed system just shows its full pips
+        if (r.on === false) row.classList.add('switched-off');
         return row;
       }),
     );
@@ -571,8 +589,20 @@ export class UI {
   }
 
   setBest(best: number): void {
-    const text = best > 0 ? `best ${formatScore(best)}` : '';
-    this.titleBest.textContent = text;
+    this.bests[0] = best;
+    this.setBests(...this.bests);
+  }
+
+  private readonly bests: [number, number, number] = [0, 0, 0];
+
+  /** Title screen bests: ranked, solo and today's daily run (zeros are left out). */
+  setBests(ranked: number, solo: number, daily: number): void {
+    this.bests.splice(0, 3, ranked, solo, daily);
+    const parts: string[] = [];
+    if (ranked > 0) parts.push(`ranked ${formatScore(ranked)}`);
+    if (solo > 0) parts.push(`solo ${formatScore(solo)}`);
+    if (daily > 0) parts.push(`daily ${formatScore(daily)}`);
+    this.titleBest.textContent = parts.length ? `best: ${parts.join(' · ')}` : '';
   }
 
   setGameOver(score: number, best: number, isNewBest: boolean, nearMisses: number, bestCombo: number, seed: number): void {
