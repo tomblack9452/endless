@@ -1,7 +1,17 @@
 import { CONFIG } from './config';
 import { label, type SettingKey, type Settings } from './settings';
 
-export type ScreenName = 'title' | 'paused' | 'over' | 'settings' | 'stats' | 'missions' | 'hangar' | 'record' | 'sectors';
+export type ScreenName = 'title' | 'paused' | 'over' | 'settings' | 'stats' | 'missions' | 'hangar' | 'record' | 'sectors' | 'league';
+
+/** Everything the league screen shows. */
+export interface LeagueView {
+  icon: string;
+  name: string;
+  next: string;
+  lpFraction: number;
+  rows: [string, string][];
+  ladder: { icon: string; name: string; needs: string; state: 'done' | 'current' | 'locked' }[];
+}
 
 /** One row on the hangar's ship tab. */
 export interface LookRow {
@@ -101,7 +111,9 @@ export class UI {
     hangar: $('screen-hangar'),
     record: $('screen-record'),
     sectors: $('screen-sectors'),
+    league: $('screen-league'),
   };
+  readonly titleLeague = $('title-league');
   private readonly hudMode = $('hud-mode');
   private readonly overMode = $('over-mode');
   private readonly overRank = $('over-rank');
@@ -381,6 +393,46 @@ export class UI {
       rows.push(head, row);
     }
     $('sectors-grid').replaceChildren(...rows);
+  }
+
+  /** League badge on the title screen. */
+  setTitleLeague(icon: string, name: string, lpFraction: number): void {
+    $('title-league-icon').innerHTML = icon;
+    $('title-league-name').textContent = name;
+    $('title-league-lp').style.transform = `scaleX(${Math.max(0, Math.min(1, lpFraction))})`;
+  }
+
+  setUpgradeNote(text: string): void {
+    $('upgrade-note').textContent = text;
+  }
+
+  renderLeague(v: LeagueView): void {
+    $('league-icon').innerHTML = v.icon;
+    $('league-name').textContent = v.name;
+    $('league-next').textContent = v.next;
+    $('league-lp').style.transform = `scaleX(${Math.max(0, Math.min(1, v.lpFraction))})`;
+    this.fillRows($('league-rows'), v.rows);
+    this.fillLadder($('league-ladder'), v.ladder);
+  }
+
+  private fillLadder(into: HTMLElement, ladder: LeagueView['ladder']): void {
+    into.replaceChildren(
+      ...ladder.map((l) => {
+        const row = document.createElement('div');
+        row.className = `ladder-row ${l.state === 'locked' ? 'locked' : l.state === 'current' ? 'current' : ''}`;
+        const icon = document.createElement('span');
+        icon.className = 'insignia small';
+        icon.innerHTML = l.icon;
+        const name = document.createElement('span');
+        name.className = 'label ladder-name';
+        name.textContent = l.name;
+        const needs = document.createElement('span');
+        needs.className = 'label dim';
+        needs.textContent = l.needs;
+        row.append(icon, name, needs);
+        return row;
+      }),
+    );
   }
 
   /** Rank badge on the title screen. */
