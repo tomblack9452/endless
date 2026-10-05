@@ -20,6 +20,8 @@ interface Span {
 const DEFAULT_BIOME: Record<ThemeId, Biome> = { land: 'alien', canyon: 'canyon', interior: 'interior' };
 import { Decor, decorate, Light, pickRoom, ROOM_IDS, ROOMS, roomLength, type RoomAPI, type RoomId, type RoomPlan } from './interior';
 import { fxMaterial, LIQUID_COLOURS, Sparks } from './fx';
+import { type Block, type Parsed, parse, type Piece, routeX } from './pieces/format';
+import { FAMILIES, pickPiece, pieceById } from './pieces';
 import { ceilingFan } from './props';
 import { alienCactus, ARCH_PILLAR_X, bush, deadTree, grassTuft, mesa, rockArch, rockSpire, tumbleweed } from './props';
 import { BOULDER_HEIGHT, boulder, canister, crystalCluster, greebleBox, mushroomTree, pipeSegment, powerGem, shuttle, spireTree } from './props';
@@ -299,6 +301,20 @@ export class World {
   private shiftLen = 0;
   private shiftDone = 0;
   private plan: RoomPlan | null = null; // split layout, mirrored to this room's side
+  // A hand-made piece being built (see pieces/), or null when it's a room template.
+  private piece: Parsed | null = null;
+  private pieceStart = 0; // distance of its first row
+  private pieceEnd = 0; // ...and of its last
+  /**
+   * Dev and tests: build these pieces in turn, each in the next slot of its kind
+   * (room pieces in room slots, corridor pieces in corridor slots).
+   */
+  devPieces: string[] = [];
+  /** Dev: draw each section's routes on the floor. */
+  showRoutes = false;
+  private devPieceNext = 0;
+  /** Each of the current piece's routes, world x, at the row just built (tests fly them). */
+  routesNow: number[] = [];
   private framePending = false;
   private enclosure = 1; // eased towards the current room's enclosure
   private readonly roomLogD = new Float64Array(16).fill(-Infinity);
@@ -465,6 +481,9 @@ export class World {
     this.roomEnd = -Infinity;
     this.enclosure = 1;
     this.plan = null;
+    this.piece = null;
+    this.routesNow = [];
+    this.devPieceNext = 0;
     this.roomShift = 0;
     this.prevWallL = this.prevWallR = NaN;
     this.floorD.fill(-Infinity);
@@ -1699,7 +1718,182 @@ export class World {
     return (it.halfWidthStart - it.halfWidthMin) * Math.exp(-score / it.widthRampPoints) + it.halfWidthMin;
   }
 
+  /** The piece for the next room (or corridor) slot, or null to use the room template. */
+  private choosePiece(next: RoomId, sub: number): Piece | null {
+    if (this.devPieces.length) {
+      const p = pieceById(this.devPieces[this.devPieceNext % this.devPieces.length]);
+      if (!p || (p.family === 'corridor') !== (next === 'corridor')) return null;
+      this.devPieceNext++;
+      return p;
+    }
+    if (next === 'corridor') return this.runStart !== null && rand() < TH.interior.corridorPieceChance ? pickPiece('corridor', sub) : null;
+    return FAMILIES.has(next) ? pickPiece(next, sub) : null;
+  }
+
+  /**
+   * Start a hand-made piece at d: a lead-in that narrows or widens from the
+   * corridor and steers the lane onto the piece's entry, the piece itself row
+   * by row, and a lead-out back to the corridor. The centre line holds
+   * straight throughout, so the grid stays lined up. Returns false (and does
+   * nothing) if it doesn't fit before the theme ends.
+   */
+  private startPiece(piece: Piece, d: number, base: number, maxSlope: number): boolean {
+    const it = TH.interior;
+    const parsed = parse(piece);
+    const main = piece.routes.find((r) => r.tag === 'main')!;
+    const entry = main.points[0][1];
+    const exit = main.points[main.points.length - 1][1];
+    const rows = parsed.rows;
+    const reach = maxSlope * 0.6;
+    const lead = Math.max(it.taperMin, Math.abs(this.lane - (this.cx + entry)) / reach + 4, Math.abs(rows[0].hw - base) * 2);
+    const leadRows = Math.ceil(lead / STEP);
+    const start = d + leadRows * STEP;
+    const end = start + (rows.length - 1) * STEP;
+    const out = Math.max(it.taperMin, Math.abs(exit) / reach + 4, Math.abs(rows[rows.length - 1].hw - base) * 2);
+    if (end + out > this.themeEnd - TH.lane.beforeChange - 10) return false;
+    this.piece = parsed;
+    this.pieceStart = start;
+    this.pieceEnd = end;
+    this.room = piece.family;
+    this.roomStart = d;
+    this.roomEnd = end + out;
+    this.roomTaper = 0;
+    this.roomHw = rows[0].hw;
+    this.roomH = piece.height;
+    this.roomSide = 1;
+    this.roomShift = 0;
+    this.shiftLen = 0;
+    this.shiftDone = 1;
+    this.plan = null;
+    this.roomOffset = null;
+    this.cxSlope = this.cxTargetSlope = 0;
+    this.cxRetargetAt = Infinity;
+    this.api.memo = this.api.memo2 = 0;
+    this.api.memoAt = start;
+    this.api.seed = rand();
+    this.api.start = start;
+    this.api.end = end;
+    this.api.taper = 0;
+    this.api.stage = 0;
+    this.framePending = true;
+    this.logRoom(d, piece.family);
+    // Its ramps and lifts.
+    for (const o of piece.overlays ?? []) {
+      if (o.kind === 'step') terrain.addStep(start + o.at * STEP, start + (o.at + o.rows) * STEP, o.rise);
+    }
+    return true;
+  }
+
+  /**
+   * The current piece at row d: sets the lane (onto the main route) and the
+   * routes for the tests, and returns the walls, height and floor here, and
+   * the grid row (-1 in the lead-in and lead-out).
+   */
+  private pieceRowAt(d: number, base: number, maxSlope: number): { hw: number; H: number; r: number; floor: [number, number][] | null; catwalk: boolean } {
+    const p = this.piece!;
+    const rows = p.rows;
+    const it = TH.interior;
+    const main = p.piece.routes.find((rt) => rt.tag === 'main')!;
+    const margin = LANE + 0.3;
+    this.routesNow = [];
+    if (d < this.pieceStart - 0.01) {
+      // Lead-in: taper to the first row and steer onto the entry.
+      const t = ease((d - this.roomStart) / Math.max(1, this.pieceStart - this.roomStart));
+      const entry = main.points[0][1];
+      const hw = Math.max(lerp(base, rows[0].hw, t), Math.abs(this.lane - this.cx) + margin, Math.abs(entry) + margin);
+      this.moveLane(maxSlope, entry, hw - margin);
+      return { hw, H: lerp(it.wallHeight, p.piece.height, t), r: -1, floor: null, catwalk: false };
+    }
+    if (d <= this.pieceEnd + 0.01) {
+      const r = Math.max(0, Math.min(rows.length - 1, Math.round((d - this.pieceStart) / STEP)));
+      this.lane = this.cx + routeX(main, r);
+      this.routesNow = p.piece.routes.map((rt) => this.cx + routeX(rt, r));
+      const row = rows[r];
+      const floor = row.floor ? row.floor.map(([a, b]): [number, number] => [this.cx + a, this.cx + b]) : null;
+      return { hw: row.hw, H: p.piece.height, r, floor, catwalk: row.catwalk };
+    }
+    // Lead-out: back to the corridor and the middle.
+    const t = ease((d - this.pieceEnd) / Math.max(1, this.roomEnd - this.pieceEnd));
+    const hw = Math.max(lerp(rows[rows.length - 1].hw, base, t), Math.abs(this.lane - this.cx) + margin);
+    this.moveLane(maxSlope, 0, hw - margin);
+    return { hw, H: lerp(p.piece.height, it.wallHeight, t), r: -1, floor: null, catwalk: false };
+  }
+
+  /** Everything that starts on grid row r of the current piece. */
+  private pieceBuild(r: number, d: number, H: number): void {
+    const p = this.piece!;
+    const api = this.api;
+    for (const b of p.blocks) if (b.r0 === r && b.part !== 'wall') this.pieceBlock(b, d, H);
+    for (const o of p.piece.overlays ?? []) {
+      if (o.at !== r) continue;
+      if (o.kind === 'hook') api.hook(this.cx + (o.x[0] + o.x[1]) / 2, (o.x[1] - o.x[0]) / 2, this.cx + o.arrive, d);
+      else if (o.kind === 'slider') api.slider(this.cx + (o.x[0] + o.x[1]) / 2, (o.x[1] - o.x[0]) / 2, this.cx + o.arrive, d, o.w, o.h, o.depth);
+      else if (o.kind === 'holo') api.holo(this.cx + o.x, o.y, d, o.w, o.h);
+      else if (o.kind === 'drip') api.pour(this.cx + o.x, d, 0.08, 1, false);
+    }
+    // Dev: the routes, as lines on the floor.
+    if (this.showRoutes) {
+      const colour = { main: Light.White, alt: Light.Teal, risky: Light.Amber } as const;
+      for (const rt of p.piece.routes) this.light(this.cx + routeX(rt, r), 0.03, d, 0.12, 0.02, STEP, colour[rt.tag], false);
+    }
+    // Pickups down rewarded routes, where they've parted from the main one.
+    const main = p.piece.routes.find((rt) => rt.tag === 'main')!;
+    if (r % 3 === 0) {
+      for (const rt of p.piece.routes) {
+        if (rt.reward !== 'pickups') continue;
+        const x = routeX(rt, r);
+        if (Math.abs(x - routeX(main, r)) > 2) this.pickups.spawn(this.cx + x - this.shipX, CONFIG.boost.pickup.height, d, 1, 1, 1, 0, false, false, 0, 0);
+      }
+    }
+  }
+
+  /** One merged solid block of a piece, drawn as its part. */
+  private pieceBlock(b: Block, d: number, H: number): void {
+    const n = b.r1 - b.r0 + 1;
+    const depth = n * STEP - 0.2;
+    const dc = d + ((n - 1) * STEP) / 2;
+    const w = b.x1 - b.x0;
+    const x = this.cx + (b.x0 + b.x1) / 2;
+    const vary = (k: number) => {
+      const v = Math.sin((b.x0 * 13.1 + b.r0 * 7.7 + k) * 12.9898) * 43758.5453;
+      return v - Math.floor(v);
+    };
+    switch (b.part) {
+      case 'divider':
+        this.hullBox(x, 0, dc, w, H, depth, true);
+        break;
+      case 'pillar':
+        this.hullBox(x, 0, dc, w, H, depth, true, true);
+        break;
+      case 'crate':
+      case 'stack': {
+        const h = b.part === 'crate' ? 0.9 : 1.8 + Math.floor(vary(1) * 2) * 0.9;
+        this.blocks.spawn(x - this.shipX, 0, dc, w, h, depth, 0, true, false, w / 2, depth / 2);
+        break;
+      }
+      case 'rack': {
+        this.hullBox(x, 0, dc, w, H - 0.7, depth, true, true);
+        const colour = vary(2) < 0.7 ? Light.Teal : Light.Amber;
+        this.light(x - w / 2 - 0.02, 1.1 + vary(3) * 0.8, dc, 0.04, 0.06, depth * 0.8, colour, false);
+        this.light(x + w / 2 + 0.02, 0.9 + vary(4) * 0.8, dc, 0.04, 0.06, depth * 0.8, colour, false);
+        break;
+      }
+      case 'console':
+        this.hullBox(x, 0, dc, w, 0.85, depth, true, true);
+        this.light(x, 0.86, dc, w - 0.1, 0.03, depth * 0.7, Light.Teal, false);
+        break;
+      case 'tank':
+        for (let k = 0; k < Math.round(w); k++) {
+          for (let j = 0; j < n; j += 2) this.api.tank(this.cx + b.x0 + k + 0.5, d + j * STEP, 0.45, Math.min(H - 0.3, 2.6));
+        }
+        break;
+      default:
+        break;
+    }
+  }
+
   private startRoom(id: RoomId, d: number, base: number, maxSlope: number, jog = true): void {
+    this.piece = null;
     const it = TH.interior;
     const def = ROOMS[id];
     const vary = def.vary !== false && id !== 'corridor';
@@ -1788,16 +1982,23 @@ export class World {
         next = this.devRoom ?? this.roomQueue.shift() ?? pickRoom(sub, this.lastRoom);
       }
       else this.lastRoom = this.room;
-      this.startRoom(next, d, base, maxSlope);
+      const piece = this.choosePiece(next, sub);
+      if (!piece || !this.startPiece(piece, d, base, maxSlope)) this.startRoom(next, d, base, maxSlope);
     }
 
     const def = ROOMS[this.room];
     const taper = this.roomTaper;
     const open = taper > 0 ? ease(Math.min((d - this.roomStart) / taper, (this.roomEnd - d) / taper)) : 1;
-    const hw = lerp(base, this.room === 'corridor' ? base : this.roomHw, open);
+    let hw = lerp(base, this.room === 'corridor' ? base : this.roomHw, open);
+    let H = lerp(it.wallHeight, this.room === 'corridor' ? it.wallHeight : this.roomH, open);
+    // A hand-made piece sets its own walls, height, floor and lane.
+    const pr = this.piece ? this.pieceRowAt(d, base, maxSlope) : null;
+    if (pr) {
+      hw = pr.hw;
+      H = pr.H;
+    }
     this.recordWalls(d, this.cx - hw, this.cx + hw);
-    this.elevate(d, this.themeEnd - d, it.elevation, 170, !def.ownSteps);
-    const H = lerp(it.wallHeight, this.room === 'corridor' ? it.wallHeight : this.roomH, open);
+    this.elevate(d, this.themeEnd - d, it.elevation, 170, !def.ownSteps && !pr);
 
     // Centre line: the room's sideways shift (an S-bend) first; winding only once it's done.
     const s = this.shiftLen > 0 ? ease((d - this.roomStart) / this.shiftLen) : 1;
@@ -1810,7 +2011,7 @@ export class World {
         this.cx += this.roomShift * (1 - this.shiftDone);
         this.shiftDone = 1;
       }
-      this.steerCentre(d, maxSlope * it.centreSlopeFraction * def.wander);
+      this.steerCentre(d, pr ? 0 : maxSlope * it.centreSlopeFraction * def.wander);
     }
 
     const api = this.api;
@@ -1831,7 +2032,9 @@ export class World {
     const margin = LANE + 0.3;
     const exiting = this.roomEnd - d < taper + 8;
     const swing = def.laneTarget && !exiting ? def.laneTarget(api) : null;
-    if (this.roomOffset !== null) {
+    if (pr) {
+      // The piece has set the lane.
+    } else if (this.roomOffset !== null) {
       this.moveLane(maxSlope, this.roomOffset * open, hw - margin);
     } else if (swing !== null) {
       this.moveLane(maxSlope, swing, hw - margin);
@@ -1849,7 +2052,12 @@ export class World {
     const inBody = d >= this.roomStart + taper && d <= this.roomEnd - taper && !this.quiet(d);
     api.row++;
     this.floorN = -1;
-    if (def.floor && inBody) def.floor(api);
+    if (pr) {
+      if (pr.floor) {
+        this.floorN = 0;
+        for (const [a, b] of pr.floor) this.floorSeg(a, b);
+      }
+    } else if (def.floor && inBody) def.floor(api);
     const pit = this.floorN >= 0;
     const P = it.pitDepth;
     this.recordFloor(d);
@@ -1904,7 +2112,7 @@ export class World {
           // The drop's side: a steel lip, then black all the way down.
           this.hullBox(edge + s * 0.08, -PIT_LIP, d, 0.16, PIT_LIP - 0.14, depth, false);
           this.voids.spawn(edge + s * 0.08 - this.shipX, -P, d, 0.16, P - PIT_LIP, depth, 0, false, false, 0, 0, false);
-          if (def.railings) {
+          if (pr ? pr.catwalk : def.railings) {
             api.run(edge - s * 0.06, it.railHeight, d, 0.035, Decor.Steel);
             if (api.row % 3 === 0) api.greeble(edge - s * 0.06, 0, d, 0.07, it.railHeight, 0.07, Decor.Steel);
           } else {
@@ -1946,6 +2154,11 @@ export class World {
       this.light(this.cx, H - 0.68, d - 0.3, 1.2, 0.06, 0.06, Light.White, false);
     }
 
+    // A piece's contents come from its grid.
+    if (pr) {
+      if (pr.r >= 0) this.pieceBuild(pr.r, d, H);
+      return;
+    }
     // Room contents (split rooms only once the dividers are up).
     if (!def.build || !inBody) return;
     if (this.plan && !split) return;

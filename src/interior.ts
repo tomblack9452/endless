@@ -1259,14 +1259,11 @@ const fanRoom: RoomDef = {
     const clear = LANE + api.jitter + 0.3;
     const left = api.wall(-1);
     const right = api.wall(1);
+    // No room for a pit on that side here: plain floor (so check before starting a custom one).
+    if (api.memo < 0 ? api.lane - clear - left < 2 : right - api.lane - clear < 2) return;
     api.floorBegin();
-    if (api.memo < 0) {
-      if (api.lane - clear - left < 2) return; // no room for a pit this side
-      api.floor(api.lane - clear, right);
-    } else {
-      if (right - api.lane - clear < 2) return;
-      api.floor(left, api.lane + clear);
-    }
+    if (api.memo < 0) api.floor(api.lane - clear, right);
+    else api.floor(left, api.lane + clear);
   },
   build(api) {
     const F = R.fanRoom;
