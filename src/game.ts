@@ -1232,6 +1232,11 @@ export class Game {
       case 'paused':
         break;
     }
+    // Off a run (title, crash, finish) the area's weather fades out rather than freezing in the air.
+    if (this.state !== 'playing' && this.state !== 'paused') {
+      this.weather.set('none', 0);
+      this.weather.update(dt, 0);
+    }
     this.stage.render();
   };
 

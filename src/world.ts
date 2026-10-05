@@ -74,6 +74,8 @@ const FLOOR_ROWS = 512; // rows of floor history kept for fall checks
 const PIT_LIP = 0.3;
 const CHASM_INSET = 1.4; // the drop starts this far in from the bridge ends
 const BRIDGE_JUMP = 0.8;
+/** Rocks and boulders collide out to this many times their size (about where the shape is). */
+const ROCK_HIT = 0.88;
 /** Room families in the order of CONFIG.themes.interior.familyLooks. */
 const FAMILY_LOOK_IDS = Object.keys(CONFIG.themes.interior.familyLooks); // a bridge edge moving more than this in a row has jumped, not bent // pit sides: a thin steel lip, then black
 
@@ -94,11 +96,11 @@ const PROP_HIT: Record<Prop, number> = {
   [Prop.Mushroom]: 0.2,
   [Prop.Spire]: 0.16,
   [Prop.Rock]: 0.8,
-  [Prop.Crystal]: 0.45,
-  [Prop.Bush]: 0.45,
+  [Prop.Crystal]: 0.62,
+  [Prop.Bush]: 0.7,
   [Prop.DeadTree]: 0.16,
   [Prop.RockSpire]: 0.6,
-  [Prop.Cactus]: 0.24,
+  [Prop.Cactus]: 0.45,
 };
 
 function clamp(v: number, lo: number, hi: number): number {
@@ -798,7 +800,7 @@ export class World {
         const span = land ? 9 : 30;
         for (let x = this.lane - span; x <= this.lane + span; x += 1.5) {
           const r = 0.6 + rand() * 0.3;
-          if (Math.abs(x - this.lane) < gap + r * 0.8) continue;
+          if (Math.abs(x - this.lane) < gap + r * ROCK_HIT) continue;
           this.obstacle(x, d + (rand() - 0.5) * 0.6, r, 0.9 + rand() * 1.4, land);
         }
         break;
@@ -1041,7 +1043,7 @@ export class World {
         const r = 1.4 + rand() * 1.8;
         const height = 4 + rand() * 6;
         const x = laneRel + this.rockFaceSide * (range(lt.rockFaceGap) + jitter + r + k * r * 1.2);
-        const hit = r * 0.85;
+        const hit = r * ROCK_HIT;
         if (Math.abs(wrap(x - laneRel)) - hit < LANE + jitter + 1) continue;
         this.rocks.spawn(wrap(x), 0, d + (rand() - 0.5) * STEP, r, height / BOULDER_HEIGHT, r, rand() * Math.PI * 2, true, true, hit, hit, false);
       }
@@ -1111,7 +1113,7 @@ export class World {
         const r = 0.5 + rand() * 0.6;
         const x = centre + (rand() - 0.5) * 4;
         // Cluster rocks spread ±2 units along the run, where the lane may have moved.
-        if (Math.abs(wrap(x - laneRel)) < LANE + maxSlope * 2 + r * 0.8) continue;
+        if (Math.abs(wrap(x - laneRel)) < LANE + maxSlope * 2 + r * ROCK_HIT) continue;
         this.obstacle(x + this.shipX, d + (rand() - 0.5) * 4, r, 0.6 + rand() * 1.2, true);
       }
     }
@@ -1181,8 +1183,8 @@ export class World {
         this.nextBombAt = d + range(spacing);
         const r = range(H.bombs.radius);
         const side = rand() < 0.5 ? -1 : 1;
-        const x = this.lane + side * (LANE + r * 0.8 + jitter + maxSlope * STEP + range(H.bombs.gap));
-        const hit = r * 0.8;
+        const x = this.lane + side * (LANE + r * ROCK_HIT + jitter + maxSlope * STEP + range(H.bombs.gap));
+        const hit = r * ROCK_HIT;
         // It falls as you approach and is down well before you reach it.
         this.lavaBombs.setNextRamp(H.bombs.height, H.bombs.fallOver, range(H.bombs.landAhead), true);
         this.lavaBombs.spawn(wrap(x - this.shipX), 0, d, r, (r * 1.1) / BOULDER_HEIGHT, r, rand() * 6.28, true, true, hit, hit);
@@ -1453,7 +1455,7 @@ export class World {
       // Lone boulders.
       this.nextFeatureAt = d + range(c.loneBoulderSpacing);
       const r = 0.9 + rand() * 0.5;
-      const x = this.offLane(hw - r, LANE + r * 0.8 + jitter);
+      const x = this.offLane(hw - r, LANE + r * ROCK_HIT + jitter);
       if (x !== null) this.obstacle(x, d, r, 1.2 + rand() * 0.8);
     } else if (sub === 1 || rand() < 0.3) {
       // Rockfall band across the path with one wide gap on the lane.
@@ -1465,14 +1467,14 @@ export class World {
       const count = rand() < 0.5 ? 1 : 2;
       for (let i = 0; i < count; i++) {
         const r = 0.7 + rand() * 0.3;
-        const x = this.offLane(hw - r, LANE + r * 0.8 + jitter + 0.3);
+        const x = this.offLane(hw - r, LANE + r * ROCK_HIT + jitter + 0.3);
         if (x === null) continue;
         if (rand() < 0.5) {
           this.obstacle(x, d + i * 3, r, 5 + rand() * 4);
         } else {
           // Crystal spire instead of a rock pillar.
           const s = r * 1.5;
-          this.crystals.spawn(x - this.shipX, 0, d + i * 3, s, s * 1.4, s, rand() * 6.28, true, false, r * 0.8, r * 0.8);
+          this.crystals.spawn(x - this.shipX, 0, d + i * 3, s, s * 1.4, s, rand() * 6.28, true, false, s * 0.62, s * 0.62);
         }
       }
     }
@@ -1486,7 +1488,7 @@ export class World {
       const roll = rand();
       const r = roll < 0.25 ? 0.45 + rand() * 0.2 : roll < 0.85 ? 0.7 + rand() * 0.3 : 1.1 + rand() * 0.4;
       const cxr = x + r;
-      if (Math.abs(cxr - this.lane) >= gapHalf + r * 0.8) this.obstacle(cxr, d + (rand() - 0.5) * 0.8, r, r * (1 + rand() * 1.6));
+      if (Math.abs(cxr - this.lane) >= gapHalf + r * ROCK_HIT) this.obstacle(cxr, d + (rand() - 0.5) * 0.8, r, r * (1 + rand() * 1.6));
       x += r * 2 + 0.15 + rand() * 0.4;
     }
   }
@@ -1548,7 +1550,7 @@ export class World {
       for (let x = -island; x <= island; x += 1.4) {
         const r = Math.min(island, 0.9 + rand() * 0.9);
         const wx = this.cx + x;
-        if (Math.abs(wx - this.lane) < LANE + r * 0.8 + jitter) continue;
+        if (Math.abs(wx - this.lane) < LANE + r * ROCK_HIT + jitter) continue;
         // Low, so the other branch (and its pickups) can be seen over it.
         this.rock(wx, d + (rand() - 0.5) * STEP, r, 1.1 + rand() * 1.6);
       }
@@ -1570,7 +1572,7 @@ export class World {
       const lo = this.cx - this.splitSide * (island + 0.4);
       const hi = this.cx - this.splitSide * (hw - 0.4);
       const x = lo + (hi - lo) * rand();
-      if (Math.abs(x - this.altLane) >= LANE + r * 0.8 + jitter && Math.abs(x - this.lane) >= LANE + r * 0.8 + jitter) {
+      if (Math.abs(x - this.altLane) >= LANE + r * ROCK_HIT + jitter && Math.abs(x - this.lane) >= LANE + r * ROCK_HIT + jitter) {
         this.obstacle(x, d, r, 0.9 + rand() * 1.2);
       }
     }
@@ -2684,12 +2686,12 @@ export class World {
   }
 
   private obstacle(x: number, d: number, r: number, height: number, wraps = false): void {
-    const hit = r * 0.8;
+    const hit = r * ROCK_HIT;
     this.obstacleRocks.spawn(x - this.shipX, 0, d, r, height / BOULDER_HEIGHT, r, rand() * Math.PI * 2, true, wraps, hit, hit);
   }
 
   private rock(x: number, d: number, r: number, height: number): void {
-    const hit = r * 0.8;
+    const hit = r * ROCK_HIT;
     this.rocks.nextColor = rockShade(x, d);
     this.rocks.spawn(x - this.shipX, 0, d, r, height / BOULDER_HEIGHT, r, rand() * Math.PI * 2, true, false, hit, hit, false);
   }
