@@ -581,18 +581,13 @@ export const CONFIG = {
     starCredits: 50, // per new star
   },
 
-  // Sectors (solo start points) and their stars.
-  sectors: {
-    starCredits: 25, // per new star
-  },
-
   // Assist mode (settings): a gentler way to play.
   assist: {
     speed: 0.8, // forward speed multiplier
     markerEvery: 3, // rows between safe-line markers
   },
 
-  // Rolling hills on open ground (see terrain.ts). Looks only: collision is flat.
+  // Rolling hills on open ground, and chasm depth (see terrain.ts). Looks only: collision is flat.
   terrain: {
     amplitude: 1.6,
     freqA: 0.045, // two waves, ~140 and ~57 units long
