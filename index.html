@@ -55,101 +55,106 @@
 
       <div id="screen-title" class="layer screen">
         <span id="title-settings" class="label link corner-link">settings</span>
-        <div class="title-mark">endless<br />space</div>
+        <div class="title-mark">
+          <div class="title-word">endless</div>
+          <div class="title-word sub">space</div>
+        </div>
         <div class="screen-foot">
-          <button id="title-start" class="label button" type="button">press to start</button>
+          <button id="title-start" class="pill primary" type="button">play</button>
           <div class="title-links">
-            <span class="label link" data-title="from">start: open ground</span>
-            <span class="label link" data-title="daily">daily run</span>
-            <span class="label link" data-title="missions">missions</span>
-            <span class="label link" data-title="hangar">hangar</span>
-            <span class="label link" data-title="stats">stats</span>
+            <span class="chip link" data-title="from">start: open ground</span>
+            <span class="chip link" data-title="daily">daily run</span>
+            <span class="chip link" data-title="missions">missions</span>
+            <span class="chip link" data-title="hangar">hangar</span>
+            <span class="chip link" data-title="stats">stats</span>
           </div>
-          <div id="title-best" class="label dim"></div>
+          <div id="title-best" class="label dim title-best"></div>
         </div>
       </div>
 
-      <div id="screen-paused" class="layer screen">
+      <div id="screen-paused" class="layer screen panel">
         <div class="screen-center">
-          <div class="label">paused</div>
+          <div class="screen-heading">paused</div>
           <div class="menu">
-            <button class="label button" type="button" data-action="resume">resume</button>
-            <button class="label button" type="button" data-action="settings">settings</button>
-            <button class="label button" type="button" data-action="menu">main menu</button>
+            <button class="pill primary" type="button" data-action="resume">resume</button>
+            <button class="pill" type="button" data-action="settings">settings</button>
+            <button class="pill" type="button" data-action="menu">main menu</button>
           </div>
         </div>
       </div>
 
-      <div id="screen-settings" class="layer screen">
+      <div id="screen-settings" class="layer screen panel">
+        <div class="panel-head">
+          <button class="label link back" type="button" data-action="back">back</button>
+          <div class="panel-title">settings</div>
+        </div>
         <div class="settings">
-          <div class="label dim settings-title">settings</div>
-          <div class="label dim settings-group">sound</div>
-          <button class="setting-row" type="button" data-setting="sound"><span class="label">sound</span><span class="label value"></span></button>
-          <button class="setting-row" type="button" data-setting="music"><span class="label">music</span><span class="label value"></span></button>
-          <button class="setting-row" type="button" data-setting="effects"><span class="label">effects</span><span class="label value"></span></button>
-          <div class="label dim settings-group">controls</div>
-          <button class="setting-row" type="button" data-setting="tilt"><span class="label">tilt to steer</span><span class="label value"></span></button>
-          <button class="setting-row" type="button" data-setting="tiltSensitivity"><span class="label">tilt sensitivity</span><span class="label value"></span></button>
-          <button class="setting-row" type="button" data-setting="touch"><span class="label">touch steering</span><span class="label value"></span></button>
-          <button class="setting-row" type="button" data-setting="steering"><span class="label">drag sensitivity</span><span class="label value"></span></button>
-          <button class="setting-row" type="button" data-setting="boostSide"><span class="label">boost button</span><span class="label value"></span></button>
-          <button class="setting-row" type="button" data-setting="haptics"><span class="label">vibration</span><span class="label value"></span></button>
-          <div class="label dim settings-group">display</div>
-          <button class="setting-row" type="button" data-setting="reduceMotion"><span class="label">reduce motion</span><span class="label value"></span></button>
-          <button class="setting-row" type="button" data-setting="textSize"><span class="label">text size</span><span class="label value"></span></button>
-          <button class="setting-row" type="button" data-setting="contrast"><span class="label">high contrast</span><span class="label value"></span></button>
-          <div class="label dim settings-group">assist</div>
-          <button class="setting-row" type="button" data-setting="assist"><span class="label">assist mode</span><span class="label value"></span></button>
-          <div class="label dim setting-note">slower, with the safe line marked. scores don't count as bests</div>          <div class="menu left">
-            <button class="label button" type="button" data-action="back">back</button>
-          </div>
+          <div class="settings-group">sound</div>
+          <button class="setting-row" type="button" data-setting="sound"><span class="label">sound</span><span class="value"></span></button>
+          <button class="setting-row" type="button" data-setting="music"><span class="label">music</span><span class="value"></span></button>
+          <button class="setting-row" type="button" data-setting="effects"><span class="label">effects</span><span class="value"></span></button>
+          <div class="settings-group">controls</div>
+          <button class="setting-row" type="button" data-setting="tilt"><span class="label">tilt to steer</span><span class="value"></span></button>
+          <button class="setting-row" type="button" data-setting="tiltSensitivity"><span class="label">tilt sensitivity</span><span class="value"></span></button>
+          <button class="setting-row" type="button" data-setting="touch"><span class="label">touch steering</span><span class="value"></span></button>
+          <button class="setting-row" type="button" data-setting="steering"><span class="label">drag sensitivity</span><span class="value"></span></button>
+          <button class="setting-row" type="button" data-setting="boostSide"><span class="label">boost button</span><span class="value"></span></button>
+          <button class="setting-row" type="button" data-setting="haptics"><span class="label">vibration</span><span class="value"></span></button>
+          <div class="settings-group">display</div>
+          <button class="setting-row" type="button" data-setting="reduceMotion"><span class="label">reduce motion</span><span class="value"></span></button>
+          <button class="setting-row" type="button" data-setting="textSize"><span class="label">text size</span><span class="value"></span></button>
+          <button class="setting-row" type="button" data-setting="contrast"><span class="label">high contrast</span><span class="value"></span></button>
+          <div class="settings-group">assist</div>
+          <button class="setting-row" type="button" data-setting="assist"><span class="label">assist mode</span><span class="value"></span></button>
+          <div class="label dim setting-note">slower, with the safe line marked. scores don't count as bests</div>
         </div>
       </div>
-      <div id="screen-stats" class="layer screen">
+
+      <div id="screen-stats" class="layer screen panel">
+        <div class="panel-head">
+          <button class="label link back" type="button" data-action="back">back</button>
+          <div class="panel-title">stats</div>
+        </div>
         <div class="settings">
-          <div class="label dim settings-title">stats</div>
           <div id="stats-rows"></div>
-          <div class="menu left">
-            <button class="label button" type="button" data-action="back">back</button>
-          </div>
         </div>
       </div>
 
-      <div id="screen-missions" class="layer screen">
+      <div id="screen-missions" class="layer screen panel">
+        <div class="panel-head">
+          <button class="label link back" type="button" data-action="back">back</button>
+          <div class="panel-title">missions</div>
+        </div>
         <div class="settings">
-          <div class="label dim settings-title">missions</div>
           <div id="missions-rows"></div>
-          <div id="missions-next" class="label dim settings-group"></div>
-          <div class="menu left">
-            <button class="label button" type="button" data-action="back">back</button>
-          </div>
+          <div id="missions-next" class="label dim setting-note"></div>
         </div>
       </div>
 
-      <div id="screen-hangar" class="layer screen">
-        <div class="settings">
-          <div class="label dim settings-title">hangar</div>
-          <button class="setting-row" type="button" data-hangar="ship"><span class="label">ship</span><span class="label value"></span></button>
-          <button class="setting-row" type="button" data-hangar="trail"><span class="label">trail</span><span class="label value"></span></button>
-          <button class="setting-row" type="button" data-hangar="palette"><span class="label">colours</span><span class="label value"></span></button>
-          <div id="hangar-count" class="label dim settings-group"></div>
-          <div class="menu left">
-            <button class="label button" type="button" data-action="back">back</button>
-          </div>
+      <div id="screen-hangar" class="layer screen panel top">
+        <div class="panel-head">
+          <button class="label link back" type="button" data-action="back">back</button>
+          <div class="panel-title">hangar</div>
+        </div>
+        <div class="settings short">
+          <button class="setting-row" type="button" data-hangar="ship"><span class="label">ship</span><span class="value"></span></button>
+          <button class="setting-row" type="button" data-hangar="trail"><span class="label">trail</span><span class="value"></span></button>
+          <button class="setting-row" type="button" data-hangar="palette"><span class="label">colours</span><span class="value"></span></button>
+          <div id="hangar-count" class="label dim setting-note"></div>
         </div>
       </div>
 
-      <div id="screen-over" class="layer screen">
+      <div id="screen-over" class="layer screen panel">
         <div class="screen-center">
-          <div class="label">crashed</div>
-          <div id="over-score" class="score">0</div>
-          <div id="over-best" class="label dim"></div>
+          <div class="screen-heading">crashed</div>
+          <div id="over-score" class="score big">0</div>
+          <div id="over-best" class="label"></div>
           <div id="over-stats" class="label dim"></div>
           <div id="over-extra" class="label dim"></div>
           <div id="over-missions" class="label dim over-missions"></div>
-          <div class="label rule">tap to retry</div>
           <div class="menu">
-            <button class="label button" type="button" data-action="menu">main menu</button>
+            <div class="pill primary">tap to retry</div>
+            <button class="pill" type="button" data-action="menu">main menu</button>
           </div>
         </div>
       </div>

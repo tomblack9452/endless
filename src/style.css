@@ -109,19 +109,32 @@ body {
 /* Text */
 
 .label {
-  font-size: calc(11px * var(--ui-scale));
+  font-size: calc(13px * var(--ui-scale));
   font-weight: 400;
-  letter-spacing: 0.22em;
+  letter-spacing: 0.12em;
   text-transform: lowercase;
-  line-height: 1.9;
+  line-height: 1.7;
 }
 
 .dim {
-  opacity: 0.55;
+  opacity: 0.72;
+}
+
+/* Text over the live scene (HUD, hints, combo, banners): a soft halo in the
+   sky colour keeps it readable when a tree or a light passes behind it. */
+#hud,
+.notice,
+.hint,
+.combo,
+.banner,
+#screen-title {
+  text-shadow:
+    0 0 2px var(--sky, transparent),
+    0 0 10px var(--sky, transparent);
 }
 
 .score {
-  font-size: calc(34px * var(--ui-scale));
+  font-size: calc(36px * var(--ui-scale));
   font-weight: 300;
   letter-spacing: 0.04em;
   line-height: 1;
@@ -138,7 +151,7 @@ body {
 .button {
   display: block;
   font: inherit;
-  font-size: calc(11px * var(--ui-scale));
+  font-size: calc(13px * var(--ui-scale));
   color: inherit;
   background: none;
   border: 0;
@@ -383,8 +396,8 @@ body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 22px;
-  margin-top: 30px;
+  gap: 12px;
+  margin-top: 32px;
 }
 
 .menu.left {
@@ -399,10 +412,11 @@ body {
 /* Settings: plain rows, label left, value right, hairline between. */
 .settings {
   position: absolute;
-  left: calc(var(--safe-left) + 26px);
-  right: calc(var(--safe-right) + 26px);
-  top: calc(var(--safe-top) + 56px);
+  left: calc(var(--safe-left) + 24px);
+  right: calc(var(--safe-right) + 24px);
+  top: calc(var(--safe-top) + 84px);
   bottom: calc(var(--safe-bottom) + 16px);
+  padding-bottom: 24px;
   overflow-y: auto;
   touch-action: pan-y; /* the only scrollable thing in the game */
   overscroll-behavior: contain;
@@ -410,20 +424,27 @@ body {
 }
 
 .settings-group {
-  margin-top: 22px;
+  margin: 26px 0 4px;
+  font-size: calc(11px * var(--ui-scale));
+  font-weight: 500;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  opacity: 0.6;
 }
 
-.settings-title {
-  margin-bottom: 14px;
+.settings-group:first-child {
+  margin-top: 6px;
 }
 
 .setting-row {
   display: flex;
   flex-shrink: 0;
   justify-content: space-between;
-  align-items: baseline;
+  align-items: center;
+  gap: 16px;
   width: 100%;
-  padding: 13px 0 8px;
+  min-height: calc(52px * var(--ui-scale));
+  padding: 8px 0;
   font: inherit;
   color: inherit;
   background: none;
@@ -436,8 +457,19 @@ body {
   appearance: none;
 }
 
+/* Current value: a small outlined chip, so it reads as something you can change. */
+.setting-row .value {
+  flex-shrink: 0;
+  font-size: calc(12px * var(--ui-scale));
+  letter-spacing: 0.1em;
+  padding: 5px 12px;
+  border: 1px solid color-mix(in srgb, currentColor 45%, transparent);
+  border-radius: 999px;
+  line-height: 1.4;
+}
+
 .setting-row:active .value {
-  opacity: 0.55;
+  background: color-mix(in srgb, currentColor 12%, transparent);
 }
 /* Dev panel (dev server only). */
 .dev-fps {
@@ -655,9 +687,10 @@ body {
 
 .screen-center {
   position: absolute;
-  left: 0;
-  right: 0;
-  top: 38%;
+  left: calc(var(--safe-left) + 24px);
+  right: calc(var(--safe-right) + 24px);
+  top: 50%;
+  transform: translateY(-50%);
   text-align: center;
 }
 
@@ -668,28 +701,30 @@ body {
 .title-links {
   display: flex;
   flex-wrap: wrap;
-  align-items: flex-start;
-  gap: 0 4px;
-  margin: 6px 0 12px;
+  gap: 10px;
+  margin: 22px 0 16px;
 }
 
 .title-links .link:empty {
   display: none;
 }
 
-.title-links .link {
-  padding: 8px 16px 8px 0;
-  margin: 0;
+.title-best {
+  margin-top: 2px;
 }
 
 .setting-note {
-  padding: 8px 0 0;
+  padding: 12px 0 0;
+  font-size: calc(12px * var(--ui-scale));
   line-height: 1.6;
 }
 
 .over-missions {
-  margin-top: 0.8em;
-  line-height: 1.7;
+  margin: 18px auto 0;
+  padding-top: 14px;
+  max-width: 320px;
+  line-height: 1.8;
+  border-top: 1px solid color-mix(in srgb, currentColor 22%, transparent);
 }
 
 .setting-row.locked {
@@ -699,23 +734,223 @@ body {
 .stat-row {
   display: flex;
   justify-content: space-between;
-  padding: 13px 0 8px;
+  align-items: center;
+  gap: 16px;
+  min-height: calc(48px * var(--ui-scale));
+  padding: 8px 0;
   border-bottom: 1px solid color-mix(in srgb, currentColor 25%, transparent);
 }
 
 .title-mark {
   position: absolute;
-  left: calc(var(--safe-left) + 26px);
-  top: calc(var(--safe-top) + 22%);
-  font-size: calc(13px * var(--ui-scale));
-  font-weight: 500;
-  letter-spacing: 0.42em;
-  line-height: 1.8;
+  left: calc(var(--safe-left) + 24px);
+  top: calc(var(--safe-top) + 16%);
   text-transform: uppercase;
 }
 
+.title-word {
+  font-size: calc(34px * var(--ui-scale));
+  font-weight: 300;
+  letter-spacing: 0.2em;
+  line-height: 1.1;
+}
+
+.title-word.sub {
+  font-size: calc(13px * var(--ui-scale));
+  font-weight: 500;
+  letter-spacing: 0.62em;
+  margin-top: 10px;
+  opacity: 0.75;
+}
+
+/* Bottom of the title screen: a scrim in the sky colour so the menu never sits
+   on busy scenery. */
 .screen-foot {
   position: absolute;
-  left: calc(var(--safe-left) + 26px);
-  bottom: calc(var(--safe-bottom) + 40px);
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 70px calc(var(--safe-right) + 24px) calc(var(--safe-bottom) + 36px) calc(var(--safe-left) + 24px);
+  background: linear-gradient(to top, var(--sky, transparent) 55%, transparent);
+}
+
+/* Pill buttons: primary is filled, the rest outlined. */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 180px;
+  min-height: calc(48px * var(--ui-scale));
+  padding: 0 28px;
+  font: inherit;
+  font-size: calc(14px * var(--ui-scale));
+  letter-spacing: 0.16em;
+  text-transform: lowercase;
+  color: inherit;
+  background: none;
+  border: 1px solid color-mix(in srgb, currentColor 55%, transparent);
+  border-radius: 999px;
+  pointer-events: auto;
+  cursor: pointer;
+  text-shadow: none;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.pill.primary {
+  color: var(--sky, #f1ede4);
+  background: var(--text);
+  border-color: var(--text);
+  font-weight: 500;
+}
+
+.pill:active {
+  transform: scale(0.97);
+  opacity: 0.85;
+}
+
+.pill:focus {
+  outline: none;
+}
+
+.pill:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 3px;
+}
+
+#title-start {
+  min-width: 100%;
+}
+
+/* Smaller outlined links (title screen). */
+.chip {
+  display: inline-block;
+  font-size: calc(12px * var(--ui-scale));
+  letter-spacing: 0.12em;
+  line-height: 1.4;
+  padding: 9px 14px;
+  border: 1px solid color-mix(in srgb, currentColor 35%, transparent);
+  border-radius: 999px;
+  text-shadow: none;
+  background: color-mix(in srgb, var(--sky, transparent) 60%, transparent);
+}
+
+.chip.link {
+  margin: 0;
+}
+
+.chip:active {
+  background: color-mix(in srgb, currentColor 12%, transparent);
+}
+
+/* Menu screens sit on a frosted panel in the sky colour, so their text never
+   lands on the moving scene. */
+.screen.panel {
+  background: color-mix(in srgb, var(--sky, #f1ede4) 88%, transparent);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+}
+
+/* The hangar leaves the lower half clear so you can see the ship. */
+.screen.panel.top {
+  background: linear-gradient(
+    to bottom,
+    color-mix(in srgb, var(--sky, #f1ede4) 92%, transparent) 50%,
+    transparent 72%
+  );
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+.settings.short {
+  bottom: auto;
+  overflow: visible;
+}
+
+/* No HUD behind a menu. */
+.menu-open #hud,
+.menu-open .combo,
+.menu-open .hint,
+.menu-open .banner {
+  visibility: hidden;
+}
+
+.panel-head {
+  position: absolute;
+  left: calc(var(--safe-left) + 24px);
+  right: calc(var(--safe-right) + 24px);
+  top: calc(var(--safe-top) + 14px);
+  height: 60px;
+  display: flex;
+  align-items: center;
+  border-bottom: 1px solid color-mix(in srgb, currentColor 25%, transparent);
+}
+
+.panel-title {
+  position: absolute;
+  left: 0;
+  right: 0;
+  text-align: center;
+  font-size: calc(17px * var(--ui-scale));
+  letter-spacing: 0.18em;
+  pointer-events: none;
+}
+
+.back {
+  position: relative;
+  z-index: 1;
+  font: inherit;
+  font-size: calc(13px * var(--ui-scale));
+  color: inherit;
+  background: none;
+  border: 0;
+  padding: 14px 18px 14px 16px;
+  margin-left: -16px;
+}
+
+.back::before {
+  content: '\2039  '; /* single left angle quote */
+  white-space: pre;
+}
+
+.screen-heading {
+  font-size: calc(15px * var(--ui-scale));
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  opacity: 0.75;
+}
+
+.score.big {
+  font-size: calc(56px * var(--ui-scale));
+}
+
+.stat-value {
+  flex-shrink: 0;
+  text-align: right;
+  opacity: 0.8;
+}
+
+/* Scrolls by touch; no scrollbar over the value chips. */
+.settings {
+  scrollbar-width: none;
+}
+
+.settings::-webkit-scrollbar {
+  display: none;
+}
+
+/* Game over: one mission per row, progress on the right. */
+.over-mission {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  text-align: left;
+  font-size: calc(12px * var(--ui-scale));
+  line-height: 1.5;
+  padding: 4px 0;
+}
+
+.over-mission-progress {
+  flex-shrink: 0;
+  opacity: 0.8;
 }
