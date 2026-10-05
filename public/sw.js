@@ -28,7 +28,8 @@ self.addEventListener('fetch', (event) => {
       fetch(req)
         .then((res) => {
           const copy = res.clone();
-          caches.open(CACHE).then((cache) => cache.put('./index.html', copy));
+          caches.open(CACHE).then((cache) => cache.put('./index.html', copy.clone()));
+          pruneOldAssets(copy);
           return res;
         })
         .catch(() => caches.match('./index.html')),
@@ -50,3 +51,28 @@ self.addEventListener('fetch', (event) => {
     ),
   );
 });
+
+// Each build's scripts and styles have hashed names, so old ones would pile up
+// in the cache forever. When a fresh page arrives, drop cached assets it no
+// longer refers to (anything it loads later is fetched and cached again).
+function pruneOldAssets(page) {
+  page
+    .text()
+    .then((html) => {
+      const used = new Set((html.match(/assets\/[^"'\s)]+/g) || []).map((p) => p.split('/').pop()));
+      return caches.open(CACHE).then((cache) =>
+        cache.keys().then((keys) =>
+          Promise.all(
+            keys
+              .filter((k) => {
+                const path = new URL(k.url).pathname;
+                // Scripts and styles only: fonts are referenced from the styles, not the page.
+                return path.includes('/assets/') && /\.(js|css)$/.test(path) && !used.has(path.split('/').pop());
+              })
+              .map((k) => cache.delete(k)),
+          ),
+        ),
+      );
+    })
+    .catch(() => {});
+}
