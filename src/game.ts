@@ -17,10 +17,10 @@ import { Cosmetics, describe } from './cosmetics';
 import { Haptics } from './haptics';
 import { Hints } from './hints';
 import { Missions, type RunMetrics } from './missions';
-import { chainTarget, dailySeed, Progress, sectorOf, sectorStart, STAR_CHAIN, STAR_CLEAR, STAR_NO_HITS } from './progress';
+import { chainTarget, dailySeed, weeklySeed, Progress, sectorOf, sectorStart, STAR_CHAIN, STAR_CLEAR, STAR_NO_HITS } from './progress';
 import { creditsFor, insignia, par, Ranked, rankName, RANKS, type RunMode } from './ranks';
 import { Wallet } from './wallet';
-import { DIVISIONS, emblem, LEAGUES, leagueName, Leagues, LP_PER_DIVISION, skillParScale } from './leagues';
+import { DIVISIONS, emblem, LEAGUES, leagueName, Leagues, LP_PER_DIVISION, skillParScale, weekKey } from './leagues';
 import { find, itemsIn, LOOKS, Looks, type Owner, type Slot, SLOT_NAMES, SLOTS, unlockText } from './looks';
 import type { Fin, Marking } from './looks';
 import type { ShipId } from './cosmetics';
@@ -37,6 +37,12 @@ type State = 'title' | 'playing' | 'paused' | 'crashed';
 
 const DEG = Math.PI / 180;
 const SOLO_BEST = 'endless.soloBest';
+
+/** "5 oct": the Monday this week's ranked course started. */
+function weekLabel(): string {
+  const [y, m, d] = weekKey(Date.now()).split('-').map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }).toLowerCase();
+}
 
 /** Music for a level: the theme's, or the biome's own where it has one. */
 function musicFor(level: number): MusicId {
@@ -257,7 +263,7 @@ export class Game {
     this.ship = mode === 'daily' ? STANDARD : this.upgrades.stats();
     this.world.collectScale = this.ship.collect;
     this.world.powerRate = this.ship.powerRate;
-    this.ui.setMode(mode === 'solo' ? 'solo' : mode === 'daily' ? 'daily run' : 'ranked');
+    this.ui.setMode(mode === 'solo' ? 'solo' : mode === 'daily' ? 'daily run' : `ranked · week of ${weekLabel()}`);
     this.pickupCount = 0;
     this.recorded = false;
     this.assisted = this.assistOn();
@@ -781,7 +787,7 @@ export class Game {
     this.startSolo();
   };
 
-  /** Ranked: level 1, fresh course, your upgrades up to the league's cap. */
+  /** Ranked: level 1, this week's course (the same for everyone), your upgrades up to the league's cap. */
   private startRanked(): void {
     const active = this.upgrades.activePoints();
     const cap = this.leagues.current.max;
@@ -793,7 +799,7 @@ export class Game {
       this.openHangar();
       return;
     }
-    this.beginRun(0, newSeed(), 'ranked');
+    this.beginRun(0, weeklySeed(), 'ranked');
   }
 
   /** Solo from the chosen start level. */
