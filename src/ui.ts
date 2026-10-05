@@ -136,6 +136,7 @@ export class UI {
   private readonly statsRows = $('stats-rows');
   private readonly overExtra = $('over-extra');
   readonly titleSettings = $('title-settings');
+  private readonly rankedSub = $('title-ranked-sub');
   private readonly titleBest = $('title-best');
   private readonly overScore = $('over-score');
   private readonly overBest = $('over-best');
@@ -270,6 +271,11 @@ export class UI {
       el.addEventListener('pointerdown', (e) => e.stopPropagation());
       el.addEventListener('click', () => onLink(el.dataset.title ?? ''));
     }
+  }
+
+  /** The line under the ranked button: this week's level and your best on it. */
+  setRankedSub(text: string): void {
+    this.rankedSub.textContent = text;
   }
 
   setTitleLink(name: string, text: string): void {

@@ -384,13 +384,6 @@ body {
 .power-label {
   bottom: calc(var(--safe-bottom) + 46px);
 }
-/* Top-right link on the title screen (settings). */
-.corner-link {
-  position: absolute;
-  right: calc(var(--safe-right) + 22px);
-  top: calc(var(--safe-top) + 18px);
-}
-
 /* Stacked text buttons (pause menu, settings back). */
 .menu {
   display: flex;
@@ -702,7 +695,7 @@ body {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 8px;
-  margin: 14px 0 16px;
+  margin: 12px 0 12px;
 }
 
 .title-links .link:empty {
@@ -770,7 +763,7 @@ body {
   left: 0;
   right: 0;
   bottom: 0;
-  padding: 70px calc(var(--safe-right) + 24px) calc(var(--safe-bottom) + 36px) calc(var(--safe-left) + 24px);
+  padding: 70px calc(var(--safe-right) + 24px) calc(var(--safe-bottom) + 14px) calc(var(--safe-left) + 24px);
   background: linear-gradient(to top, var(--sky, transparent) 55%, transparent);
 }
 
@@ -822,6 +815,82 @@ body {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 8px;
+  margin-top: 10px;
+}
+
+/* The main button: this week's ranked level. */
+.pill.title-ranked {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+  min-width: 0;
+  min-height: calc(76px * var(--ui-scale));
+  border-radius: 22px;
+  box-shadow: 0 10px 24px -14px color-mix(in srgb, var(--text) 70%, transparent);
+}
+
+.title-ranked-name {
+  font-size: calc(20px * var(--ui-scale));
+  font-weight: 600;
+  letter-spacing: 0.3em;
+  margin-right: -0.3em; /* letter-spacing leaves a gap after the last letter */
+}
+
+.title-ranked-sub {
+  font-size: calc(11px * var(--ui-scale));
+  font-weight: 400;
+  letter-spacing: 0.1em;
+  opacity: 0.75;
+}
+
+.title-ranked-sub:empty {
+  display: none;
+}
+
+/* Hangar bottom-left, settings bottom-right. */
+.title-corners {
+  display: flex;
+  justify-content: space-between;
+  margin: 10px -10px 0;
+}
+
+.corner-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 48px;
+  padding: 0 10px;
+  font: inherit;
+  font-size: calc(13px * var(--ui-scale));
+  letter-spacing: 0.14em;
+  color: inherit;
+  background: none;
+  border: none;
+  pointer-events: auto;
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.corner-link svg {
+  width: 26px;
+  height: 26px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.corner-link:active {
+  opacity: 0.6;
+}
+
+.corner-link:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+  border-radius: 12px;
 }
 
 .title-modes .pill {

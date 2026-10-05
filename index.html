@@ -74,19 +74,30 @@
           </span>
         </button>
         <div class="screen-foot">
+          <button id="title-start" class="pill primary title-ranked" type="button">
+            <span class="title-ranked-name">ranked</span>
+            <span id="title-ranked-sub" class="title-ranked-sub"></span>
+          </button>
           <div class="title-modes">
-            <button id="title-start" class="pill primary" type="button">ranked</button>
             <button class="pill" type="button" data-title="solo">solo</button>
+            <button class="pill" type="button" data-title="endless">endless</button>
           </div>
           <div class="title-links">
-            <span class="chip link" data-title="endless">endless</span>
             <span class="chip link" data-title="record">record</span>
             <span class="chip link" data-title="missions">missions</span>
-            <span class="chip link" data-title="hangar">hangar</span>
             <span class="chip link" data-title="stats">stats</span>
-            <span id="title-settings" class="chip link">settings</span>
           </div>
           <div id="title-best" class="label dim title-best"></div>
+          <div class="title-corners">
+            <button class="corner-link" type="button" data-title="hangar">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 20V10l9-6 9 6v10" /><path d="M7 20v-6h10v6" /><path d="M12 14v3M9.5 17.5h5" /></svg>
+              <span>hangar</span>
+            </button>
+            <button id="title-settings" class="corner-link" type="button">
+              <span>settings</span>
+              <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.2" /><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1" /><circle cx="12" cy="12" r="6.3" /></svg>
+            </button>
+          </div>
         </div>
       </div>
 
