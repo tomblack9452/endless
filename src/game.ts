@@ -20,6 +20,7 @@ import { Missions, type RunMetrics } from './missions';
 import { chainTarget, dailySeed, Progress, sectorOf, sectorStart, STAR_CHAIN, STAR_CLEAR, STAR_NO_HITS } from './progress';
 import { creditsFor, insignia, par, Ranked, rankName, RANKS, type RunMode } from './ranks';
 import { Wallet } from './wallet';
+import { MAX_TIER, type ShipStats, STANDARD, SYSTEMS, type SystemId, TIER_COST, Upgrades } from './upgrades';
 import { newSeed } from './rng';
 import { loadNumber, saveNumber } from './storage';
 import { formatScore, type RankResultView, UI } from './ui';
@@ -85,6 +86,10 @@ export class Game {
   private readonly ranked = new Ranked();
   private readonly wallet = new Wallet();
   private soloBest = 0;
+  private readonly upgrades = new Upgrades();
+  /** This run's ship systems: the standard ship unless it's a solo run. */
+  private ship: ShipStats = STANDARD;
+  private hangarTab: 'ship' | 'upgrades' = 'ship';
   private pickupCount = 0;
   private recorded = false; // this run's stats are saved
   private assisted = false; // assist mode was on at some point this run
@@ -188,6 +193,12 @@ export class Game {
     void loadNumber(SOLO_BEST, 0).then((b) => (this.soloBest = b));
     this.ui.bindHangar(this.onHangar);
     this.ui.bindSectors(this.onSectorPick);
+    this.ui.bindHangarTabs((tab) => {
+      this.hangarTab = tab;
+      this.openHangar();
+    });
+    this.ui.bindUpgrades(this.onBuyUpgrade);
+    void this.upgrades.load();
     void this.missions.load();
     void this.cosmetics.load().then(() => this.applyCosmetics());
     void loadSettings().then((s) => {
@@ -217,6 +228,9 @@ export class Game {
     // Solo starts part-way along begin with half the points they skipped.
     this.scoreBase = mode === 'solo' ? startScore / 2 : 0;
     this.world.assist = this.assistOn();
+    this.ship = mode === 'solo' ? this.upgrades.stats() : STANDARD;
+    this.world.collectScale = this.ship.collect;
+    this.world.powerRate = this.ship.powerRate;
     this.ui.setMode(mode === 'solo' ? 'solo' : mode === 'daily' ? 'daily run' : 'ranked');
     this.pickupCount = 0;
     this.recorded = false;
@@ -246,6 +260,10 @@ export class Game {
     this.boosting = false;
     this.boostLevel = 0;
     this.endPowers();
+    if (this.ship.startShield) {
+      this.shield = true;
+      this.player.setShield(true);
+    }
     this.stage.pullBack = this.stage.drop = 0;
     this.speedLines.update(0, 0, 0);
     this.player.reset();
@@ -490,7 +508,39 @@ export class Game {
     this.openHangar();
   };
 
+  private onBuyUpgrade = (id: string): void => {
+    const sys = id as SystemId;
+    const check = this.upgrades.check(sys, this.wallet.credits, this.ranked.rank);
+    if (!check.ok || !this.wallet.spend(check.cost)) return;
+    this.upgrades.raise(sys);
+    this.sound.pickup();
+    this.haptics.pickup();
+    this.refreshTitle();
+    this.openHangar();
+  };
+
+  private renderUpgrades(): void {
+    this.ui.renderUpgrades(
+      SYSTEMS.map((s) => {
+        const tier = this.upgrades.tier(s.id);
+        const check = this.upgrades.check(s.id, this.wallet.credits, this.ranked.rank);
+        const next = Math.min(MAX_TIER, tier + 1);
+        return {
+          id: s.id,
+          name: s.name,
+          effect: tier >= MAX_TIER ? s.effect(tier) : `next: ${s.effect(next)}`,
+          tier,
+          max: MAX_TIER,
+          button: check.ok ? formatScore(TIER_COST[tier]) : check.reason,
+          canBuy: check.ok,
+        };
+      }),
+    );
+  }
+
   private openHangar(): void {
+    this.renderUpgrades();
+    this.ui.setHangarTab(this.hangarTab, `${formatScore(this.wallet.credits)} credits`);
     const c = this.cosmetics;
     this.ui.renderHangar(
       {
@@ -875,7 +925,7 @@ export class Game {
     const slope = (terrain.heightAt(dist + 6) - terrain.heightAt(dist)) / 6;
     // Positive pitch dips the nose, so climbing subtracts.
     const pitch = this.boostLevel * CONFIG.boost.shipPitchDeg * DEG - Math.atan(slope) * CONFIG.terrain.shipPitch;
-    this.player.update(dt, this.input.steering(), lateralSpeedAt(speed), pitch);
+    this.player.update(dt, this.input.steering(), lateralSpeedAt(speed) * this.ship.steer, pitch);
     this.speedLines.update(dt, speed, this.settings.reduceMotion ? 0 : this.boostLevel);
     this.trail.update(this.player.lateral * dt, speed * dt, -this.player.steer * CONFIG.ship.maxBankDeg * DEG);
     if (this.boosting) {
@@ -932,7 +982,7 @@ export class Game {
       // The shield takes the hit; pass through for a moment.
       this.shield = false;
       this.player.setShield(false);
-      this.graceT = CONFIG.powers.shield.graceSeconds;
+      this.graceT = CONFIG.powers.shield.graceSeconds + this.ship.graceExtra;
       this.sectorHit = true; // a shield save still counts as a hit for stars
       this.sound.shieldHit();
       this.haptics.crash();
@@ -1021,8 +1071,8 @@ export class Game {
       this.sound.boostStart();
       this.haptics.boost();
     }
-    if (this.boosting) this.boostMeter = Math.max(0, this.boostMeter - dt / b.drainSeconds);
-    else this.boostMeter = Math.min(1, this.boostMeter + dt / b.fillSeconds);
+    if (this.boosting) this.boostMeter = Math.max(0, this.boostMeter - dt / (b.drainSeconds * this.ship.boostDrain));
+    else this.boostMeter = Math.min(1, this.boostMeter + (dt * this.ship.boostFill) / b.fillSeconds);
     const goal = this.boosting ? 1 : 0;
     const rate = this.boosting ? b.easeIn : b.easeOut;
     this.boostLevel += (goal - this.boostLevel) * (1 - Math.exp(-rate * dt));
@@ -1082,7 +1132,7 @@ export class Game {
     if (kind === 0) {
       this.shield = true;
       this.player.setShield(true);
-    } else if (kind === 1) this.magnetT = p.magnet.seconds;
+    } else if (kind === 1) this.magnetT = p.magnet.seconds + this.ship.magnetExtra;
     else this.slowT = p.slow.seconds;
     this.pickupCount++;
     this.ui.showNotice(POWER_NOTICE[kind]);

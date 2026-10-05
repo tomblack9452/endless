@@ -92,6 +92,9 @@ export class World {
   private genBiome: Biome = 'alien'; // at the row being generated
   /** Assist mode: mark the safe line on the ground (rows generated from now on). */
   assist = false;
+  /** Ship upgrades (solo): pickup reach and power-up frequency multipliers. */
+  collectScale = 1;
+  powerRate = 1;
   insideMix = 0; // 0..1, inside the ship at all (ignores how open the room is)
 
   private generatedTo = 0;
@@ -313,7 +316,7 @@ export class World {
     this.laneRetargetAt = this.distance + clearance + 20;
     this.nextFeatureAt = this.distance + clearance;
     this.nextPickupAt = this.distance + clearance + 40;
-    this.nextPowerAt = this.distance + CONFIG.powers.firstAfter + range(CONFIG.powers.spacing) * 0.5;
+    this.nextPowerAt = this.distance + CONFIG.powers.firstAfter + (range(CONFIG.powers.spacing) * 0.5) / this.powerRate;
     this.generatedTo = this.distance + clearance;
     this.fill();
   }
@@ -348,7 +351,7 @@ export class World {
   /** Collects pickups the ship passed through; returns how many. */
   collect(prevDistance: number): number {
     const p = this.pickups;
-    const r = CONFIG.boost.pickup.collectRadius;
+    const r = CONFIG.boost.pickup.collectRadius * this.collectScale;
     let n = 0;
     for (let i = 0; i < p.max; i++) {
       if (!p.active[i]) continue;
@@ -368,7 +371,7 @@ export class World {
   /** Collects a power-up the ship passed through; returns its kind, or -1. */
   collectPower(prevDistance: number): PowerKind | -1 {
     const p = this.powers;
-    const r = CONFIG.boost.pickup.collectRadius;
+    const r = CONFIG.boost.pickup.collectRadius * this.collectScale;
     for (let i = 0; i < p.max; i++) {
       if (!p.active[i]) continue;
       const x = p.x[i];
@@ -495,7 +498,7 @@ export class World {
       const x = this.lane - this.shipX;
       if (d >= this.nextPowerAt) {
         // Now and then a power-up takes the boost pickup's place.
-        this.nextPowerAt = d + range(CONFIG.powers.spacing);
+        this.nextPowerAt = d + range(CONFIG.powers.spacing) / this.powerRate;
         this.powers.nextColor = Math.floor(rand() * 3);
         this.powers.spawn(x, CONFIG.boost.pickup.height, d, 1, 1, 1, 0, false, this.theme === 'land', 0, 0);
       } else {

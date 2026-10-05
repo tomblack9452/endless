@@ -3,6 +3,17 @@ import { label, type SettingKey, type Settings } from './settings';
 
 export type ScreenName = 'title' | 'paused' | 'over' | 'settings' | 'stats' | 'missions' | 'hangar' | 'record' | 'sectors';
 
+/** One row on the upgrades tab. */
+export interface UpgradeRow {
+  id: string;
+  name: string;
+  effect: string;
+  tier: number;
+  max: number;
+  button: string;
+  canBuy: boolean;
+}
+
 /** One tile on the sector map. */
 export interface SectorTile {
   index: number;
@@ -249,6 +260,59 @@ export class UI {
   setMode(text: string): void {
     this.hudMode.textContent = text;
     this.overMode.textContent = text;
+  }
+
+  bindHangarTabs(onTab: (tab: 'ship' | 'upgrades') => void): void {
+    for (const el of document.querySelectorAll<HTMLElement>('[data-tab]')) {
+      el.addEventListener('pointerdown', (e) => e.stopPropagation());
+      el.addEventListener('click', () => onTab(el.dataset.tab as 'ship' | 'upgrades'));
+    }
+  }
+
+  /** Show a hangar tab. The ship tab leaves the lower screen clear to see the ship. */
+  setHangarTab(tab: 'ship' | 'upgrades', credits: string): void {
+    for (const el of document.querySelectorAll<HTMLElement>('[data-tab]')) el.classList.toggle('on', el.dataset.tab === tab);
+    for (const el of document.querySelectorAll<HTMLElement>('[data-pane]')) el.hidden = el.dataset.pane !== tab;
+    this.screens.hangar.classList.toggle('top', tab === 'ship');
+    $('hangar-credits').textContent = credits;
+  }
+
+  bindUpgrades(onBuy: (id: string) => void): void {
+    const rows = $('upgrade-rows');
+    rows.addEventListener('pointerdown', (e) => e.stopPropagation());
+    rows.addEventListener('click', (e) => {
+      const b = (e.target as HTMLElement).closest<HTMLButtonElement>('button[data-upgrade]');
+      if (b && !b.disabled) onBuy(b.dataset.upgrade ?? '');
+    });
+  }
+
+  renderUpgrades(rows: UpgradeRow[]): void {
+    $('upgrade-rows').replaceChildren(
+      ...rows.map((r) => {
+        const row = document.createElement('div');
+        row.className = 'upgrade-row';
+        const info = document.createElement('div');
+        info.className = 'upgrade-info';
+        const name = document.createElement('div');
+        name.className = 'label';
+        name.textContent = r.name;
+        const effect = document.createElement('div');
+        effect.className = 'label dim upgrade-effect';
+        effect.textContent = r.effect;
+        const pips = document.createElement('div');
+        pips.className = 'pips';
+        pips.textContent = '●'.repeat(r.tier) + '○'.repeat(r.max - r.tier);
+        info.append(name, pips, effect);
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = `pill small${r.canBuy ? ' primary' : ''}`;
+        b.dataset.upgrade = r.id;
+        b.disabled = !r.canBuy;
+        b.textContent = r.button;
+        row.append(info, b);
+        return row;
+      }),
+    );
   }
 
   /** Taps on unlocked sector tiles call `onPick` with the sector index. */
