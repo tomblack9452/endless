@@ -15,20 +15,20 @@ export interface League {
   name: string;
   min: number; // upgrade points owned to get in
   max: number; // most active points allowed while playing it
-  par: number; // score for a run that holds your LP steady-ish (+10)
+  par: number; // share of the weekly level's score target that earns +10 LP
   promotion: number; // credits for being promoted INTO this league
   weekly: [number, number, number]; // weekly credits by division reached (1, 2, 3)
   color: string; // emblem colour
 }
 
 export const LEAGUES: readonly League[] = [
-  { name: 'bronze', min: 0, max: 4, par: 3000, promotion: 0, weekly: [1000, 1250, 1500], color: '#b07a4a' },
-  { name: 'silver', min: 5, max: 9, par: 5000, promotion: 2000, weekly: [1800, 2200, 2600], color: '#a3a9b1' },
-  { name: 'gold', min: 10, max: 14, par: 7500, promotion: 5000, weekly: [3000, 3500, 4000], color: '#d4a63a' },
-  { name: 'platinum', min: 15, max: 19, par: 11000, promotion: 10000, weekly: [4500, 5250, 6000], color: '#6fb8bd' },
-  { name: 'diamond', min: 20, max: 24, par: 16000, promotion: 20000, weekly: [6500, 7500, 8500], color: '#6d9be0' },
-  { name: 'champion', min: 25, max: 29, par: 23000, promotion: 35000, weekly: [9000, 10500, 12000], color: '#9a78dc' },
-  { name: 'grand champion', min: 30, max: 30, par: 32000, promotion: 50000, weekly: [12000, 13500, 15000], color: '#e0573f' },
+  { name: 'bronze', min: 0, max: 4, par: 0.55, promotion: 0, weekly: [1000, 1250, 1500], color: '#b07a4a' },
+  { name: 'silver', min: 5, max: 9, par: 0.65, promotion: 2000, weekly: [1800, 2200, 2600], color: '#a3a9b1' },
+  { name: 'gold', min: 10, max: 14, par: 0.75, promotion: 5000, weekly: [3000, 3500, 4000], color: '#d4a63a' },
+  { name: 'platinum', min: 15, max: 19, par: 0.85, promotion: 10000, weekly: [4500, 5250, 6000], color: '#6fb8bd' },
+  { name: 'diamond', min: 20, max: 24, par: 0.95, promotion: 20000, weekly: [6500, 7500, 8500], color: '#6d9be0' },
+  { name: 'champion', min: 25, max: 29, par: 1.05, promotion: 35000, weekly: [9000, 10500, 12000], color: '#9a78dc' },
+  { name: 'grand champion', min: 30, max: 30, par: 1.15, promotion: 50000, weekly: [12000, 13500, 15000], color: '#e0573f' },
 ];
 
 export const DIVISIONS = ['1', '2', '3']; // shown as numbers: the UI is lowercase
@@ -47,9 +47,9 @@ export function lpFor(score: number, par: number): number {
   return Math.round(Math.max(-15, -60 * (0.75 - p)));
 }
 
-/** How much harder personal-rank skill par is in league `l` (stronger ships score more). */
-export function skillParScale(l: number): number {
-  return 1 + 0.05 * l;
+/** League par for a weekly level with score target `target`: stronger ships, higher bar. */
+export function leaguePar(l: number, target: number): number {
+  return Math.round((target * LEAGUES[l].par) / 50) * 50;
 }
 
 export function leagueName(l: number, division: number): string {
@@ -122,10 +122,10 @@ export class Leagues {
     return !this.top && this.division === DIVISIONS.length - 1 && this.lp >= LP_PER_DIVISION;
   }
 
-  /** Score a ranked run in the current league. */
-  record(score: number, now = Date.now()): LeagueResult {
+  /** Score a ranked run in the current league, on a weekly level with score target `target`. */
+  record(score: number, target: number, now = Date.now()): LeagueResult {
     this.rollWeek(now);
-    const delta = lpFor(score, this.current.par);
+    const delta = lpFor(score, leaguePar(this.league, target));
     let lp = this.lp + delta;
     let divisionUp = false;
     let divisionDown = false;

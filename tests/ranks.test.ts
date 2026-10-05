@@ -35,15 +35,16 @@ describe('xp and skill', () => {
     expect(xpFor(30000)).toBe(76);
   });
 
-  it('takes around 1,200 good runs to reach general grade 4', () => {
-    const runs = 50000 / xpFor(16000); // a strong but not elite run
-    expect(runs).toBeGreaterThan(1000);
-    expect(runs).toBeLessThan(1400);
+  it('takes well over a thousand good runs to reach general grade 4', () => {
+    const runs = 50000 / xpFor(12000); // a strong run on a weekly level
+    expect(runs).toBeGreaterThan(1300);
+    expect(runs).toBeLessThan(2000);
   });
 
-  it('moves skill against par', () => {
-    expect(par(1)).toBe(1200);
-    expect(par(50)).toBeGreaterThan(40000);
+  it('moves skill against par (a share of the week\'s score target)', () => {
+    expect(par(1, 10000)).toBe(3500);
+    expect(par(50, 10000)).toBe(12000);
+    expect(par(10, 20000)).toBe(2 * par(10, 10000));
     expect(skillDelta(par(10), 10)).toBe(1);
     expect(skillDelta(par(10) * 1.5, 10)).toBe(2);
     expect(skillDelta(par(10) * 0.7, 10)).toBe(0);

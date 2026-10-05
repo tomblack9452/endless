@@ -5,7 +5,9 @@ import { storage } from './storage';
 //
 //   XP     - earned by every ranked run (and the daily run). Never goes down.
 //   skill  - 1..50. Each run is compared with the par score for your current
-//            skill: beat it to go up, fall well short to go down.
+//            skill: beat it to go up, fall well short to go down. Ranked is a
+//            weekly level with a finish, so par is a share of that week's
+//            score target: 35% of it at skill 1, 120% at skill 50.
 //
 // Rank uses the HIGHEST skill you've ever reached, so it never drops; your
 // current skill still moves. Reaching General Grade 4 takes ~50,000 XP
@@ -78,9 +80,12 @@ export function rankFor(xp: number, highestSkill: number): number {
   return best;
 }
 
-/** Par score for a skill level: beat it to climb. Rises 7.5% per level. */
-export function par(skill: number): number {
-  return Math.round(1200 * Math.pow(1.075, skill - 1));
+/** A typical weekly level's score target (for when there isn't one to hand). */
+export const DEFAULT_TARGET = 10000;
+
+/** Par score at a skill level for a course with score target `target`: beat it to climb. */
+export function par(skill: number, target = DEFAULT_TARGET): number {
+  return Math.round(target * (0.35 + (0.85 * (skill - 1)) / 49));
 }
 
 /** XP for one run, before any daily double. */
@@ -88,16 +93,16 @@ export function xpFor(score: number): number {
   return score < MIN_SCORE_FOR_XP ? 0 : 1 + Math.floor(score / 400);
 }
 
-/** Skill change for one run at `skill`. `parScale` > 1 in higher leagues, where ships are stronger. */
-export function skillDelta(score: number, skill: number, parScale = 1): number {
-  const p = par(skill) * parScale;
+/** Skill change for one run at `skill` on a course with score target `target`. */
+export function skillDelta(score: number, skill: number, target = DEFAULT_TARGET): number {
+  const p = par(skill, target);
   if (score >= p * 1.5) return Math.min(2, MAX_SKILL - skill);
   if (score >= p) return Math.min(1, MAX_SKILL - skill);
   if (score < p * 0.5 && skill > 1) return -1;
   return 0;
 }
 
-/** Credits for a run: ranked and daily earn 1 per 100 points, solo half that. */
+/** Credits for a run: ranked earns 1 per 100 points, solo and endless half that. */
 export function creditsFor(score: number, ranked: boolean): number {
   return Math.floor(score / (ranked ? 100 : 200));
 }
@@ -109,11 +114,12 @@ export function promotionBonus(i: number): number {
 
 // --- saved state ---------------------------------------------------------------
 
-export type RunMode = 'ranked' | 'solo' | 'daily';
+export type RunMode = 'ranked' | 'solo' | 'endless';
 
-/** One ranked or daily run, kept for the service record and future leaderboards. */
+/** One ranked run, kept for the service record and future leaderboards. */
 export interface RunRecord {
-  mode: RunMode;
+  mode: RunMode | 'daily'; // older saves have daily runs
+  week?: string; // the weekly level it was on
   score: number;
   level: number;
   seed: number;
@@ -185,7 +191,7 @@ export class Ranked {
   }
 
   /** Fold a finished ranked or daily run in. */
-  record(mode: RunMode, score: number, level: number, seed: number, now = Date.now(), parScale = 1): RankedResult {
+  record(mode: RunMode, score: number, level: number, seed: number, now = Date.now(), target = DEFAULT_TARGET, week?: string): RankedResult {
     const rankBefore = this.rank;
     const skillBefore = this.skill;
     const today = localDate(now);
@@ -195,18 +201,18 @@ export class Ranked {
     if (doubled) xp *= 2;
     if (xp > 0) this.day.runs++;
     this.xp += xp;
-    this.skill = Math.max(1, Math.min(MAX_SKILL, this.skill + skillDelta(score, this.skill, parScale)));
+    this.skill = Math.max(1, Math.min(MAX_SKILL, this.skill + skillDelta(score, this.skill, target)));
     this.highestSkill = Math.max(this.highestSkill, this.skill);
     const rankAfter = this.rank;
     let credits = 0;
     for (let i = rankBefore + 1; i <= rankAfter; i++) credits += promotionBonus(i);
-    this.history.push({ mode, score: Math.floor(score), level, seed, at: now, xp });
+    this.history.push({ mode, score: Math.floor(score), level, seed, at: now, xp, week });
     if (this.history.length > HISTORY) this.history.splice(0, this.history.length - HISTORY);
     this.save();
     return { xp, doubled, skillBefore, skillAfter: this.skill, rankBefore, rankAfter, credits };
   }
 
-  /** Best ranked/daily score today, in the last 7 days, and ever (from the kept history). */
+  /** Best ranked score today, in the last 7 days, and ever (from the kept history). */
   bests(now = Date.now()): { today: number; week: number; all: number } {
     const today = localDate(now);
     const weekAgo = now - 7 * 24 * 3600 * 1000;
@@ -214,7 +220,7 @@ export class Ranked {
     let w = 0;
     let a = 0;
     for (const h of this.history) {
-      if (h.mode === 'solo') continue;
+      if (h.mode !== 'ranked') continue;
       a = Math.max(a, h.score);
       if (h.at >= weekAgo) w = Math.max(w, h.score);
       if (localDate(h.at) === today) t = Math.max(t, h.score);
