@@ -446,6 +446,7 @@ export const CONFIG = {
       wallHeight: 3.4,
       centreSlopeFraction: 0.75,
       connectorLength: [14, 24], // corridor between rooms
+      corridorPieceChance: 0.35, // a designed corridor piece instead of a plain one
       taperMin: 12, // shortest width change into or out of a room
       roomShift: [2, 8], // each room's centre line shifts sideways this much (random side)
       corridorJog: [3, 7], // some corridors jog sideways this much...
