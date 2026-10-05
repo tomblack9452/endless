@@ -20,6 +20,16 @@ export class Input {
 
   private boostKey = false;
   private boostPointer = -1;
+  /** Double-tap and hold: the press that's boosting, and the last quick tap. */
+  doubleTapBoost = true;
+  private tapBoostPointer = -1;
+  private downAt = 0;
+  private downX = 0;
+  private downY = 0;
+  private moved = false;
+  private lastTapAt = -Infinity;
+  private lastTapX = 0;
+  private lastTapY = 0;
 
   enabled = false;
   /** Touch steering: false = drag anywhere, true = hold the left or right side. */
@@ -115,7 +125,7 @@ export class Input {
 
   /** True while boost is held (boost control, Shift, W, Up or Space). */
   boostHeld(): boolean {
-    return this.enabled && (this.boostKey || this.boostPointer !== -1);
+    return this.enabled && (this.boostKey || this.boostPointer !== -1 || this.tapBoostPointer !== -1);
   }
 
   /** Make `el` a hold-to-boost control. Touches on it never steer. */
@@ -140,6 +150,8 @@ export class Input {
     this.keyValue = 0;
     this.boostKey = false;
     this.boostPointer = -1;
+    this.tapBoostPointer = -1;
+    this.lastTapAt = -Infinity;
   };
 
   private range(): number {
@@ -148,6 +160,17 @@ export class Input {
 
   private onDown = (e: PointerEvent): void => {
     if (this.dragging) return;
+    // The second press of a quick double-tap boosts while held; it steers as normal too.
+    const T = CONFIG.boost.doubleTap;
+    const now = e.timeStamp;
+    if (this.doubleTapBoost && now - this.lastTapAt <= T.gapMs && Math.hypot(e.clientX - this.lastTapX, e.clientY - this.lastTapY) <= T.slopPx) {
+      this.tapBoostPointer = e.pointerId;
+    }
+    this.lastTapAt = -Infinity;
+    this.downAt = now;
+    this.downX = e.clientX;
+    this.downY = e.clientY;
+    this.moved = false;
     this.dragging = true;
     this.pointerId = e.pointerId;
     this.anchorX = e.clientX;
@@ -158,6 +181,7 @@ export class Input {
 
   private onMove = (e: PointerEvent): void => {
     if (!this.dragging || e.pointerId !== this.pointerId) return;
+    if (Math.hypot(e.clientX - this.downX, e.clientY - this.downY) > CONFIG.boost.doubleTap.slopPx / 3) this.moved = true;
     const range = this.range();
     let offset = e.clientX - this.anchorX;
     // Drag the anchor along past full lock so reversing direction responds at once.
@@ -172,7 +196,14 @@ export class Input {
   };
 
   private onUp = (e: PointerEvent): void => {
+    if (e.pointerId === this.tapBoostPointer) this.tapBoostPointer = -1;
     if (e.pointerId !== this.pointerId) return;
+    // A short press that barely moved is a tap: the first half of a double-tap.
+    if (!this.moved && e.timeStamp - this.downAt <= CONFIG.boost.doubleTap.tapMs) {
+      this.lastTapAt = e.timeStamp;
+      this.lastTapX = e.clientX;
+      this.lastTapY = e.clientY;
+    }
     this.dragging = false;
     this.pointerId = -1;
     this.dragValue = 0;

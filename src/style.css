@@ -243,35 +243,100 @@ body {
 }
 
 /* Boost control: hold in this corner. Large invisible hit area. */
+/* Boost button: a dial whose ring fills with the meter. Its touch area is
+   bigger than it looks. Bottom right by default; left or middle in settings. */
 .hud-boost {
+  --meter: 0;
   position: absolute;
-  right: calc(var(--safe-right) + 22px);
+  right: calc(var(--safe-right) + 18px);
   bottom: calc(var(--safe-bottom) + 22px);
-  padding: 28px 22px 18px 44px;
-  margin: -28px -22px -18px -44px;
-  text-align: right;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 24px 18px 14px 30px;
+  margin: -24px -18px -14px -30px;
   pointer-events: auto;
   cursor: pointer;
-  opacity: 0.4;
+  opacity: 0.55;
   transition: opacity 150ms ease-out;
+  touch-action: none;
 }
 
 .hud-boost.ready {
   opacity: 1;
 }
 
-/* Boost control on the left (setting): swap it with the percentage readout. */
-.boost-left .hud-boost {
-  right: auto;
-  left: calc(var(--safe-left) + 22px);
-  padding: 28px 44px 18px 22px;
-  margin: -28px -44px -18px -22px;
-  text-align: left;
+.boost-dial {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: calc(72px * var(--ui-scale));
+  height: calc(72px * var(--ui-scale));
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--sky, #f1ede4) 55%, transparent);
+  transition: transform 120ms ease-out, background 150ms ease-out;
 }
 
-.boost-left .boost-pct {
-  left: auto;
-  right: calc(var(--safe-right) + 22px);
+/* The meter ring. */
+.boost-dial::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: conic-gradient(currentColor calc(var(--meter) * 360deg), color-mix(in srgb, currentColor 18%, transparent) 0);
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 5px), #000 calc(100% - 4px));
+  mask: radial-gradient(farthest-side, transparent calc(100% - 5px), #000 calc(100% - 4px));
+}
+
+.boost-dial svg {
+  width: 24px;
+  height: 24px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.boost-num {
+  font-size: calc(11px * var(--ui-scale));
+  letter-spacing: 0.06em;
+  line-height: 1;
+  margin-top: 2px;
+}
+
+.boost-caption {
+  font-size: calc(10px * var(--ui-scale));
+  letter-spacing: 0.24em;
+  margin-right: -0.24em;
+}
+
+.hud-boost.active .boost-dial {
+  transform: scale(1.1);
+  color: var(--sky, #f1ede4);
+  background: var(--text);
+}
+
+.hud-boost.active .boost-dial::before {
+  background: conic-gradient(var(--sky, #f1ede4) calc(var(--meter) * 360deg), transparent 0);
+}
+
+.boost-left .hud-boost {
+  right: auto;
+  left: calc(var(--safe-left) + 18px);
+  padding: 24px 30px 14px 18px;
+  margin: -24px -30px -14px -18px;
+}
+
+.boost-middle .hud-boost {
+  right: auto;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 24px 30px 14px;
+  margin: -24px 0 -14px;
 }
 
 .boost-left .boost-fill {
@@ -373,16 +438,16 @@ body {
   }
 }
 
-/* Percentage readout above the bar's left end. */
-.boost-pct {
+/* Active power-up: bottom left, or bottom right when the boost button is on the left. */
+.power-label {
   position: absolute;
   left: calc(var(--safe-left) + 22px);
-  bottom: calc(var(--safe-bottom) + 22px);
+  bottom: calc(var(--safe-bottom) + 26px);
 }
 
-/* Active power-up, just above the boost readout. */
-.power-label {
-  bottom: calc(var(--safe-bottom) + 46px);
+.boost-left .power-label {
+  left: auto;
+  right: calc(var(--safe-right) + 22px);
 }
 /* Stacked text buttons (pause menu, settings back). */
 .menu {
@@ -734,10 +799,24 @@ body {
   border-bottom: 1px solid color-mix(in srgb, currentColor 25%, transparent);
 }
 
+/* Title screen: wordmark and badges at the top, menu at the bottom, stacked
+   in a column so they can't overlap on short screens. */
+#screen-title {
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+}
+
+.title-top {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+  padding: calc(var(--safe-top) + clamp(28px, 13vh, 130px)) calc(var(--safe-right) + 24px) 0 calc(var(--safe-left) + 24px);
+}
+
 .title-mark {
-  position: absolute;
-  left: calc(var(--safe-left) + 24px);
-  top: calc(var(--safe-top) + 16%);
+  margin-bottom: 14px;
   text-transform: uppercase;
 }
 
@@ -765,6 +844,71 @@ body {
   bottom: 0;
   padding: 70px calc(var(--safe-right) + 24px) calc(var(--safe-bottom) + 14px) calc(var(--safe-left) + 24px);
   background: linear-gradient(to top, var(--sky, transparent) 55%, transparent);
+}
+
+#screen-title .screen-foot {
+  position: relative;
+  margin-top: auto;
+  padding-top: 24px;
+  background: var(--sky, transparent);
+}
+
+/* The scrim fades up from the menu over the scenery. */
+#screen-title .screen-foot::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 100%;
+  height: 60px;
+  background: linear-gradient(to top, var(--sky, transparent), transparent);
+  pointer-events: none;
+}
+
+/* Short screens: tighter everything, and the wordmark loses its subtitle. */
+@media (max-height: 680px) {
+  .title-top {
+    gap: 8px;
+    padding-top: calc(var(--safe-top) + 46px);
+  }
+  .title-mark {
+    margin-bottom: 6px;
+  }
+  .title-word {
+    font-size: calc(26px * var(--ui-scale));
+  }
+  .title-word.sub {
+    margin-top: 6px;
+  }
+  #screen-title .screen-foot {
+    padding-top: 12px;
+    padding-bottom: calc(var(--safe-bottom) + 4px);
+  }
+  .pill.title-ranked {
+    min-height: calc(60px * var(--ui-scale));
+  }
+  #screen-title .pill {
+    min-height: calc(44px * var(--ui-scale));
+  }
+  .title-modes,
+  .title-links {
+    margin-top: 8px;
+  }
+  .title-links {
+    margin-bottom: 4px;
+  }
+  .title-links .chip {
+    padding: 9px 6px;
+  }
+  .title-corners {
+    margin-top: 0;
+  }
+}
+
+@media (max-height: 540px) {
+  .title-word.sub {
+    display: none;
+  }
 }
 
 /* Pill buttons: primary is filled, the rest outlined. */
@@ -899,9 +1043,6 @@ body {
 
 /* Rank badge under the wordmark: opens the service record. */
 .title-rank {
-  position: absolute;
-  left: calc(var(--safe-left) + 24px);
-  top: calc(var(--safe-top) + 16% + 92px);
   display: flex;
   align-items: center;
   gap: 12px;
@@ -917,9 +1058,6 @@ body {
   text-shadow: none;
 }
 
-.title-league {
-  top: calc(var(--safe-top) + 16% + 150px);
-}
 
 .lp-track {
   display: block;

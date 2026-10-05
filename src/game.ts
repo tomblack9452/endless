@@ -592,7 +592,7 @@ export class Game {
 
   /** What the HUD and game-over screen call this run. */
   private modeLabel(): string {
-    if (this.mode === 'ranked') return `ranked · ${this.weekly.name}`;
+    if (this.mode === 'ranked') return 'ranked · weekly level';
     if (this.course) return `level ${COURSES.indexOf(this.course) + 1} · ${this.course.name}`;
     if (this.environment) return `solo · ${this.environment.name}`;
     return 'endless';
@@ -866,7 +866,7 @@ export class Game {
     this.ui.setTitleLeague(emblem(lg.league, lg.division), `${leagueName(lg.league, lg.division)} · ${lg.lp} lp`, lg.lp / LP_PER_DIVISION);
     this.ui.setTitleRank(insignia(i), rankName(i), `${formatScore(this.wallet.credits)} credits`);
     const wb = this.progress.weeklyBest(this.weekly.id);
-    this.ui.setRankedSub(wb > 0 ? `${this.weekly.name} · best ${formatScore(wb)}` : this.weekly.name);
+    this.ui.setRankedSub(wb > 0 ? `best this week ${formatScore(wb)}` : 'new level every week');
     this.ui.setBests([['endless', this.progress.endlessBest]]);
   }
 
@@ -982,10 +982,11 @@ export class Game {
     this.input.tiltEnabled = s.tilt;
     this.input.tiltSensitivity = TILT_GAIN[s.tiltSensitivity];
     this.input.sidesMode = s.touch === 1;
+    this.input.doubleTapBoost = s.doubleTapBoost;
     this.haptics.enabled = s.haptics;
     this.world.assist = this.assistOn();
     if (this.assistOn() && this.state !== 'title') this.assisted = true;
-    this.ui.setDisplay(TEXT_SCALE[s.textSize], s.boostSide === 1, s.reduceMotion);
+    this.ui.setDisplay(TEXT_SCALE[s.textSize], (['right', 'left', 'middle'] as const)[s.boostSide] ?? 'right', s.reduceMotion);
     this.applyLook(this.distanceScore / CONFIG.score.levelLength);
     this.ui.renderSettings(s);
   }

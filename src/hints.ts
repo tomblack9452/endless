@@ -13,7 +13,7 @@ const touch = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)'
 
 const TEXT: Record<HintId, string> = {
   steer: touch ? 'drag or tilt to steer' : 'arrows or a / d to steer',
-  boost: touch ? 'hold the bottom right corner to boost' : 'hold shift to boost',
+  boost: touch ? 'hold the boost button, or double-tap and hold' : 'hold shift to boost',
   nearMiss: 'near miss. chain them for more points',
   pickup: 'pickups fill your boost',
   pits: 'gaps in the floor. stay over the deck',

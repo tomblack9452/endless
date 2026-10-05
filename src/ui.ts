@@ -199,7 +199,8 @@ export class UI {
     if (q !== this.shownBoost) {
       this.shownBoost = q;
       this.boostFill.style.transform = `scaleX(${q / 100})`;
-      this.boostPct.textContent = `boost ${q}`;
+      this.boostPct.textContent = String(q);
+      this.boostControl.style.setProperty('--meter', String(q / 100));
       const full = q >= 100;
       if (full !== this.shownFull) {
         this.shownFull = full;
@@ -214,6 +215,7 @@ export class UI {
     if (active !== this.shownActive) {
       this.shownActive = active;
       this.boostBar.classList.toggle('active', active);
+      this.boostControl.classList.toggle('active', active);
     }
   }
 
@@ -259,9 +261,10 @@ export class UI {
     }
   }
   /** Display settings that live on the page: text size, boost side, reduce motion. */
-  setDisplay(textScale: number, boostLeft: boolean, reduceMotion: boolean): void {
+  setDisplay(textScale: number, boostSide: 'right' | 'left' | 'middle', reduceMotion: boolean): void {
     document.documentElement.style.setProperty('--ui-scale', String(textScale));
-    document.body.classList.toggle('boost-left', boostLeft);
+    document.body.classList.toggle('boost-left', boostSide === 'left');
+    document.body.classList.toggle('boost-middle', boostSide === 'middle');
     document.body.classList.toggle('reduce-motion', reduceMotion);
   }
 
