@@ -640,7 +640,7 @@ export class World {
     const p = this.pickups;
     const r = CONFIG.boost.pickup.collectRadius * this.collectScale;
     let n = 0;
-    for (let i = 0; i < p.max; i++) {
+    for (let i = 0; i < p.top; i++) {
       if (!p.active[i]) continue;
       const x = p.x[i];
       if (x > r || x < -r) continue;
@@ -659,7 +659,7 @@ export class World {
   collectPower(prevDistance: number): PowerKind | -1 {
     const p = this.powers;
     const r = CONFIG.boost.pickup.collectRadius * this.collectScale;
-    for (let i = 0; i < p.max; i++) {
+    for (let i = 0; i < p.top; i++) {
       if (!p.active[i]) continue;
       const x = p.x[i];
       if (x > r || x < -r) continue;
@@ -679,7 +679,7 @@ export class World {
     const m = CONFIG.powers.magnet;
     const p = this.pickups;
     const k = 1 - Math.exp(-m.pull * dt);
-    for (let i = 0; i < p.max; i++) {
+    for (let i = 0; i < p.top; i++) {
       if (!p.active[i]) continue;
       const ahead = p.d[i] - this.distance;
       if (ahead < -1 || ahead > m.reach) continue;
