@@ -10,7 +10,9 @@ import { CONFIG } from './config';
 // tall blocks repeat panels instead of stretching them. Everything drawn in a
 // cell either stays inside it or is drawn wrapped, so vertical tiling is seamless.
 
-export const SIDE_VARIANTS = 4;
+export const SIDE_VARIANTS = 8;
+/** Floor/top plates: TOP_VARIANTS cells side by side (picked per instance by its style). */
+export const TOP_VARIANTS = 4;
 
 type Ctx = CanvasRenderingContext2D;
 type Pt = [number, number];
@@ -273,7 +275,62 @@ function sideTech(p: Painter): void {
   [[16, 100], [104, 100], [16, 212], [112, 240], [142, 236], [242, 236]].forEach(([x, y]) => p.bolt(x, y, 3.6));
 }
 
-const SIDES = [sideAngular, sideOctagon, sidePipes, sideTech];
+/** Open grating over a dark void, on a frame. */
+function sideGrate(p: Painter): void {
+  base(p, 0.66);
+  p.recess([[24, 24], [232, 24], [232, 232], [24, 232]], 0.3);
+  for (let x = 36; x < 232; x += 16) p.seam([[x, 26], [x, 230]], false, 1.6);
+  for (let y = 40; y < 232; y += 32) p.seam([[26, y], [230, y]], false, 0.8);
+  [[12, 12], [244, 12], [12, 244], [244, 244]].forEach(([x, y]) => p.bolt(x, y, 4));
+}
+
+/** Vertical ribs, like the inside of a hull frame. */
+function sideRibbed(p: Painter): void {
+  base(p, 0.6);
+  for (let x = 8; x < 256; x += 48) {
+    p.plate([[x, 0], [x + 26, 0], [x + 26, 256], [x, 256]], 0.78);
+    p.seam([[x + 26, -2], [x + 26, 258]], false, 1.2);
+  }
+  p.seam([[0, 92], [256, 92]]);
+  p.seam([[0, 188], [256, 188]]);
+  for (let x = 21; x < 256; x += 48) {
+    p.bolt(x, 80, 3);
+    p.bolt(x, 176, 3);
+  }
+}
+
+/** A panel with a band of hazard stripes along the bottom. */
+function sideHazard(p: Painter): void {
+  base(p, 0.7);
+  p.plate([[0, 0], [256, 0], [256, 176], [0, 176]], 0.74);
+  p.recess([[30, 40], [226, 40], [226, 140], [30, 140]], 0.58);
+  p.slats(40, 52, 176, 76, 12);
+  // Stripes: dark diagonals across a light band.
+  p.plate([[0, 186], [256, 186], [256, 244], [0, 244]], 0.86);
+  for (let x = -60; x < 256; x += 36) p.plate([[x, 244], [x + 18, 244], [x + 76, 186], [x + 58, 186]], 0.22);
+  p.seam([[0, 186], [256, 186]]);
+  p.seam([[0, 244], [256, 244]]);
+  [[16, 16], [240, 16], [16, 160], [240, 160]].forEach(([x, y]) => p.bolt(x, y, 3.6));
+}
+
+/** Small square panels in a grid, a couple of them lit screens. */
+function sidePanels(p: Painter): void {
+  base(p, 0.64);
+  for (let y = 0; y < 256; y += 64) {
+    for (let x = 0; x < 256; x += 64) {
+      const tone = 0.62 + ((x * 7 + y * 3) % 5) * 0.03;
+      p.plate([[x + 4, y + 4], [x + 60, y + 4], [x + 60, y + 60], [x + 4, y + 60]], tone);
+      p.seam([[x + 4, y + 4], [x + 60, y + 4], [x + 60, y + 60], [x + 4, y + 60]], true);
+    }
+  }
+  p.recess([[72, 136], [120, 136], [120, 180], [72, 180]], 0.3);
+  p.light(76, 150, 40);
+  p.light(76, 162, 30);
+  p.recess([[200, 72], [248, 72], [248, 116], [200, 116]], 0.3);
+  p.light(204, 92, 40);
+}
+
+const SIDES = [sideAngular, sideOctagon, sidePipes, sideTech, sideGrate, sideRibbed, sideHazard, sidePanels];
 
 function drawSide(size: number): HTMLCanvasElement {
   const canvas = document.createElement('canvas');
@@ -300,11 +357,61 @@ function drawSide(size: number): HTMLCanvasElement {
   return canvas;
 }
 
+/** Floor plates: octagon hatch, tread plate, grating, big plates with a stripe. */
 function drawTop(size: number): HTMLCanvasElement {
   const canvas = document.createElement('canvas');
-  canvas.width = canvas.height = size;
+  canvas.width = size * TOP_VARIANTS;
+  canvas.height = size;
   const ctx = canvas.getContext('2d')!;
-  const p = new Painter(ctx, 0, 0, size, rand(19));
+  const r = rand(19);
+  [topHatch, topTread, topGrating, topStriped].forEach((draw, v) => {
+    const p = new Painter(ctx, v * size, 0, size, r);
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(p.x0, 0, size, size);
+    ctx.clip();
+    draw(p);
+    weather(p, 0.8);
+    // Rim
+    ctx.fillStyle = grey(0, 0.35);
+    ctx.fillRect(p.x0, 0, size, 5 * p.k);
+    ctx.fillRect(p.x0, 0, 5 * p.k, size);
+    ctx.fillRect(p.x0, size - 5 * p.k, size, 5 * p.k);
+    ctx.fillRect(p.x0 + size - 5 * p.k, 0, 5 * p.k, size);
+    ctx.restore();
+  });
+  return canvas;
+}
+
+/** Diamond tread plate. */
+function topTread(p: Painter): void {
+  base(p, 0.7);
+  for (let y = 10; y < 256; y += 24) {
+    for (let x = (y / 24) % 2 ? 22 : 10; x < 256; x += 24) {
+      p.plate([[x, y - 6], [x + 3, y - 6], [x + 9, y + 6], [x + 6, y + 6]], 0.82);
+    }
+  }
+}
+
+/** Floor grating on beams. */
+function topGrating(p: Painter): void {
+  base(p, 0.62);
+  p.recess([[16, 16], [240, 16], [240, 240], [16, 240]], 0.28);
+  for (let x = 24; x < 240; x += 12) p.seam([[x, 18], [x, 238]], false, 1.4);
+  p.plate([[0, 120], [256, 120], [256, 136], [0, 136]], 0.7);
+  [[8, 8], [248, 8], [8, 248], [248, 248], [8, 128], [248, 128]].forEach(([x, y]) => p.bolt(x, y, 3.4));
+}
+
+/** Big plain plates with a painted guide stripe. */
+function topStriped(p: Painter): void {
+  base(p, 0.74);
+  p.seam([[128, -2], [128, 258]]);
+  p.seam([[0, 128], [256, 128]]);
+  p.plate([[56, 0], [72, 0], [72, 256], [56, 256]], 0.9);
+  [[16, 16], [240, 16], [16, 240], [240, 240], [112, 112], [144, 144]].forEach(([x, y]) => p.bolt(x, y, 3.2));
+}
+
+function topHatch(p: Painter): void {
   base(p, 0.72);
   // Geometric plate: octagon hatch with seams to the corners.
   p.plate([[0, 0], [256, 0], [176, 80], [80, 80]], 0.78);
@@ -320,14 +427,6 @@ function drawTop(size: number): HTMLCanvasElement {
     const a = (i / 8) * Math.PI * 2 + Math.PI / 8;
     p.bolt(128 + Math.cos(a) * 52, 128 + Math.sin(a) * 52, 3.4);
   }
-  weather(p, 0.8);
-  // Rim
-  ctx.fillStyle = grey(0, 0.35);
-  ctx.fillRect(0, 0, size, 5 * p.k);
-  ctx.fillRect(0, 0, 5 * p.k, size);
-  ctx.fillRect(0, size - 5 * p.k, size, 5 * p.k);
-  ctx.fillRect(size - 5 * p.k, 0, 5 * p.k, size);
-  return canvas;
 }
 
 function toTexture(canvas: HTMLCanvasElement, anisotropy: number): CanvasTexture {
@@ -358,10 +457,11 @@ export function createBlockTextures(maxAnisotropy: number) {
 export function patchBlockMaterial(mat: MeshBasicMaterial, top: boolean, topScale = 1): void {
   const cube = CONFIG.field.cubeSize.toFixed(4);
   const variants = SIDE_VARIANTS.toFixed(1);
+  const tops = TOP_VARIANTS.toFixed(1);
   mat.onBeforeCompile = (shader) => {
-    const decl = 'varying vec2 vBlockUv;\nvarying float vBlockCell;\n';
+    const decl = 'varying vec2 vBlockUv;\nvarying float vBlockCell;\nvarying float vTopCell;\n';
     shader.vertexShader = shader.vertexShader
-      .replace('#include <common>', `#include <common>\n${decl}`)
+      .replace('#include <common>', `#include <common>\n${decl}\nattribute float aStyle;`)
       .replace(
         '#include <uv_vertex>',
         `#include <uv_vertex>
@@ -370,7 +470,10 @@ export function patchBlockMaterial(mat: MeshBasicMaterial, top: boolean, topScal
     vec3 sc = vec3(length(instanceMatrix[0].xyz), length(instanceMatrix[1].xyz), length(instanceMatrix[2].xyz));
     float seed = fract(sc.y * 7.137 + sc.x * 3.71 + sc.z * 1.93);
     vec3 p = position * sc / ${cube};
-    vBlockCell = floor(seed * ${variants});
+    // aStyle: which floor plate (0-3), and the room family's half of the wall atlas.
+    vTopCell = mod(aStyle, ${tops});
+    float wallSet = floor(aStyle / ${tops});
+    vBlockCell = wallSet > 0.5 ? mod(floor(seed * 4.0) + 4.0 * mod(wallSet - 1.0, 2.0), ${variants}) : floor(seed * ${variants});
     if (abs(normal.y) > 0.5) {
       vBlockUv = p.xz * ${topScale.toFixed(3)} + 0.5;
     } else {
@@ -387,7 +490,11 @@ export function patchBlockMaterial(mat: MeshBasicMaterial, top: boolean, topScal
         '#include <map_fragment>',
         top
           ? `#ifdef USE_MAP
-  diffuseColor *= texture2D(map, vBlockUv);
+  {
+    vec2 tile = vec2((fract(vBlockUv.x) + vTopCell) / ${tops}, vBlockUv.y);
+    vec2 g = vec2(1.0 / ${tops}, 1.0);
+    diffuseColor *= textureGrad(map, tile, dFdx(vBlockUv) * g, dFdy(vBlockUv) * g);
+  }
 #endif`
           : `#ifdef USE_MAP
   {

@@ -65,7 +65,9 @@ const LANE = TH.lane.halfWidth;
 const FLOOR_ROWS = 512; // rows of floor history kept for fall checks
 const PIT_LIP = 0.3;
 const CHASM_INSET = 1.4; // the drop starts this far in from the bridge ends
-const BRIDGE_JUMP = 0.8; // a bridge edge moving more than this in a row has jumped, not bent // pit sides: a thin steel lip, then black
+const BRIDGE_JUMP = 0.8;
+/** Room families in the order of CONFIG.themes.interior.familyLooks. */
+const FAMILY_LOOK_IDS = Object.keys(CONFIG.themes.interior.familyLooks); // a bridge edge moving more than this in a row has jumped, not bent // pit sides: a thin steel lip, then black
 
 /** Open-ground prop kinds. */
 const enum Prop {
@@ -301,6 +303,8 @@ export class World {
   private shiftLen = 0;
   private shiftDone = 0;
   private plan: RoomPlan | null = null; // split layout, mirrored to this room's side
+  /** The current room family's look (index into the hull's look tables). */
+  private hullLook = 0;
   // A hand-made piece being built (see pieces/), or null when it's a room template.
   private piece: Parsed | null = null;
   private pieceStart = 0; // distance of its first row
@@ -343,9 +347,18 @@ export class World {
     this.blocks = new InstancedField(scene, box, mats, F.maxBlocks);
     const hullMats = [this.matDark, this.matDark, this.matHullTop, this.matHullTop, this.matMid, this.matMid];
     this.hull = new InstancedField(scene, box, hullMats, F.maxHull);
+    // Each room family's tint and panels (see CONFIG.themes.interior.familyLooks).
+    const looks = Object.values(TH.interior.familyLooks) as readonly (readonly [string, number, number])[];
+    this.hull.setColorTable(looks.map(([c]) => new Color(c)));
+    this.hull.setStyleTable(looks.map(([, floor, walls]) => floor + 4 * walls));
+    const crates = TH.interior.crateLooks as readonly (readonly [string, number])[];
+    this.blocks.setColorTable(crates.map(([c]) => new Color(c)));
+    this.blocks.setStyleTable(crates.map(([, lid]) => lid));
     this.rockMat = new MeshBasicMaterial({ vertexColors: true });
     const rock = boulder();
     this.rocks = new InstancedField(scene, rock, this.rockMat, F.maxRocks);
+    // Rock shades, so walls and cliffs aren't all one colour.
+    this.rocks.setColorTable(['#ffffff', '#f2e2cf', '#d9cbbd', '#e8d0b0', '#c9c1b8', '#e0c4a8'].map((h) => new Color(h)));
     this.obstacleMat = new MeshBasicMaterial({ vertexColors: true });
     this.obstacleRocks = new InstancedField(scene, rock, this.obstacleMat, F.maxObstacleRocks);
     this.propMat = new MeshBasicMaterial({ vertexColors: true });
@@ -901,6 +914,7 @@ export class World {
     this.cxSlope = this.cxTargetSlope = 0;
     this.cxRetargetAt = d + 30;
     this.laneRetargetAt = d;
+    this.hullLook = 0;
     if (theme === 'canyon') {
       // Centre the mouth on the ship, not the lane: on open ground the player can
       // roam far from the lane. The lane carries on from where it was (the mouth is
@@ -1877,6 +1891,7 @@ export class World {
       case 'crate':
       case 'stack': {
         const h = b.part === 'crate' ? 0.9 : 1.8 + Math.floor(vary(1) * 2) * 0.9;
+        this.blocks.nextColor = crateLook(x, dc);
         this.blocks.spawn(x - this.shipX, 0, dc, w, h, depth, 0, true, false, w / 2, depth / 2);
         break;
       }
@@ -2035,6 +2050,7 @@ export class World {
     }
 
     const def = ROOMS[this.room];
+    this.hullLook = Math.max(0, FAMILY_LOOK_IDS.indexOf(this.room));
     const taper = this.roomTaper;
     const open = taper > 0 ? ease(Math.min((d - this.roomStart) / taper, (this.roomEnd - d) / taper)) : 1;
     let hw = lerp(base, this.room === 'corridor' ? base : this.roomHw, open);
@@ -2341,6 +2357,7 @@ export class World {
         return (densityAt(this.score) / 100) * 2 * this.hw * STEP * scale;
       },
       crate(x, d, width, h) {
+        w.blocks.nextColor = crateLook(x, d);
         w.blocks.spawn(x - w.shipX, 0, d, width, h, width, 0, true, false, width / 2, width / 2);
       },
       box(x, y, d, width, h, depth, solid, scores) {
@@ -2515,6 +2532,7 @@ export class World {
   /** `scores`: counts for near misses (bulkheads yes, walls no). */
   private hullBox(x: number, y: number, d: number, w: number, h: number, depth: number, solid: boolean, scores = false): void {
     const s = F.cubeSize;
+    this.hull.nextColor = this.hullLook;
     this.hull.spawn(x - this.shipX, y, d, w / s, h / s, depth / s, 0, solid, false, w / 2, depth / 2, scores);
   }
 
@@ -2538,6 +2556,19 @@ export class World {
 
   private rock(x: number, d: number, r: number, height: number): void {
     const hit = r * 0.8;
+    this.rocks.nextColor = rockShade(x, d);
     this.rocks.spawn(x - this.shipX, 0, d, r, height / BOULDER_HEIGHT, r, rand() * Math.PI * 2, true, false, hit, hit, false);
   }
+}
+
+/** A crate's paint, from where it stands (so it's the same every time). */
+function crateLook(x: number, d: number): number {
+  const v = Math.sin(Math.round(x * 2) * 12.9898 + Math.round(d) * 78.233) * 43758.5453;
+  return Math.floor((v - Math.floor(v)) * TH.interior.crateLooks.length);
+}
+
+/** A rock's shade (index into the rock colour table), from where it stands. */
+function rockShade(x: number, d: number): number {
+  const v = Math.sin(Math.round(x) * 39.346 + Math.round(d) * 11.135) * 43758.5453;
+  return Math.floor((v - Math.floor(v)) * 6);
 }
