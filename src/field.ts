@@ -109,6 +109,21 @@ export class InstancedField {
     this.mesh.instanceColor = this.colorAttr;
   }
 
+  /**
+   * Also give each instance a style number (aStyle in the block material: floor
+   * plate and wall set), looked up by the same index as its colour. The
+   * geometry is copied, so pools sharing one keep their own styles.
+   */
+  setStyleTable(styles: number[]): void {
+    this.styleTable = styles;
+    this.mesh.geometry = this.mesh.geometry.clone();
+    this.styleAttr = new InstancedBufferAttribute(new Float32Array(this.max), 1);
+    this.mesh.geometry.setAttribute('aStyle', this.styleAttr);
+  }
+
+  private styleTable: number[] | null = null;
+  private styleAttr: InstancedBufferAttribute | null = null;
+
   /** Make the next spawn() a moving instance (see the note at the top). */
   /**
    * Make the next spawn() pulse up and down (steam vents): fully up while
@@ -375,6 +390,7 @@ export class InstancedField {
         a[o + 10] = sz;
         a[o + 13] += Math.abs(Math.sin(angle * 0.5)) * 0.35 * this.sy[i];
       }
+      if (this.styleTable) (this.styleAttr!.array as Float32Array)[n] = this.styleTable[this.colorIdx[i]] ?? 0;
       if (this.colorTable) {
         const col = this.colorTable[this.colorIdx[i]];
         const ca = this.colorAttr!.array as Float32Array;
@@ -387,6 +403,7 @@ export class InstancedField {
     this.mesh.count = n;
     this.mesh.instanceMatrix.needsUpdate = true;
     if (this.colorAttr) this.colorAttr.needsUpdate = true;
+    if (this.styleAttr) this.styleAttr.needsUpdate = true;
   }
 }
 
