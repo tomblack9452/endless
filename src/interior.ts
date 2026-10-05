@@ -1,4 +1,5 @@
 import { CONFIG } from './config';
+import { Liquid } from './fx';
 import { rand } from './rng';
 
 // Ship interior: a sequence of reusable rooms joined by short corridors.
@@ -27,6 +28,9 @@ export type RoomId =
   | 'pistons'
   | 'hangar'
   | 'collapse'
+  | 'coolant'
+  | 'vents'
+  | 'foundry'
   | 'gantry'
   | 'breach';
 
@@ -103,6 +107,22 @@ export interface RoomAPI {
   door(d: number, gapX: number, gapHalf: number): void;
   /** Solid debris that falls from the ceiling, landing `landAhead` before you reach it. */
   debris(x: number, d: number, w: number, h: number, depth: number, landAhead: number): void;
+  /** Liquid falling from the ceiling, `width` across (x), floor to ceiling. Solid ones are curtains. */
+  pour(x: number, d: number, width: number, liquid: Liquid, solid: boolean): void;
+  /** A pool of liquid on the floor (scenery). */
+  pool(x: number, d: number, r: number, liquid: Liquid): void;
+  /** A plume of steam rising from y (scenery). */
+  steam(x: number, y: number, d: number, height: number): void;
+  /** A small light that blinks at its own rate. */
+  blinker(x: number, y: number, d: number, w: number, h: number, colour: Light): void;
+  /** A hologram panel facing down the room. */
+  holo(x: number, y: number, d: number, w: number, h: number): void;
+  /** A spinning ceiling fan. */
+  fan(x: number, d: number, size: number): void;
+  /** Steam vent in the floor (a hazard). Vents on the lane are always down as you arrive. */
+  vent(x: number, d: number, half: number, period: number): void;
+  /** A panel that throws sparks. */
+  sparks(x: number, y: number, d: number): void;
   /** Alien tree (trunk collides) for the hydroponics bay. */
   tree(x: number, d: number, size: number): void;
 }
@@ -528,6 +548,60 @@ export const ROOMS: Record<RoomId, RoomDef> = {
     },
   },
 
+  // Coolant plant: curtains of coolant falling across the room, one gap on the lane.
+  coolant: {
+    name: 'coolant plant',
+    extraWidth: () => R.coolant.extraWidth,
+    height: R.coolant.height,
+    ceiling: true,
+    windows: false,
+    light: Light.Teal,
+    wander: 0.4,
+    enclosure: 1,
+    build(api) {
+      if (!api.due(R.coolant.curtainSpacing)) return;
+      curtain(api, R.coolant.gapWidth, Liquid.Coolant, api.sub === 2 && rand() < 0.5 ? 2 : 1);
+    },
+  },
+
+  // Steam vents: rows of floor vents firing on a rhythm. The lane's are always
+  // down when you get there; read the rhythm to cut across the others.
+  vents: {
+    name: 'steam vents',
+    extraWidth: () => R.vents.extraWidth,
+    height: R.vents.height,
+    ceiling: true,
+    windows: false,
+    light: Light.Amber,
+    wander: 0.6,
+    enclosure: 1,
+    build(api) {
+      if (!api.due(R.vents.rowSpacing)) return;
+      const V = R.vents;
+      const shift = rand() * V.pitch;
+      for (let x = api.cx - api.hw + 0.7 + shift; x < api.cx + api.hw - 0.6; x += V.pitch) {
+        if (rand() < 0.25) continue;
+        api.vent(x, api.d, V.ventHalf, V.period);
+      }
+    },
+  },
+
+  // Foundry: molten metal pouring into troughs, curtains of it across the floor, sparks.
+  foundry: {
+    name: 'foundry',
+    extraWidth: () => R.foundry.extraWidth,
+    height: R.foundry.height,
+    ceiling: true,
+    windows: false,
+    light: Light.Amber,
+    wander: 0.4,
+    enclosure: 1,
+    build(api) {
+      if (!api.due(R.foundry.curtainSpacing)) return;
+      curtain(api, R.foundry.gapWidth, Liquid.Molten, 1);
+    },
+  },
+
   // Set piece: the reactor is coming apart. Debris crashes down off the lane as
   // you approach and the core lights run red. The lane stays clear throughout.
   collapse: {
@@ -561,6 +635,27 @@ export const ROOMS: Record<RoomId, RoomDef> = {
     },
   },
 };
+
+/** A curtain of falling liquid across the room with `gaps` openings (one always on the lane). */
+function curtain(api: RoomAPI, gapWidth: number, liquid: Liquid, gaps: number): void {
+  const g = gapWidth / 2 + api.jitter;
+  const extra = api.cx + (rand() * 2 - 1) * (api.hw - g - 0.5);
+  const cuts = gaps === 2 ? [api.lane, extra].sort((a, b) => a - b) : [api.lane];
+  let from = api.cx - api.hw;
+  const right = api.cx + api.hw;
+  const span = (a: number, b: number) => {
+    if (b - a < 0.3) return;
+    api.pour((a + b) / 2, api.d, b - a, liquid, true);
+    // The slot it falls from, and a trough where it lands.
+    api.greeble((a + b) / 2, api.H - 0.25, api.d, b - a + 0.2, 0.25, 0.5, Decor.Dark);
+    api.greeble((a + b) / 2, 0, api.d, b - a + 0.2, 0.12, 0.7, Decor.Dark);
+  };
+  for (const c of cuts) {
+    if (c - g > from) span(from, c - g);
+    from = Math.max(from, c + g);
+  }
+  if (right > from) span(from, right);
+}
 
 /** Crates scattered in the branches of a split room, off the lane and clear of dividers. */
 function branchCrates(api: RoomAPI, scale: number): void {
@@ -690,6 +785,7 @@ function corridorDecor(api: RoomAPI, runs = 1 + Math.floor(h(api, 1) * 3)): void
     if (api.row % 11 === (s > 0 ? 3 : 8) && h(api, 50 + api.row) > 0.4) {
       api.greeble(api.wall(s) - s * 0.15, 0.7, api.d, 0.3, 0.9, 1.2, Decor.Panel);
       api.light(api.wall(s) - s * 0.31, 1.15, api.d, 0.02, 0.32, 0.8, h(api, 60 + api.row) < 0.5 ? Light.Teal : Light.Amber);
+      for (let k = 0; k < 3; k++) api.blinker(api.wall(s) - s * 0.32, 0.85 + k * 0.1, api.d + 0.3, 0.05, 0.04, [Light.Red, Light.Green, Light.Amber][k]);
     }
   }
 }
@@ -701,11 +797,13 @@ function serversDecor(api: RoomAPI): void {
     api.greeble(api.wall(s) - s * 0.1, 0.45, api.d, 0.2, api.H - 1.1, 2.32, Decor.Dark);
     for (let k = 0; k < 5; k++) {
       if (rand() > 0.55) continue;
-      api.light(api.wall(s) - s * 0.21, 0.7 + k * 0.42, api.d + (rand() - 0.5) * 1.8, 0.03, 0.05, 0.12, colours[Math.floor(rand() * 4)]);
+      api.blinker(api.wall(s) - s * 0.21, 0.7 + k * 0.42, api.d + (rand() - 0.5) * 1.8, 0.04, 0.05, colours[Math.floor(rand() * 4)]);
     }
     api.pipe(s, 0.22, 0.05, Decor.Dark);
     api.pipe(s, 0.32, 0.04, Decor.Dark);
     api.greeble(api.wall(s) - s * 0.5, api.H - 0.35, api.d, 1, 0.12, 2.32, Decor.Dark);
+    // Holograms of data floating in front of the racks.
+    if (api.row % 9 === (s > 0 ? 2 : 6)) api.holo(api.wall(s) - s * 0.9, 1.0, api.d, 0.9, 1.2);
   }
 }
 
@@ -725,6 +823,49 @@ function reactorDecor(api: RoomAPI): void {
     api.pipe(s, 2.5, 0.3, Decor.Teal);
     api.pipe(s, 3.6, 0.15, Decor.Steel);
     if (api.row % 3 === 0) api.greeble(api.wall(s) - s * 0.5, 0, api.d, 1, api.H, 0.35, Decor.Panel);
+    if (api.row % 12 === (s > 0 ? 3 : 9)) {
+      api.pour(api.wall(s) - s * 1.2, api.d, 0.45, Liquid.Coolant, false);
+      api.pool(api.wall(s) - s * 1.2, api.d, 0.9, Liquid.Coolant);
+    }
+  }
+}
+
+/** Coolant plant: big teal pipes, pools along the walls, pours feeding them, blinking gauges. */
+function coolantDecor(api: RoomAPI): void {
+  for (const s of [-1, 1]) {
+    api.pipe(s, 0.9, 0.35, Decor.Teal);
+    api.pipe(s, 2.3, 0.2, Decor.Steel);
+    if (api.row % 7 === (s > 0 ? 2 : 5)) {
+      api.pour(api.wall(s) - s * 1.0, api.d, 0.5, Liquid.Coolant, false);
+      api.pool(api.wall(s) - s * 1.0, api.d, 1.0, Liquid.Coolant);
+    }
+    if (api.row % 5 === 0) api.blinker(api.wall(s) - s * 0.12, 1.6, api.d, 0.06, 0.06, Light.Teal);
+    if (api.row % 11 === 6) api.steam(api.wall(s) - s * 0.5, 2.3, api.d, 1.4);
+  }
+}
+
+/** Steam vents: low pipes that leak steam, hazard stripes, amber warning lights. */
+function ventsDecor(api: RoomAPI): void {
+  for (const s of [-1, 1]) {
+    api.pipe(s, 0.4, 0.14, Decor.Copper);
+    api.pipe(s, 0.7, 0.1, Decor.Copper);
+    api.greeble(api.wall(s) - s * 0.06, 0, api.d, 0.12, 0.3, 2.32, api.row % 2 ? Decor.Yellow : Decor.Dark);
+    if (api.row % 5 === (s > 0 ? 1 : 3)) api.steam(api.wall(s) - s * 0.35, 0.55, api.d, 1.6);
+    if (api.row % 6 === 0) api.blinker(api.wall(s) - s * 0.05, 2.2, api.d, 0.08, 0.14, Light.Amber);
+  }
+}
+
+/** Foundry: molten pours into troughs along the walls, sparks, glowing lights. */
+function foundryDecor(api: RoomAPI): void {
+  for (const s of [-1, 1]) {
+    api.pipe(s, api.H - 0.8, 0.3, Decor.Dark);
+    if (api.row % 6 === (s > 0 ? 1 : 4)) {
+      api.pour(api.wall(s) - s * 1.1, api.d, 0.55, Liquid.Molten, false);
+      api.pool(api.wall(s) - s * 1.1, api.d, 1.0, Liquid.Molten);
+      api.greeble(api.wall(s) - s * 1.1, 0, api.d, 2.2, 0.25, 2.2, Decor.Dark);
+    }
+    if (api.row % 9 === (s > 0 ? 4 : 0)) api.sparks(api.wall(s) - s * 0.4, 1.5, api.d);
+    if (api.row % 4 === 0) api.light(api.wall(s) - s * 0.03, 1.4, api.d, 0.05, 0.6, 0.8, Light.Red);
   }
 }
 
@@ -813,6 +954,26 @@ function ambientProps(api: RoomAPI): void {
   if (r % 10 === 5) {
     for (let k = 0; k < 4; k++) api.greeble(api.wall(s) - s * 0.05, 0.35 + k * 0.16, api.d, 0.1, 0.08, 1.2, k % 2 ? Decor.Panel : Decor.Dark);
   }
+  // A leak: a thin trickle from the ceiling into a puddle by the wall.
+  if (api.ceiling && !api.pit && r % 17 === 9 && h(api, r + 11) > 0.5) {
+    api.pour(api.wall(s) - s * 0.55, api.d, 0.12, Liquid.Water, false);
+    api.pool(api.wall(s) - s * 0.55, api.d, 0.45, Liquid.Water);
+  }
+  // A burst pipe venting steam.
+  if (r % 13 === 2 && h(api, r + 12) > 0.45) {
+    api.greeble(api.wall(-s) + s * 0.25, 1.15, api.d, 0.5, 0.18, 0.5, Decor.Copper);
+    api.steam(api.wall(-s) + s * 0.3, 1.3, api.d, 1.3);
+  }
+  // A broken panel throwing sparks.
+  if (r % 19 === 11 && h(api, r + 13) > 0.5) {
+    api.greeble(api.wall(s) - s * 0.1, 1.2, api.d, 0.2, 0.7, 0.9, Decor.Dark);
+    api.sparks(api.wall(s) - s * 0.25, 1.5, api.d);
+  }
+  // Ceiling fans in tall rooms.
+  if (api.ceiling && api.H > 4.2 && r % 9 === 4 && api.hw > 2.5) {
+    api.fan(api.cx - api.hw * 0.5, api.d, 0.8 + h(api, r + 14) * 0.4);
+    api.fan(api.cx + api.hw * 0.5, api.d, 0.8 + h(api, r + 15) * 0.4);
+  }
   // Big wall screen in a frame.
   if (r % 13 === 6 && api.H > 3.5 && h(api, r + 7) > 0.45) {
     api.greeble(api.wall(-s) + s * 0.06, 1.3, api.d, 0.12, 1.3, 2, Decor.Panel);
@@ -841,6 +1002,9 @@ ROOMS.pistons.decor = pistonsDecor;
 ROOMS.hangar.decor = hangarDecor;
 ROOMS.hydroponics.decor = hydroponicsDecor;
 ROOMS.lasers.decor = lasersDecor;
+ROOMS.coolant.decor = coolantDecor;
+ROOMS.vents.decor = ventsDecor;
+ROOMS.foundry.decor = foundryDecor;
 ROOMS.deck.decor = deckDecor;
 ROOMS.shaft.decor = (api) => corridorDecor(api, 5);
 

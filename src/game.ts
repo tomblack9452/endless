@@ -20,6 +20,7 @@ import { Missions, type RunMetrics } from './missions';
 import { chainTarget, dailySeed, weeklySeed, Progress, sectorOf, sectorStart, STAR_CHAIN, STAR_CLEAR, STAR_NO_HITS } from './progress';
 import { creditsFor, insignia, par, Ranked, rankName, RANKS, type RunMode } from './ranks';
 import { Wallet } from './wallet';
+import { fxDistance, fxTime } from './fx';
 import { DIVISIONS, emblem, LEAGUES, leagueName, Leagues, LP_PER_DIVISION, skillParScale, weekKey } from './leagues';
 import { find, itemsIn, LOOKS, Looks, type Owner, type Slot, SLOT_NAMES, SLOTS, unlockText } from './looks';
 import type { Fin, Marking } from './looks';
@@ -1046,6 +1047,14 @@ export class Game {
   private frame = (now: number): void => {
     requestAnimationFrame(this.frame);
     this.stage.setTerrain(this.world.distance);
+    // Interior animation: shared clock and distance, fans, sparks.
+    const fxDt = Math.max(0, Math.min((now - this.lastTime) / 1000, 0.05));
+    fxTime.value += fxDt;
+    fxDistance.value = this.world.distance;
+    if (this.world.insideMix > 0) {
+      this.world.spinFans(fxDt);
+      this.world.sparks.update(this.state === 'paused' ? 0 : fxDt, this.world.distance, this.world.lateral);
+    }
     this.stage.setGroundStyle(...this.groundStyle(), this.world.lateral, this.world.distance);
     if (this.state === 'playing' || this.state === 'title') this.stage.adapt(now - this.lastTime);
     const dt = Math.max(0, Math.min((now - this.lastTime) / 1000, 1 / 20));

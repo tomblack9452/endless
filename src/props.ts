@@ -275,3 +275,15 @@ export function rockArch(): BufferGeometry {
 
 /** Inner half-width of rockArch's opening, and where its pillars stand. */
 export const ARCH_PILLAR_X = 5.2;
+
+// --- ship interior: animated pieces ------------------------------------------------
+
+/** Ceiling fan: a hub and four blades, flat, radius 1 at scale 1. Spun about y. */
+export function ceilingFan(): BufferGeometry {
+  const parts: Part[] = [part(new CylinderGeometry(0.16, 0.2, 0.18, 8), '#5a5f66')];
+  for (let i = 0; i < 4; i++) {
+    const a = (i / 4) * Math.PI * 2;
+    parts.push(part(new CylinderGeometry(0.5, 0.5, 0.03, 3), '#8a9097', scale(1.9, 1, 0.42), move(0.55, 0, 0), (m) => m.makeRotationY(a)));
+  }
+  return build(parts);
+}

@@ -35,7 +35,7 @@ export class InstancedField {
   readonly solid: Uint8Array;
   readonly wraps: Uint8Array;
   readonly scores: Uint8Array; // counts for near misses (walls don't)
-  readonly moving: Uint8Array; // 0 still, 1 sine, 2 ramp sideways, 3 ramp down
+  readonly moving: Uint8Array; // 0 still, 1 sine, 2 ramp sideways, 3 ramp down, 4 pulse up/down
   readonly bx: Float32Array; // moving: centre of travel
   readonly amp: Float32Array;
   readonly freq: Float32Array;
@@ -100,6 +100,19 @@ export class InstancedField {
   }
 
   /** Make the next spawn() a moving instance (see the note at the top). */
+  /**
+   * Make the next spawn() pulse up and down (steam vents): fully up while
+   * sin(2pi * (distance - d) / period + phase) > 0, sunk by `drop` otherwise.
+   * Sunk instances don't collide. Like sine motion it's tied to distance, so
+   * phase -pi/2 means "down when the ship arrives", at any speed.
+   */
+  setNextPulse(drop: number, period: number, phase: number): void {
+    this.nextAmp = drop;
+    this.nextFreq = (Math.PI * 2) / period;
+    this.nextPhase = phase;
+    this.nextRamp = 4;
+  }
+
   /** Make the next spawn() ramp once: sideways (`down` false) or dropping from `amp` above. */
   setNextRamp(amp: number, len: number, finish: number, down: boolean): void {
     this.nextAmp = amp;
@@ -158,7 +171,9 @@ export class InstancedField {
       this.amp[i] = this.nextAmp;
       this.freq[i] = this.nextFreq;
       this.phase[i] = this.nextPhase;
-      if (this.nextRamp === 3) {
+      if (this.nextRamp === 4) {
+        this.bx[i] = y; // a pulse keeps its raised height here
+      } else if (this.nextRamp === 3) {
         this.bx[i] = y; // a drop keeps its resting height here
         this.y[i] = y + this.nextAmp;
       } else if (this.nextRamp === 2) {
@@ -211,6 +226,12 @@ export class InstancedField {
         this.x[i] = this.bx[i] + this.amp[i] * Math.sin(this.freq[i] * (distance - this.d[i]) + this.phase[i]);
         continue;
       }
+      if (m === 4) {
+        const s = Math.sin(this.freq[i] * (distance - this.d[i]) + this.phase[i]);
+        const up = s <= -0.15 ? 0 : s >= 0.15 ? 1 : (s + 0.15) / 0.3;
+        this.y[i] = this.bx[i] - this.amp[i] * (1 - up);
+        continue;
+      }
       // Ramp: 0 far out, 1 once `finish` ahead of the ship, eased.
       const ahead = this.d[i] - distance;
       let t = 1 - (ahead - this.phase[i]) / this.freq[i];
@@ -241,6 +262,8 @@ export class InstancedField {
     const shipZ = CONFIG.ship.hitHalfDepth;
     for (let i = 0; i < this.max; i++) {
       if (!this.active[i] || !this.solid[i]) continue;
+      // A pulsing vent that's mostly sunk is harmless.
+      if (this.moving[i] === 4 && this.y[i] < this.bx[i] - this.amp[i] * 0.5) continue;
       const rx = this.hx[i] + shipX;
       // Instances moved by -dx this frame, so they were at x + dx before it.
       const x = this.x[i];
