@@ -28,6 +28,9 @@ import { shopFor } from './economy/shop';
 import { Tickets } from './economy/tickets';
 import { dayKey, formatWait, untilTomorrow } from './economy/time';
 import { EconomyView } from './economy/view';
+import { createBackend } from './server/backend';
+import { CloudSave } from './server/sync';
+import { shareCard } from './share';
 import { fxDistance, fxTime } from './fx';
 import { type Course, COURSES, courseLength, type Environment, ENVIRONMENTS, weeklyCourse } from './courses';
 import { DIVISIONS, divisionReward, emblem, LEAGUES, leagueName, leaguePar, Leagues, LP_PER_DIVISION, weekKey } from './leagues';
@@ -46,6 +49,7 @@ import { terrain } from './terrain';
 type State = 'title' | 'playing' | 'paused' | 'countdown' | 'crashed' | 'finished';
 
 const DEG = Math.PI / 180;
+const PATH_STEP = 4;
 
 type InfoScreen = 'stats' | 'missions' | 'hangar' | 'record' | 'solo' | 'league' | 'shop' | 'pass' | 'daily';
 
@@ -129,6 +133,11 @@ export class Game {
   private readonly daily = new Daily();
   private readonly pass = new Pass();
   private readonly econ = new EconomyView();
+  private readonly backend = createBackend();
+  private readonly cloud = new CloudSave(this.backend);
+  // Ranked: the ship's sideways position every PATH_STEP units (the leaderboard check, and later the ghost).
+  private path: number[] = [];
+  private pathNext = 0;
   private economyTimer = 0;
   // Revive (not in ranked): once a run. While the offer is up the run isn't recorded yet.
   private revived = false;
@@ -269,6 +278,7 @@ export class Game {
       }
       this.refreshTitle();
       this.claimLogin();
+      void this.connect();
     });
     this.econ.bindShop(this.onShopOffer, this.onShopBuy, this.onShopTicket, this.onShopCores);
     this.econ.bindPass(this.onPassPremium);
@@ -321,6 +331,9 @@ export class Game {
     this.econ.setCountdown(0);
     this.econ.setOverRewards([]);
     this.revived = this.revivePending = this.reviveAsked = false;
+    this.path = [];
+    this.pathNext = 0;
+    this.ui.showShare(false);
     this.preview = null;
     this.seed = seed;
     this.mode = mode;
@@ -829,6 +842,30 @@ export class Game {
     else this.refreshBar(now);
   }
 
+  /** Sign in and sync with the server, if there is one (see src/server). */
+  private async connect(): Promise<void> {
+    if (!(await this.backend.signIn())) return;
+    if (await this.cloud.start()) {
+      location.reload(); // the cloud save is newer: start again from it
+      return;
+    }
+    await this.wallet.link(this.backend);
+    this.refreshTitle();
+  }
+
+  /** A picture of this run for the share sheet. */
+  private async share(): Promise<void> {
+    const lg = this.leagues;
+    const best = this.progress.weeklyBest(this.weekly.id);
+    await shareCard({
+      score: formatScore(this.score),
+      heading: `weekly level · week of ${new Date(`${weekKey(Date.now())}T00:00:00Z`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' }).toLowerCase()}`,
+      lines: [rankName(this.ranked.rank), leagueName(lg.league, lg.division), `best this week ${formatScore(best)}`],
+      sky: '#' + this.palette.sky.getHexString(),
+      text: this.palette.textCss(),
+    });
+  }
+
   private refreshBar(now = Date.now()): void {
     const wait = this.tickets.count < CONFIG.economy.tickets.max ? formatWait(this.tickets.nextIn(now)) : '';
     this.econ.setBar(this.wallet.credits, this.wallet.cores, this.tickets.count, wait);
@@ -838,6 +875,17 @@ export class Game {
   /** Fold a ranked run into the rank and league; fills the game-over block. Returns bonus credits. */
   private recordRanked(finished: boolean): number {
     const lg = this.leagues;
+    if (!this.assisted)
+      void this.backend.submitRun({
+        week: weekKey(Date.now()),
+        league: lg.league,
+        score: Math.floor(this.score),
+        seconds: this.runTime,
+        distance: this.world.distance - this.runStart,
+        finished,
+        path: this.path,
+      });
+    this.ui.showShare(true);
     const target = this.weekly.target;
     this.beatPar = this.score >= leaguePar(lg.league, target);
     this.finishedRun = finished;
@@ -1005,6 +1053,21 @@ export class Game {
       })),
     });
     this.openInfo('league');
+    void this.loadBoard();
+  }
+
+  /** This week's leaderboard in your league (just your best when offline). */
+  private async loadBoard(): Promise<void> {
+    const lg = this.leagues;
+    this.ui.renderBoard([], this.backend.online ? 'loading' : '');
+    const rows = await this.backend.board(weekKey(Date.now()), lg.league);
+    const mine = this.progress.weeklyBest(this.weekly.id);
+    const view: [string, string][] = rows.map((r, i) => [`${i + 1}. ${r.you ? 'you' : r.name}`, formatScore(r.score)]);
+    if (!this.backend.online) {
+      this.ui.renderBoard(mine > 0 ? [['your best', formatScore(mine)]] : [['no ranked run yet this week', '']], 'online leaderboards come with accounts');
+      return;
+    }
+    this.ui.renderBoard(view.length > 0 ? view : [['no runs yet this week', '']], LEAGUES[lg.league].name);
   }
 
   /** How far through the current rank's XP band the player is (0..1). */
@@ -1384,6 +1447,7 @@ export class Game {
     const tickets = t > 0 ? `${t} ticket${t === 1 ? '' : 's'}` : `no tickets · next in ${formatWait(this.tickets.nextIn(now))}`;
     this.ui.setRankedSub(`${wb > 0 ? `best this week ${formatScore(wb)}` : 'new level every week'} · ${tickets}`);
     this.refreshBar(now);
+    this.cloud.push(); // most changes end here: keep the cloud save current
     this.ui.setBests([['endless', this.progress.endlessBest]]);
   }
 
@@ -1464,6 +1528,7 @@ export class Game {
     if (action === 'resume') this.resume();
     else if (action === 'settings') this.openSettings();
     else if (action === 'menu') this.toMainMenu();
+    else if (action === 'share') void this.share();
     else if (action === 'back') {
       if (this.infoOpen) this.closeInfo();
       else this.closeSettings();
@@ -1757,6 +1822,12 @@ export class Game {
 
     const prev = this.world.distance;
     this.world.advance(dt, speed, this.player.lateral);
+    if (this.mode === 'ranked') {
+      while (this.world.distance - this.runStart >= this.pathNext) {
+        this.path.push(Math.round(this.world.lateral * 100) / 100);
+        this.pathNext += PATH_STEP;
+      }
+    }
     this.world.spinPickups(dt);
     const got = this.world.collect(prev);
     if (got > 0) {
