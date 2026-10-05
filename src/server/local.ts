@@ -5,6 +5,7 @@ import type { Backend, BoardRow, RunSubmission } from './backend';
 
 export class LocalBackend implements Backend {
   readonly online = false;
+  readonly userId = null;
   private best = new Map<string, number>(); // week:league -> best score this session
 
   async signIn(): Promise<boolean> {

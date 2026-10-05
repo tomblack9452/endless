@@ -55,6 +55,8 @@ export interface PassView {
   fraction: number;
   detail: string;
   premium: { text: string; enabled: boolean } | null; // null once owned
+  /** The same for money, in the apps. */
+  buy: string | null;
   tiers: PassTierView[];
   premiumOwned: boolean;
 }
@@ -177,8 +179,9 @@ export class EconomyView {
 
   // --- pass ---
 
-  bindPass(onPremium: () => void): void {
+  bindPass(onPremium: () => void, onBuy: () => void): void {
     $('pass-premium').addEventListener('click', onPremium);
+    $('pass-buy').addEventListener('click', onBuy);
   }
 
   renderPass(v: PassView): void {
@@ -193,6 +196,9 @@ export class EconomyView {
       btn.textContent = v.premium.text;
       btn.disabled = !v.premium.enabled;
     }
+    const buy = $('pass-buy');
+    buy.hidden = !v.premium || !v.buy;
+    buy.textContent = v.buy ?? '';
     const list = $('pass-tiers');
     list.replaceChildren(
       ...v.tiers.map((t) => {

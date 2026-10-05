@@ -31,6 +31,8 @@ import { EconomyView } from './economy/view';
 import { createBackend } from './server/backend';
 import { CloudSave } from './server/sync';
 import { shareCard } from './share';
+import { createStore, type ProductId, type StoreProduct } from './store/store';
+import { storage } from './storage';
 import { fxDistance, fxTime } from './fx';
 import { type Course, COURSES, courseLength, type Environment, ENVIRONMENTS, weeklyCourse } from './courses';
 import { DIVISIONS, divisionReward, emblem, LEAGUES, leagueName, leaguePar, Leagues, LP_PER_DIVISION, weekKey } from './leagues';
@@ -50,6 +52,7 @@ type State = 'title' | 'playing' | 'paused' | 'countdown' | 'crashed' | 'finishe
 
 const DEG = Math.PI / 180;
 const PATH_STEP = 4;
+const OWNED_KEY = 'endless.purchases';
 
 type InfoScreen = 'stats' | 'missions' | 'hangar' | 'record' | 'solo' | 'league' | 'shop' | 'pass' | 'daily';
 
@@ -135,6 +138,12 @@ export class Game {
   private readonly econ = new EconomyView();
   private readonly backend = createBackend();
   private readonly cloud = new CloudSave(this.backend);
+  private readonly store = createStore();
+  private storeProducts: StoreProduct[] = [];
+  /** Shop rows for real-money products, in the order shown ('dev' adds cores in the dev build). */
+  private shopPacks: (ProductId | 'dev' | 'restore')[] = [];
+  /** One-time products already bought. */
+  private ownedProducts = new Set<string>();
   // Ranked: the ship's sideways position every PATH_STEP units (the leaderboard check, and later the ghost).
   private path: number[] = [];
   private pathNext = 0;
@@ -281,7 +290,7 @@ export class Game {
       void this.connect();
     });
     this.econ.bindShop(this.onShopOffer, this.onShopBuy, this.onShopTicket, this.onShopCores);
-    this.econ.bindPass(this.onPassPremium);
+    this.econ.bindPass(this.onPassPremium, () => void this.buyProduct('season_pass'));
     this.econ.bindDaily(() => this.claimLogin());
     this.ui.titleLeague.addEventListener('pointerdown', (e) => e.stopPropagation());
     this.ui.titleLeague.addEventListener('click', () => this.openLeague());
@@ -639,14 +648,36 @@ export class Game {
         button: `${T.coreCost} cores`,
         enabled: this.wallet.cores >= T.coreCost,
       },
-      cores: import.meta.env.DEV
-        ? [{ label: 'dev: add cores (purchases stand-in)', button: '+500', enabled: true }]
-        : [{ label: 'packs of cores arrive with the app store release', button: 'soon', enabled: false }],
+      cores: this.coreRows(),
     });
     this.player.reset();
     this.player.setVisible(true);
     this.trail.setVisible(true);
     this.openInfo('shop');
+  }
+
+  /** The shop's real-money rows: store products in the apps, a note on the web. */
+  private coreRows(): { label: string; button: string; enabled: boolean }[] {
+    const rows: { label: string; button: string; enabled: boolean }[] = [];
+    this.shopPacks = [];
+    const price = new Map(this.storeProducts.map((p) => [p.id, p.price]));
+    for (const p of CONFIG.economy.store.products) {
+      const cost = price.get(p.id);
+      if (!cost || 'pass' in p || ('once' in p && this.ownedProducts.has(p.id))) continue;
+      const label = 'once' in p ? `starter pack · ${formatScore(p.cores)} cores, ${p.tickets} tickets and ${rewardText({ look: p.look })}` : `${formatScore(p.cores)} cores`;
+      rows.push({ label, button: cost, enabled: true });
+      this.shopPacks.push(p.id);
+    }
+    if (this.store.available) {
+      rows.push({ label: 'bought on another device?', button: 'restore', enabled: true });
+      this.shopPacks.push('restore');
+    }
+    if (import.meta.env.DEV) {
+      rows.push({ label: 'dev: add cores (purchases stand-in)', button: '+500', enabled: true });
+      this.shopPacks.push('dev');
+    }
+    if (rows.length === 0) rows.push({ label: 'packs of cores come with the iOS and Android apps', button: 'soon', enabled: false });
+    return rows;
   }
 
   /** Tap a shop look: try it on the ship (tap again to take it off). */
@@ -692,10 +723,13 @@ export class Game {
   }
 
   /** Cores packs: real purchases come with the store (stage D); the dev build adds them free. */
-  private onShopCores = (): void => {
-    if (!import.meta.env.DEV) return;
-    this.devAddCores(500);
-    this.openShop();
+  private onShopCores = (i: number): void => {
+    const pack = this.shopPacks[i];
+    if (pack === 'dev') {
+      this.devAddCores(500);
+      this.openShop();
+    } else if (pack === 'restore') void this.restorePurchases();
+    else if (pack) void this.buyProduct(pack);
   };
 
   private openPass(): void {
@@ -705,12 +739,14 @@ export class Game {
     const tier = this.pass.tier;
     const s = seasonAt(now);
     const maxed = tier >= P.tiers;
+    const passPrice = this.storeProducts.find((p) => p.id === 'season_pass')?.price;
     this.econ.renderPass({
       big: maxed ? 'complete' : String(P.xpPerTier - (this.pass.xp % P.xpPerTier)),
       goal: maxed ? `all ${P.tiers} tiers` : `xp to tier ${tier + 1}`,
       fraction: this.pass.tierFraction,
       detail: `season ${s.season} · tier ${tier} of ${P.tiers} · ends in ${formatWait(s.end - now)}`,
       premium: this.pass.premium ? null : { text: `unlock premium · ${formatScore(P.premiumCores)} cores`, enabled: this.wallet.cores >= P.premiumCores },
+      buy: passPrice ? `or unlock for ${passPrice}` : null,
       premiumOwned: this.pass.premium,
       tiers: Array.from({ length: P.tiers }, (_, i) => ({
         tier: i + 1,
@@ -844,13 +880,64 @@ export class Game {
 
   /** Sign in and sync with the server, if there is one (see src/server). */
   private async connect(): Promise<void> {
-    if (!(await this.backend.signIn())) return;
-    if (await this.cloud.start()) {
-      location.reload(); // the cloud save is newer: start again from it
+    if (await this.backend.signIn()) {
+      if (await this.cloud.start()) {
+        location.reload(); // the cloud save is newer: start again from it
+        return;
+      }
+      await this.wallet.link(this.backend);
+      this.refreshTitle();
+    }
+    this.ownedProducts = new Set(JSON.parse((await storage.get(OWNED_KEY)) ?? '[]') as string[]);
+    await this.store.start(this.backend.userId);
+    this.storeProducts = await this.store.products();
+    if (this.infoOpen === 'shop') this.openShop();
+  }
+
+  /** Buy a real-money product through the app store, then deliver it. */
+  private async buyProduct(id: ProductId): Promise<void> {
+    const result = await this.store.buy(id);
+    if (result === 'cancelled') return;
+    if (result === 'failed') {
+      this.ui.showNotice('purchase didn\'t go through. nothing was charged');
       return;
     }
-    await this.wallet.link(this.backend);
+    const p = CONFIG.economy.store.products.find((x) => x.id === id)!;
+    const lines: string[] = [];
+    if ('cores' in p) {
+      // With the server, the store's webhook pays the cores there: take its balance.
+      if (this.backend.online) {
+        lines.push(`+${formatScore(p.cores)} cores`);
+        window.setTimeout(() => void this.wallet.link(this.backend).then(() => this.refreshTitle()), 2500);
+      } else lines.push(...this.grant({ cores: p.cores }));
+    }
+    if ('tickets' in p) lines.push(...this.grant({ tickets: p.tickets, look: p.look }));
+    if ('pass' in p && !this.pass.premium) lines.push(...this.pass.unlockPremium().flatMap((r) => this.grant(r)), 'season pass premium');
+    if ('once' in p) {
+      this.ownedProducts.add(id);
+      void storage.set(OWNED_KEY, JSON.stringify([...this.ownedProducts]));
+    }
+    this.ui.celebrate([{ kicker: 'thank you', icon: GIFT_ICON, name: 'purchase complete', lines: mergeCredits(lines) }]);
+    this.sound.power();
     this.refreshTitle();
+    if (this.infoOpen === 'shop') this.openShop();
+    if (this.infoOpen === 'pass') this.openPass();
+  }
+
+  /** Restore one-time purchases on a new install (cores come back with the cloud save). */
+  private async restorePurchases(): Promise<void> {
+    const ids = await this.store.restore();
+    let n = 0;
+    for (const id of ids) {
+      const p = CONFIG.economy.store.products.find((x) => x.id === id);
+      if (!p || !('once' in p) || this.ownedProducts.has(id)) continue;
+      this.ownedProducts.add(id);
+      if ('look' in p) this.grant({ look: p.look });
+      n++;
+    }
+    void storage.set(OWNED_KEY, JSON.stringify([...this.ownedProducts]));
+    this.ui.showNotice(n > 0 ? `restored ${n} purchase${n === 1 ? '' : 's'}` : 'nothing to restore');
+    this.openShop();
   }
 
   /** A picture of this run for the share sheet. */

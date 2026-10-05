@@ -27,6 +27,8 @@ export interface BoardRow {
 export interface Backend {
   /** True when talking to a real server. */
   readonly online: boolean;
+  /** The signed-in account's id (the store buys as this account), or null. */
+  readonly userId: string | null;
   /** Sign in (or restore the session). Resolves false if the server can't be reached. */
   signIn(): Promise<boolean>;
   /** The cloud save: every saved key, and when it was written (ms), or null if none. */

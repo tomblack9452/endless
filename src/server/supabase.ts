@@ -22,6 +22,10 @@ export class SupabaseBackend implements Backend {
   readonly online = true;
   private session: Session | null = null;
 
+  get userId(): string | null {
+    return this.session?.user ?? null;
+  }
+
   constructor(
     private readonly url: string,
     private readonly key: string,
