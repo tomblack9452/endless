@@ -62,6 +62,7 @@ const SPAN = W * 2;
 const LANE = TH.lane.halfWidth;
 const FLOOR_ROWS = 512; // rows of floor history kept for fall checks
 const PIT_LIP = 0.3;
+const CHASM_INSET = 1.4; // the drop starts this far in from the bridge ends
 const BRIDGE_JUMP = 0.8; // a bridge edge moving more than this in a row has jumped, not bent // pit sides: a thin steel lip, then black
 
 /** Open-ground prop kinds. */
@@ -1497,7 +1498,9 @@ export class World {
       this.chasmEnd = this.chasmStart + len;
       this.holeAt = this.chasmStart + 4;
       this.holeUntil = -Infinity;
-      terrain.addPit(this.chasmStart, this.chasmEnd);
+      // The ground drops away a little inside the first and last planks, so the bridge
+      // rests on solid ground at each end instead of hovering over the start of the drop.
+      terrain.addPit(this.chasmStart + CHASM_INSET, this.chasmEnd - CHASM_INSET);
       // Some bridges climb or dip on their way across.
       if (kind !== 2 && rand() < C.riseChance) {
         const lvl = terrain.level - this.themeLevel;
@@ -1611,7 +1614,7 @@ export class World {
     }
     // A lip of rock along each rim, either side of the bridge.
     if (first || this.chasmEnd - d < STEP) {
-      const edge = first ? d - STEP / 2 : d + STEP / 2;
+      const edge = first ? this.chasmStart + CHASM_INSET - 0.25 : this.chasmEnd - CHASM_INSET + 0.25;
       const lip = (x0: number, x1: number) => {
         this.greebles.nextColor = Decor.Cliff;
         this.greebles.spawn((x0 + x1) / 2 - this.shipX, -0.6, edge, x1 - x0, 0.62, 0.5, 0, false, false, 0, 0, false);
