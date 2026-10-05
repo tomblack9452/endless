@@ -154,10 +154,9 @@ interface Saved {
 const KEY = 'endless.ranked';
 const HISTORY = 500;
 
-function localDate(ms: number): string {
-  const d = new Date(ms);
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+/** The UTC date as YYYY-MM-DD: the day (double-XP runs) turns over for everyone at once. */
+function utcDate(ms: number): string {
+  return new Date(ms).toISOString().slice(0, 10);
 }
 
 export class Ranked {
@@ -193,14 +192,14 @@ export class Ranked {
 
   /** Double-XP runs left today. */
   bonusRunsLeft(now = Date.now()): number {
-    return this.day.date === localDate(now) ? Math.max(0, DAILY_BONUS_RUNS - this.day.runs) : DAILY_BONUS_RUNS;
+    return this.day.date === utcDate(now) ? Math.max(0, DAILY_BONUS_RUNS - this.day.runs) : DAILY_BONUS_RUNS;
   }
 
   /** Fold a finished ranked or daily run in. */
   record(mode: RunMode, score: number, level: number, seed: number, now = Date.now(), target = DEFAULT_TARGET, week?: string): RankedResult {
     const rankBefore = this.rank;
     const skillBefore = this.skill;
-    const today = localDate(now);
+    const today = utcDate(now);
     if (this.day.date !== today) this.day = { date: today, runs: 0 };
     let xp = xpFor(score);
     const doubled = xp > 0 && this.day.runs < DAILY_BONUS_RUNS;
@@ -220,7 +219,7 @@ export class Ranked {
 
   /** Best ranked score today, in the last 7 days, and ever (from the kept history). */
   bests(now = Date.now()): { today: number; week: number; all: number } {
-    const today = localDate(now);
+    const today = utcDate(now);
     const weekAgo = now - 7 * 24 * 3600 * 1000;
     let t = 0;
     let w = 0;
@@ -229,7 +228,7 @@ export class Ranked {
       if (h.mode !== 'ranked') continue;
       a = Math.max(a, h.score);
       if (h.at >= weekAgo) w = Math.max(w, h.score);
-      if (localDate(h.at) === today) t = Math.max(t, h.score);
+      if (utcDate(h.at) === today) t = Math.max(t, h.score);
     }
     return { today: t, week: w, all: a };
   }

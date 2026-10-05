@@ -77,11 +77,9 @@ function blankStats(): Stats {
   return { runs: 0, distance: 0, seconds: 0, bestScore: 0, bestLevel: 0, nearMisses: 0, bestChain: 0, pickups: 0, crashes: {} };
 }
 
-/** Local calendar date as YYYY-MM-DD: the daily course changes at your midnight. */
+/** The UTC calendar date as YYYY-MM-DD (the same day for everyone). */
 export function today(): string {
-  const d = new Date();
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  return new Date().toISOString().slice(0, 10);
 }
 
 /** Same seed for everyone on the same date (FNV-1a hash of the date). */
