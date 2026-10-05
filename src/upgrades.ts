@@ -78,19 +78,36 @@ const KEY = 'endless.upgrades';
 
 export class Upgrades {
   tiers: Partial<Record<SystemId, number>> = {};
+  /** Bought systems switched off in the hangar (they keep their tier). */
+  private off = new Set<SystemId>();
 
   async load(): Promise<void> {
     const raw = await storage.get(KEY);
     if (!raw) return;
     try {
-      this.tiers = JSON.parse(raw) as Partial<Record<SystemId, number>>;
+      const s = JSON.parse(raw) as { tiers?: Partial<Record<SystemId, number>>; off?: SystemId[] } & Partial<Record<SystemId, number>>;
+      // Older saves were just the tiers.
+      this.tiers = s.tiers ?? (s as Partial<Record<SystemId, number>>);
+      this.off = new Set(s.off ?? []);
     } catch {
       // Corrupt value: start fresh.
     }
   }
 
   save(): void {
-    void storage.set(KEY, JSON.stringify(this.tiers));
+    void storage.set(KEY, JSON.stringify({ tiers: this.tiers, off: [...this.off] }));
+  }
+
+  isOn(id: SystemId): boolean {
+    return !this.off.has(id);
+  }
+
+  /** Switch a bought system on or off. */
+  toggle(id: SystemId): void {
+    if (this.tier(id) === 0) return;
+    if (this.off.has(id)) this.off.delete(id);
+    else this.off.add(id);
+    this.save();
   }
 
   tier(id: SystemId): number {
@@ -113,7 +130,10 @@ export class Upgrades {
     this.save();
   }
 
+  /** The ship's systems with switched-off ones left out. */
   stats(): ShipStats {
-    return statsFor(this.tiers);
+    const on: Partial<Record<SystemId, number>> = {};
+    for (const [id, t] of Object.entries(this.tiers) as [SystemId, number][]) if (this.isOn(id)) on[id] = t;
+    return statsFor(on);
   }
 }

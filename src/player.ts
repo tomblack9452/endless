@@ -110,7 +110,7 @@ function shipGeometry(id: ShipId): BufferGeometry {
   return g;
 }
 
-// --- dressing: markings, fins and the wing decal --------------------------------
+// --- dressing: markings, fins and the wing decals ------------------------------
 
 const DOWN = new Vector3(0, -1, 0);
 const UP_Z = new Vector3(0, 0, 1);
@@ -130,79 +130,92 @@ function surface(geometry: BufferGeometry, x: number, z: number): { y: number; n
   return { y: hit.point.y, normal };
 }
 
-/** A quad in hull space: `a` runs tail (0) to nose (1), `b` across (-1 left edge, 1 right edge). */
-type Quad = [number, number][];
-
-const MARKINGS: Record<Exclude<Marking, 'none'>, Quad[]> = {
-  stripe: [[[0.04, -0.16], [0.04, 0.16], [0.92, 0.16], [0.92, -0.16]]],
-  twin: [
-    [[0.04, -0.55], [0.04, -0.34], [0.85, -0.34], [0.85, -0.55]],
-    [[0.04, 0.34], [0.04, 0.55], [0.85, 0.55], [0.85, 0.34]],
-  ],
-  split: [[[0.01, -0.97], [0.01, 0], [0.97, 0], [0.97, -0.97]]],
-  twotone: [[[0.01, -0.97], [0.01, 0.97], [0.38, 0.97], [0.38, -0.97]]],
-  chevron: [
-    [[0.3, -0.85], [0.45, -0.85], [0.66, 0], [0.51, 0]],
-    [[0.51, 0], [0.66, 0], [0.45, 0.85], [0.3, 0.85]],
-  ],
-};
-
 interface Frame {
   nose: Vector3;
   left: Vector3;
 }
 
-/** Hull space (a, b) to ship x, z. */
+/** Hull space to ship x, z: `a` runs tail (0) to nose (1), `b` across (-1 left edge, 1 right edge). */
 function hullPoint(f: Frame, a: number, b: number): [number, number] {
   const tailZ = f.left.z;
   const halfW = Math.abs(f.left.x);
   return [b * halfW * (1 - a), tailZ + (f.nose.z - tailZ) * a];
 }
 
-/** Lay a quad onto the hull's top surface as a grid of small triangles. */
-function drape(geometry: BufferGeometry, f: Frame, q: Quad, out: number[]): void {
-  const N = 6;
-  const at = (s: number, t: number): number[] | null => {
-    const a0 = q[0][0] + (q[1][0] - q[0][0]) * s;
-    const b0 = q[0][1] + (q[1][1] - q[0][1]) * s;
-    const a1 = q[3][0] + (q[2][0] - q[3][0]) * s;
-    const b1 = q[3][1] + (q[2][1] - q[3][1]) * s;
-    const [x, z] = hullPoint(f, a0 + (a1 - a0) * t, b0 + (b1 - b0) * t);
-    const hit = surface(geometry, x, z);
-    return hit ? [x, hit.y + SURFACE_LIFT, z] : null;
-  };
-  for (let i = 0; i < N; i++) {
-    for (let j = 0; j < N; j++) {
-      const p00 = at(i / N, j / N);
-      const p10 = at((i + 1) / N, j / N);
-      const p11 = at((i + 1) / N, (j + 1) / N);
-      const p01 = at(i / N, (j + 1) / N);
-      if (!p00 || !p10 || !p11 || !p01) continue;
-      out.push(...p00, ...p10, ...p11, ...p00, ...p11, ...p01);
-    }
+/** Marking ids for the hull shader (0 = none). */
+const MARKING_ID: Record<Marking, number> = { none: 0, stripe: 1, twin: 2, split: 3, twotone: 4, chevron: 5 };
+
+/**
+ * Markings are painted by the hull's own shader, worked out per pixel from
+ * the point's place on the hull (the same tail-to-nose / edge-to-edge space as
+ * hullPoint), so they follow every hull shape exactly with clean edges.
+ */
+function addMarkings(mat: MeshBasicMaterial, uniforms: Record<string, { value: unknown }>): void {
+  mat.onBeforeCompile = (shader) => {
+    Object.assign(shader.uniforms, uniforms);
+    shader.vertexShader = shader.vertexShader
+      .replace('#include <common>', '#include <common>\nvarying vec3 vShip;')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvShip = position;');
+    shader.fragmentShader = shader.fragmentShader
+      .replace(
+        '#include <common>',
+        `#include <common>
+varying vec3 vShip;
+uniform float uMark;
+uniform vec3 uMarkColor;
+uniform vec3 uFrame; // nose z, tail z, half width`,
+      )
+      .replace(
+        '#include <color_fragment>',
+        `#include <color_fragment>
+if (uMark > 0.5) {
+  float a = clamp((uFrame.y - vShip.z) / (uFrame.y - uFrame.x), 0.0, 1.0);
+  float b = vShip.x / max(uFrame.z * (1.0 - a), 0.02);
+  float ab = abs(b);
+  float m = 0.0;
+  if (uMark < 1.5) m = step(ab, 0.16) * step(0.04, a) * step(a, 0.92);
+  else if (uMark < 2.5) m = step(0.32, ab) * step(ab, 0.56) * step(0.04, a) * step(a, 0.85);
+  else if (uMark < 3.5) m = step(b, 0.0);
+  else if (uMark < 4.5) m = step(a, 0.36);
+  else {
+    float lo = 0.5 - 0.22 * ab / 0.85;
+    m = step(ab, 0.85) * step(lo, a) * step(a, lo + 0.14);
   }
+  diffuseColor.rgb = mix(diffuseColor.rgb, uMarkColor, m);
+}`,
+      );
+  };
 }
 
 function finGeometry(geometry: BufferGeometry, f: Frame, fin: Exclude<Fin, 'none'>): BufferGeometry {
   const pos: number[] = [];
   const tri = (a: Vector3, b: Vector3, c: Vector3) => pos.push(a.x, a.y, a.z, b.x, b.y, b.z, c.x, c.y, c.z);
   const len = f.left.z - f.nose.z;
+  const halfW = Math.abs(f.left.x);
   const on = (x: number, z: number) => new Vector3(x, (surface(geometry, x, z)?.y ?? 0) - 0.002, z);
-  if (fin === 'tail' || fin === 'twin') {
-    const xs = fin === 'tail' ? [0] : [-Math.abs(f.left.x) * 0.4, Math.abs(f.left.x) * 0.4];
-    for (const x of xs) {
-      const back = on(x * 0.8, f.left.z - len * 0.06);
-      const front = on(x, f.left.z - len * 0.4);
-      const top = back.clone().add(new Vector3(0, fin === 'tail' ? 0.15 : 0.11, len * 0.02));
-      tri(back, front, top);
-    }
+  /** A wedge fin: a blade with a back face, so the chase camera sees it. */
+  const wedge = (x: number, lean: number, height: number) => {
+    const front = on(x, f.left.z - len * 0.42);
+    const back = on(x, f.left.z - len * 0.08);
+    const bl = back.clone().add(new Vector3(-0.035, 0, 0));
+    const br = back.clone().add(new Vector3(0.035, 0, 0));
+    const top = back.clone().add(new Vector3(lean, height, len * 0.03));
+    tri(front, bl, top);
+    tri(front, top, br);
+    tri(bl, br, top);
+  };
+  if (fin === 'tail') wedge(0, 0, 0.26);
+  else if (fin === 'twin') {
+    // Canted outwards so their faces catch the light from above.
+    wedge(-halfW * 0.42, -0.1, 0.19);
+    wedge(halfW * 0.42, 0.1, 0.19);
   } else {
     for (const side of [-1, 1]) {
-      const tip = new Vector3(Math.abs(f.left.x) * side, 0, f.left.z);
+      const tip = new Vector3(halfW * side, 0, f.left.z);
       const along = tip.clone().lerp(new Vector3(0, 0, f.nose.z), 0.28);
       const base0 = on(tip.x * 0.97, tip.z - 0.01);
       const base1 = on(along.x, along.z);
-      const top = base0.clone().add(new Vector3(side * 0.035, 0.1, 0));
+      const top = base0.clone().add(new Vector3(side * 0.05, 0.14, 0));
       tri(base0, base1, top);
     }
   }
@@ -247,7 +260,16 @@ export class Player {
   private readonly matShadow: MeshBasicMaterial;
   // Dressing (see looks.ts), all children of the body so they bank and blink with it.
   private readonly decor = new Group();
-  private readonly matMarking = new MeshBasicMaterial({ side: DoubleSide, polygonOffset: true, polygonOffsetFactor: -2 });
+  private readonly markColor = new Color();
+  // Fins get their own material: the hull's shade, darker, and never marked.
+  private readonly matFin = new MeshBasicMaterial({ side: DoubleSide });
+  private readonly markUniforms = {
+    uMark: { value: 0 },
+    uMarkColor: { value: this.markColor },
+    uFrame: { value: new Vector3() },
+  };
+  /** Engine flames mount here (see trail.ts): straight back from the tail, banking with the hull. */
+  readonly engine = new Group();
   private readonly matDecal: MeshBasicMaterial;
   private readonly decalTexture: CanvasTexture;
   private shape: ShipId = 'dart';
@@ -274,9 +296,11 @@ export class Player {
       depthWrite: false,
     });
 
+    addMarkings(this.matTop, this.markUniforms);
+    addMarkings(this.matShade, this.markUniforms);
     this.body = new Mesh(shipGeometry('dart'), [this.matTop, this.matShade]);
     this.root.add(this.body);
-    this.body.add(this.decor);
+    this.body.add(this.decor, this.engine);
     const canvas = document.createElement('canvas');
     canvas.width = canvas.height = 128;
     this.decalTexture = new CanvasTexture(canvas);
@@ -344,28 +368,31 @@ export class Player {
     const geometry = this.body.geometry;
     const s = shipShape(this.shape);
     const frame: Frame = { nose: s.outline[0], left: s.outline[1] };
-    if (this.marking !== 'none') {
-      const pos: number[] = [];
-      for (const q of MARKINGS[this.marking]) drape(geometry, frame, q, pos);
-      const g = new BufferGeometry();
-      g.setAttribute('position', new Float32BufferAttribute(pos, 3));
-      this.decor.add(new Mesh(g, this.matMarking));
-    }
-    if (this.fin !== 'none') this.decor.add(new Mesh(finGeometry(geometry, frame, this.fin), this.matShade));
+    this.markUniforms.uMark.value = MARKING_ID[this.marking];
+    this.markUniforms.uFrame.value.set(frame.nose.z, frame.left.z, Math.abs(frame.left.x));
+    // The engine sits at the tail line, centred (wing tips: see engineSpan()).
+    this.engine.position.set(0, 0, frame.left.z);
+    this.engineHalfSpan = Math.abs(frame.left.x);
+    if (this.fin !== 'none') this.decor.add(new Mesh(finGeometry(geometry, frame, this.fin), this.matFin));
     if (this.decalSvg) {
-      const [x, z] = hullPoint(frame, 0.32, -0.55);
-      const hit = surface(geometry, x, z);
-      if (hit) {
-        svgTexture(this.decalSvg, this.decalTexture);
-        const size = Math.min(0.11, Math.abs(frame.left.x) * 0.45);
+      svgTexture(this.decalSvg, this.decalTexture);
+      // One on each wing, as big as the wing allows.
+      const size = Math.min(0.17, Math.abs(frame.left.x) * 0.6);
+      for (const side of [-1, 1]) {
+        const [x, z] = hullPoint(frame, 0.44, side * 0.46); // forward of the two-tone band
+        const hit = surface(geometry, x, z);
+        if (!hit) continue;
         const decal = new Mesh(new PlaneGeometry(size, size), this.matDecal);
-        decal.position.set(x, hit.y + SURFACE_LIFT * 1.5, z);
+        decal.position.set(x, hit.y + SURFACE_LIFT, z);
         decal.quaternion.setFromUnitVectors(UP_Z, hit.normal);
-        decal.rotateZ(Math.PI); // nose up the insignia, seen from behind
+        decal.rotateZ(Math.PI); // upright as seen from behind
         this.decor.add(decal);
       }
     }
   }
+
+  /** Half the distance between the wing tips (engine flames sit at the tips for ion). */
+  engineHalfSpan: number = S.halfWidth;
 
   /** Swap the ship's shape (cosmetic). */
   setShape(id: ShipId): void {
@@ -394,9 +421,10 @@ export class Player {
     }
     // Markings and decal contrast with the hull: dark on light paint, light on dark.
     const light = luma(this.matTop.color) > 0.42;
-    if (light) this.matMarking.color.copy(this.matTop.color).multiplyScalar(0.38);
-    else this.matMarking.color.copy(this.matTop.color).lerp(WHITE, 0.62);
-    this.matDecal.color.copy(this.matMarking.color);
+    if (light) this.markColor.copy(this.matTop.color).multiplyScalar(0.38);
+    else this.markColor.copy(this.matTop.color).lerp(WHITE, 0.62);
+    this.matDecal.color.copy(this.markColor);
+    this.matFin.color.copy(this.matShade.color).multiplyScalar(0.6);
     this.matShadow.color.copy(this.palette.text);
   }
 
