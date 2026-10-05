@@ -9,6 +9,8 @@ Everything is procedural: the courses, the textures, the props, the sound
 effects and the music. There are no image or audio files apart from the app
 icons.
 
+Play it at https://tomblack9452.github.io/endless/.
+
 ## Contents
 
 - [Running it](#running-it)
@@ -16,8 +18,11 @@ icons.
 - [How it plays](#how-it-plays)
 - [Themes and biomes](#themes-and-biomes)
 - [Scoring, boost and power-ups](#scoring-boost-and-power-ups)
-- [Missions and the hangar](#missions-and-the-hangar)
-- [Other modes](#other-modes)
+- [Modes](#modes)
+- [Ranked](#ranked)
+- [Solo: sectors and stars](#solo-sectors-and-stars)
+- [Credits, upgrades and looks](#credits-upgrades-and-looks)
+- [Missions](#missions)
 - [Settings](#settings)
 - [Sound](#sound)
 - [How it works](#how-it-works)
@@ -62,7 +67,8 @@ Accept the certificate warning once on the phone.
 | Steer | Drag anywhere, tap the sides, or tilt | Arrow keys or A / D |
 | Boost | Hold the boost corner (bottom right, or left in settings) | Shift, W, Up or Space |
 | Pause | `pause`, top right | Esc or P |
-| Start / retry | Tap | Space or Enter |
+| Start | `ranked` or `solo` on the title screen | Space or Enter (ranked) |
+| Retry | Tap | Space or Enter |
 
 Tilt steering is calibrated to however you're holding the phone when a run
 starts, with a small deadzone. On iOS the game asks for motion permission on
@@ -170,7 +176,109 @@ Events change the look and sound only, never the course.
   - **Magnet** (purple): pulls boost pickups ahead towards you for 9 s.
   - **Slow-mo** (green): drops you to 62% speed for 6 s.
 
-## Missions and the hangar
+## Modes
+
+| | Ranked | Solo | Daily run |
+|---|---|---|---|
+| Starts at | Level 1 | Any sector you've reached | Level 1 |
+| Course | Fresh every run | Fresh every run | Same for everyone that day |
+| Ship | Standard | Your upgrades | Standard |
+| Assist mode | Off | Allowed | Off |
+| Earns | XP, skill, credits | Stars, credits at half rate | XP, skill, credits |
+| Best score | Ranked best | Solo best | Daily best |
+
+Ranked and daily runs always fly the standard ship, so their scores are
+comparable between players. That's the ground work for leaderboards (best of
+the day, week and all time); every ranked and daily run is already kept with
+its score, date and seed. Looks are allowed everywhere, because every hull
+shares one hitbox.
+
+## Ranked
+
+Ranks follow the Halo 3 ladder, and like Halo 3 there are two numbers:
+
+- **XP:** every ranked or daily run earns 1 + 1 per 400 points (nothing for
+  a run under 500). Your first 3 runs each day earn double.
+- **Skill (1-50):** each run is compared with the par score for your current
+  skill. Par is 1,200 at skill 1 and rises 7.5% a level (about 41,000 at 50).
+  Beat par for +1, beat it by half again for +2, score under half of it for -1.
+
+A rank needs enough XP **and** a high enough highest-ever skill, so your rank
+never drops even when your skill does.
+
+| Rank | XP | Highest skill |
+|---|---|---|
+| Recruit | 0 | - |
+| Apprentice, G2 | 10, 25 | - |
+| Private, G2 | 50, 80 | - |
+| Corporal, G2 | 120, 175 | - |
+| Sergeant, G2, G3 | 250, 350, 450 | 5, 7, 9 |
+| Gunnery Sergeant, G2, G3 | 600, 800, 1,000 | 11, 13, 15 |
+| Lieutenant, G2, G3 | 1,300, 1,650, 2,000 | 17, 19, 21 |
+| Captain, G2, G3 | 2,500, 3,100, 3,750 | 23, 25, 27 |
+| Major, G2, G3 | 4,500, 5,400, 6,400 | 29, 31, 33 |
+| Commander, G2, G3 | 7,500, 9,000, 10,500 | 35, 36, 37 |
+| Colonel, G2, G3 | 12,500, 15,000, 17,500 | 39, 40, 41 |
+| Brigadier, G2, G3 | 20,000, 24,000, 28,000 | 43, 44, 45 |
+| General, G2, G3, G4 | 33,000, 38,000, 44,000, 50,000 | 47, 48, 49, 50 |
+
+General Grade 4 is roughly 1,200 strong runs, and skill 50 needs consistent
+40,000+ point runs. Every promotion pays credits (50 x the new rank's place
+on the ladder) and shows on the game-over screen.
+
+Insignia are drawn in code: chevrons for enlisted ranks (with rockers for
+sergeants), bars and diamonds for officers, stars for generals, and pips for
+grades. The **service record** (tap your rank on the title screen) shows
+your rank, XP bar, skill, par, what the next rank needs, double-XP runs left
+today, your best today, this week and ever, recent runs and the whole ladder.
+
+## Solo: sectors and stars
+
+A **sector** is one theme's three levels: alien ground (levels 1-3), canyon
+(4-6), interior (7-9), ice field (10-12) and on through the loops. Reaching a
+sector in any mode unlocks it on the solo sector map. Starting a solo run
+part-way gives you half the points you skipped.
+
+Each sector has three stars, earned in any mode when you leave it:
+
+1. clear it
+2. clear it without taking a hit (a shield save counts as a hit)
+3. hit a near-miss chain of x5 in it (x6 in loop 2, rising each loop)
+
+Each new star is worth 25 credits, and star totals unlock looks.
+
+## Credits, upgrades and looks
+
+**Credits** come from runs (1 per 100 points in ranked and daily, 1 per 200
+in solo), promotions and stars. Spend them in the **hangar**.
+
+**Upgrades** (solo only), five tiers each at 150 / 400 / 1,000 / 2,500 /
+6,000 credits. Tier 4 needs Sergeant and tier 5 needs Lieutenant.
+
+| System | Per tier | At tier 5 |
+|---|---|---|
+| Thrusters | Boost lasts 8% longer | +40% |
+| Capacitor | Boost refills 10% faster | +50% |
+| Tractor beam | Pickup reach +12%, magnet +1 s | +60%, +5 s |
+| Deflector | Shield grace +0.2 s | Every run starts shielded |
+| Stabilisers | Steering 3% quicker | +15% |
+| Scanner | Power-ups 8% more often | +40% |
+
+**Looks** (any mode). Tap a row in the hangar's ship tab to cycle it; locked
+items are tried on the ship with a buy button or what unlocks them.
+
+| Slot | Options |
+|---|---|
+| Hull | dart, wing, needle, manta (missions), arrow (1,500), talon (4,000) |
+| Paint | standard, slate, crimson, cobalt, olive, sand, white, carbon (credits), gold (Colonel), chrome (General) |
+| Markings | stripe, twin stripes, split (credits), chevron (10 stars), two-tone (25 stars) |
+| Fins | tail fin, winglets (credits), twin fins (15 stars) |
+| Engine colour | amber, cyan, violet, green, white (credits), red (Sergeant) |
+| Wing decal | your rank insignia |
+
+Missions still unlock trail styles and world colour palettes.
+
+## Missions
 
 Three missions are active at a time, drawn from:
 
@@ -186,24 +294,17 @@ Three missions are active at a time, drawn from:
 
 Each one gets harder every time you complete it.
 
-Every completed mission unlocks the next cosmetic, in a fixed order. You
-pick your cosmetics in the **hangar**:
+Level missions only count runs that start from level 1. Every completed
+mission unlocks the next item, in a fixed order:
 
-- **Ships:** dart, wing, needle, manta. All share the same hitbox.
-- **Trails:** none, line, dashes, ion. The trail traces your actual path.
-- **Colours:** bone, tidewater, clay, lichen, ink, ember. At each loop of
-  the themes the world fades to your next unlocked palette.
+- **Hulls:** wing, needle, manta.
+- **Trails:** line, dashes, ion. Short engine flames behind the ship.
+- **World colours:** tidewater, clay, lichen, ink, ember. At each loop of the
+  themes the world fades to your next unlocked palette.
 
-## Other modes
-
-- **Checkpoints:** once you've reached the canyon or the interior, the
-  title screen lets you start there. Checkpoint runs score from zero.
-- **Daily run:** the same course for everyone on a given date, built from a
-  hash of the date. It keeps its own best.
-- **Stats:** runs, time played, distance, best score, furthest level, best
-  chain, near misses, pickups, and where you crash most.
-- **Seeds:** every run has a seed, and the same seed always builds the same
-  course.
+**Stats** (title screen) show runs, time played, distance, ranked and solo
+bests, furthest level, best chain, near misses, pickups, and where you crash
+most. Every run has a seed, and the same seed always builds the same course.
 
 ## Settings
 
@@ -234,6 +335,9 @@ Everything is synthesised with the Web Audio API on the first tap.
   - open ground: major pentatonic
   - canyon: minor pentatonic
   - interior: Phrygian, with a metallic FM lead
+  - ice field: Lydian, with the bell lead
+  - volcanic plain: Phrygian dominant
+  - asteroid belt: Mixolydian pentatonic, with the bell lead
 - Tempo follows speed, density follows level and boost, and brightness
   follows the time of day.
 - Near-miss chimes climb the current scale.
@@ -295,8 +399,12 @@ manifest, so the game installs to a home screen and works offline.
 | `src/blockTextures.ts` | Procedural metal textures |
 | `src/speedLines.ts` | Boost streaks |
 | `src/input.ts` | Drag, side taps, tilt, keyboard, boost control |
-| `src/missions.ts`, `src/cosmetics.ts` | Missions and unlocks |
-| `src/progress.ts` | Stats, checkpoints, daily seed |
+| `src/missions.ts`, `src/cosmetics.ts` | Missions and mission unlocks |
+| `src/ranks.ts` | Rank ladder, XP, skill, par, insignia, run history |
+| `src/wallet.ts` | Credits |
+| `src/upgrades.ts` | Ship upgrade systems and the standard ship |
+| `src/looks.ts` | Ship looks catalogue and ownership |
+| `src/progress.ts` | Stats, sectors, stars, daily seed |
 | `src/settings.ts` | Settings table and storage |
 | `src/hints.ts`, `src/haptics.ts` | First-run hints, vibration |
 | `src/rng.ts` | Seeded random numbers (mulberry32) |
@@ -304,6 +412,7 @@ manifest, so the game installs to a home screen and works offline.
 | `src/ui.ts`, `src/style.css`, `index.html` | HUD and screens |
 | `src/dev.ts` | Dev-only panel |
 | `tests/fairness.test.ts` | Headless survivability test |
+| `tests/ranks.test.ts` | Rank ladder, XP, skill and credit maths |
 | `public/` | Icons, manifest, service worker |
 
 ## Tuning
@@ -316,6 +425,8 @@ Nearly every number lives in `src/config.ts`, grouped by system:
 - `boost` and `powers`: pickups and power-ups
 - `events`, `biomes`, `terrain`: weather, biome looks, hills
 - `assist`: assist mode
+- `sectors`: credits per star (rank, upgrade and look tables live in
+  `ranks.ts`, `upgrades.ts` and `looks.ts`)
 - `audio`: every gain, the music and the engine
 - `render`: pixel ratio and adaptive-resolution thresholds
 
@@ -329,6 +440,10 @@ On the dev server only, a `dev` link opens a panel with:
 - **Invincible** and **full boost** toggles
 - **Replay seed:** replays the last run's course
 - **Ship room:** forces every interior room to one type
+- **Unlock all:** General Grade 4, every sector to loop 9 with all stars,
+  every look, every upgrade maxed and 100,000 credits (saved in that browser)
+- **Reset all progress:** clears ranks, credits, unlocks and stats (keeps
+  settings)
 - an FPS readout with the pixel ratio and draw calls
 
 `window.game` is exposed in dev builds for poking at state from the
@@ -342,6 +457,9 @@ theme across the first two and a half loops. That covers every biome. It
 steers at the normal limit with no boost, and any crash or fall fails the
 test. A guard test checks that a ship that never steers does crash, so the
 harness can't pass by accident.
+
+`tests/ranks.test.ts` checks the rank ladder, that ranks need both XP and
+skill, the XP and skill rules, the length of the grind and credit rates.
 
 ## Deploying
 
