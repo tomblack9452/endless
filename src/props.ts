@@ -176,7 +176,8 @@ export function boulder(): BufferGeometry {
       j = 0.78 + Math.random() * 0.4;
       jitter.set(key, j);
     }
-    pos.setXYZ(i, v.x * j, v.y * j * 0.9, v.z * j);
+    // Narrowed so the shape stays within about its collision radius (ROCK_HIT in world.ts).
+    pos.setXYZ(i, v.x * j * 0.82, v.y * j * 0.9, v.z * j * 0.82);
   }
   return build([part(g, '#ffffff', move(0, 0.6, 0))]); // sunk slightly into the ground
 }
