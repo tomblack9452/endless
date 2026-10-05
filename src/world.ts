@@ -24,7 +24,6 @@ export type ThemeId = 'land' | 'canyon' | 'interior';
 
 /** Power-up kinds: 0 shield, 1 magnet, 2 slow-mo. */
 export type PowerKind = 0 | 1 | 2;
-export const POWER_NAMES = ['shield', 'magnet', 'slow-mo'] as const;
 const THEMES: ThemeId[] = ['land', 'canyon', 'interior'];
 
 const F = CONFIG.field;

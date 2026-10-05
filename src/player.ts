@@ -140,6 +140,11 @@ export class Player {
     this.setVisible(false);
   }
 
+  /** 0 hides the ground shadow (no ground in the asteroid belt), 1 shows it. */
+  setShadowAmount(k: number): void {
+    this.matShadow.opacity = S.shadowOpacity * k; // opacity only: visibility belongs to setVisible/crash
+  }
+
   setShield(on: boolean): void {
     this.shield.visible = on;
   }

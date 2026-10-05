@@ -1,6 +1,5 @@
 import { CONFIG } from '../config';
-import type { ThemeId } from '../world';
-import { Music } from './music';
+import { Music, type MusicId } from './music';
 import { driveCurve, impulseResponse, midiHz, noiseBuffer, pluckEnv, ROOT_MIDI } from './synth';
 
 // Sound design overview
@@ -128,7 +127,7 @@ export class Sound {
     void this.ctx?.resume();
   }
 
-  setTheme(theme: ThemeId): void {
+  setTheme(theme: MusicId): void {
     this.music?.setTheme(theme);
   }
 
@@ -348,7 +347,7 @@ export class Sound {
   }
 
   /** New level: a bell arpeggio from the chord. A theme change adds a falling wash and a sub drop. */
-  level(themeChange: boolean, theme: ThemeId): void {
+  level(themeChange: boolean, theme: MusicId): void {
     const ctx = this.ctx;
     if (!ctx) return;
     const t = ctx.currentTime;
