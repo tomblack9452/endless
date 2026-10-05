@@ -47,9 +47,9 @@ function fly(course: Course): { finished: boolean; at: number; section: string; 
     const speed = speedAt(section.difficulty);
     const steer = Math.max(-1, Math.min(1, (laneAt(world.distance + 3) - hooked.shipX) * 1.5));
     const prev = world.distance;
-    eased += (steer - eased) * (1 - Math.exp(-CONFIG.steering.response * DT));
+    eased += (steer - eased) * (1 - Math.exp(-CONFIG.steering.response * (world.onIce() ? CONFIG.hazards.ice.grip : 1) * DT));
     world.advance(DT, speed, eased * lateralSpeedAt(speed));
-    if (world.overPit() || world.hitTest(prev)) {
+    if (world.overPit() || world.inLava() || world.hitTest(prev)) {
       return { finished: false, at: Math.round(world.distance - start), section: section.name, room: world.roomName };
     }
   }
@@ -146,9 +146,9 @@ describe('solo environments', () => {
             }
           }
           const prev = world.distance;
-          eased += (Math.max(-1, Math.min(1, (target - hooked.shipX) * 1.5)) - eased) * (1 - Math.exp(-CONFIG.steering.response / 60));
+          eased += (Math.max(-1, Math.min(1, (target - hooked.shipX) * 1.5)) - eased) * (1 - Math.exp(-(CONFIG.steering.response * (world.onIce() ? CONFIG.hazards.ice.grip : 1)) / 60));
           world.advance(1 / 60, speed, eased * lateralSpeedAt(speed));
-          crashed = world.overPit() || world.hitTest(prev);
+          crashed = world.overPit() || world.inLava() || world.hitTest(prev);
         }
         expect(crashed, `${env.name}, seed ${seed}`).toBe(false);
       }

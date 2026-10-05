@@ -22,7 +22,7 @@ export const fxTime = { value: 0 };
 /** Distance along the run (gives each instance a fixed phase). */
 export const fxDistance = { value: 0 };
 
-export type FxKind = 'pour' | 'pool' | 'steam' | 'blink' | 'holo' | 'vent' | 'water' | 'tank';
+export type FxKind = 'pour' | 'pool' | 'steam' | 'blink' | 'holo' | 'vent' | 'water' | 'tank' | 'ice';
 
 const COMMON = /* glsl */ `
 uniform float uFxTime;
@@ -65,6 +65,12 @@ const FRAG: Record<FxKind, string> = {
     float wa = sin(vFxLocal.x * 7.0 + uFxTime * 1.3 + vFxPhase * 6.28) * sin(vFxLocal.z * 5.0 - uFxTime * 0.9);
     float glint = smoothstep(0.75, 1.0, wa);
     diffuseColor.rgb *= 0.72 + 0.18 * wa + 0.5 * glint;`,
+  // Ice: a pale sheen, darker cracks and slow glints.
+  ice: `
+    float crack = smoothstep(0.03, 0.0, abs(sin(vFxLocal.x * 9.0 + sin(vFxLocal.z * 7.0) * 1.5) * cos(vFxLocal.z * 6.0 - vFxLocal.x * 2.0)));
+    float glint = smoothstep(0.92, 1.0, sin(vFxLocal.x * 4.0 + vFxLocal.z * 3.0 + uFxTime * 0.6));
+    float edge = smoothstep(0.85, 1.0, length(vFxLocal.xz) * 2.0);
+    diffuseColor.rgb *= 0.95 - crack * 0.25 + glint * 0.35 - edge * 0.12;`,
   // Glass tank: bubbles rising through glowing liquid.
   tank: `
     float rise = fract(vFxLocal.y * 2.5 - uFxTime * 0.7 + vFxPhase + sin(vFxLocal.x * 21.0) * 0.3);
@@ -82,7 +88,7 @@ const FRAG: Record<FxKind, string> = {
  * geometry space the look reads, so unit boxes stretched by instances work.
  */
 export function fxMaterial(kind: FxKind, opts: { transparent?: boolean; opacity?: number; additive?: boolean } = {}): MeshBasicMaterial {
-  const transparent = opts.transparent ?? (kind !== 'pool' && kind !== 'blink' && kind !== 'water');
+  const transparent = opts.transparent ?? (kind !== 'pool' && kind !== 'blink' && kind !== 'water' && kind !== 'ice');
   const m = new MeshBasicMaterial({
     transparent,
     opacity: opts.opacity ?? 1,

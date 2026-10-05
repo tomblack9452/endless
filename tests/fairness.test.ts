@@ -22,7 +22,7 @@ interface Hooked {
   shipX: number;
 }
 
-function drive(seed: number, level: number, autopilot = true, room: RoomId | null = null, seconds = SECONDS): { crashed: boolean; at: number; room: string } {
+function drive(seed: number, level: number, autopilot = true, room: RoomId | null = null, seconds = SECONDS): { crashed: boolean; at: number; room: string; hazards: number } {
   const world = new World(new Scene(), new LivePalette());
   world.devRoom = room;
   const hooked = world as unknown as Hooked;
@@ -58,11 +58,12 @@ function drive(seed: number, level: number, autopilot = true, room: RoomId | nul
     const speed = speedAt(score);
     const steer = autopilot ? Math.max(-1, Math.min(1, (laneAt(world.distance + 3) - hooked.shipX) * 1.5)) : 0;
     const prev = world.distance;
-    eased += (steer - eased) * (1 - Math.exp(-CONFIG.steering.response * DT));
+    eased += (steer - eased) * (1 - Math.exp(-CONFIG.steering.response * (world.onIce() ? CONFIG.hazards.ice.grip : 1) * DT));
     world.advance(DT, speed, eased * lateralSpeedAt(speed));
-    if (world.overPit() || world.hitTest(prev)) return { crashed: true, at: Math.round(score), room: world.roomName };
+    if (world.overPit() || world.inLava() || world.hitTest(prev)) return { crashed: true, at: Math.round(score), room: world.roomName, hazards: 0 };
   }
-  return { crashed: false, at: 0, room: '' };
+  const w = world as unknown as { iceLakes: unknown[]; lavaLakes: unknown[]; lavaBombs: { count: number } };
+  return { crashed: false, at: 0, room: '', hazards: w.iceLakes.length + w.lavaLakes.length + w.lavaBombs.count };
 }
 
 describe('course fairness', () => {
@@ -152,9 +153,9 @@ function driveAlt(seed: number, level: number): { crashed: boolean; at: number; 
     }
     const steer = Math.max(-1, Math.min(1, (target - hooked.shipX) * 1.5));
     const prev = world.distance;
-    eased += (steer - eased) * (1 - Math.exp(-CONFIG.steering.response * DT));
+    eased += (steer - eased) * (1 - Math.exp(-CONFIG.steering.response * (world.onIce() ? CONFIG.hazards.ice.grip : 1) * DT));
     world.advance(DT, speed, eased * lateralSpeedAt(speed));
-    if (world.overPit() || world.hitTest(prev)) return { crashed: true, at: Math.round(score), splits: hooked.altRoutes, chasms: chasms.size };
+    if (world.overPit() || world.inLava() || world.hitTest(prev)) return { crashed: true, at: Math.round(score), splits: hooked.altRoutes, chasms: chasms.size };
   }
   return { crashed: false, at: 0, splits: hooked.altRoutes, chasms: chasms.size };
 }
@@ -173,6 +174,22 @@ describe('other routes', () => {
       // The test only means something if there are routes and chasms to fly.
       expect(splits).toBeGreaterThan(0);
       expect(chasms).toBeGreaterThan(0);
+    });
+  }
+});
+
+// The ice field and volcanic plain, deeper in: ice lakes to slide across, lava
+// lakes beside the way and lava bombs falling either side of it.
+describe('ice and fire', () => {
+  for (const level of [11, 12, 20, 21]) {
+    it(`level ${level} is survivable for every seed, with its hazards`, () => {
+      let hazards = 0;
+      for (const seed of SEEDS) {
+        const r = drive(seed, level);
+        expect(r.crashed, `seed ${seed} crashed at score ${r.at}`).toBe(false);
+        hazards += r.hazards;
+      }
+      expect(hazards).toBeGreaterThan(0);
     });
   }
 });

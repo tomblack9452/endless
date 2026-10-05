@@ -462,8 +462,9 @@ export class Player {
 
   /** `maxLateral` is the sideways speed at full steer (rises with forward speed). */
   /** `pitch` (radians) dips the nose, used while boosting. */
-  update(dt: number, input: number, maxLateral: number, pitch = 0): void {
-    const k = 1 - Math.exp(-CONFIG.steering.response * dt);
+  /** `grip` < 1 makes steering slow to take hold (sliding on ice). */
+  update(dt: number, input: number, maxLateral: number, pitch = 0, grip = 1): void {
+    const k = 1 - Math.exp(-CONFIG.steering.response * grip * dt);
     this.steer += (input - this.steer) * k;
     this.lateral = this.steer * maxLateral;
     this.root.rotation.z = -this.steer * S.maxBankDeg * DEG;

@@ -241,6 +241,9 @@ export const CONFIG = {
     maxRockSpires: 500,
     maxCacti: 500,
     maxTumbleweeds: 60,
+    maxIceSheets: 260,
+    maxLavaBombs: 60,
+    maxMarks: 60,
     maxTufts: 2600,
     maxMesas: 60,
     maxArches: 12,
@@ -628,6 +631,44 @@ export const CONFIG = {
     markerEvery: 3, // rows between safe-line markers
   },
 
+  // Ice field and volcanic plain hazards (see world.ts: land()).
+  hazards: {
+    // Ice lakes: open ice the lane runs across. On it you slow a little and slide.
+    ice: { firstAfter: 120, spacing: [130, 240], halfWidth: [6, 12], halfLength: [16, 32], slow: 0.86, grip: 0.24, runoff: 16 },
+    // Lava lakes: glowing pools off the lane. Touch one and the run ends, shield or not.
+    lava: { firstAfter: 80, spacing: [[90, 150], [60, 110], [40, 80]], halfWidth: [2.2, 4.5], halfLength: [3, 7], gap: [0.6, 3] },
+    // Lava bombs from eruptions: they fall in front of you, landing off the lane, a
+    // ring marking the spot as they come down. None at level 1 of the plain.
+    bombs: { spacing: [[0, 0], [70, 120], [40, 80]], height: 26, fallOver: 90, landAhead: [18, 28], radius: [0.8, 1.3], gap: [0.4, 2.6] },
+    // How much denser the ice field and volcanic plain are than other open ground.
+    density: { ice: 1.25, volcanic: 1.3 },
+  },
+
+  // Weather that comes with an area (weather.ts): snow on the ice, ash and smoke on the plain.
+  weather: {
+    particles: 900,
+    halfWidth: 16,
+    height: 12,
+    depth: 60,
+    ease: 1.5, // seconds to settle to a new intensity
+    // Intensity at levels 1, 2, 3 of the area, plus this much per loop after the first.
+    snow: [0.3, 0.6, 1.0],
+    ash: [0.35, 0.7, 1.0],
+    loopStep: 0.15,
+    snowColor: '#ffffff',
+    ashColor: '#4a423e',
+    snowSize: 0.11,
+    ashSize: 0.08,
+    snowFall: 3.2,
+    ashFall: 1.2,
+    snowWind: 9,
+    ashWind: 2.5,
+    blizzardFogScale: 1.8,
+    smokeFogScale: 1.6,
+    blizzardFog: '#e9eef3',
+    smokeFog: '#5a504a',
+  },
+
   // Tumbleweeds: how far they roll across, over how much of your approach.
   tumbleweed: { travel: [22, 34], over: [150, 210], size: [0.8, 1.3] },
 
@@ -652,6 +693,8 @@ export const CONFIG = {
       volcanic: { mushroom: 0, spire: 0.08, rock: 0.43, crystal: 0.1, bush: 0, deadTree: 0.2, rockSpire: 0.15, cactus: 0.04 },
     },
     lavaChance: 0.6, // per row on the volcanic plain: a glowing crack off the lane
+    iceLake: '#cfe6f2',
+    lavaBomb: '#ff6a2a',
     looks: {
       ice: {
         ground: '#e4edf2',
