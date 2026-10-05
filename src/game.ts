@@ -304,7 +304,8 @@ export class Game {
 
   private metrics(): RunMetrics {
     return {
-      level: this.level,
+      // Checkpoint runs start part-way, so they don't count towards level missions.
+      level: this.scoreBase > 0 ? 0 : this.level,
       score: this.assisted ? 0 : this.score,
       nearMisses: this.nearMissCount,
       bestChain: this.bestChain,
@@ -632,6 +633,7 @@ export class Game {
     this.sky.setAmount(Math.max(space, night));
     this.stage.setPlanetVisible(1 - this.world.interiorMix);
     this.stage.setUnderfloor(Math.max(w.insideMix, w.asteroidMix));
+    this.player.setShadowAmount(1 - w.asteroidMix); // nothing to cast it on in space
     this.stage.applyPalette();
     this.world.applyPalette();
     this.speedLines.applyPalette();
