@@ -1255,7 +1255,12 @@ export class Game {
     }
 
     const fell = this.world.overPit();
-    const hit = !fell && this.graceT <= 0 && this.world.hitTest(prev);
+    // Shielded (or just saved by a shield), the walls still hold you in: steer
+    // into one and you slide along it instead of out of the course. Touching
+    // one with a shield up uses the shield, like any other hit.
+    let scraped = false;
+    if (!fell && (this.shield || this.graceT > 0) && !this.dev.invincible) scraped = this.world.clampToWalls(CONFIG.ship.hitHalfWidth + 0.15);
+    const hit = !fell && this.graceT <= 0 && (scraped || this.world.hitTest(prev));
     if (hit && this.shield && !this.dev.invincible) {
       // The shield takes the hit; pass through for a moment.
       this.shield = false;

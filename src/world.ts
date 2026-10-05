@@ -411,6 +411,7 @@ export class World {
     this.roomShift = 0;
     this.prevWallL = this.prevWallR = NaN;
     this.floorD.fill(-Infinity);
+    this.wallD.fill(-Infinity);
     this.sparks.clear();
     // Forget the last run's look too: the title applies it straight after a reset.
     this.canyonMix = this.interiorMix = this.insideMix = this.deckMix = this.biomeMix = this.asteroidMix = 0;
@@ -459,6 +460,34 @@ export class World {
   hitTest(prevDistance: number): boolean {
     for (const f of this.solids) if (f.hitTest(prevDistance, this.distance, this.lastDx)) return true;
     return false;
+  }
+
+  /**
+   * Keep the ship inside the walls (canyon and ship interior), `margin` from
+   * their inner faces. Used while shielded: a shield lets you through what you
+   * hit, but never out of the course. Returns true if the ship was pushed back.
+   */
+  clampToWalls(margin: number): boolean {
+    const slot = (((Math.round(this.distance / STEP) % FLOOR_ROWS) + FLOOR_ROWS) % FLOOR_ROWS);
+    if (Math.abs(this.wallD[slot] - this.distance) > STEP * 0.6) return false;
+    const lo = this.wallL[slot] + margin;
+    const hi = this.wallR[slot] - margin;
+    let dx = 0;
+    if (this.shipX < lo) dx = lo - this.shipX;
+    else if (this.shipX > hi) dx = hi - this.shipX;
+    if (dx === 0) return false;
+    this.shipX += dx;
+    for (const f of this.fields) f.advance(dx, -Infinity);
+    this.lastDx = 0;
+    return true;
+  }
+
+  /** Remember a row's inner wall faces (world x) for clampToWalls. */
+  private recordWalls(d: number, left: number, right: number): void {
+    const slot = (((Math.round(d / STEP) % FLOOR_ROWS) + FLOOR_ROWS) % FLOOR_ROWS);
+    this.wallD[slot] = d;
+    this.wallL[slot] = left;
+    this.wallR[slot] = right;
   }
 
   // Obstacles that just passed the ship closely (walls excluded), for scoring and sound.
@@ -1055,6 +1084,7 @@ export class World {
     else this.retargetOffset(d, maxOffset);
     this.moveLane(maxSlope, this.laneTarget, maxOffset);
     hw = hwAll;
+    this.recordWalls(d, this.cx - hw, this.cx + hw);
 
     // Walls: two staggered inner rocks per side so there are no gaps to slip
     // through, plus tall outer rocks for the canyon sides.
@@ -1342,6 +1372,7 @@ export class World {
     const taper = this.roomTaper;
     const open = taper > 0 ? ease(Math.min((d - this.roomStart) / taper, (this.roomEnd - d) / taper)) : 1;
     const hw = lerp(base, this.room === 'corridor' ? base : this.roomHw, open);
+    this.recordWalls(d, this.cx - hw, this.cx + hw);
     const H = lerp(it.wallHeight, this.room === 'corridor' ? it.wallHeight : this.roomH, open);
 
     // Centre line: the room's sideways shift (an S-bend) first; winding only once it's done.
@@ -1555,6 +1586,10 @@ export class World {
     this.light(cx + door * 0.6, H + 1.2, front - 0.1, 1.2, 0.3, 0.1, Light.White, false);
   }
   /** Remember this row's floor so the ship can fall through gaps (ring buffer by row). */
+  private readonly wallD = new Float64Array(FLOOR_ROWS).fill(-Infinity);
+  private readonly wallL = new Float32Array(FLOOR_ROWS);
+  private readonly wallR = new Float32Array(FLOOR_ROWS);
+
   private recordFloor(d: number): void {
     const slot = (((Math.round(d / STEP) % FLOOR_ROWS) + FLOOR_ROWS) % FLOOR_ROWS);
     this.floorD[slot] = d;
