@@ -165,7 +165,7 @@ export class Game {
     this.world = new World(this.stage.scene, this.palette, textures);
     this.player = new Player(this.stage.scene, this.palette);
     this.speedLines = new SpeedLines(this.stage.scene, this.palette);
-    this.trail = new Trail(this.stage.scene, this.palette);
+    this.trail = new Trail(this.player.engine, this.palette);
     this.events = new Events(this.stage.scene);
     this.sky = new Sky(this.stage.scene);
     this.input = new Input(document.body);
@@ -203,7 +203,11 @@ export class Game {
       this.hangarTab = tab;
       this.openHangar();
     });
-    this.ui.bindUpgrades(this.onBuyUpgrade);
+    this.ui.bindUpgrades(this.onBuyUpgrade, (id) => {
+      this.upgrades.toggle(id as SystemId);
+      this.haptics.pickup();
+      this.openHangar();
+    });
     void this.upgrades.load();
     void this.missions.load();
     void Promise.all([this.cosmetics.load(), this.looks.load()]).then(() => {
@@ -278,7 +282,6 @@ export class Game {
     this.speedLines.update(0, 0, 0);
     this.player.reset();
     this.player.setVisible(true);
-    this.trail.reset();
     this.trail.setVisible(true);
     this.events.clear();
     this.input.releaseAll();
@@ -621,6 +624,7 @@ export class Game {
           max: MAX_TIER,
           button: check.ok ? formatScore(TIER_COST[tier]) : check.reason,
           canBuy: check.ok,
+          on: tier > 0 ? this.upgrades.isOn(s.id) : null,
         };
       }),
     );
@@ -630,9 +634,10 @@ export class Game {
     this.renderUpgrades();
     this.ui.setHangarTab(this.hangarTab, `${formatScore(this.wallet.credits)} credits`);
     this.renderLooks();
-    // Show the ship over the title scene while choosing.
+    // Show the ship (and its engine) over the title scene while choosing.
     this.player.reset();
     this.player.setVisible(true);
+    this.trail.setVisible(true);
     this.openInfo('hangar');
   }
 
@@ -729,7 +734,8 @@ export class Game {
     this.applyLooks(); // the wing decal follows your rank
     this.ui.setTitleRank(insignia(i), rankName(i), `${formatScore(this.wallet.credits)} credits`);
     const db = this.progress.dailyBest;
-    this.ui.setTitleLink('daily', db > 0 ? `daily run (best ${formatScore(db)})` : 'daily run');
+    this.ui.setTitleLink('daily', 'daily run');
+    this.ui.setBests(this.best, this.soloBest, db);
   }
 
   private openStats(): void {
@@ -817,7 +823,10 @@ export class Game {
       // Leaving the hangar takes off anything only being tried on.
       this.preview = null;
       this.applyLooks();
-      if (this.state === 'title') this.player.setVisible(false);
+      if (this.state === 'title') {
+        this.player.setVisible(false);
+        this.trail.setVisible(false);
+      }
     }
     this.infoOpen = null;
     this.ui.show('title');
@@ -1004,6 +1013,7 @@ export class Game {
 
   private updateTitle(dt: number): void {
     this.titleTime += dt;
+    if (this.infoOpen === 'hangar') this.trail.update(dt, 0, this.player.engineHalfSpan);
     this.speed = CONFIG.speed.titleDrift;
     // Slow lateral sway so the idle scene feels alive.
     const lateral = Math.sin(this.titleTime * 0.23) * 2.2;
@@ -1030,7 +1040,7 @@ export class Game {
     const pitch = this.boostLevel * CONFIG.boost.shipPitchDeg * DEG - Math.atan(slope) * CONFIG.terrain.shipPitch;
     this.player.update(dt, this.input.steering(), lateralSpeedAt(speed) * this.ship.steer, pitch);
     this.speedLines.update(dt, speed, this.settings.reduceMotion ? 0 : this.boostLevel);
-    this.trail.update(this.player.lateral * dt, speed * dt, -this.player.steer * CONFIG.ship.maxBankDeg * DEG);
+    this.trail.update(dt, this.boostLevel, this.player.engineHalfSpan);
     if (this.boosting) {
       this.boostSeconds += dt;
       this.boosted = true;

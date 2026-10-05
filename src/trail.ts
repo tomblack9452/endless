@@ -1,42 +1,32 @@
-import {
-  BufferAttribute,
-  BufferGeometry,
-  Color,
-  DoubleSide,
-  Mesh,
-  MeshBasicMaterial,
-  Scene,
-} from 'three';
-import { CONFIG } from './config';
+import { BufferAttribute, BufferGeometry, Color, DoubleSide, Mesh, MeshBasicMaterial, type Object3D } from 'three';
 import type { TrailId } from './cosmetics';
 import type { LivePalette } from './palette';
 
-// A short exhaust ribbon behind the ship tracing where it has actually been. Points are kept
-// ship-relative (like the world): each frame they slide back by the forward
-// distance and sideways against the ship's movement. Styles:
-//   line   - one flame from the tail, fading out
+// Engine flames, fixed to the back of the ship so they always point straight
+// out of the engine and bank with the hull. Styles (from missions):
+//   none   - a small engine glow only
+//   line   - one flame from the tail
 //   dashes - the same flame, pulsing
-//   ion    - two thin streams from the wing tips in the pickup colour
+//   ion    - two thin streams from the wing tips, plus the glow
+// The engine colour (looks) tints them; boosting stretches them.
+//
+// The ship never turns its nose, so a trail that traced the real path ran off
+// at an angle to the hull; flames fixed to the hull avoid that.
 
-const COUNT = 10; // samples per ribbon
-// The camera sits ~2.5 behind and above the ship, so anything longer than about a unit
-// runs off the bottom of the screen as a straight bar. Trails are short engine flames.
-const SPACING = 0.035; // ~0.35 long
-const S = CONFIG.ship;
+const SEGMENTS = 8;
+const DEFAULT_FLAME = new Color('#e9b26a');
 
-class Ribbon {
-  readonly x = new Float32Array(COUNT);
-  readonly z = new Float32Array(COUNT);
-  readonly pos = new Float32Array(COUNT * 2 * 3);
-  readonly col = new Float32Array(COUNT * 2 * 4);
+class Flame {
+  readonly pos = new Float32Array((SEGMENTS + 1) * 2 * 3);
+  readonly col = new Float32Array((SEGMENTS + 1) * 2 * 4);
   readonly geometry = new BufferGeometry();
   readonly mesh: Mesh;
 
-  constructor(scene: Scene, material: MeshBasicMaterial) {
+  constructor(parent: Object3D, material: MeshBasicMaterial) {
     this.geometry.setAttribute('position', new BufferAttribute(this.pos, 3));
     this.geometry.setAttribute('color', new BufferAttribute(this.col, 4));
     const index: number[] = [];
-    for (let i = 0; i < COUNT - 1; i++) {
+    for (let i = 0; i < SEGMENTS; i++) {
       const a = i * 2;
       index.push(a, a + 1, a + 2, a + 1, a + 3, a + 2);
     }
@@ -44,13 +34,43 @@ class Ribbon {
     this.mesh = new Mesh(this.geometry, material);
     this.mesh.frustumCulled = false;
     this.mesh.renderOrder = 2;
-    scene.add(this.mesh);
+    parent.add(this.mesh);
+  }
+
+  /** Lay the flame out from (x, 0, 0) backwards: `len` long, `width` wide at the root. */
+  draw(x: number, len: number, width: number, alpha: number, colour: Color, pulse: number | null): void {
+    for (let k = 0; k <= SEGMENTS; k++) {
+      const t = k / SEGMENTS; // 0 at the engine, 1 at the tip
+      const w = width * (1 - t) * (0.85 + 0.15 * Math.cos(t * 3));
+      const z = t * len;
+      const o = k * 6;
+      this.pos[o] = x - w;
+      this.pos[o + 1] = 0.005;
+      this.pos[o + 2] = z;
+      this.pos[o + 3] = x + w;
+      this.pos[o + 4] = 0.005;
+      this.pos[o + 5] = z;
+      let a = alpha * (1 - t) * (1 - t * 0.5);
+      if (pulse !== null) a *= 0.35 + 0.65 * Math.max(0, Math.sin((t * 3 - pulse) * Math.PI * 2));
+      const c = k * 8;
+      for (const off of [0, 4]) {
+        this.col[c + off] = colour.r;
+        this.col[c + off + 1] = colour.g;
+        this.col[c + off + 2] = colour.b;
+        this.col[c + off + 3] = a;
+      }
+    }
+    (this.geometry.getAttribute('position') as BufferAttribute).needsUpdate = true;
+    (this.geometry.getAttribute('color') as BufferAttribute).needsUpdate = true;
   }
 }
 
 export class Trail {
   private style: TrailId = 'none';
-  private shown = false; // only during a run
+  private shown = false;
+  private tint: Color | null = null;
+  private clock = 0;
+  private readonly colour = new Color();
   private readonly material = new MeshBasicMaterial({
     vertexColors: true,
     transparent: true,
@@ -58,130 +78,51 @@ export class Trail {
     side: DoubleSide,
     fog: false,
   });
-  private readonly ribbons: Ribbon[];
-  private readonly offsets = [0, -S.halfWidth * 0.9, S.halfWidth * 0.9]; // tail, left tip, right tip
-  private head = 0; // index of the newest fixed sample (the live point is the next slot)
-  private sinceSample = 0;
-  private travelled = 0; // for dash phase
-  private readonly colour = new Color();
-  private tint: Color | null = null; // engine colour (looks), or null for the default
+  private readonly centre: Flame;
+  private readonly left: Flame;
+  private readonly right: Flame;
 
-  /** Engine colour for the trail, or null for the default (text colour, or pickup colour for ion). */
-  setTint(css: string | null): void {
-    this.tint = css ? new Color(css) : null;
-  }
-
-  constructor(scene: Scene, private readonly palette: LivePalette) {
-    this.ribbons = this.offsets.map(() => new Ribbon(scene, this.material));
-    this.setStyle('none');
+  /** `mount` is the ship's engine point (Player.engine). */
+  constructor(mount: Object3D, private readonly palette: LivePalette) {
+    this.centre = new Flame(mount, this.material);
+    this.left = new Flame(mount, this.material);
+    this.right = new Flame(mount, this.material);
+    this.setVisible(false);
   }
 
   setStyle(style: TrailId): void {
     this.style = style;
-    this.showRibbons();
-    this.reset();
+    this.showFlames();
   }
 
-  /** Collapse the trail onto the ship (new run). */
-  reset(): void {
-    for (let r = 0; r < this.ribbons.length; r++) {
-      const rb = this.ribbons[r];
-      rb.x.fill(this.offsets[r]);
-      for (let i = 0; i < COUNT; i++) rb.z[i] = S.length * 0.4;
-      rb.col.fill(0); // nothing drawn until the next update
-      (rb.geometry.getAttribute('color') as BufferAttribute).needsUpdate = true;
-    }
-    this.sinceSample = 0;
+  /** Engine colour, or null for the default (amber, or the pickup colour for ion). */
+  setTint(css: string | null): void {
+    this.tint = css ? new Color(css) : null;
   }
 
   setVisible(on: boolean): void {
     this.shown = on;
-    this.showRibbons();
+    this.showFlames();
   }
 
-  private showRibbons(): void {
-    const s = this.style;
-    this.ribbons[0].mesh.visible = this.shown && (s === 'line' || s === 'dashes');
-    this.ribbons[1].mesh.visible = this.ribbons[2].mesh.visible = this.shown && s === 'ion';
+  private showFlames(): void {
+    this.centre.mesh.visible = this.shown;
+    this.left.mesh.visible = this.right.mesh.visible = this.shown && this.style === 'ion';
   }
 
-  /** `dx` is how far the ship moved sideways this frame, `dz` how far forward. */
-  update(dx: number, dz: number, bank: number): void {
-    if (this.style === 'none') return;
-    this.travelled += dz;
-    // Fixed samples are laid exactly SPACING apart along the ground. At speed
-    // the ship covers several per frame, so the new ones are filled in along
-    // the line from last frame's emitter position to this one's. The slot
-    // after the newest fixed sample is a live point that sits on the emitter.
-    this.sinceSample += dz;
-    const total = Math.floor(this.sinceSample / SPACING);
-    this.sinceSample -= total * SPACING; // travel since the newest fixed sample
-    const added = Math.min(COUNT - 2, total); // only the most recent ones fit
+  /** `boost` 0..1 stretches the flames; `halfSpan` is half the wing span (ion streams). */
+  update(dt: number, boost: number, halfSpan: number): void {
+    if (!this.shown) return;
+    this.clock += dt;
+    const flicker = 0.9 + 0.1 * Math.sin(this.clock * 47) * Math.sin(this.clock * 31);
+    const stretch = (1 + boost * 0.9) * flicker;
     const ion = this.style === 'ion';
-    this.colour.copy(this.tint ?? (ion ? this.palette.pickup : this.palette.text));
-    const width = ion ? 0.016 : 0.07;
-    const alpha = ion ? 0.9 : 0.6;
-    const cos = Math.cos(bank);
-    const emitZ = S.length * 0.4;
-    const y0 = S.hoverY + 0.02; // at engine height, not on the ground
-    let head = this.head;
-    for (let r = 0; r < this.ribbons.length; r++) {
-      const rb = this.ribbons[r];
-      if (!rb.mesh.visible) continue;
-      for (let i = 0; i < COUNT; i++) {
-        rb.x[i] -= dx;
-        rb.z[i] += dz;
-      }
-      const live = (this.head + 1) % COUNT;
-      const fromX = rb.x[live]; // last frame's emitter point, now dz further back
-      const toX = this.offsets[r] * cos;
-      head = this.head;
-      for (let j = 1; j <= added; j++) {
-        const back = this.sinceSample + (added - j) * SPACING; // how far behind the emitter, oldest first
-        const f = dz > 0 ? Math.min(1, back / dz) : 0;
-        head = (head + 1) % COUNT;
-        rb.x[head] = toX + (fromX - toX) * f;
-        rb.z[head] = emitZ + back;
-      }
-      const now = (head + 1) % COUNT;
-      rb.x[now] = toX;
-      rb.z[now] = emitZ;
-      // Wing tips rise and fall with the bank.
-      const y = y0 + (ion ? this.offsets[r] * -Math.sin(bank) : 0);
-      for (let k = 0; k < COUNT; k++) {
-        const i = (now - k + COUNT) % COUNT;
-        const t = k / (COUNT - 1); // 0 at the ship, 1 at the end
-        let a = alpha * (1 - t) * (1 - t);
-        // Samples left from earlier frames can lie further back than the flame is long: fold them in.
-        const maxZ = emitZ + (COUNT - 1) * SPACING;
-        if (rb.z[i] > maxZ) {
-          rb.z[i] = maxZ;
-          a = 0;
-        }
-        if (this.style === 'dashes') {
-          // Dashes fixed to the ground: pulses along the flame.
-          const along = this.travelled - (rb.z[i] - emitZ);
-          if (((along % 0.12) + 0.12) % 0.12 > 0.06) a = 0;
-        }
-        const w = width * (1 - t); // tapers to a point
-        const o = k * 6;
-        rb.pos[o] = rb.x[i] - w;
-        rb.pos[o + 1] = y;
-        rb.pos[o + 2] = rb.z[i];
-        rb.pos[o + 3] = rb.x[i] + w;
-        rb.pos[o + 4] = y;
-        rb.pos[o + 5] = rb.z[i];
-        const c = k * 8;
-        for (const off of [0, 4]) {
-          rb.col[c + off] = this.colour.r;
-          rb.col[c + off + 1] = this.colour.g;
-          rb.col[c + off + 2] = this.colour.b;
-          rb.col[c + off + 3] = a;
-        }
-      }
-      (rb.geometry.getAttribute('position') as BufferAttribute).needsUpdate = true;
-      (rb.geometry.getAttribute('color') as BufferAttribute).needsUpdate = true;
+    this.colour.copy(this.tint ?? (ion ? this.palette.pickup : DEFAULT_FLAME));
+    if (this.style === 'none' || ion) this.centre.draw(0, 0.14 * stretch, 0.05, 0.75, this.colour, null);
+    else this.centre.draw(0, 0.42 * stretch, 0.075, 0.8, this.colour, this.style === 'dashes' ? this.clock * 4 : null);
+    if (ion) {
+      this.left.draw(-halfSpan * 0.92, 0.5 * stretch, 0.018, 0.9, this.colour, null);
+      this.right.draw(halfSpan * 0.92, 0.5 * stretch, 0.018, 0.9, this.colour, null);
     }
-    this.head = head;
   }
 }
