@@ -155,3 +155,40 @@ describe('solo environments', () => {
     });
   });
 });
+
+// The weekly level must be the same for everyone, however they steer: the
+// course depends only on its seed. Two ships, one following the lane and one
+// weaving wildly (crashes ignored), must see the same lane row for row.
+describe('the course depends only on its seed', () => {
+  it('two very different flights through a weekly level build the same lane', () => {
+    const course = weeklyCourse('2026-10-26');
+    const lanesFor = (weave: boolean): Map<number, number> => {
+      const world = new World(new Scene(), new LivePalette());
+      const hooked = world as unknown as Hooked;
+      const seen = new Map<number, number>();
+      const row = hooked.row.bind(world);
+      hooked.row = (d: number) => {
+        row(d);
+        seen.set(Math.round(d * 10), hooked.lane);
+      };
+      world.setCourse(course);
+      world.reset(CONFIG.field.startClearance, true, 0, course.seed);
+      for (let t = 0; t < 70; t += 1 / 60) {
+        const speed = speedAt(world.sectionAt(world.distance)!.difficulty);
+        const steer = weave ? Math.sin(t * 1.7) : Math.max(-1, Math.min(1, ((seen.get(Math.round((world.distance + 3) * 10)) ?? hooked.shipX) - hooked.shipX) * 1.5));
+        world.advance(1 / 60, speed, steer * lateralSpeedAt(speed));
+      }
+      return seen;
+    };
+    const a = lanesFor(false);
+    const b = lanesFor(true);
+    let compared = 0;
+    for (const [d, x] of a) {
+      const y = b.get(d);
+      if (y === undefined) continue;
+      expect(Math.abs(x - y), `row ${d / 10}`).toBeLessThan(1e-6);
+      compared++;
+    }
+    expect(compared).toBeGreaterThan(500);
+  });
+});
