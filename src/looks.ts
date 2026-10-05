@@ -4,9 +4,10 @@ import { rankName } from './ranks';
 import { storage } from './storage';
 
 // Ship looks: what the ship wears. Purely cosmetic (every hull shares one
-// hitbox), so they're allowed in ranked too. Items unlock four ways: free,
-// credits, a rank, or a total of sector stars. Hull shapes beyond the
-// starter also come from missions (see cosmetics.ts).
+// hitbox), so they're allowed in ranked too. Items unlock by being free,
+// credits, cores, a rank, a league, a total of stars, or as a reward (the
+// login calendar and the season pass). Hull shapes beyond the starter also come
+// from missions (see cosmetics.ts).
 
 export type Slot = 'hull' | 'paint' | 'markings' | 'fins' | 'engine' | 'decal';
 export type Marking = 'none' | 'stripe' | 'twin' | 'chevron' | 'twotone' | 'split';
@@ -16,6 +17,8 @@ export type Unlock =
   | { by: 'free' }
   | { by: 'mission' } // hull shapes unlocked by missions
   | { by: 'credits'; cost: number }
+  | { by: 'cores'; cost: number } // the premium currency (the shop sells these too)
+  | { by: 'reward'; from: 'login' | 'pass' }
   | { by: 'rank'; rank: number }
   | { by: 'stars'; stars: number }
   | { by: 'league'; league: number };
@@ -33,6 +36,8 @@ const credits = (cost: number): Unlock => ({ by: 'credits', cost });
 const rank = (r: number): Unlock => ({ by: 'rank', rank: r });
 const stars = (n: number): Unlock => ({ by: 'stars', stars: n });
 const league = (l: number): Unlock => ({ by: 'league', league: l });
+const cores = (cost: number): Unlock => ({ by: 'cores', cost });
+const pass: Unlock = { by: 'reward', from: 'pass' };
 
 export const LOOKS: readonly LookItem[] = [
   { slot: 'hull', id: 'dart', name: 'dart', unlock: free },
@@ -59,6 +64,13 @@ export const LOOKS: readonly LookItem[] = [
   { slot: 'paint', id: 'diamond', name: 'diamond', unlock: league(4), colors: ['#aac8f1', '#6e92c5'] },
   { slot: 'paint', id: 'champion', name: 'champion', unlock: league(5), colors: ['#ab8ce2', '#7458ac'] },
   { slot: 'paint', id: 'supernova', name: 'supernova', unlock: league(6), colors: ['#e8684f', '#a83f30'] },
+  // Premium paints: cores, the login calendar and the season pass.
+  { slot: 'paint', id: 'nebula', name: 'nebula', unlock: cores(120), colors: ['#7a4fb8', '#3d2a6e'] },
+  { slot: 'paint', id: 'solar', name: 'solar', unlock: cores(150), colors: ['#f0b23a', '#c2541e'] },
+  { slot: 'paint', id: 'void', name: 'void', unlock: cores(200), colors: ['#1c1d2b', '#0b0b12'] },
+  { slot: 'paint', id: 'aurora', name: 'aurora', unlock: { by: 'reward', from: 'login' }, colors: ['#5fd6a8', '#3a6fb0'] },
+  { slot: 'paint', id: 'frost', name: 'frost', unlock: pass, colors: ['#d8eef6', '#8fbcd4'] },
+  { slot: 'paint', id: 'ember', name: 'ember', unlock: pass, colors: ['#d4522f', '#5a1c14'] },
 
   { slot: 'markings', id: 'none', name: 'none', unlock: free },
   { slot: 'markings', id: 'stripe', name: 'stripe', unlock: credits(250) },
@@ -79,6 +91,8 @@ export const LOOKS: readonly LookItem[] = [
   { slot: 'engine', id: 'green', name: 'green', unlock: credits(250), colors: ['#6ccf7c', '#6ccf7c'] },
   { slot: 'engine', id: 'white', name: 'white', unlock: credits(400), colors: ['#f4f4f0', '#f4f4f0'] },
   { slot: 'engine', id: 'red', name: 'red', unlock: rank(7), colors: ['#e0503f', '#e0503f'] },
+  { slot: 'engine', id: 'plasma', name: 'plasma', unlock: cores(60), colors: ['#ff5fd2', '#7a6bff'] },
+  { slot: 'engine', id: 'solar', name: 'solar', unlock: pass, colors: ['#ffd25a', '#ff7a2e'] },
 
   { slot: 'decal', id: 'none', name: 'none', unlock: free },
   { slot: 'decal', id: 'rank', name: 'rank insignia', unlock: free },
@@ -120,6 +134,10 @@ export function unlockText(u: Unlock): string {
       return 'from missions';
     case 'credits':
       return `${u.cost.toLocaleString('en-US')} credits`;
+    case 'cores':
+      return `${u.cost.toLocaleString('en-US')} cores`;
+    case 'reward':
+      return u.from === 'login' ? 'daily login reward' : 'season pass';
     case 'rank':
       return `rank ${rankName(u.rank)}`;
     case 'stars':
@@ -134,7 +152,7 @@ const KEY = 'endless.looks';
 type Equipped = Record<Slot, string>;
 
 export class Looks {
-  /** Bought with credits (rank, star, mission and free items are owned when earned). */
+  /** Bought (credits or cores) or given as a reward; rank, star, mission and free items are owned when earned. */
   private bought = new Set<string>();
   equipped: Equipped = { hull: 'dart', paint: 'standard', markings: 'none', fins: 'none', engine: 'standard', decal: 'none' };
 
@@ -162,6 +180,8 @@ export class Looks {
       case 'mission':
         return o.missionHulls.includes(item.id as ShipId);
       case 'credits':
+      case 'cores':
+      case 'reward':
         return this.bought.has(`${item.slot}:${item.id}`);
       case 'rank':
         return o.rank >= u.rank;
@@ -173,13 +193,22 @@ export class Looks {
   }
 
   buy(item: LookItem): void {
-    this.bought.add(`${item.slot}:${item.id}`);
+    this.give(`${item.slot}:${item.id}`);
+  }
+
+  /** Own a look by key ("slot:id"): a purchase or a reward. */
+  give(key: string): void {
+    this.bought.add(key);
     this.save();
+  }
+
+  has(key: string): boolean {
+    return this.bought.has(key);
   }
 
   /** Mark everything bought (dev). */
   buyAll(): void {
-    for (const l of LOOKS) if (l.unlock.by === 'credits') this.bought.add(`${l.slot}:${l.id}`);
+    for (const l of LOOKS) if (l.unlock.by === 'credits' || l.unlock.by === 'cores' || l.unlock.by === 'reward') this.bought.add(`${l.slot}:${l.id}`);
     this.save();
   }
 
