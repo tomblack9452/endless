@@ -61,7 +61,8 @@ const W = F.halfWidth;
 const SPAN = W * 2;
 const LANE = TH.lane.halfWidth;
 const FLOOR_ROWS = 512; // rows of floor history kept for fall checks
-const PIT_LIP = 0.3; // pit sides: a thin steel lip, then black
+const PIT_LIP = 0.3;
+const BRIDGE_JUMP = 0.8; // a bridge edge moving more than this in a row has jumped, not bent // pit sides: a thin steel lip, then black
 
 /** Open-ground prop kinds. */
 const enum Prop {
@@ -1530,12 +1531,18 @@ export class World {
     segs.forEach(([x0, x1, railL, railR], si) => {
       this.floorSeg(x0, x1);
       const prev = joined && si < this.railPrevN ? [this.railPrev[si * 2], this.railPrev[si * 2 + 1]] : [x0, x1];
-      const turn = Math.atan2(-((x0 + x1) / 2 - (prev[0] + prev[1]) / 2), STEP);
+      // The bridge's drift this row: from the edges that moved smoothly. An edge that
+      // jumps (planks missing from here on, or back again) isn't a bend.
+      const moves = [x0 - prev[0], x1 - prev[1]].filter((v) => Math.abs(v) < BRIDGE_JUMP);
+      const drift = moves.length ? moves.reduce((t, v) => t + v, 0) / moves.length : 0;
+      const turn = Math.atan2(-drift, STEP);
       // Planks butted together (alternating shades show the boards), square to the bridge.
       this.greebles.nextColor = row % 2 === 0 ? Decor.Wood : Decor.WoodDark;
       this.greebles.nextTilt = true;
       this.greebles.spawn((x0 + x1) / 2 - this.shipX, -0.12, d, x1 - x0, 0.12, STEP + 0.04, turn, false, false, 0, 0, false);
-      for (const [x, s, rail, px] of [[x0, -1, railL, prev[0]], [x1, 1, railR, prev[1]]] as const) {
+      for (const [x, s, rail, prevX] of [[x0, -1, railL, prev[0]], [x1, 1, railR, prev[1]]] as const) {
+        // Where the edge jumped, its rail starts afresh rather than angling across.
+        const px = Math.abs(x - prevX) < BRIDGE_JUMP ? prevX : x;
         if (rail) {
           // Each rail piece runs from last row's rail point to this row's, leaning with
           // the slope, so the rope is one unbroken line however the bridge winds.
