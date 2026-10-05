@@ -21,6 +21,7 @@ Play it at https://tomblack9452.github.io/endless/.
 - [Modes](#modes)
 - [Ranked](#ranked)
 - [Leagues](#leagues)
+- [Solo: set levels](#solo-set-levels)
 - [Solo: sectors and stars](#solo-sectors-and-stars)
 - [Credits, upgrades and looks](#credits-upgrades-and-looks)
 - [Missions](#missions)
@@ -107,10 +108,17 @@ Each loop of nine levels runs: ground theme (levels 1-3), second theme
 | 2, 5, 8... | Ice field | Asteroid belt | Interior |
 | 3, 6, 9... | Volcanic plain | Canyon | Interior |
 
-**Open ground.** Mushroom trees, spire trees, crystals and boulders. Level 2
+**Open ground.** Mushroom trees, spire trees, crystals, boulders, bushes,
+dead trees and standing rock spires, mixed differently in each biome. Level 2
 adds rock clusters. Level 3 is a forest path: dense forest on both sides of
-a winding, clear path. Open ground has rolling hills. They change the view
-only, and the ship noses up and down with the slope.
+a winding, clear path. Around them:
+
+- rolling hills, with a few big hill sections per theme (they change the
+  view only, and the ship noses up and down with the slope)
+- grass tufts, and patches of greener grass and bare dirt in the ground
+- rock faces running alongside the path for a stretch
+- natural rock arches over the path
+- flat-topped mesas on the horizon
 
 - *Ice field:* pale ground and sky, mostly crystals and spires.
 - *Volcanic plain:* dark basalt, a smoky sky, glowing lava cracks, and a
@@ -118,7 +126,14 @@ only, and the ship noses up and down with the slope.
 
 **Canyon.** Rock walls that wind, with bands of rocks and pillars across
 the floor and gaps through them. Obstacles are dark so they read against the
-walls.
+walls. Rocks run from small floor pebbles to huge cliffs towering over the
+walls; bands mix small, medium and big boulders; natural bridges span the
+canyon overhead.
+
+**Split paths:** now and then a low rocky island (with crystals along it)
+divides the canyon in two. Your lane runs down one branch. The other has its
+own clear line, more rocks and bonus pickups: the reward for taking it. Both
+are guaranteed passable, with clear stretches before and after to cross.
 
 - *Asteroid belt:* the same layout in space. The ground falls away, the sky
   opens to stars and the galaxy, and the rock turns grey.
@@ -144,9 +159,17 @@ forks:
 - reactor collapse (debris crashes down around you)
 - maintenance gantry and hull breach (big holes in the floor against the
   walls; fall in and the run ends)
+- coolant plant (curtains of falling coolant with a gap on the lane)
+- steam vents (floor vents firing on a rhythm; any on the lane are always
+  down as you arrive, because their timing is tied to distance, not the
+  clock)
+- foundry (molten metal pours, molten curtains, sparks)
 
 Walls are dressed with pipes, panels, cables and canisters, and the ship's
-outer hull shows outside the windows.
+outer hull shows outside the windows. Every room also gets animated detail:
+leaks dripping into puddles, burst pipes venting steam, panels throwing
+sparks, blinking console lights, ceiling fans in tall rooms and holograms in
+the server halls.
 
 **Theme events.** As the middle level of a theme begins, there's a chance
 (the same for a given seed) of an event:
@@ -173,7 +196,8 @@ Events change the look and sound only, never the course.
   meter lasts 3.5 s.
 - **Power-ups** are rarer gems that replace a boost pickup now and then:
   - **Shield** (blue): survives one hit, then gives a moment of grace to
-    get clear. It doesn't save you from falling into a pit.
+    get clear. Walls still hold you in while shielded (steer into one and
+    you slide along it). It doesn't save you from falling into a pit.
   - **Magnet** (purple): pulls boost pickups ahead towards you for 9 s.
   - **Slow-mo** (green): drops you to 62% speed for 6 s.
 
@@ -263,6 +287,31 @@ power. Every upgrade tier you own is one **upgrade point** (30 at most).
 - Personal-rank skill par rises 5% per league, since stronger ships score more.
 - Each league above Bronze unlocks a paint, and the wing decal can show your
   league emblem.
+
+## Solo: set levels
+
+Solo has two tabs: **levels** and **random run** (the sector map below).
+Set levels are hand-built runs, the same every time, with a finish line.
+Each is a script of named sections: an area, how hard it is, and set pieces
+(slaloms, stone gates, arch runs, pickup trails, forced events, a chosen
+order of ship rooms).
+
+| # | Level | Where |
+|---|---|---|
+| 1 | first light | plains, an arch run, the forest path |
+| 2 | stone garden | spire slalom, stone gates, a meteor shower |
+| 3 | frost and fire | ice field and frozen forest into the burning plain |
+| 4 | dry river | riverbank down into the gorge and the narrows |
+| 5 | twin gorge | splits, a sandstorm, a pillar run |
+| 6 | asteroid run | the asteroid belt from end to end |
+| 7 | maintenance deck | cargo, servers, laser gates, the coolant plant, the hangar |
+| 8 | red alert | steam vents, gantries, pistons and the foundry, in a power failure |
+| 9 | core breach | burning plain, gorge, then the ship to the reactor collapse |
+
+Each runs about 2-4 minutes and has three stars: **finish**, **no hits** (a
+shield save counts as a hit) and **beat the score target**. Your best time
+and score are kept. Finishing a level opens the next. New stars are worth 50
+credits each.
 
 ## Solo: sectors and stars
 
@@ -439,7 +488,9 @@ manifest, so the game installs to a home screen and works offline.
 | `src/upgrades.ts` | Ship upgrade systems, points and the standard ship |
 | `src/leagues.ts` | Leagues, divisions, league points, weekly rewards, emblems |
 | `src/looks.ts` | Ship looks catalogue and ownership |
-| `src/progress.ts` | Stats, sectors, stars, daily seed |
+| `src/progress.ts` | Stats, sectors, stars, set level results, daily and weekly seeds |
+| `src/courses.ts` | The set levels |
+| `src/fx.ts` | Animated interior detail: liquids, steam, blinkers, holograms, sparks |
 | `src/settings.ts` | Settings table and storage |
 | `src/hints.ts`, `src/haptics.ts` | First-run hints, vibration |
 | `src/rng.ts` | Seeded random numbers (mulberry32) |
@@ -448,6 +499,7 @@ manifest, so the game installs to a home screen and works offline.
 | `src/dev.ts` | Dev-only panel |
 | `tests/fairness.test.ts` | Headless survivability test |
 | `tests/ranks.test.ts` | Rank ladder, XP, skill and credit maths |
+| `tests/courses.test.ts` | Every set level can be flown to the finish |
 | `tests/leagues.test.ts` | League brackets, LP, divisions, promotion, weekly rewards, prices |
 | `public/` | Icons, manifest, service worker |
 
@@ -470,7 +522,7 @@ After changing anything in `themes`, run `npm test`.
 
 ## Dev tools
 
-On the dev server only, a `dev` link opens a panel with:
+A `dev` link (top left, on the live site too while the game's in testing) opens a panel with:
 
 - **Start just before** any level from 1 to 27
 - **Invincible** and **full boost** toggles
@@ -478,13 +530,13 @@ On the dev server only, a `dev` link opens a panel with:
 - **Ship room:** forces every interior room to one type
 - **Unlock all:** General Grade 4, Grand Champion, every sector to loop 9
   with all stars, every look, every upgrade maxed and 100,000 credits (saved
-  in that browser)
+  in that browser), and every set level open until you reload
 - **Reset all progress:** clears ranks, credits, unlocks and stats (keeps
   settings)
 - an FPS readout with the pixel ratio and draw calls
 
-`window.game` is exposed in dev builds for poking at state from the
-console. None of this is in production builds.
+`window.game` is exposed in dev builds (not the live site) for poking at
+state from the console.
 
 ## Testing
 
@@ -493,7 +545,12 @@ seeds, an autopilot follows the recorded safe lane from the start of every
 theme across the first two and a half loops. That covers every biome. It
 steers at the normal limit with no boost, and any crash or fall fails the
 test. A guard test checks that a ship that never steers does crash, so the
-harness can't pass by accident.
+harness can't pass by accident. A second pilot takes the other branch of
+every canyon split, looking well ahead as a player would, to prove both
+branches are survivable.
+
+`tests/courses.test.ts` flies every set level from start to finish at each
+section's speed, and checks each runs 100-260 seconds.
 
 `tests/ranks.test.ts` checks the rank ladder, that ranks need both XP and
 skill, the XP and skill rules, the length of the grind and credit rates.
