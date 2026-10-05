@@ -252,6 +252,8 @@ export const CONFIG = {
     maxGreebles: 2600,
     maxVoids: 1600,
     maxCanisters: 500,
+    maxWaters: 260,
+    maxTanks: 160,
     // Cubes per 100 square units, on the same capped curve as speed.
     // Rough density at the start of: L1 0.35, L5 0.52, L10 0.68, L20 0.87, cap 1.05.
     densityStart: 0.35,
@@ -389,6 +391,37 @@ export const CONFIG = {
       bandGapWidth: 4.4,
       pillarSpacing: [22, 32], // level 3
       wallCrystals: 0.22, // chance per row per side of crystals on the canyon sides
+      // Ramps, platforms and drops (heights are looks only: see terrain.ts).
+      elevation: {
+        spacing: [60, 140], // platform length between changes
+        rise: [2.4, 4.4],
+        riseLength: [30, 46], // ramps stay gentle
+        drop: [1.8, 3.6],
+        dropLength: [8, 13], // drops are short and steep
+        dropChance: 0.55, // going down: a drop rather than a ramp
+        min: -4, // relative to where the canyon began
+        max: 7,
+        returnSlope: 12, // units of run per unit of height, heading back level at the end
+      },
+      // Upper and lower routes: a split's branch with the bonus line climbs, the other dips.
+      lift: { up: 2.6, down: -1.5, ease: 16 },
+      // Chasms: the floor falls away and a bridge carries the lane across. From
+      // level 1 rope bridges; from 2 also wide ones with planks missing; from 3
+      // also ones that fork around a gap (pickups on the far branch).
+      chasm: {
+        firstAfter: [90, 200], // after the mouth
+        spacing: [420, 700],
+        length: [26, 46],
+        splitLength: [80, 110],
+        splitOffset: 5.2, // how far the fork's second bridge swings out
+        bridgeHalf: 1.9,
+        wideHalf: 4.4,
+        holeLength: [5, 9], // missing stretches...
+        holeGap: [4, 8], // ...and whole stretches between
+        railHeight: 0.75,
+        riseChance: 0.35,
+        altPickups: 3,
+      },
     },
     // The ship interior is a chain of rooms joined by short corridors (see
     // interior.ts). Each room is a reusable template; which ones can appear
@@ -425,10 +458,27 @@ export const CONFIG = {
         yellow: '#c9a03c',
         panel: '#5a6068',
         green: '#5f7d55',
+        wood: '#8a6a4a', // canyon bridges
+        woodDark: '#5c4532',
+        rope: '#c8b48a',
+        glass: '#9cc9cf', // lab tanks
+        cliff: '#6e5a48', // canyon chasm sides
       },
       pitDepth: 10, // how far the pit walls go down (below that it's black)
       void: '#07090c', // pit bottom
       railHeight: 0.9, // catwalk railings
+      // Ramps between decks: gentler and lower than the canyon's (the ceiling comes too).
+      elevation: {
+        spacing: [90, 180],
+        rise: [1.2, 2.4],
+        riseLength: [22, 34],
+        drop: [1.2, 2.2],
+        dropLength: [10, 14],
+        dropChance: 0.3,
+        min: -3,
+        max: 4,
+        returnSlope: 10,
+      },
       // Exterior hull the canyon runs into.
       facade: { width: 46, height: [12, 22], towers: [3, 5], masts: [2, 4] },
       rooms: {
@@ -467,6 +517,19 @@ export const CONFIG = {
         coolant: { weight: 2, minSub: 0, length: [60, 90], extraWidth: 2.6, height: 4.4, curtainSpacing: [11, 16], gapWidth: 3.2 },
         vents: { weight: 2, minSub: 1, length: [55, 85], extraWidth: 2.2, height: 3.8, rowSpacing: [7, 10], pitch: 2.1, period: 30, ventHalf: 0.45 },
         foundry: { weight: 2, minSub: 1, length: [60, 90], extraWidth: 3, height: 5.2, curtainSpacing: [13, 18], gapWidth: 3.2 },
+        // Landmark rooms.
+        // Drop shaft: a railed catwalk over a deep shaft, then the deck drops away steeply to the level below.
+        dropShaft: { weight: 2, minSub: 1, length: [80, 110], extraWidth: 4, height: 7.5, catwalkHalf: 1.6, drop: [3.5, 5], dropLength: [10, 14], dropAt: 0.6 },
+        // Cargo lift: the floor rises on a lift platform; hooks on chains swing across.
+        cargoLift: { weight: 2, minSub: 0, length: [75, 105], extraWidth: 4, height: 6.5, rise: [2.6, 3.6], liftLength: [8, 11], liftAt: 0.35, hookSpacing: [11, 16], hookY: 0.45, hookFreq: 0.09, crates: 0.35 },
+        // Flooded section: water over the deck; railed catwalks, one on the lane.
+        flooded: { weight: 2, minSub: 1, length: [70, 105], extraWidth: 4.5, height: 4.6, catwalkHalf: 1.5, sideWalks: [12, 20], sideLength: [10, 20], level: -0.45 },
+        // Command deck: tiers of consoles under a big viewscreen, the floor raised a step.
+        command: { weight: 2, minSub: 0, length: [70, 100], extraWidth: 5, height: 4.6, tier: 1.1, rowSpacing: [9, 13], gapWidth: 3.2, enclosure: 0.35 },
+        // Ventilation: giant fans turning in pits under the deck; the lane keeps to the walkways.
+        fanRoom: { weight: 2, minSub: 1, length: [65, 95], extraWidth: 4.5, height: 6.5, pitSpacing: [10, 15], pitLength: [7, 11], fanSize: 3 },
+        // Lab: rows of glass tanks of glowing liquid, benches and holograms.
+        lab: { weight: 2, minSub: 0, length: [60, 95], extraWidth: 3.6, height: 4.6, rowSpacing: [8, 11], pitch: 2.4, tankRadius: 0.5, fill: 0.6 },
         // Set piece: reactor collapse (debris falls off the lane as you approach).
         collapse: { weight: 1.5, minSub: 2, length: [70, 95], extraWidth: 6, spacing: [5, 8], landAhead: [9, 16], fallOver: 22 },
       },
@@ -537,6 +600,7 @@ export const CONFIG = {
     fade: 80, // units to fade in and out at each end of a theme
     flatEdge: 40, // flat this far into and before the end of a theme
     shipPitch: 0.6, // how much the ship noses up and down with the slope
+    pitDepth: 16, // how far canyon chasms drop
     shade: 2.5, // ground brightness change per unit of slope
   },
 
