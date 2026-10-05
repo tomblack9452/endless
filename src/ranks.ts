@@ -107,6 +107,11 @@ export function creditsFor(score: number, ranked: boolean): number {
   return Math.floor(score / (ranked ? 100 : 200));
 }
 
+/** XP still needed for rank `i` (0 once there). */
+export function xpToRank(xp: number, i: number): number {
+  return Math.max(0, RANKS[i].xp - xp);
+}
+
 /** Credits for reaching rank `i` (paid once, on promotion). */
 export function promotionBonus(i: number): number {
   return i * 50;
@@ -125,6 +130,7 @@ export interface RunRecord {
   seed: number;
   at: number; // ms since epoch
   xp: number;
+  skill?: number; // skill after the run (older saves don't have it)
 }
 
 export interface RankedResult {
@@ -206,7 +212,7 @@ export class Ranked {
     const rankAfter = this.rank;
     let credits = 0;
     for (let i = rankBefore + 1; i <= rankAfter; i++) credits += promotionBonus(i);
-    this.history.push({ mode, score: Math.floor(score), level, seed, at: now, xp, week });
+    this.history.push({ mode, score: Math.floor(score), level, seed, at: now, xp, week, skill: this.skill });
     if (this.history.length > HISTORY) this.history.splice(0, this.history.length - HISTORY);
     this.save();
     return { xp, doubled, skillBefore, skillAfter: this.skill, rankBefore, rankAfter, credits };

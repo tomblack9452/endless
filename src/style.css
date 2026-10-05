@@ -976,7 +976,6 @@ body {
 
 .title-ranked-name {
   font-size: calc(20px * var(--ui-scale));
-  font-weight: 600;
   letter-spacing: 0.3em;
   margin-right: -0.3em; /* letter-spacing leaves a gap after the last letter */
 }
@@ -1575,4 +1574,365 @@ body {
 .over-mission-progress {
   flex-shrink: 0;
   opacity: 0.8;
+}
+
+/* --- Service record and league screens ----------------------------------- */
+
+.prog-hero {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 6px 0 2px;
+}
+
+.prog-hero .insignia.big {
+  width: 64px;
+  height: 64px;
+  flex: none;
+}
+
+.prog-hero .record-rank {
+  margin-top: 2px;
+}
+
+.prog-kicker {
+  letter-spacing: 0.2em;
+}
+
+/* The headline: what's left to the next step, big. */
+.prog-goal {
+  margin-top: 18px;
+  padding: 18px 18px 14px;
+  border: 1px solid color-mix(in srgb, currentColor 22%, transparent);
+  border-radius: 18px;
+  background: color-mix(in srgb, currentColor 4%, transparent);
+}
+
+.prog-big {
+  font-size: calc(46px * var(--ui-scale));
+  font-weight: 300;
+  letter-spacing: 0.02em;
+  line-height: 1;
+}
+
+.prog-goal-label {
+  margin-top: 6px;
+  letter-spacing: 0.12em;
+}
+
+.prog-goal .xp-track {
+  height: 10px;
+  border-radius: 5px;
+  margin: 14px 0 8px;
+}
+
+.prog-detail {
+  font-size: calc(11px * var(--ui-scale));
+  line-height: 1.5;
+}
+
+.prog-checks {
+  margin-top: 10px;
+}
+
+.prog-check {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 7px 2px;
+}
+
+.prog-check-mark {
+  width: 14px;
+  text-align: center;
+  opacity: 0.55;
+}
+
+.prog-check.met .prog-check-mark {
+  opacity: 1;
+  font-weight: 600;
+}
+
+.prog-check-value {
+  margin-left: auto;
+  opacity: 0.6;
+  text-align: right;
+}
+
+.prog-gives {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.prog-card {
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px dashed color-mix(in srgb, currentColor 32%, transparent);
+}
+
+.prog-card-title {
+  letter-spacing: 0.12em;
+  margin-bottom: 6px;
+}
+
+.prog-card-item {
+  line-height: 1.7;
+}
+
+.prog-card-item::before {
+  content: '› ';
+  opacity: 0.5;
+}
+
+.prog-trend {
+  margin: 18px 0 6px;
+}
+
+.prog-trend-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.prog-empty {
+  padding: 8px 0;
+}
+
+/* Recent runs as bars; signed charts (LP) have a middle line. */
+.trend-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  height: 56px;
+}
+
+.trend-bars.signed {
+  align-items: center;
+  background: linear-gradient(color-mix(in srgb, currentColor 25%, transparent), color-mix(in srgb, currentColor 25%, transparent)) center / 100% 1px no-repeat;
+}
+
+.trend-bar {
+  flex: 1;
+  max-width: 16px;
+  min-height: 2px;
+  height: calc(var(--h) * 100%);
+  border-radius: 2px;
+  background: currentColor;
+  opacity: 0.75;
+}
+
+.trend-bars.signed .trend-bar {
+  height: calc(var(--h) * 50%);
+  transform: translateY(-50%);
+}
+
+.trend-bars.signed .trend-bar.down {
+  transform: translateY(50%);
+  opacity: 0.35;
+}
+
+/* The ladder scrolls in its own box, opened at your place in it. */
+.ladder {
+  max-height: 340px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+  scrollbar-width: none;
+  border-radius: 14px;
+  border: 1px solid color-mix(in srgb, currentColor 16%, transparent);
+  padding: 0 12px;
+  margin-top: 8px;
+}
+
+.ladder-row {
+  align-items: flex-start;
+  padding: 10px 0;
+}
+
+.ladder-row:last-child {
+  border-bottom: none;
+}
+
+.ladder-row .insignia.small {
+  margin-top: 2px;
+  flex: none;
+}
+
+.ladder-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.ladder-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ladder-needs,
+.ladder-gives {
+  font-size: calc(11px * var(--ui-scale));
+  line-height: 1.5;
+  margin-top: 2px;
+}
+
+.ladder-gives {
+  opacity: 0.75;
+}
+
+.ladder-you,
+.ladder-done {
+  font-size: calc(10px * var(--ui-scale));
+  letter-spacing: 0.14em;
+}
+
+.ladder-you {
+  padding: 2px 8px;
+  border-radius: 999px;
+  color: var(--sky, #f1ede4);
+  background: var(--text);
+}
+
+.ladder-row.current {
+  margin: 0 -12px;
+  padding: 10px 12px;
+  background: color-mix(in srgb, currentColor 7%, transparent);
+}
+
+/* --- Promotion moment ------------------------------------------------------ */
+
+.promo {
+  --promo: var(--text);
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: color-mix(in srgb, var(--sky, #f1ede4) 82%, transparent);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: auto;
+  cursor: pointer;
+  transition: opacity 250ms ease-out, visibility 0s 250ms;
+}
+
+.promo.show {
+  opacity: 1;
+  visibility: visible;
+  transition: opacity 250ms ease-out, visibility 0s;
+}
+
+/* Slowly turning rays behind the badge. */
+.promo-rays {
+  position: absolute;
+  width: 520px;
+  height: 520px;
+  border-radius: 50%;
+  background: repeating-conic-gradient(color-mix(in srgb, var(--promo) 22%, transparent) 0 8deg, transparent 8deg 22deg);
+  -webkit-mask: radial-gradient(closest-side, #000 25%, transparent);
+  mask: radial-gradient(closest-side, #000 25%, transparent);
+  animation: promo-spin 18s linear infinite;
+}
+
+.promo-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  max-width: 320px;
+}
+
+.promo-kicker {
+  letter-spacing: 0.4em;
+  margin-right: -0.4em;
+  font-weight: 600;
+}
+
+.promo-icon {
+  width: 128px;
+  height: 128px;
+  margin: 18px 0 10px;
+  filter: drop-shadow(0 8px 24px color-mix(in srgb, var(--promo) 55%, transparent));
+}
+
+.promo-name {
+  font-size: calc(26px * var(--ui-scale));
+  letter-spacing: 0.12em;
+}
+
+.promo-lines {
+  margin-top: 14px;
+  line-height: 1.9;
+}
+
+.promo-tap {
+  margin-top: 26px;
+  animation: promo-breathe 1600ms ease-in-out infinite;
+}
+
+.promo.show .promo-icon {
+  animation: promo-pop 700ms cubic-bezier(0.2, 1.6, 0.4, 1) both;
+}
+
+.promo.show .promo-kicker,
+.promo.show .promo-name,
+.promo.show .promo-lines {
+  animation: promo-rise 500ms ease-out both;
+}
+
+.promo.show .promo-name {
+  animation-delay: 150ms;
+}
+
+.promo.show .promo-lines {
+  animation-delay: 300ms;
+}
+
+@keyframes promo-pop {
+  0% {
+    transform: scale(0.3) rotate(-12deg);
+    opacity: 0;
+  }
+  100% {
+    transform: none;
+    opacity: 1;
+  }
+}
+
+@keyframes promo-rise {
+  0% {
+    transform: translateY(10px);
+    opacity: 0;
+  }
+  100% {
+    transform: none;
+    opacity: 1;
+  }
+}
+
+@keyframes promo-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes promo-breathe {
+  50% {
+    opacity: 0.35;
+  }
+}
+
+.reduce-motion .promo-rays,
+.reduce-motion .promo.show .promo-icon,
+.reduce-motion .promo.show .promo-kicker,
+.reduce-motion .promo.show .promo-name,
+.reduce-motion .promo.show .promo-lines {
+  animation: none;
 }

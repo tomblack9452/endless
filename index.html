@@ -220,20 +220,30 @@
           <button class="label link back" type="button" data-action="back">back</button>
           <div class="panel-title">league</div>
         </div>
-        <div class="settings">
-          <div class="record-top">
+        <div class="settings prog">
+          <div class="prog-hero">
             <span id="league-icon" class="insignia big"></span>
-            <div id="league-name" class="record-rank"></div>
-            <div id="league-next" class="label dim"></div>
+            <div>
+              <div class="label dim prog-kicker">you are</div>
+              <div id="league-name" class="record-rank"></div>
+            </div>
           </div>
-          <div class="xp-track"><div id="league-lp" class="xp-fill"></div></div>
+          <div class="prog-goal">
+            <div id="league-big" class="prog-big"></div>
+            <div id="league-goal" class="label prog-goal-label"></div>
+            <div class="xp-track"><div id="league-fill" class="xp-fill"></div></div>
+            <div id="league-detail" class="label dim prog-detail"></div>
+          </div>
+          <div id="league-checks" class="prog-checks"></div>
+          <div id="league-gives" class="prog-gives"></div>
+          <div id="league-trend" class="prog-trend"></div>
           <div id="league-rows"></div>
-          <div class="settings-group">leagues</div>
+          <div class="settings-group">all leagues</div>
           <div id="league-ladder" class="ladder"></div>
           <div class="label dim setting-note">
             ranked runs earn league points against your league's par. fill a division to move up; finish division 3 and
             own the next league's upgrade points to be promoted. divisions can drop, leagues never do. in a league your
-            active upgrades can't be over its cap. daily runs always fly the standard ship.
+            active upgrades can't be over its cap.
           </div>
         </div>
       </div>
@@ -243,17 +253,25 @@
           <button class="label link back" type="button" data-action="back">back</button>
           <div class="panel-title">service record</div>
         </div>
-        <div class="settings">
-          <div class="record-top">
+        <div class="settings prog">
+          <div class="prog-hero">
             <span id="record-icon" class="insignia big"></span>
-            <div id="record-rank" class="record-rank"></div>
-            <div id="record-next" class="label dim"></div>
+            <div>
+              <div class="label dim prog-kicker">you are</div>
+              <div id="record-name" class="record-rank"></div>
+            </div>
           </div>
-          <div class="xp-track"><div id="record-xp" class="xp-fill"></div></div>
+          <div class="prog-goal">
+            <div id="record-big" class="prog-big"></div>
+            <div id="record-goal" class="label prog-goal-label"></div>
+            <div class="xp-track"><div id="record-fill" class="xp-fill"></div></div>
+            <div id="record-detail" class="label dim prog-detail"></div>
+          </div>
+          <div id="record-checks" class="prog-checks"></div>
+          <div id="record-gives" class="prog-gives"></div>
+          <div id="record-trend" class="prog-trend"></div>
           <div id="record-rows"></div>
-          <div class="settings-group">recent runs</div>
-          <div id="record-runs"></div>
-          <div class="settings-group">ranks</div>
+          <div class="settings-group">all ranks</div>
           <div id="record-ladder" class="ladder"></div>
         </div>
       </div>
@@ -273,6 +291,17 @@
             <button class="pill" type="button" data-action="menu">main menu</button>
           </div>
         </div>
+      </div>
+    </div>
+
+    <div id="promo" class="promo" role="dialog" aria-live="assertive">
+      <div class="promo-rays"></div>
+      <div class="promo-card">
+        <div id="promo-kicker" class="label promo-kicker"></div>
+        <span id="promo-icon" class="insignia promo-icon"></span>
+        <div id="promo-name" class="promo-name"></div>
+        <div id="promo-lines" class="promo-lines"></div>
+        <div class="label dim promo-tap">tap to continue</div>
       </div>
     </div>
 
