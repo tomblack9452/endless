@@ -86,6 +86,8 @@ export class UI {
     for (const key of Object.keys(this.screens) as ScreenName[]) {
       this.screens[key].classList.toggle('on', key === screen);
     }
+    // Every screen but the title is a menu panel: the HUD hides behind it.
+    document.getElementById('ui')?.classList.toggle('menu-open', screen !== null && screen !== 'title');
   }
 
   showHud(on: boolean): void {
@@ -220,7 +222,13 @@ export class UI {
     this.overMissions.replaceChildren(
       ...rows.map(([text, prog]) => {
         const line = document.createElement('div');
-        line.textContent = `${text}  ${prog}`;
+        line.className = 'over-mission';
+        const a = document.createElement('span');
+        a.textContent = text;
+        const b = document.createElement('span');
+        b.className = 'over-mission-progress';
+        b.textContent = prog;
+        line.append(a, b);
         return line;
       }),
     );
@@ -253,7 +261,7 @@ export class UI {
         a.className = 'label';
         a.textContent = k;
         const b = document.createElement('span');
-        b.className = 'label';
+        b.className = 'label stat-value';
         b.textContent = v;
         row.append(a, b);
         return row;
@@ -318,7 +326,7 @@ export class UI {
   setGameOver(score: number, best: number, isNewBest: boolean, nearMisses: number, bestCombo: number, seed: number): void {
     this.overStats.textContent =
       (nearMisses > 0 ? `near misses ${nearMisses}, best chain x${bestCombo}` : 'no near misses') +
-      (import.meta.env.DEV ? `  seed ${seed}` : ''); // dev builds: for reporting a layout
+      (import.meta.env.DEV ? ` · seed ${seed}` : ''); // dev builds: for reporting a layout
     this.overScore.textContent = formatScore(score);
     this.overBest.textContent = isNewBest ? 'new best' : `best ${formatScore(best)}`;
   }
