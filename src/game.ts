@@ -1,5 +1,6 @@
 import { applyAtmosphere } from './atmosphere';
 import { type AudioState, Sound } from './audio/sound';
+import type { MusicId } from './audio/music';
 import { createBlockTextures } from './blockTextures';
 import { CONFIG, PALETTES } from './config';
 import { lateralSpeedAt, speedAt } from './difficulty';
@@ -28,6 +29,12 @@ import { terrain } from './terrain';
 type State = 'title' | 'playing' | 'paused' | 'crashed';
 
 const DEG = Math.PI / 180;
+
+/** Music for a level: the theme's, or the biome's own where it has one. */
+function musicFor(level: number): MusicId {
+  const biome = biomeForLevel(level);
+  return biome === 'ice' || biome === 'volcanic' || biome === 'asteroids' ? biome : themeForLevel(level);
+}
 
 const POWER_NOTICE = ['shield. takes one hit', 'magnet. pulls in boost', 'slow-mo'];
 
@@ -204,7 +211,7 @@ export class Game {
     this.world.reset(CONFIG.field.startClearance, true, startScore, seed);
     const level = Math.floor(startScore / CONFIG.score.levelLength) + 1;
     this.sound.ignite();
-    this.sound.setTheme(themeForLevel(level));
+    this.sound.setTheme(musicFor(level));
     this.runStart = this.world.distance - startScore / CONFIG.score.pointsPerUnit;
     this.distanceScore = startScore;
     this.score = startScore - this.scoreBase;
@@ -722,7 +729,7 @@ export class Game {
       this.ui.setLevel(level);
       this.progress.reachedLevel(level);
       this.ui.announceLevel(level, themeName(level));
-      this.sound.level(themeChange, themeForLevel(level));
+      this.sound.level(themeChange, musicFor(level));
       this.haptics.level(themeChange);
       this.maybeStartEvent(level);
       const loop = Math.floor((level - 1) / (CONFIG.themes.levelsPerTheme * 3));

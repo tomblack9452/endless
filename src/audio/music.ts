@@ -26,7 +26,10 @@ interface ThemeMusic {
   bell: boolean; // metallic FM lead instead of a soft pluck
 }
 
-export const THEME_MUSIC: Record<ThemeId, ThemeMusic> = {
+/** A theme, or one of the biomes that has its own music. */
+export type MusicId = ThemeId | 'ice' | 'volcanic' | 'asteroids';
+
+export const THEME_MUSIC: Record<MusicId, ThemeMusic> = {
   // D major pentatonic: open and airy.
   land: {
     scale: [0, 2, 4, 7, 9],
@@ -60,6 +63,39 @@ export const THEME_MUSIC: Record<ThemeId, ThemeMusic> = {
     ],
     bell: true,
   },
+  // D Lydian: bright and glassy, with the bell lead, for the ice field.
+  ice: {
+    scale: [0, 2, 4, 6, 9],
+    chords: [
+      [0, 7, 14, 18],
+      [2, 9, 14, 18],
+      [-5, 2, 7, 14],
+      [-3, 4, 9, 14],
+    ],
+    bell: true,
+  },
+  // Phrygian dominant: hot and uneasy, for the volcanic plain.
+  volcanic: {
+    scale: [0, 1, 4, 7, 8],
+    chords: [
+      [0, 7, 12, 16],
+      [1, 8, 13, 17],
+      [-4, 3, 8, 12],
+      [-5, 2, 7, 11],
+    ],
+    bell: false,
+  },
+  // Mixolydian pentatonic with open voicings: floating, for the asteroid belt.
+  asteroids: {
+    scale: [0, 2, 4, 7, 10],
+    chords: [
+      [0, 7, 14, 17],
+      [-2, 5, 12, 16],
+      [-5, 2, 9, 14],
+      [3, 10, 15, 19],
+    ],
+    bell: true,
+  },
 };
 
 const M = CONFIG.audio.music;
@@ -72,8 +108,8 @@ interface PadVoice {
 }
 
 export class Music {
-  private theme: ThemeId = 'land';
-  private pendingTheme: ThemeId | null = null;
+  private theme: MusicId = 'land';
+  private pendingTheme: MusicId | null = null;
   private running = false;
   private step = 0;
   private nextTime = 0;
@@ -112,7 +148,7 @@ export class Music {
     this.leadFilter.connect(delaySend);
   }
 
-  get currentTheme(): ThemeId {
+  get currentTheme(): MusicId {
     return this.pendingTheme ?? this.theme;
   }
 
@@ -130,7 +166,7 @@ export class Music {
   }
 
   /** Switch mode at the next bar (or now, if `now`). */
-  setTheme(theme: ThemeId, now = false): void {
+  setTheme(theme: MusicId, now = false): void {
     if (theme === this.theme && !this.pendingTheme) return;
     this.pendingTheme = theme;
     if (now) this.step = Math.ceil(this.step / STEPS_PER_BAR) * STEPS_PER_BAR;
