@@ -8,6 +8,7 @@ import type { LivePalette } from './palette';
 import { type Biome, BIOME_NAMES } from './biomes';
 import { terrain } from './terrain';
 import { Decor, decorate, Light, pickRoom, ROOM_IDS, ROOMS, roomLength, type RoomAPI, type RoomId, type RoomPlan } from './interior';
+import { ARCH_PILLAR_X, bush, deadTree, grassTuft, mesa, rockArch, rockSpire } from './props';
 import { BOULDER_HEIGHT, boulder, canister, crystalCluster, greebleBox, mushroomTree, pipeSegment, powerGem, shuttle, spireTree } from './props';
 
 // The world ahead of the ship: obstacle pools plus the generator that lays
@@ -42,7 +43,21 @@ const enum Prop {
   Spire,
   Rock,
   Crystal,
+  Bush,
+  DeadTree,
+  RockSpire,
 }
+
+/** Collision radius per unit of size, by prop kind (trees collide at the trunk only). */
+const PROP_HIT: Record<Prop, number> = {
+  [Prop.Mushroom]: 0.2,
+  [Prop.Spire]: 0.16,
+  [Prop.Rock]: 0.8,
+  [Prop.Crystal]: 0.45,
+  [Prop.Bush]: 0.45,
+  [Prop.DeadTree]: 0.16,
+  [Prop.RockSpire]: 0.6,
+};
 
 function clamp(v: number, lo: number, hi: number): number {
   return v < lo ? lo : v > hi ? hi : v;
@@ -104,6 +119,11 @@ export class World {
   private prevWallL = NaN;
   private prevWallR = NaN;
   private shipX = 0; // ship's world lateral position
+
+  /** The ship's sideways position in the world (ground patterns follow it). */
+  get lateral(): number {
+    return this.shipX;
+  }
   private runStart: number | null = null; // null on the title screen
 
   private readonly blocks: InstancedField; // steel crates (interior)
@@ -113,6 +133,16 @@ export class World {
   private readonly mushrooms: InstancedField;
   private readonly spires: InstancedField;
   private readonly crystals: InstancedField;
+  private readonly bushes: InstancedField;
+  private readonly deadTrees: InstancedField;
+  private readonly rockSpires: InstancedField;
+  private readonly tufts: InstancedField; // grass, scenery
+  private readonly mesas: InstancedField; // horizon scenery
+  private readonly arches: InstancedField; // rock arches over the path (pillars collide via rocks)
+  private nextRockFaceAt = 0;
+  private rockFaceUntil = -Infinity;
+  private rockFaceSide = 1;
+  private nextArchAt = 0;
   private readonly strips: InstancedField; // lights, and laser beams (solid ones)
   private readonly shuttles: InstancedField;
   private readonly pipes: InstancedField; // wall dressing
@@ -216,6 +246,12 @@ export class World {
     this.mushrooms = new InstancedField(scene, mushroomTree(), this.propMat, F.maxMushrooms);
     this.spires = new InstancedField(scene, spireTree(), this.propMat, F.maxSpires);
     this.crystals = new InstancedField(scene, crystalCluster(), this.propMat, F.maxCrystals);
+    this.bushes = new InstancedField(scene, bush(), this.propMat, F.maxBushes);
+    this.deadTrees = new InstancedField(scene, deadTree(), this.propMat, F.maxDeadTrees);
+    this.rockSpires = new InstancedField(scene, rockSpire(), this.propMat, F.maxRockSpires);
+    this.tufts = new InstancedField(scene, grassTuft(), this.propMat, F.maxTufts);
+    this.mesas = new InstancedField(scene, mesa(), this.propMat, F.maxMesas);
+    this.arches = new InstancedField(scene, rockArch(), this.propMat, F.maxArches);
     this.stripMat = new MeshBasicMaterial();
     this.strips = new InstancedField(scene, box, this.stripMat, F.maxStrips);
     const L = TH.interior.lights;
@@ -239,8 +275,21 @@ export class World {
     const pw = CONFIG.powers;
     this.powers = new InstancedField(scene, powerGem(pw.size), new MeshBasicMaterial({ vertexColors: true }), F.maxPowers);
     this.powers.setColorTable([pw.shield.color, pw.magnet.color, pw.slow.color].map((c) => new Color(c)));
-    this.solids = [this.blocks, this.hull, this.rocks, this.obstacleRocks, this.mushrooms, this.spires, this.crystals, this.shuttles, this.strips];
-    this.fields = [...this.solids, this.pickups, this.powers, this.pipes, this.greebles, this.voids, this.canisters];
+    this.solids = [
+      this.blocks,
+      this.hull,
+      this.rocks,
+      this.obstacleRocks,
+      this.mushrooms,
+      this.spires,
+      this.crystals,
+      this.bushes,
+      this.deadTrees,
+      this.rockSpires,
+      this.shuttles,
+      this.strips,
+    ];
+    this.fields = [...this.solids, this.tufts, this.mesas, this.arches, this.pickups, this.powers, this.pipes, this.greebles, this.voids, this.canisters];
     this.applyPalette();
   }
 
@@ -314,7 +363,10 @@ export class World {
     const level = this.levelAt(this.distance);
     this.themeEnd = run ? this.levelStart(level - ((level - 1) % LPT) + LPT) : Infinity;
     // A run that starts on open ground never calls startTheme for it, so set its hills here.
-    if (run && themeForLevel(level) === 'land') terrain.setWindow(this.distance + clearance, this.themeEnd, rand() * 6.28, rand() * 6.28);
+    if (run && themeForLevel(level) === 'land') this.setHills(this.distance + clearance, this.themeEnd);
+    this.nextRockFaceAt = this.distance + clearance + range(TH.land.rockFaceSpacing) * 0.5;
+    this.rockFaceUntil = -Infinity;
+    this.nextArchAt = this.distance + clearance + range(TH.land.archSpacing) * 0.5;
     this.lane = this.laneTarget = this.shipX;
     this.laneRetargetAt = this.distance + clearance + 20;
     this.nextFeatureAt = this.distance + clearance;
@@ -535,11 +587,75 @@ export class World {
       this.prevWallL = this.prevWallR = NaN;
     } else {
       this.laneTarget = this.lane;
-      if (this.runStart !== null) terrain.setWindow(d, this.themeEnd, rand() * 6.28, rand() * 6.28);
+      if (this.runStart !== null) this.setHills(d, this.themeEnd);
     }
   }
 
   // --- land ------------------------------------------------------------------
+
+  /** Rolling hills for an open-ground theme, with a few big hill sections. */
+  private setHills(start: number, end: number): void {
+    const lt = TH.land;
+    const p = rand() * 6.28;
+    const q = rand() * 6.28;
+    const n = Math.round(range(lt.bigHills));
+    const bumps: [number, number, number][] = [];
+    for (let i = 0; i < n; i++) {
+      // Spread along the theme, away from its ends (where the hills fade out anyway).
+      const c = start + (end - start) * ((i + 0.3 + rand() * 0.4) / n);
+      bumps.push([c, range(lt.bigHillWidth), range(lt.bigHillHeight) * (rand() < 0.3 ? -0.6 : 1)]);
+    }
+    terrain.setWindow(start, end, p, q, bumps);
+  }
+
+  /**
+   * Open-ground dressing: grass, mesas on the horizon, rock faces alongside
+   * the path and the odd arch over it. All clear of the lane.
+   */
+  private landDressing(d: number, laneRel: number, jitter: number): void {
+    const lt = TH.land;
+    const biome = this.genBiome;
+    // Grass tufts (alien ground only): scenery, so anywhere.
+    if (biome === 'alien') {
+      for (let i = 0; i < lt.tuftsPerRow; i++) {
+        const s = 0.7 + rand() * 0.9;
+        this.tufts.spawn((rand() * 2 - 1) * W, 0, d + (rand() - 0.5) * STEP, s, s * (0.8 + rand() * 0.5), s, rand() * 6.28, false, true, 0, 0, false);
+      }
+    }
+    // Mesas on the horizon.
+    if (rand() < lt.mesaChance) {
+      const side = rand() < 0.5 ? -1 : 1;
+      const s = 0.8 + rand() * 1.0;
+      this.mesas.spawn(wrap(laneRel + side * (30 + rand() * 40)), 0, d, s, s * (0.7 + rand() * 0.6), s, rand() * 6.28, false, true, 0, 0, false);
+    }
+    if (this.runStart === null) return; // the title keeps to scenery
+    // Rock faces: a wall of tall rock alongside the path for a stretch.
+    if (d >= this.nextRockFaceAt && d > this.rockFaceUntil) {
+      this.rockFaceSide = rand() < 0.5 ? -1 : 1;
+      this.rockFaceUntil = d + range(lt.rockFaceLength);
+      this.nextRockFaceAt = this.rockFaceUntil + range(lt.rockFaceSpacing);
+    }
+    if (d <= this.rockFaceUntil) {
+      for (let k = 0; k < 2; k++) {
+        const r = 1.4 + rand() * 1.8;
+        const height = 4 + rand() * 6;
+        const x = laneRel + this.rockFaceSide * (range(lt.rockFaceGap) + jitter + r + k * r * 1.2);
+        const hit = r * 0.85;
+        if (Math.abs(wrap(x - laneRel)) - hit < LANE + jitter + 1) continue;
+        this.rocks.spawn(wrap(x), 0, d + (rand() - 0.5) * STEP, r, height / BOULDER_HEIGHT, r, rand() * Math.PI * 2, true, true, hit, hit, false);
+      }
+    }
+    // A natural arch over the path, pillars well clear of the lane.
+    if (d >= this.nextArchAt && biome !== 'ice') {
+      this.nextArchAt = d + range(lt.archSpacing);
+      const s = 1 + rand() * 0.25;
+      this.arches.spawn(wrap(laneRel), 0, d, s, s, s, 0, false, true, 0, 0, false);
+      for (const side of [-1, 1]) {
+        const px = laneRel + side * ARCH_PILLAR_X * s;
+        this.rocks.spawn(wrap(px), 0, d, 1.2 * s, (5.5 * s) / BOULDER_HEIGHT, 1.2 * s, 0, true, true, 1.1 * s, 1.1 * s, false);
+      }
+    }
+  }
 
   private land(d: number, sub: number, score: number, maxSlope: number): void {
     const lt = TH.land;
@@ -557,6 +673,7 @@ export class World {
     const laneRel = this.lane - this.shipX;
     // Props are jittered half a row forwards/back, where the lane may have moved.
     const jitter = maxSlope * STEP * 0.5;
+    this.landDressing(d, laneRel, jitter);
 
     if (sub === 2) {
       // Forest path: dense alien forest either side of a clear winding path
@@ -619,23 +736,26 @@ export class World {
   private pickProp(): void {
     const b = this.genBiome;
     const m = CONFIG.biomes.mix[b === 'ice' || b === 'volcanic' ? b : 'alien'];
-    const r = rand() * (m.mushroom + m.spire + m.rock + m.crystal);
-    if (r < m.mushroom) {
-      this.propKind = Prop.Mushroom;
-      this.propSize = 0.8 + rand() * 0.45;
-      this.propHit = 0.2 * this.propSize;
-    } else if (r < m.mushroom + m.spire) {
-      this.propKind = Prop.Spire;
-      this.propSize = 0.8 + rand() * 0.4;
-      this.propHit = 0.16 * this.propSize;
-    } else if (r < m.mushroom + m.spire + m.rock) {
-      this.propKind = Prop.Rock;
-      this.propSize = 0.5 + rand() * 0.6;
-      this.propHit = 0.8 * this.propSize;
-    } else {
-      this.propKind = Prop.Crystal;
-      this.propSize = 0.8 + rand() * 0.5;
-      this.propHit = 0.45 * this.propSize;
+    const weights: [Prop, number, number, number][] = [
+      // kind, weight, size min, size range
+      [Prop.Mushroom, m.mushroom, 0.8, 0.45],
+      [Prop.Spire, m.spire, 0.8, 0.4],
+      [Prop.Rock, m.rock, 0.5, 0.6],
+      [Prop.Crystal, m.crystal, 0.8, 0.5],
+      [Prop.Bush, m.bush, 0.8, 0.6],
+      [Prop.DeadTree, m.deadTree, 0.8, 0.5],
+      [Prop.RockSpire, m.rockSpire, 0.7, 0.6],
+    ];
+    let total = 0;
+    for (const w of weights) total += w[1];
+    let r = rand() * total;
+    for (const [kind, w, min, span] of weights) {
+      r -= w;
+      if (r > 0) continue;
+      this.propKind = kind;
+      this.propSize = min + rand() * span;
+      this.propHit = PROP_HIT[kind] * this.propSize;
+      return;
     }
   }
 
@@ -647,8 +767,24 @@ export class World {
     if (this.propKind === Prop.Rock) {
       this.obstacleRocks.spawn(x, 0, d, s, (0.6 + rand()) / BOULDER_HEIGHT, s, rot, true, wraps, h, h);
     } else {
-      const field = this.propKind === Prop.Mushroom ? this.mushrooms : this.propKind === Prop.Spire ? this.spires : this.crystals;
+      const field = this.propField(this.propKind);
       field.spawn(x, 0, d, s, s * (0.85 + rand() * 0.3), s, rot, true, wraps, h, h);
+    }
+  }
+  private propField(kind: Prop): InstancedField {
+    switch (kind) {
+      case Prop.Mushroom:
+        return this.mushrooms;
+      case Prop.Spire:
+        return this.spires;
+      case Prop.Bush:
+        return this.bushes;
+      case Prop.DeadTree:
+        return this.deadTrees;
+      case Prop.RockSpire:
+        return this.rockSpires;
+      default:
+        return this.crystals;
     }
   }
   // --- shared path steering --------------------------------------------------

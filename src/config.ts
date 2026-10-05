@@ -229,6 +229,12 @@ export const CONFIG = {
     maxRocks: 1800,
     maxStrips: 1600,
     maxObstacleRocks: 1400,
+    maxBushes: 900,
+    maxDeadTrees: 500,
+    maxRockSpires: 500,
+    maxTufts: 2600,
+    maxMesas: 60,
+    maxArches: 12,
     maxMushrooms: 1200,
     maxSpires: 800,
     maxCrystals: 700,
@@ -331,6 +337,16 @@ export const CONFIG = {
       pathWander: 14, // gentler lane drift so the path winds smoothly
       forestDensity: 2.6, // level 3 density multiplier outside the path
       edgeChance: 0.75, // chance per row per side of a prop lining the path edge
+      // Dressing (alien ground and title screen).
+      tuftsPerRow: 12, // grass tufts scattered per row (scenery)
+      mesaChance: 0.035, // per row: a mesa on the horizon
+      rockFaceSpacing: [160, 320], // between rock faces running alongside the path
+      rockFaceLength: [40, 90],
+      rockFaceGap: [6, 11], // distance from the lane to the face
+      archSpacing: [380, 650], // between natural rock arches over the path
+      bigHills: [1, 3], // big hill sections per open-ground theme
+      bigHillWidth: [70, 130], // half-width of a big hill (units along the run)
+      bigHillHeight: [3.5, 6],
     },    // The canyon is about readable shapes, not random clutter: the walls wind,
     // and obstacles are dark rocks that stand out from the sand.
     //   level 1: winding path, a few lone boulders
@@ -495,9 +511,9 @@ export const CONFIG = {
   biomes: {
     // Prop mixes for open ground by biome (relative chances).
     mix: {
-      alien: { mushroom: 0.4, spire: 0.2, rock: 0.28, crystal: 0.12 },
-      ice: { mushroom: 0, spire: 0.3, rock: 0.25, crystal: 0.45 },
-      volcanic: { mushroom: 0, spire: 0.25, rock: 0.6, crystal: 0.15 },
+      alien: { mushroom: 0.32, spire: 0.16, rock: 0.2, crystal: 0.1, bush: 0.17, deadTree: 0, rockSpire: 0.05 },
+      ice: { mushroom: 0, spire: 0.22, rock: 0.2, crystal: 0.38, bush: 0, deadTree: 0.05, rockSpire: 0.15 },
+      volcanic: { mushroom: 0, spire: 0.08, rock: 0.45, crystal: 0.1, bush: 0, deadTree: 0.22, rockSpire: 0.15 },
     },
     lavaChance: 0.6, // per row on the volcanic plain: a glowing crack off the lane
     looks: {
