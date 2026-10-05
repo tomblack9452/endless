@@ -62,7 +62,7 @@ export class Stage {
   private readonly pits = { value: Array.from({ length: MAX_PITS }, () => new Vector2()) };
   private readonly shipX = { value: 0 };
   private readonly groundAt = { value: new Vector2() }; // world x and distance under the camera, wrapped
-  private readonly groundStyle = { value: new Vector2() };
+  private readonly groundStyle = { value: new Vector3() };
 
   // Camera state driven by the game.
   roll = 0; // radians
@@ -129,7 +129,7 @@ export class Stage {
 varying float vHillShade;
 varying float vPit;
 varying vec2 vGround;
-uniform vec2 uGroundStyle; // grass and dirt patches, fine speckle
+uniform vec3 uGroundStyle; // grass and dirt patches, fine speckle, canyon sediment
 float gHash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
 float gNoise(vec2 p) {
   vec2 i = floor(p);
@@ -149,6 +149,16 @@ float gNoise(vec2 p) {
           // Fine grain so the ground doesn't read as flat paint.
           float grain = gNoise(vGround * 1.6) * 0.6 + gNoise(vGround * 4.1) * 0.4;
           diffuseColor.rgb *= 1.0 + (grain - 0.5) * 0.09 * uGroundStyle.y;
+        }
+        if (uGroundStyle.z > 0.0) {
+          // Canyon floor: wavy bands of sediment along the run, dried cracks, darker gravel.
+          float band = sin(vGround.y * 0.21 + gNoise(vGround * 0.08) * 4.0 + vGround.x * 0.06);
+          diffuseColor.rgb *= 1.0 + band * 0.045 * uGroundStyle.z;
+          float cell = gNoise(vGround * 0.9);
+          float crack = smoothstep(0.035, 0.0, abs(cell - 0.5)) * smoothstep(0.55, 0.75, gNoise(vGround * 0.05 + 3.0));
+          diffuseColor.rgb *= 1.0 - crack * 0.22 * uGroundStyle.z;
+          float gravel = smoothstep(0.72, 0.9, gNoise(vGround * 2.7 + 11.0));
+          diffuseColor.rgb *= 1.0 - gravel * 0.12 * uGroundStyle.z;
         }
         // Chasm walls darken as soon as they drop below the rim (each wall is one steep strip of ground).
         diffuseColor.rgb *= 1.0 - 0.9 * smoothstep(0.0, 0.06, vPit);`)
@@ -206,8 +216,8 @@ float gNoise(vec2 p) {
    * speckle. `shipX` and `distance` place the pattern so it moves with the
    * world (wrapped, so floats stay precise on long runs).
    */
-  setGroundStyle(grass: number, grain: number, shipX: number, distance: number): void {
-    this.groundStyle.value.set(grass, grain);
+  setGroundStyle(grass: number, grain: number, shipX: number, distance: number, strata = 0): void {
+    this.groundStyle.value.set(grass, grain, strata);
     this.groundAt.value.set(shipX % 4096, distance % 4096);
   }
 

@@ -1205,7 +1205,8 @@ export class Game {
       this.world.spinFans(fxDt);
       this.world.sparks.update(this.state === 'paused' ? 0 : fxDt, this.world.distance, this.world.lateral);
     }
-    this.stage.setGroundStyle(...this.groundStyle(), this.world.lateral, this.world.distance);
+    const [grass, grain, strata] = this.groundStyle();
+    this.stage.setGroundStyle(grass, grain, this.world.lateral, this.world.distance, strata);
     if (this.state === 'playing' || this.state === 'title') this.stage.adapt(now - this.lastTime);
     const dt = Math.max(0, Math.min((now - this.lastTime) / 1000, 1 / 20));
     this.lastTime = now;
@@ -1489,11 +1490,11 @@ export class Game {
   }
 
   /** Ground patches and grain for the current biome: lush on alien ground, faint elsewhere, none indoors. */
-  private groundStyle(): [number, number] {
+  private groundStyle(): [number, number, number] {
     const w = this.world;
     const outside = (1 - w.insideMix) * (1 - w.asteroidMix);
     const grass: Record<string, number> = { alien: 1, ice: 0.25, volcanic: 0.4, canyon: 0.15 };
-    return [(grass[w.biome] ?? 0) * outside, outside];
+    return [(grass[w.biome] ?? 0) * outside, outside, w.canyonMix * outside];
   }
 
   /** A set level, each frame: section changes (banner, event), progress, look, and the finish. */
