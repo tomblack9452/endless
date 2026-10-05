@@ -1722,9 +1722,11 @@ export class World {
   private choosePiece(next: RoomId, sub: number): Piece | null {
     if (this.devPieces.length) {
       const p = pieceById(this.devPieces[this.devPieceNext % this.devPieces.length]);
-      if (!p || (p.family === 'corridor') !== (next === 'corridor')) return null;
-      this.devPieceNext++;
-      return p;
+      if (p && (p.family === 'corridor') === (next === 'corridor')) {
+        this.devPieceNext++;
+        return p;
+      }
+      // The queued piece is for the other kind of slot: fill this one as normal.
     }
     if (next === 'corridor') return this.runStart !== null && rand() < TH.interior.corridorPieceChance ? pickPiece('corridor', sub) : null;
     return FAMILIES.has(next) ? pickPiece(next, sub) : null;
@@ -2028,7 +2030,8 @@ export class World {
       }
       else this.lastRoom = this.room;
       const piece = named ?? this.choosePiece(next, sub);
-      if (!piece || !this.startPiece(piece, d, base, maxSlope)) this.startRoom(next, d, base, maxSlope);
+      // No piece (or no room for one before the area ends): a plain corridor.
+      if (!piece || !this.startPiece(piece, d, base, maxSlope)) this.startRoom('corridor', d, base, maxSlope);
     }
 
     const def = ROOMS[this.room];
