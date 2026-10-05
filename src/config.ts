@@ -93,6 +93,7 @@ export const PALETTES: Palette[] = [
 export const CONFIG = {
   render: {
     maxPixelRatio: 2,
+    performancePixelRatio: 1.1, // the cap in performance mode
     // Adaptive resolution: if frames run slow, render at a lower scale; step
     // back up when there's headroom. Frame times are averaged first.
     adaptive: true,
