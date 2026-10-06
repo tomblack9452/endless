@@ -7,6 +7,11 @@ desktop window, the code read for flow bugs, and the store rules checked.
 Each item says what's wrong, where, and what the fix is. **Must** blocks the
 launch, **should** is worth doing first, **nice** can wait.
 
+**Status:** every must and should item is fixed and on main. Added on the
+way: a pilot name box on the welcome screen and in settings, swapping cores
+for credits in the shop, and the camera leaving the showroom when the
+practice run starts.
+
 ## Must
 
 1. **Leaving the practice run by the pause menu keeps you invincible.**
@@ -66,6 +71,9 @@ launch, **should** is worth doing first, **nice** can wait.
 18. A "rate the game" prompt after a good run. Better added once there are
     players.
 19. Interstitial ads stay off. Rewarded ads only, as agreed.
+20. Moving progress to a new phone. The account is anonymous, so a new phone
+    starts again (purchases restore). Sign in with Apple and Google would fix
+    it; support says to email in the meantime.
 
 ## Checked and fine
 
