@@ -193,6 +193,9 @@ describe('db:apply (the migrations from a terminal)', () => {
     expect(second).toEqual({ applied: [], recorded: [] });
     const t = await d.query<{ n: string }>("select table_name n from information_schema.tables where table_schema = 'public' order by 1");
     expect(t.rows.map((r) => r.n)).toEqual(['bests', 'core_log', 'endless_migrations', 'players', 'runs', 'saves', 'store_events', 'wallets']);
+    // Every table has row-level security on (Supabase's advisor flags any that don't).
+    const open = await d.query<{ n: string }>("select relname n from pg_class c join pg_namespace s on s.oid = c.relnamespace where s.nspname = 'public' and c.relkind = 'r' and not c.relrowsecurity");
+    expect(open.rows).toEqual([]);
   });
 
   it('picks up a newer migration on its own', async () => {

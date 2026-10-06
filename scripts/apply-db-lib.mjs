@@ -14,6 +14,9 @@ const MADE = { '0001_init.sql': 'players', '0002_store.sql': 'store_events', '00
  */
 export async function applyMigrations(db, migrations, log = () => {}) {
   await db.query('create table if not exists public.endless_migrations (name text primary key, at timestamptz not null default now())');
+  // Only this script reads it: no row-level access for the game's keys at all.
+  await db.query('alter table public.endless_migrations enable row level security');
+  await db.query('revoke all on public.endless_migrations from anon, authenticated');
   const done = new Set((await db.query('select name from public.endless_migrations')).rows.map((r) => r.name));
   const applied = [];
   const recorded = [];
