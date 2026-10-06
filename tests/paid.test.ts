@@ -85,6 +85,14 @@ describe('ads', () => {
     expect(await premium.reward('revive')).toBe(true);
   });
 
+  it('swap a daily goal for free where there are no ads (the web)', async () => {
+    const web = new Ads(new FakeNetwork(false), () => false, () => 0);
+    expect(web.offers('rerollQuest')).toBe(true);
+    expect(web.label()).toBe('free');
+    expect(await web.reward('rerollQuest')).toBe(true);
+    expect(new Ads(new FakeNetwork(true), () => false, () => 0).label()).toBe('watch an ad');
+  });
+
   it('reward only an ad watched to the end, and never show one to premium', async () => {
     const net = new FakeNetwork(true);
     expect(await new Ads(net, () => false, () => 0).reward('doubleCredits')).toBe(true);

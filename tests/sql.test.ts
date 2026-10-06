@@ -230,6 +230,22 @@ describe('accounts', () => {
     const w = await db.query<{ cores: number }>('select cores from public.wallets where user_id = $1', [id]);
     expect(w.rows[0].cores).toBe(0);
   });
+
+  it('can be deleted by its owner, taking its save, wallet, runs and bests with it', async () => {
+    const [a, b] = [await newUser(), await newUser()];
+    await as(a);
+    await db.query("select public.set_pilot_name('Gone Soon')");
+    await submit({ board: 'endless', score: 1200 });
+    await as(null);
+    await rejects(db.query('select public.delete_my_account()'), /permission denied|not signed in/);
+    await as(a);
+    await db.query('select public.delete_my_account()');
+    await admin();
+    for (const t of ['players', 'wallets', 'runs', 'bests', 'saves'])
+      expect((await db.query(`select 1 from public.${t} where user_id = $1`, [a])).rows.length, t).toBe(0);
+    expect((await db.query('select 1 from auth.users where id = $1', [a])).rows.length).toBe(0);
+    expect((await db.query('select 1 from auth.users where id = $1', [b])).rows.length).toBe(1);
+  });
 });
 
 describe('submit_run', () => {

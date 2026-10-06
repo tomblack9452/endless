@@ -169,6 +169,14 @@ export class SupabaseBackend implements Backend {
     return rows?.[0]?.name ?? null;
   }
 
+  async deleteAccount(): Promise<boolean> {
+    if (!this.session && !(await this.signIn())) return false;
+    const { status } = await this.request('/rest/v1/rpc/delete_my_account', { method: 'POST', body: '{}' });
+    if (status < 200 || status >= 300) return false;
+    this.session = null;
+    return true;
+  }
+
   async setPilotName(name: string): Promise<{ ok: boolean; message: string }> {
     const { status, body } = await this.request('/rest/v1/rpc/set_pilot_name', { method: 'POST', body: JSON.stringify({ p_name: name }) });
     if (status >= 200 && status < 300) return { ok: true, message: String(body) };

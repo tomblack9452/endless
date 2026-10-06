@@ -1,7 +1,7 @@
 import { Scene } from 'three';
 import { describe, expect, it } from 'vitest';
 import { CONFIG } from '../src/config';
-import { Daily, questsFor } from '../src/economy/daily';
+import { Daily, questsFor, questText } from '../src/economy/daily';
 import { Weekly, weeklyFor } from '../src/economy/weekly';
 import { freeReward, Pass, premiumReward, seasonAt } from '../src/economy/pass';
 import { shopFor } from '../src/economy/shop';
@@ -14,6 +14,13 @@ const HOUR = 3_600_000;
 const T0 = Date.UTC(2026, 9, 5, 9); // a Monday morning
 
 describe('daily', () => {
+  it('words ranked goals as any run until ranked opens', () => {
+    const q = { type: 'ranked' as const, target: 2, progress: 0, credits: 100, done: false };
+    expect(questText(q)).toBe('play 2 ranked runs');
+    expect(questText(q, false)).toMatch(/any mode until ranked opens/);
+    expect(questText({ ...q, type: 'beatPar', target: 1 }, false)).toMatch(/bronze par/);
+  });
+
   it('quests are the same for everyone on a day, different types, and change day to day', () => {
     const a = questsFor('2026-10-05');
     expect(JSON.stringify(a)).toBe(JSON.stringify(questsFor('2026-10-05')));

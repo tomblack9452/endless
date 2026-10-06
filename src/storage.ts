@@ -6,6 +6,8 @@ export interface KeyValueStore {
   set(key: string, value: string): Promise<void>;
   /** Every key starting with `prefix`, with its value (the cloud save). */
   entries(prefix: string): Promise<Record<string, string>>;
+  /** Forget every key starting with `prefix`. */
+  clear(prefix: string): Promise<void>;
 }
 
 class LocalStore implements KeyValueStore {
@@ -36,6 +38,14 @@ class LocalStore implements KeyValueStore {
       // Storage blocked: nothing saved.
     }
     return out;
+  }
+
+  async clear(prefix: string): Promise<void> {
+    try {
+      for (const k of Object.keys(await this.entries(prefix))) localStorage.removeItem(k);
+    } catch {
+      // Storage blocked: nothing saved to clear.
+    }
   }
 }
 

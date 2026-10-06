@@ -148,6 +148,8 @@
             <div id="welcome-paint" class="chip-row"></div>
             <div class="settings-group">engine colour</div>
             <div id="welcome-engine" class="chip-row"></div>
+            <div class="settings-group">pilot name</div>
+            <input id="welcome-name" class="name-input" type="text" maxlength="16" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="for the leaderboards (optional)" aria-label="pilot name" />
             <button id="welcome-done" class="pill primary sheet-buy" type="button">ready</button>
           </div>
         </div>
@@ -176,8 +178,13 @@
           <div class="panel-title">settings</div>
         </div>
         <div class="settings">
+          <div class="settings-group">pilot name</div>
+          <div class="name-edit">
+            <input id="settings-name" type="text" maxlength="16" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="pilot name" aria-label="pilot name" />
+            <button id="settings-name-save" class="tab" type="button">save</button>
+          </div>
+          <div id="settings-name-note" class="label dim setting-note"></div>
           <div class="settings-group">sound</div>
-          <button class="setting-row" type="button" data-action="tutorial"><span class="label">replay the tutorial</span><span class="value"></span></button>
           <button class="setting-row" type="button" data-setting="sound"><span class="label">sound</span><span class="value"></span></button>
           <button class="setting-row" type="button" data-setting="music"><span class="label">music</span><span class="value"></span></button>
           <button class="setting-row" type="button" data-setting="effects"><span class="label">effects</span><span class="value"></span></button>
@@ -199,6 +206,12 @@
           <div class="settings-group">assist</div>
           <button class="setting-row" type="button" data-setting="assist"><span class="label">assist mode</span><span class="value"></span></button>
           <div class="label dim setting-note">slower, with the safe line marked. scores don't count as bests</div>
+          <div class="settings-group">help</div>
+          <button class="setting-row" type="button" data-action="tutorial"><span class="label">replay the tutorial</span><span class="value">play</span></button>
+          <a class="setting-row" href="https://tomblack9452.github.io/endless/support.html" target="_blank" rel="noopener"><span class="label">help and contact</span><span class="value">open</span></a>
+          <a class="setting-row" href="https://tomblack9452.github.io/endless/privacy.html" target="_blank" rel="noopener"><span class="label">privacy policy</span><span class="value">open</span></a>
+          <button id="delete-account" class="setting-row" type="button" data-action="delete"><span class="label">delete my account and data</span><span class="value">delete</span></button>
+          <div class="label dim setting-note">deletes your progress, looks, cores, name and leaderboard scores, here and on the server. purchases can be restored from the store.</div>
         </div>
       </div>
 

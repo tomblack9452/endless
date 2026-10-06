@@ -43,6 +43,10 @@ export class LocalBackend implements Backend {
     return null;
   }
 
+  async deleteAccount(): Promise<boolean> {
+    return true; // nothing held anywhere but this device
+  }
+
   async setPilotName(): Promise<{ ok: boolean; message: string }> {
     return { ok: false, message: 'names need the server' };
   }
