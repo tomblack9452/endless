@@ -144,11 +144,19 @@ a winding, clear path. Around them:
     level 2, a blizzard at level 3 (thicker fog, white-out, gusting wind), and
     heavier again on later loops.
 - *Volcanic plain:* dark basalt, a smoky sky, glowing lava cracks, and a
-  light ship so it stays visible.
+  light ship so it stays visible. Basalt columns stand about in clusters.
   - **Lava lakes:** glowing pools beside the lane. Touch one and the run
     ends, shield or not.
+  - **Lava rivers:** from level 1, a river of lava runs across the whole
+    plain and a basalt causeway carries you over it. The causeway follows the
+    lane and gets narrower deeper in (about 5.2 wide at level 1, 4 at level 3).
+    Fly off it and the run ends, shield or not.
+  - **Lava geysers:** vents that erupt on a cycle of distance, a glowing mouth
+    marking each. One on your lane is always down when you reach it, so you
+    watch it blow and slip through; the rest stand off the lane.
   - **Lava bombs:** from level 2, chunks of lava thrown up by eruptions fall
-    in front of you. A glowing ring marks where each will land, with time to
+    in front of you in salvos (a pair at level 2, three at level 3), landing
+    either side. A glowing ring marks where each will land, with time to
     steer clear; they never land on the lane.
   - **Ash and smoke** thicken the deeper you go, so you can see less far.
 
