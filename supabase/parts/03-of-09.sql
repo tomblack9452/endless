@@ -1,4 +1,4 @@
--- Endless Space database: part 3 of 7. Run the parts in order, 01 first.
+-- Endless Space database: part 3 of 9. Run the parts in order, 01 first.
 
 -- Leaderboards: one table of each player's best per board, filled by submit_run
 -- (which checks a run is possible) and read through leaderboard().

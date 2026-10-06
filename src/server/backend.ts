@@ -1,3 +1,4 @@
+import type { ShipLook } from '../portrait';
 import { LocalBackend } from './local';
 import { SupabaseBackend } from './supabase';
 
@@ -49,6 +50,8 @@ export interface BoardRow {
   you: boolean;
   /** Owns the premium unlock (a badge on the board). */
   premium?: boolean;
+  /** The looks the pilot has on (drawn next to their name), if they've sent them. */
+  ship?: ShipLook | null;
 }
 
 export interface Backend {
@@ -76,6 +79,8 @@ export interface Backend {
   pilotName(): Promise<string | null>;
   /** Change it; says why not when the server turns it down. */
   setPilotName(name: string): Promise<{ ok: boolean; message: string }>;
+  /** Show these looks next to your name on the boards; false if it didn't get there. */
+  setShip(ship: ShipLook): Promise<boolean>;
   /** Delete this account and everything the server holds for it; false if that couldn't be done. */
   deleteAccount(): Promise<boolean>;
 }

@@ -1,4 +1,5 @@
 import { storage } from '../storage';
+import type { ShipLook } from '../portrait';
 import type { Backend, BoardQuery, BoardRow, RunSubmission, SubmitResult } from './backend';
 
 // Supabase over plain fetch (no SDK, to keep the bundle small):
@@ -152,11 +153,11 @@ export class SupabaseBackend implements Backend {
   }
 
   async board(q: BoardQuery): Promise<BoardRow[] | null> {
-    const rows = await this.call<{ rank: number; name: string; score: number; you: boolean; premium?: boolean }[]>('/rest/v1/rpc/leaderboard', {
+    const rows = await this.call<{ rank: number; name: string; score: number; you: boolean; premium?: boolean; ship?: ShipLook | null }[]>('/rest/v1/rpc/leaderboard', {
       method: 'POST',
       body: JSON.stringify({ p_board: q.board, p_period: q.period, p_league: q.league, p_limit: q.limit ?? 50 }),
     });
-    return rows ? rows.map((r) => ({ rank: Number(r.rank), name: r.name, score: r.score, you: r.you, premium: r.premium === true })) : null;
+    return rows ? rows.map((r) => ({ rank: Number(r.rank), name: r.name, score: r.score, you: r.you, premium: r.premium === true, ship: r.ship ?? null })) : null;
   }
 
   async purchases(): Promise<string[] | null> {
@@ -167,6 +168,11 @@ export class SupabaseBackend implements Backend {
   async pilotName(): Promise<string | null> {
     const rows = await this.call<{ name: string }[]>(`/rest/v1/players?select=name&user_id=eq.${this.session?.user}`);
     return rows?.[0]?.name ?? null;
+  }
+
+  async setShip(ship: ShipLook): Promise<boolean> {
+    const { status } = await this.request('/rest/v1/rpc/set_ship', { method: 'POST', body: JSON.stringify({ p_ship: ship }) });
+    return status >= 200 && status < 300;
   }
 
   async deleteAccount(): Promise<boolean> {

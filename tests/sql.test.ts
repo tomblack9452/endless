@@ -80,7 +80,7 @@ async function submit(r: Run = {}): Promise<{ rank: number; best: number; newBes
 }
 
 async function board(b: string, period = 'all', league = 0, limit = 50) {
-  const res = await db.query<{ rank: string; name: string; score: number; you: boolean }>(
+  const res = await db.query<{ rank: string; name: string; score: number; you: boolean; ship: Record<string, unknown> | null }>(
     'select * from public.leaderboard($1, $2, $3::smallint, $4)',
     [b, period, league, limit],
   );
@@ -386,6 +386,23 @@ describe('pilot names', () => {
     await rejects(db.query("select public.set_pilot_name('nova9')"), /taken/);
     await db.query("select public.set_pilot_name('Vega7')");
     await rejects(db.query("select public.set_pilot_name('Vega8')"), /once an hour/);
+  });
+});
+
+describe('ships on the boards', () => {
+  it('shows the ship a pilot set next to their score, and checks its shape', async () => {
+    const a = await newUser();
+    await as(a);
+    const ship = { hull: 'needle', paint: 's3-p1', markings: 'none', fins: 'twin', decal: 'rank', engine: 'cold', trail: 'standard', rank: 4 };
+    await db.query('select public.set_ship($1::jsonb)', [JSON.stringify(ship)]);
+    await submit({ board: 'solo:asteroids', score: 1300 });
+    expect((await board('solo:asteroids')).find((r) => r.you)?.ship).toEqual(ship);
+    await rejects(db.query('select public.set_ship($1::jsonb)', ['{"hull":"<b>"}']), /not a look/);
+    await rejects(db.query('select public.set_ship($1::jsonb)', ['{"wallet":"x"}']), /not a slot/);
+    await rejects(db.query('select public.set_ship($1::jsonb)', ['{"rank":1000}']), /not a number/);
+    await rejects(db.query('select public.set_ship($1::jsonb)', ['[1]']), /not a ship/);
+    await as(null);
+    await rejects(db.query('select public.set_ship($1::jsonb)', ['{}']), /permission denied|not signed in/);
   });
 });
 

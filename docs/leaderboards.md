@@ -15,7 +15,7 @@ to a board.
      is safe. This is a secret; it's not a `VITE_` variable, so it never goes into
      the game's build.
    - **Or paste it:** SQL editor > New query > paste the files in `supabase/parts/`
-     one at a time, in order (`01-of-07.sql` first), running each. They are small
+     one at a time, in order (`01-of-...sql` first), running each. They are small
      on purpose: pasting one big file can get cut off part way (about 4 KB), which
      shows up as `unterminated dollar-quoted string`. If you'd rather paste one
      file, `supabase/setup.sql` is all of it.

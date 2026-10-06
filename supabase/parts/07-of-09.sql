@@ -1,4 +1,4 @@
--- Endless Space database: part 7 of 7. Run the parts in order, 01 first.
+-- Endless Space database: part 7 of 9. Run the parts in order, 01 first.
 
 -- leaderboard() gains a premium column, so it's made again (a function's
 -- columns can't change in place).
@@ -71,3 +71,9 @@ $$;
 revoke execute on function public.delete_my_account from public, anon;
 
 grant execute on function public.delete_my_account to authenticated;
+
+-- Ships on the boards: each player's equipped looks (hull, paint, markings,
+-- fins, decal, engine colour, trail, and the rank and league their badge
+-- decals show), so the leaderboard can draw everyone's ship next to their name.
+
+alter table public.players add column if not exists ship jsonb;

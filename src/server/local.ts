@@ -43,6 +43,10 @@ export class LocalBackend implements Backend {
     return null;
   }
 
+  async setShip(): Promise<boolean> {
+    return false;
+  }
+
   async deleteAccount(): Promise<boolean> {
     return true; // nothing held anywhere but this device
   }
