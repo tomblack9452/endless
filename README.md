@@ -524,10 +524,16 @@ turn over at midnight UTC, the same moment for everyone.
   cores. Every finished goal (daily, weekly or achievement) waits on the goals
   screen to be **claimed** with a tap; the bar's goals button has a dot while
   anything is waiting.
+- **Rewarded ads** (the apps only; free for premium players): a revive once
+  the free ones are used, doubling a run's credits from the end screen, a free
+  daily gift card on the title screen (150 credits and 2 cores), and swapping
+  one daily goal a day for another.
 - **Shop:** a showroom, with the camera circling your ship above a sheet of
   cards. Tap a card to put the look on the ship, then buy it with the button
-  under the cards (tap an owned one to wear it). Three tabs, all the same for
-  everyone and all turning over on the UTC clock:
+  under the cards (tap an owned one to wear it). Six tabs: three of looks, the
+  same for everyone and turning over on the UTC clock, then **season pass** (its
+  premium track for cores or money), **cores** (the packs and the starter pack)
+  and **premium**. Tapping cores in the top bar opens the cores tab.
   - **today:** four looks a day, at least one premium, one a deal at a quarter
     off. Looks you don't own come first, and the day's picks are kept for the
     day, so buying one doesn't reshuffle the rest.
@@ -535,7 +541,6 @@ turn over at midnight UTC, the same moment for everyone.
     at a fifth off (in cores). Every set comes round once before any repeats.
   - **vault:** one rare look a month, for cores. When it goes it's away for the
     rest of the cycle.
-  Also: core packs in the apps.
 - **Season pass:** six weeks (six weekly runs), 30 tiers of 600 XP, paced so
   a regular player finishes in about five weeks. Runs earn XP (1 per 500
   points, up to 30) and each quest 30. The free track pays credits and cores;

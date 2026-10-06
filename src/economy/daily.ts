@@ -142,6 +142,8 @@ interface Saved {
   allDonePaid: boolean; // the all-three bonus has been claimed
   reviveDay: string; // the day free revives were last used
   reviveUsed?: number; // how many that day (older saves: 1)
+  rerollDay?: string; // the day a quest was last swapped (once a day)
+  giftDay?: string; // the day the free gift was last taken
 }
 
 const KEY = 'endless.daily';
@@ -221,6 +223,23 @@ export class Daily {
     return done;
   }
 
+  /** Swap unfinished quest `i` for another kind (once a day); returns the new one, or null. */
+  reroll(i: number, day: string): Quest | null {
+    const q = this.s.quests[i];
+    if (!q || q.done || this.s.rerollDay === day) return null;
+    const taken = new Set(this.s.quests.map((x) => x.type));
+    const pool = questsFor(`${day}-reroll-${i}`).concat(questsFor(`${day}-reroll-${i}-b`)).filter((x) => !taken.has(x.type));
+    if (pool.length === 0) return null;
+    this.s.quests[i] = pool[0];
+    this.s.rerollDay = day;
+    this.save();
+    return pool[0];
+  }
+
+  canReroll(day: string): boolean {
+    return this.s.rerollDay !== day;
+  }
+
   /** Claim quest `i` if it's finished: returns its credits, or null. */
   claim(i: number): Quest | null {
     const q = this.s.quests[i];
@@ -250,6 +269,16 @@ export class Daily {
   /** How many rewards are waiting to be claimed (quests and the bonus). */
   get claimable(): number {
     return this.s.quests.filter((q) => q.done && !q.claimed).length + (this.bonusReady ? 1 : 0);
+  }
+
+  /** The free daily gift (a rewarded ad, or free with premium): once a day. */
+  giftReady(day: string): boolean {
+    return this.s.giftDay !== day;
+  }
+
+  takeGift(day: string): void {
+    this.s.giftDay = day;
+    this.save();
   }
 
   // --- revive ---

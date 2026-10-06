@@ -67,6 +67,9 @@ const PATH_STEP = 4;
 const FIRST_PLAYED_KEY = 'endless.firstPlayed';
 const REVEAL_KEY = 'endless.reveal';
 
+/** The shop's tabs: looks as cards (today, the set, the vault), then lists (the pass, cores, premium). */
+type ShopTab = 'today' | 'set' | 'vault' | 'pass' | 'cores' | 'premium';
+
 type InfoScreen = 'goals' | 'hangar' | 'record' | 'solo' | 'league' | 'shop' | 'pass' | 'boards';
 
 /** "5 oct": the Monday this week's ranked course started. */
@@ -158,7 +161,7 @@ export class Game {
   private readonly store = createStore();
   private storeProducts: StoreProduct[] = [];
   /** Shop rows for real-money products, in the order shown ('dev' adds cores in the dev build). */
-  private shopPacks: (ProductId | 'dev' | 'restore')[] = [];
+  private shopPacks: (ProductId | 'dev' | 'restore' | 'pass-cores' | 'pass-open' | 'dev-premium')[] = [];
   /** One-time products already bought. */
   private readonly entitlements = new Entitlements();
   private firstPlayed = Date.now();
@@ -176,6 +179,8 @@ export class Game {
   private goalsTab: GoalsTab = 'daily';
   /** This ranked run scored at least the league's par (a weekly goal counts these). */
   private beatPar = false;
+  /** Credits the last run paid (for doubling with a rewarded ad). */
+  private lastRunCredits = 0;
   private readonly hangarUi = new HangarScreen();
   private hangar: HangarState = { slot: 'hull', pick: null };
   private hangarUpgrades = false; // the upgrades chip is open, not a slot of looks
@@ -350,6 +355,7 @@ export class Game {
       },
       claimLogin: () => this.claimLogin(),
       claim: (id) => this.onClaim(id),
+      reroll: (id) => void this.onReroll(id),
     });
     this.ui.titleLeague.addEventListener('pointerdown', (e) => e.stopPropagation());
     this.ui.titleLeague.addEventListener('click', () => this.openLeague());
@@ -394,6 +400,7 @@ export class Game {
     this.pathNext = 0;
     this.ghost.start(mode === 'ranked' ? this.weekly.id : null, this.settings.ghost);
     this.ui.showShare(false);
+    this.ui.showDouble(null);
     this.preview = null;
     this.seed = seed;
     this.mode = mode;
@@ -558,6 +565,9 @@ export class Game {
     credits += this.recordRank(this.state === 'finished');
     if (this.assisted) lines.push('assist mode. not counted as a best');
     this.wallet.add(credits);
+    this.lastRunCredits = credits;
+    this.ui.showDouble(credits > 0 && this.ads.offers('doubleCredits') ? `double +${formatScore(credits)} credits · ${this.ads.label()}` : null);
+    this.ads.afterRun(Date.now(), false);
     lines.push(`+${formatScore(credits)} credits${fromPickups > 0 ? ` (${formatScore(fromPickups)} from pickups)` : ''}`);
     const board = boardForRun(this.mode, this.environment?.id ?? null, this.course !== null);
     if (board && board !== 'ranked') this.submitToBoard(board, this.state === 'finished');
@@ -641,7 +651,7 @@ export class Game {
     if (this.infoOpen === 'goals') this.renderGoals();
   }
 
-  private shopTab: 'today' | 'set' | 'vault' = 'today';
+  private shopTab: ShopTab = 'today';
 
   /** The cards for the open shop tab, and the line, heading and buy button that go with them. */
   private shopTabView(now: number, owned: (key: string) => boolean): { heading: string; reset: string; info: string; items: LookItem[]; cards: { price: string; premium: boolean; deal: boolean }[]; buy: { text: string; enabled: boolean } } {
@@ -698,22 +708,31 @@ export class Game {
     };
   }
 
-  private openShop(): void {
+  private openShop(tab?: ShopTab): void {
     const now = Date.now();
+    if (tab) {
+      this.shopTab = tab;
+      this.shopPick = -1;
+      this.preview = null;
+      this.applyLooks();
+    }
+    const tabs = this.shopTabs();
+    if (!tabs.some((t) => t.id === this.shopTab)) this.shopTab = 'today';
     const o = this.owner();
     const owned = (key: string): boolean => {
       const it = byKey(key);
       return !!it && this.looks.owns(it, o);
     };
-    const v = this.shopTabView(now, owned);
+    const looksTab = this.shopTab === 'today' || this.shopTab === 'set' || this.shopTab === 'vault';
+    const v = looksTab ? this.shopTabView(now, owned) : { heading: '', reset: '', info: '', items: [] as LookItem[], cards: [] as { price: string; premium: boolean; deal: boolean }[], buy: { text: '', enabled: false } };
+    const list = looksTab ? { head: '', note: '', rows: [] } : this.shopList(this.shopTab);
     this.econ.renderShop({
       wallet: `${formatScore(this.wallet.credits)} credits · ${formatScore(this.wallet.cores)} cores`,
       reset: v.reset,
-      tabs: [
-        { id: 'today', label: 'today' },
-        { id: 'set', label: 'weekly set' },
-        { id: 'vault', label: 'vault' },
-      ].map((t) => ({ ...t, on: t.id === this.shopTab })),
+      tabs: tabs.map((t) => ({ ...t, on: t.id === this.shopTab })),
+      pane: looksTab ? 'looks' : 'list',
+      listHead: list.head,
+      listNote: list.note,
       heading: v.heading,
       info: v.info,
       offers: v.items.map((item, i) => ({
@@ -729,7 +748,7 @@ export class Game {
         picked: i === this.shopPick,
       })),
       buy: v.buy,
-      cores: this.coreRows(),
+      cores: list.rows,
     });
     this.player.reset();
     this.player.setVisible(true);
@@ -737,37 +756,67 @@ export class Game {
     this.openInfo('shop');
   }
 
+  /** The shop's tabs. Cores and premium show where they can be bought (the apps, or the dev build). */
+  private shopTabs(): { id: ShopTab; label: string }[] {
+    const tabs: { id: ShopTab; label: string }[] = [
+      { id: 'today', label: 'today' },
+      { id: 'set', label: 'weekly set' },
+      { id: 'vault', label: 'vault' },
+      { id: 'pass', label: 'season pass' },
+    ];
+    if (this.store.available || import.meta.env.DEV) tabs.push({ id: 'cores', label: 'cores' });
+    if (this.storeProducts.some((p) => p.id === 'premium') || import.meta.env.DEV || this.entitlements.has('premium')) tabs.push({ id: 'premium', label: 'premium' });
+    return tabs;
+  }
+
   private onShopTab = (id: string): void => {
-    if (id !== 'today' && id !== 'set' && id !== 'vault') return;
-    this.shopTab = id;
-    this.shopPick = -1;
-    this.preview = null;
-    this.applyLooks();
-    this.openShop();
+    if (!this.shopTabs().some((t) => t.id === id)) return;
+    this.openShop(id as ShopTab);
   };
 
-  /** The shop's real-money rows: store products in the apps, a note on the web. */
-  private coreRows(): { label: string; button: string; enabled: boolean }[] {
+  /** A list tab's heading, note and rows (what each row's button does is in shopPacks). */
+  private shopList(tab: ShopTab): { head: string; note: string; rows: { label: string; button: string; enabled: boolean }[] } {
     const rows: { label: string; button: string; enabled: boolean }[] = [];
     this.shopPacks = [];
     const price = new Map(this.storeProducts.map((p) => [p.id, p.price]));
+    const row = (label: string, button: string, enabled: boolean, action: (typeof this.shopPacks)[number]) => {
+      rows.push({ label, button, enabled });
+      this.shopPacks.push(action);
+    };
+    if (tab === 'pass') {
+      const P = CONFIG.economy.pass;
+      const s = seasonAt(Date.now());
+      if (this.pass.premium) row(`season ${s.season}'s premium track is yours`, 'see tiers', true, 'pass-open');
+      else {
+        row(`premium track, season ${s.season}`, `${formatScore(P.premiumCores)} cores`, this.wallet.cores >= P.premiumCores, 'pass-cores');
+        const money = price.get('season_pass');
+        if (money) row('premium track, for money', money, true, 'season_pass');
+        row(`tier ${this.pass.tier} of ${P.tiers} · ends in ${formatWait(s.end - Date.now())}`, 'see tiers', true, 'pass-open');
+      }
+      return { head: 'season pass', note: "every tier pays on the free track; premium pays more, with the season's new looks.", rows };
+    }
+    if (tab === 'premium') {
+      const own = this.entitlements.has('premium');
+      const money = price.get('premium');
+      if (own) row('premium is yours. thank you', 'owned', false, 'pass-open');
+      else if (money) row('premium, once, for good', money, true, 'premium');
+      if (import.meta.env.DEV) row('dev: premium on/off', 'toggle', true, 'dev-premium');
+      if (this.store.available) row('bought on another device?', 'restore', true, 'restore');
+      return {
+        head: 'premium',
+        note: 'no ads; ad rewards (revives, double credits, the daily gift) without the ad; the halo hull, regalia paint and crown flame; an extra free revive a day; a badge on the leaderboards. nothing that makes you faster in ranked.',
+        rows,
+      };
+    }
     for (const p of CONFIG.economy.store.products) {
       const cost = price.get(p.id);
       if (!cost || 'pass' in p || 'premium' in p || ('once' in p && this.ownsProduct(p.id))) continue;
-      const label = 'look' in p ? `starter pack · ${formatScore(p.cores)} cores and ${rewardText({ look: p.look })}` : `${formatScore(p.cores)} cores`;
-      rows.push({ label, button: cost, enabled: true });
-      this.shopPacks.push(p.id);
+      row('look' in p ? `starter pack · ${formatScore(p.cores)} cores and ${rewardText({ look: p.look })}` : `${formatScore(p.cores)} cores`, cost, true, p.id);
     }
-    if (this.store.available) {
-      rows.push({ label: 'bought on another device?', button: 'restore', enabled: true });
-      this.shopPacks.push('restore');
-    }
-    if (import.meta.env.DEV) {
-      rows.push({ label: 'dev: add cores (purchases stand-in)', button: '+500', enabled: true });
-      this.shopPacks.push('dev');
-    }
+    if (this.store.available) row('bought on another device?', 'restore', true, 'restore');
+    if (import.meta.env.DEV) row('dev: add cores (purchases stand-in)', '+500', true, 'dev');
     if (rows.length === 0) rows.push({ label: 'packs of cores come with the iOS and Android apps', button: 'soon', enabled: false });
-    return rows;
+    return { head: 'cores', note: 'cores buy premium looks, the vault, revives and the pass. never upgrades.', rows };
   }
 
   /** Tap a look: it goes on the ship to try (owned ones are just put on). Tap again to take it off. */
@@ -841,7 +890,14 @@ export class Game {
     if (pack === 'dev') {
       this.devAddCores(500);
       this.openShop();
-    } else if (pack === 'restore') void this.restorePurchases();
+    } else if (pack === 'dev-premium') {
+      this.devTogglePremium();
+      this.openShop();
+    } else if (pack === 'pass-cores') {
+      this.onPassPremium();
+      this.openShop('pass'); // stay in the shop
+    } else if (pack === 'pass-open') this.openPass();
+    else if (pack === 'restore') void this.restorePurchases();
     else if (pack) void this.buyProduct(pack);
   };
 
@@ -892,24 +948,62 @@ export class Game {
   private offerRevive(): void {
     const day = dayKey(Date.now());
     const free = this.daily.freeRevivesLeft(day, this.freeRevivesADay()) > 0;
+    // Out of free ones: a rewarded ad if there is one (free with premium), otherwise cores.
+    const byAd = !free && this.ads.offers('revive');
     const cost = CONFIG.economy.revive.coreCost;
     this.econ.offer(
       {
         kicker: 'crashed',
         name: 'keep going?',
         lines: [free ? 'your free revive today' : `you have ${formatScore(this.wallet.cores)} cores`, `score so far ${formatScore(this.score)}`],
-        yes: free ? 'revive · free' : `revive · ${cost} cores`,
-        yesEnabled: free || this.wallet.cores >= cost,
+        yes: free ? 'revive · free' : byAd ? `revive · ${this.ads.label()}` : `revive · ${cost} cores`,
+        yesEnabled: free || byAd || this.wallet.cores >= cost,
         no: 'no thanks',
         seconds: 6,
       },
       () => {
         if (free) this.daily.useFreeRevive(day);
-        else if (!this.wallet.spendCores(cost)) return this.settleCrash();
+        else if (byAd) {
+          void this.ads.reward('revive').then((ok) => (ok ? this.revive() : this.settleCrash()));
+          return;
+        } else if (!this.wallet.spendCores(cost)) return this.settleCrash();
         this.revive();
       },
       () => this.settleCrash(),
     );
+  }
+
+  /** Double the last run's credits for a rewarded ad (free with premium), once. */
+  private async doubleCredits(): Promise<void> {
+    const n = this.lastRunCredits;
+    if (n <= 0) return;
+    this.lastRunCredits = 0;
+    this.ui.showDouble(null);
+    if (!(await this.ads.reward('doubleCredits'))) return;
+    this.grant({ credits: n });
+    this.ui.showNotice(`+${formatScore(n)} credits, doubled`);
+    this.refreshTitle();
+  }
+
+  /** The free daily gift (a rewarded ad, or free with premium). */
+  private async claimGift(): Promise<void> {
+    const day = dayKey(Date.now());
+    if (!this.daily.giftReady(day) || !(await this.ads.reward('dailyGift'))) return;
+    this.daily.takeGift(day);
+    const lines = this.grant(CONFIG.ads.dailyGift);
+    this.ui.celebrate([{ kicker: 'free gift', icon: GIFT_ICON, name: 'daily gift', lines }]);
+    this.refreshTitle();
+  }
+
+  /** Swap an unfinished daily goal for another (a rewarded ad, or free with premium), once a day. */
+  private async onReroll(id: string): Promise<void> {
+    const i = Number(id.slice(1));
+    const day = dayKey(Date.now());
+    if (!/^q\d$/.test(id) || !this.daily.canReroll(day) || !(await this.ads.reward('rerollQuest'))) return;
+    const q = this.daily.reroll(i, day);
+    if (q) this.ui.showNotice(`new goal: ${questText(q)}`);
+    this.renderGoals();
+    this.refreshTitle();
   }
 
   /** Free revives a day: one for everyone, more with premium. */
@@ -1611,7 +1705,7 @@ export class Game {
       })),
       claim: due >= 0 ? { text: `claim day ${step + 1}`, enabled: true } : { text: `next reward in ${formatWait(untilTomorrow(now))}`, enabled: false },
       reset: `new in ${formatWait(untilTomorrow(now))}`,
-      rows: [...taskRows(qs, 'q', Q.passXp), bonusRow('qall', 'claim all three', Q.allDoneCores, this.daily.bonusReady, this.daily.bonusClaimed, qs)],
+      rows: [...taskRows(qs, 'q', Q.passXp).map((r) => (r.state === 'open' && this.daily.canReroll(day) && this.ads.offers('rerollQuest') ? { ...r, reroll: `swap for another goal · ${this.ads.label()}` } : r)), bonusRow('qall', 'claim all three', Q.allDoneCores, this.daily.bonusReady, this.daily.bonusClaimed, qs)],
     });
     // Weekly.
     const wg = this.weeklyGoals.goals;
@@ -1846,11 +1940,15 @@ export class Game {
       this.preview = null;
       this.openShop();
     }
-    else if (name === 'shop-cores') this.onTitleLink('shop');
+    else if (name === 'shop-cores') {
+      this.preview = null;
+      this.openShop(this.shopTabs().some((t) => t.id === 'cores') ? 'cores' : 'today');
+    }
     else if (name === 'pass') this.openPass();
     else if (name === 'boards') this.openBoards();
     else if (name === 'daily') this.openGoals('daily');
     else if (name === 'claim') this.claimLogin();
+    else if (name === 'gift') void this.claimGift();
   };
 
   /** How much of the game is open to this player (new players see it in stages: reveal.ts). */
@@ -1889,6 +1987,7 @@ export class Game {
     const day = dayKey(now);
     const due = this.daily.loginDue(day);
     if (due >= 0) cards.push({ id: 'claim', kicker: 'daily reward', title: `day ${due + 1} ready to claim`, hot: true });
+    if (this.daily.giftReady(day) && this.ads.offers('dailyGift')) cards.push({ id: 'gift', kicker: 'free gift', title: this.ads.label(), hot: true });
     const quests = this.daily.quests;
     const done = quests.filter((q) => q.done).length;
     const toClaim = this.goalsToClaim();
@@ -2001,6 +2100,7 @@ export class Game {
     else if (action === 'settings') this.openSettings();
     else if (action === 'menu') this.toMainMenu();
     else if (action === 'share') void this.share();
+    else if (action === 'double') void this.doubleCredits();
     else if (action === 'back') {
       if (this.infoOpen) this.closeInfo();
       else this.closeSettings();

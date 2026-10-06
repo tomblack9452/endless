@@ -2715,6 +2715,19 @@ body {
   font-weight: 500;
 }
 
+.goal-reroll {
+  display: inline-block;
+  margin-top: 6px;
+  padding: 0;
+  font: inherit;
+  font-size: calc(11px * var(--ui-scale));
+  color: inherit;
+  background: none;
+  border: none;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
 .pill.claim-btn {
   min-width: 0;
   min-height: calc(32px * var(--ui-scale));

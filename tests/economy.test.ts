@@ -68,6 +68,22 @@ describe('daily', () => {
     expect(w.goals.every((q) => !q.done)).toBe(true);
   });
 
+  it('a daily goal can be swapped once a day, and the gift taken once a day', async () => {
+    const d = new Daily();
+    const day = dayKey(T0);
+    await d.load(day);
+    const before = d.quests.map((q) => q.type);
+    const q = d.reroll(0, day);
+    expect(q).not.toBeNull();
+    expect(before).not.toContain(q!.type);
+    expect(new Set(d.quests.map((x) => x.type)).size).toBe(d.quests.length);
+    expect(d.reroll(1, day)).toBeNull();
+    expect(d.canReroll(dayKey(T0 + 24 * HOUR))).toBe(true);
+    expect(d.giftReady(day)).toBe(true);
+    d.takeGift(day);
+    expect(d.giftReady(day)).toBe(false);
+  });
+
   it('a finished quest in an older save counts as already paid', async () => {
     const store = new Map<string, string>([['endless.daily', JSON.stringify({ questDay: '2026-10-05', quests: [{ type: 'runs', target: 3, progress: 3, credits: 100, done: true }], allDonePaid: true })]]);
     (globalThis as { localStorage?: unknown }).localStorage = { getItem: (k: string) => store.get(k) ?? null, setItem: (k: string, v: string) => void store.set(k, v), key: () => null, length: 0 };

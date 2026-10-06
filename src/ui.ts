@@ -431,6 +431,14 @@ export class UI {
     $('over-share').hidden = !on;
   }
 
+  /** The end screen's "double credits" offer (a rewarded ad, or free with premium); null hides it. */
+  showDouble(text: string | null): void {
+    const b = $('over-double') as HTMLButtonElement;
+    b.hidden = text === null;
+    b.disabled = false;
+    if (text) b.textContent = text;
+  }
+
   bindRecordTabs(onTab: (tab: 'rank' | 'stats') => void): void {
     for (const t of document.querySelectorAll<HTMLElement>('[data-recordtab]')) {
       t.addEventListener('pointerdown', (e) => e.stopPropagation());

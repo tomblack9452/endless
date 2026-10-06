@@ -38,14 +38,20 @@ interface ShopOfferView {
 export interface ShopView {
   wallet: string;
   reset: string;
-  /** The tabs (today, the weekly set, the vault) and which is open. */
+  /** The tabs (today, the weekly set, the vault, the pass, cores, premium) and which is open. */
   tabs: { id: string; label: string; on: boolean }[];
+  /** Looks as cards (today, the set, the vault), or a list of things to buy (the rest). */
+  pane: 'looks' | 'list';
+  /** The list pane's heading and the line under it. */
+  listHead: string;
+  listNote: string;
   heading: string;
   /** A line under the cards: what the set or the vault is. */
   info: string;
   offers: ShopOfferView[];
   /** The one buy button, for the picked look. */
   buy: { text: string; enabled: boolean };
+  /** The list pane's rows (a tap on one's button calls onCores with its index). */
   cores: { label: string; button: string; enabled: boolean }[];
 }
 
@@ -183,6 +189,10 @@ export class EconomyView {
       return row;
     };
     $('shop-cores').replaceChildren(...v.cores.map((c, i) => action(c.label, c.button, c.enabled, ['pack', String(i)])));
+    $('shop-looks').hidden = v.pane !== 'looks';
+    $('shop-list').hidden = v.pane !== 'list';
+    $('shop-list-head').textContent = v.listHead;
+    $('shop-list-note').textContent = v.listNote;
   }
 
   // --- pass ---

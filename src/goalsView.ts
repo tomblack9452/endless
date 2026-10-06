@@ -30,6 +30,8 @@ export interface TaskRow {
   /** What it pays, in words (credits, pass XP, a look). */
   reward: string;
   state: 'open' | 'claim' | 'claimed';
+  /** Offer to swap it for another goal (the button's text), once a day. */
+  reroll?: string;
 }
 
 export interface DailyView {
@@ -63,6 +65,12 @@ function row(r: TaskRow): HTMLElement {
     fill(f, r.fraction);
   }
   if (r.reward) out.append(el('div', 'label goal-reward', r.reward));
+  if (r.reroll) {
+    const b = el('button', 'label link goal-reroll', r.reroll) as HTMLButtonElement;
+    b.type = 'button';
+    b.dataset.reroll = r.id;
+    out.append(b);
+  }
   return out;
 }
 
@@ -71,12 +79,14 @@ export class GoalsScreen {
     $('screen-goals').addEventListener('pointerdown', (e) => e.stopPropagation());
   }
 
-  bind(on: { tab: (t: GoalsTab) => void; claimLogin: () => void; claim: (id: string) => void }): void {
+  bind(on: { tab: (t: GoalsTab) => void; claimLogin: () => void; claim: (id: string) => void; reroll: (id: string) => void }): void {
     for (const t of document.querySelectorAll<HTMLElement>('[data-goaltab]')) t.addEventListener('click', () => on.tab(t.dataset.goaltab as GoalsTab));
     $('daily-claim').addEventListener('click', on.claimLogin);
     $('screen-goals').addEventListener('click', (e) => {
       const b = (e.target as HTMLElement).closest<HTMLElement>('[data-claim]');
       if (b) on.claim(b.dataset.claim ?? '');
+      const r = (e.target as HTMLElement).closest<HTMLElement>('[data-reroll]');
+      if (r) on.reroll(r.dataset.reroll ?? '');
     });
   }
 

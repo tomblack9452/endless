@@ -318,14 +318,20 @@
         <div id="shop-wallet" class="label dim showroom-note"></div>
         <div class="sheet settings">
           <div id="shop-tabs" class="chip-row"></div>
-          <div class="settings-group"><span id="shop-heading">today's looks</span> <span id="shop-reset" class="group-note"></span></div>
-          <div id="shop-offers" class="offer-cards"></div>
-          <div id="shop-info" class="label dim setting-note"></div>
-          <button id="shop-buy" class="pill primary sheet-buy" type="button"></button>
-          <button id="shop-hangar" class="pill sheet-buy" type="button">open your hangar</button>
-          <div class="settings-group">cores</div>
-          <div id="shop-cores"></div>
+          <div id="shop-looks">
+            <div class="settings-group"><span id="shop-heading">today's looks</span> <span id="shop-reset" class="group-note"></span></div>
+            <div id="shop-offers" class="offer-cards"></div>
+            <div id="shop-info" class="label dim setting-note"></div>
+            <button id="shop-buy" class="pill primary sheet-buy" type="button"></button>
+            <button id="shop-hangar" class="pill sheet-buy" type="button">open your hangar</button>
+          </div>
+          <div id="shop-list" hidden>
+            <div id="shop-list-head" class="settings-group"></div>
+            <div id="shop-list-note" class="label dim setting-note"></div>
+            <div id="shop-cores"></div>
+          </div>
         </div>
+      </div>
       </div>
 
       <div id="screen-hangar" class="layer screen panel showroom">
@@ -385,6 +391,7 @@
           <div class="menu">
             <div class="pill primary">tap to retry</div>
             <button id="over-share" class="pill" type="button" data-action="share" hidden>share</button>
+            <button id="over-double" class="pill" type="button" data-action="double" hidden></button>
             <button class="pill" type="button" data-action="menu">main menu</button>
           </div>
         </div>
