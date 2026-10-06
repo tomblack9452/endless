@@ -68,6 +68,8 @@ export interface Backend {
   cores(): Promise<number | null>;
   /** Cores earned in play (rewards, quests, the pass); the server caps them per day. */
   earnCores(amount: number, reason: string): Promise<void>;
+  /** Merge the device's credits with the server's (`last`: the server's answer last time, or null); the balance to keep, or null if unknown. */
+  syncCredits(credits: number, last: number | null): Promise<number | null>;
   /** Spend cores; resolves false if the server says there aren't enough. */
   spendCores(amount: number, reason: string): Promise<boolean>;
   submitRun(run: RunSubmission): Promise<SubmitResult>;

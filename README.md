@@ -834,6 +834,7 @@ Without keys, everything lives on the device. With them:
   player (linkable to Apple or Google later), a cloud save of every saved
   setting and stat (the newer save wins; a fresh install takes the cloud's),
   cores held on the server (earned cores capped per day, spending checked),
+  credits mirrored there (so balances can be changed from the dashboard),
   and **leaderboards**: this week's ranked run per league, endless, and one
   for each solo environment, with pilot names and each pilot's ship drawn next
   to their name from the looks they have on (tap a row to see it bigger, with
@@ -874,6 +875,7 @@ step-by-step first setup is in [docs/leaderboards.md](docs/leaderboards.md).
 | Connect > Session pooler | The connection string, with your database password | Goes in `SUPABASE_DB_URL` in `.env` for `npm run db:apply`. A secret: never a `VITE_` variable, never in GitHub |
 | Edge Functions > Secrets | `REVENUECAT_WEBHOOK_SECRET` (a long random string) | Only for store purchases. `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are there already. Deploy with `supabase functions deploy revenuecat-webhook --no-verify-jwt` ([docs/store.md](docs/store.md)) |
 | Authentication > Users | Nothing to set | Anonymous players show here. Deleting one deletes their save, cores, runs and scores |
+| Table Editor > wallets | `cores` and `credits`: edit to change a player's balance | They get it the next time the game opens or comes back to the front. Credits merge: what you add or take away is added to or taken from whatever they have on their device (see below) |
 
 Where the keys go:
 
@@ -883,10 +885,26 @@ Where the keys go:
   `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` as repository secrets
   (`deploy.yml` passes them to the build). Not `SUPABASE_DB_URL`.
 
+**Changing a player's balance.** Find them by pilot name in the `players`
+table (its `user_id` is the same in `wallets`), then edit `cores` or
+`credits` in `wallets`. Or in the SQL editor:
+
+```sql
+update public.wallets set credits = credits + 5000, cores = cores + 100
+where user_id = (select user_id from public.players where name = 'Ace Pilot');
+```
+
+Cores are held on the server, so the number you set is their balance.
+Credits are earned on the device and merged with the server's copy, so a
+change you make is applied on top of anything they've earned since (add
+5,000 and they get 5,000 more, even if they played offline meanwhile). A
+`credits` cell that's empty means that player hasn't synced since this was
+added; it fills in when they next open the game.
+
 After every update that adds a file to `supabase/migrations/`, run
 `npm run db:apply` (it only applies what's new), then `npm run check-server`
-to see it's all there. The latest, `0005_delete_account.sql`, is what
-"delete my account and data" in settings needs.
+to see it's all there. Recent ones: `0005` (deleting an account from
+settings), `0006` (ships on the leaderboards), `0007` (credits in `wallets`).
 
 Still to do on the server: a full re-fly of submitted runs with the game's
 own code (it needs the run simulation pulled out of `game.ts` first), and

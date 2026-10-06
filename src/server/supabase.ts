@@ -118,6 +118,11 @@ export class SupabaseBackend implements Backend {
     return rows?.[0]?.cores ?? null;
   }
 
+  async syncCredits(credits: number, last: number | null): Promise<number | null> {
+    const n = await this.call<number>('/rest/v1/rpc/sync_credits', { method: 'POST', body: JSON.stringify({ p_credits: Math.floor(credits), p_last: last }) });
+    return typeof n === 'number' ? n : null;
+  }
+
   async earnCores(amount: number, reason: string): Promise<void> {
     await this.call('/rest/v1/rpc/earn_cores', { method: 'POST', body: JSON.stringify({ amount, reason }) });
   }

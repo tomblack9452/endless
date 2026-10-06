@@ -43,6 +43,10 @@ export class LocalBackend implements Backend {
     return null;
   }
 
+  async syncCredits(): Promise<null> {
+    return null;
+  }
+
   async setShip(): Promise<boolean> {
     return false;
   }

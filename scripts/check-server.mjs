@@ -74,6 +74,16 @@ if (token) {
   if (rejected.status === 400 && /unknown board/.test(JSON.stringify(rejected.body))) ok('submit_run checks runs');
   else if (board.status === 200) bad(`submit_run isn't answering as expected (${rejected.status})`, 'run `npm run db:apply` again');
 
+  const credits = await call('/rest/v1/rpc/sync_credits', { method: 'POST', headers, body: JSON.stringify({ p_credits: 0, p_last: null }) });
+  if (credits.status === 200) ok('credits are kept on the server too');
+  else if (credits.status === 404) bad('the database has no sync_credits function yet', 'run `npm run db:apply` (it adds 0007_wallet_credits.sql)');
+  else bad(`sync_credits failed (${credits.status}): ${JSON.stringify(credits.body)}`, 'run `npm run db:apply` again');
+
+  const ship = await call('/rest/v1/rpc/set_ship', { method: 'POST', headers, body: JSON.stringify({ p_ship: { hull: 'dart' } }) });
+  if (ship.status >= 200 && ship.status < 300) ok('ships can be sent to the leaderboards');
+  else if (ship.status === 404) bad('the database has no set_ship function yet', 'run `npm run db:apply` (it adds 0006_ship_looks.sql)');
+  else bad(`set_ship failed (${ship.status}): ${JSON.stringify(ship.body)}`, 'run `npm run db:apply` again');
+
   // Last: deleting an account (settings > delete my account), on the throwaway one.
   const gone = await call('/rest/v1/rpc/delete_my_account', { method: 'POST', headers, body: '{}' });
   if (gone.status >= 200 && gone.status < 300) ok('players can delete their account (the check account is gone again)');

@@ -1,4 +1,4 @@
--- Endless Space database: part 9 of 9. Run the parts in order, 01 first.
+-- Endless Space database: part 9 of 10. Run the parts in order, 01 first.
 
 -- A board, best first: the top p_limit pilots and, if you are further down,
 -- your own row at the end with your rank.
@@ -49,3 +49,10 @@ end $$;
 revoke execute on function public.leaderboard from public, anon;
 
 grant execute on function public.leaderboard to authenticated;
+
+-- Credits on the server too, next to cores, so a balance can be changed from
+-- the dashboard (Table Editor > wallets > credits). Credits are still earned
+-- and spent on the device; sync_credits merges the two: whatever changed on
+-- the server since the device last synced is added to the device's balance.
+
+alter table public.wallets add column if not exists credits bigint check (credits >= 0);

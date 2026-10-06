@@ -315,6 +315,8 @@ export class Game {
     this.ui.titleRank.addEventListener('click', () => this.onTitleLink('record'));
     document.addEventListener('visibilitychange', () => {
       if (document.hidden) this.pause();
+      // Back to the front: pick up any change to the balances made on the server (the dashboard).
+      else void this.wallet.refresh().then(() => this.refreshTitle());
     });
     window.addEventListener('blur', () => this.pause());
 

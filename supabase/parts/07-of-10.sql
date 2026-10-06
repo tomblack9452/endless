@@ -1,4 +1,4 @@
--- Endless Space database: part 7 of 9. Run the parts in order, 01 first.
+-- Endless Space database: part 7 of 10. Run the parts in order, 01 first.
 
 -- leaderboard() gains a premium column, so it's made again (a function's
 -- columns can't change in place).

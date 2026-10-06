@@ -392,6 +392,36 @@ describe('pilot names', () => {
   });
 });
 
+describe('credits on the server', () => {
+  const sync = async (credits: number, last: number | null) =>
+    Number((await db.query<{ sync_credits: string }>('select public.sync_credits($1, $2)', [credits, last])).rows[0].sync_credits);
+
+  it('start from the device, then carry over changes made in the dashboard', async () => {
+    const a = await newUser();
+    await as(a);
+    expect(await sync(1200, null)).toBe(1200); // first sync: the device's balance
+    expect(await sync(1500, 1200)).toBe(1500); // earned 300 on the device
+    await admin();
+    await db.query('update public.wallets set credits = credits + 5000 where user_id = $1', [a]); // a gift from the dashboard
+    await as(a);
+    expect(await sync(1400, 1500)).toBe(6400); // spent 100 meanwhile, and the gift arrives
+    await admin();
+    await db.query('update public.wallets set credits = 0 where user_id = $1', [a]); // taken away
+    await as(a);
+    expect(await sync(6400, 6400)).toBe(0);
+  });
+
+  it('give a device that never synced the server balance, and refuse nonsense', async () => {
+    const a = await newUser();
+    await as(a);
+    await sync(800, null);
+    expect(await sync(50, null)).toBe(800);
+    await rejects(db.query('select public.sync_credits(-5, null)'), /not a balance/);
+    await as(null);
+    await rejects(db.query('select public.sync_credits(5, null)'), /permission denied|not signed in/);
+  });
+});
+
 describe('ships on the boards', () => {
   it('shows the ship a pilot set next to their score, and checks its shape', async () => {
     const a = await newUser();
