@@ -78,6 +78,8 @@ const BRIDGE_JUMP = 0.8;
 export const ROCK_HIT = 0.88;
 /** Mesas are round: a box this fraction of the radius fits them closely. */
 export const MESA_HIT = 0.92;
+/** A tumbleweed is a ring of wire loops about half a unit in radius; its box is a little inside that. */
+export const TUMBLEWEED_HIT = 0.45;
 /** Room families in the order of CONFIG.themes.interior.familyLooks. */
 const FAMILY_LOOK_IDS = Object.keys(CONFIG.themes.interior.familyLooks); // a bridge edge moving more than this in a row has jumped, not bent // pit sides: a thin steel lip, then black
 
@@ -104,7 +106,7 @@ export const PROP_HIT: Record<Prop, number> = {
   [Prop.Crystal]: 0.68,
   [Prop.Bush]: 0.8,
   [Prop.DeadTree]: 0.19,
-  [Prop.RockSpire]: 0.68,
+  [Prop.RockSpire]: 0.78,
   [Prop.Cactus]: 0.45,
 };
 
@@ -186,7 +188,7 @@ export class World {
   private readonly deadTrees: InstancedField;
   private readonly rockSpires: InstancedField;
   private readonly cacti: InstancedField;
-  private readonly tumbleweeds: InstancedField; // scenery rolling across
+  private readonly tumbleweeds: InstancedField; // rolling across; solid, but always ends its roll clear of the lane
   // Ice field and volcanic plain hazards.
   private readonly iceSheets: InstancedField;
   private readonly lavaSheets: InstancedField;
@@ -461,6 +463,8 @@ export class World {
       this.deadTrees,
       this.rockSpires,
       this.cacti,
+      this.tumbleweeds,
+      this.mesas,
       this.lavaBombs,
       this.shuttles,
       this.strips,
@@ -468,7 +472,7 @@ export class World {
       this.vents,
       this.tanks,
     ];
-    this.fields = [...this.solids, this.pools, this.steamPlumes, this.blinkers, this.holos, this.fans, this.tufts, this.mesas, this.arches, this.pickups, this.powers, this.pipes, this.greebles, this.voids, this.canisters, this.waters, this.tumbleweeds, this.iceSheets, this.lavaSheets, this.marks];
+    this.fields = [...this.solids, this.pools, this.steamPlumes, this.blinkers, this.holos, this.fans, this.tufts, this.arches, this.pickups, this.powers, this.pipes, this.greebles, this.voids, this.canisters, this.waters, this.iceSheets, this.lavaSheets, this.marks];
     this.applyPalette();
   }
 
@@ -1512,7 +1516,7 @@ export class World {
         } else {
           // Crystal spire instead of a rock pillar.
           const s = r * 1.5;
-          this.crystals.spawn(x - this.shipX, 0, d + i * 3, s, s * 1.4, s, rand() * 6.28, true, false, s * 0.62, s * 0.62);
+          this.crystals.spawn(x - this.shipX, 0, d + i * 3, s, s * 1.4, s, rand() * 6.28, true, false, s * PROP_HIT[Prop.Crystal], s * PROP_HIT[Prop.Crystal]);
         }
       }
     }
@@ -1596,7 +1600,7 @@ export class World {
       if (island > this.splitHalf * 0.6 && rand() < 0.35) {
         const s = 0.9 + rand() * 0.8;
         const wx = this.cx + (rand() - 0.5) * island;
-        if (Math.abs(wx - this.lane) > LANE + s + jitter) this.crystals.spawn(wx - this.shipX, 0, d, s, s * (1 + rand() * 0.6), s, rand() * 6.28, true, false, s * 0.45, s * 0.45);
+        if (Math.abs(wx - this.lane) > LANE + s + jitter) this.crystals.spawn(wx - this.shipX, 0, d, s, s * (1 + rand() * 0.6), s, rand() * 6.28, true, false, s * PROP_HIT[Prop.Crystal], s * PROP_HIT[Prop.Crystal]);
       }
     }
     // The other branch: its own line wanders a little, and rocks stay off it.
@@ -1862,9 +1866,19 @@ export class World {
     // It starts off to one side and has rolled across by the time you reach it,
     // staying between the walls (half: how far either side of centre it may go).
     const travel = Math.min(range(T.travel), Math.max(0, 2 * (half - s * 0.6)));
-    const from = centre - (dir * travel) / 2;
-    this.tumbleweeds.setNextRamp(dir * travel, range(T.over), 0, false);
-    this.tumbleweeds.spawn(from - this.shipX, 0.5 * s, d, s, s, s, 0, false, wraps, 0, 0, false);
+    const hit = TUMBLEWEED_HIT * s;
+    // It's solid, and where it ends up is where it hits: the end of the roll has to be clear
+    // of the lane (the roll's last stretch moves it about 0.3). If not, roll the other way.
+    const clear = LANE + hit + 0.9;
+    let from = centre - (dir * travel) / 2;
+    let way = dir;
+    if (Math.abs(from + way * travel - this.lane) < clear) {
+      way = -dir;
+      from = centre - (way * travel) / 2;
+      if (Math.abs(from + way * travel - this.lane) < clear) return;
+    }
+    this.tumbleweeds.setNextRamp(way * travel, range(T.over), 0, false);
+    this.tumbleweeds.spawn(from - this.shipX, 0.5 * s, d, s, s, s, 0, true, wraps, hit, hit, false);
   }
 
   /** Remember the lane after each row (for the dev autopilot). */
@@ -2095,7 +2109,7 @@ export class World {
         for (let j = 0; j < n; j++) {
           const dj = d + j * STEP;
           this.light(x, 0.28, dj, w, 0.07, 0.12, Light.Red, true);
-          this.light(x, 0.62, dj, w, 0.05, 0.1, Light.Red, true);
+          this.light(x, 0.62, dj, w, 0.05, 0.1, Light.Red, false); // above the ship: look only
           this.hullBox(this.cx + b.x0 + 0.12, 0, dj, 0.24, 1.1, 0.3, true, true);
           this.hullBox(this.cx + b.x1 - 0.12, 0, dj, 0.24, 1.1, 0.3, true, true);
         }

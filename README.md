@@ -152,7 +152,7 @@ a winding, clear path. Around them:
 
 **Canyon.** Rock walls that wind, with bands of rocks and pillars across
 the floor and gaps through them. Alien cacti stand along the floor and
-tumbleweeds roll across it (both solid). Obstacles are dark so they read against the
+tumbleweeds roll across it (both solid; a tumbleweed always ends its roll clear of the safe lane). Obstacles are dark so they read against the
 walls. Rocks run from small floor pebbles to huge cliffs towering over the
 walls; bands mix small, medium and big boulders; natural bridges span the
 canyon overhead.
