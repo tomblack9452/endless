@@ -29,7 +29,9 @@ import { shopFor } from './economy/shop';
 import { Tickets } from './economy/tickets';
 import { dayKey, formatWait, untilTomorrow } from './economy/time';
 import { EconomyView } from './economy/view';
-import { createBackend } from './server/backend';
+import { type BoardId, createBackend } from './server/backend';
+import { BOARD_TABS, boardCaption, boardForRun, boardName, boardQuery } from './server/boards';
+import { Outbox } from './server/outbox';
 import { CloudSave } from './server/sync';
 import { shareCard } from './share';
 import { createStore, type ProductId, type StoreProduct } from './store/store';
@@ -56,7 +58,7 @@ const DEG = Math.PI / 180;
 const PATH_STEP = 4;
 const OWNED_KEY = 'endless.purchases';
 
-type InfoScreen = 'stats' | 'missions' | 'hangar' | 'record' | 'solo' | 'league' | 'shop' | 'pass' | 'daily';
+type InfoScreen = 'stats' | 'missions' | 'hangar' | 'record' | 'solo' | 'league' | 'shop' | 'pass' | 'daily' | 'boards';
 
 /** "5 oct": the Monday this week's ranked course started. */
 /** "1:23.4" */
@@ -143,6 +145,10 @@ export class Game {
   private readonly econ = new EconomyView();
   private readonly backend = createBackend();
   private readonly cloud = new CloudSave(this.backend);
+  /** Finished runs on their way to the leaderboards (kept and retried when there's no signal). */
+  private readonly outbox = new Outbox(this.backend);
+  private boardTab = 'week';
+  private boardSeq = 0;
   private readonly store = createStore();
   private storeProducts: StoreProduct[] = [];
   /** Shop rows for real-money products, in the order shown ('dev' adds cores in the dev build). */
@@ -276,6 +282,8 @@ export class Game {
 
     this.ui.bindCelebration();
     this.ui.bindTitleLinks(this.onTitleLink);
+    this.ui.bindBoards(BOARD_TABS, (id) => void this.showBoard(id), (name) => void this.savePilotName(name));
+    window.addEventListener('online', () => void this.outbox.flush());
     const now = Date.now();
     // Looks load once; a login reward can give one, so it waits for them.
     const looksReady = Promise.all([this.cosmetics.load(), this.looks.load()]);
@@ -532,6 +540,8 @@ export class Game {
     }
     this.wallet.add(credits);
     lines.push(`+${formatScore(credits)} credits`);
+    const board = boardForRun(this.mode, this.environment?.id ?? null, this.course !== null);
+    if (board && board !== 'ranked') this.submitToBoard(board, this.state === 'finished');
     if (this.unlockable) {
       const next = nextEnvironment(this.progress.furthest);
       if (next) lines.push(`solo: ${next.env.name} opens at level ${next.status.level} (${next.status.toGo} to go)`);
@@ -929,6 +939,7 @@ export class Game {
       }
       await this.wallet.link(this.backend);
       this.refreshTitle();
+      void this.outbox.flush(); // runs that couldn't be sent last time
     }
     this.ownedProducts = new Set(JSON.parse((await storage.get(OWNED_KEY)) ?? '[]') as string[]);
     await this.store.start(this.backend.userId);
@@ -1004,16 +1015,7 @@ export class Game {
   /** Fold a ranked run into the rank and league; fills the game-over block. Returns bonus credits. */
   private recordRanked(finished: boolean): number {
     const lg = this.leagues;
-    if (!this.assisted)
-      void this.backend.submitRun({
-        week: weekKey(Date.now()),
-        league: lg.league,
-        score: Math.floor(this.score),
-        seconds: this.runTime,
-        distance: this.world.distance - this.runStart,
-        finished,
-        path: this.path,
-      });
+    this.submitToBoard('ranked', finished);
     this.ui.showShare(true);
     const target = this.weekly.target;
     this.beatPar = this.score >= leaguePar(lg.league, target);
@@ -1188,15 +1190,82 @@ export class Game {
   /** This week's leaderboard in your league (just your best when offline). */
   private async loadBoard(): Promise<void> {
     const lg = this.leagues;
+    const tab = BOARD_TABS[0];
     this.ui.renderBoard([], this.backend.online ? 'loading' : '');
-    const rows = await this.backend.board(weekKey(Date.now()), lg.league);
+    const rows = await this.backend.board(boardQuery(tab, lg.league));
     const mine = this.progress.weeklyBest(this.weekly.id);
-    const view: [string, string][] = rows.map((r, i) => [`${i + 1}. ${r.you ? 'you' : r.name}`, formatScore(r.score)]);
-    if (!this.backend.online) {
-      this.ui.renderBoard(mine > 0 ? [['your best', formatScore(mine)]] : [['no ranked run yet this week', '']], 'online leaderboards come with accounts');
+    if (!this.backend.online || rows === null) {
+      this.ui.renderBoard(mine > 0 ? [['your best', formatScore(mine)]] : [['no ranked run yet this week', '']], this.backend.online ? "couldn't load the board" : 'the leaderboards need the server');
       return;
     }
+    const view: [string, string][] = rows.map((r) => [`${r.rank}. ${r.you ? 'you' : r.name}`, formatScore(r.score)]);
     this.ui.renderBoard(view.length > 0 ? view : [['no runs yet this week', '']], LEAGUES[lg.league].name);
+  }
+
+  // --- leaderboards ----------------------------------------------------------------
+
+  /** Send a finished run to its board. Assisted and dev runs never go. */
+  private submitToBoard(board: BoardId, finished: boolean): void {
+    if (this.assisted || this.dev.invincible || this.dev.autopilot) return;
+    const distance = this.world.distance - this.runStart;
+    if (distance < 60 || this.runTime < 5 || this.score <= 0) return; // a crash at the start isn't a result
+    void this.outbox
+      .send({
+        board,
+        league: board === 'ranked' ? this.leagues.league : 0,
+        score: Math.floor(this.score),
+        seconds: this.runTime,
+        distance,
+        finished,
+        path: board === 'ranked' ? [...this.path] : [],
+      })
+      .then((res) => {
+        if (!res) return; // waiting for a signal
+        if (res.status === 'ok' && res.rank) this.ui.showNotice(`${res.newBest ? 'new best: ' : ''}#${res.rank} on the ${boardName(board)} board`);
+        else if (res.status === 'rejected' && import.meta.env.DEV) console.warn(`leaderboard turned the run down: ${res.message}`);
+      });
+  }
+
+  /** Your own best on a tab, for when the board can't be read. */
+  private localBest(id: string): number {
+    if (id === 'week') return this.progress.weeklyBest(this.weekly.id);
+    if (id === 'endless') return this.progress.endlessBest;
+    return this.progress.envBest[id] ?? 0;
+  }
+
+  private openBoards(): void {
+    this.openInfo('boards');
+    void this.showBoard(this.boardTab);
+    void this.backend.pilotName().then((name) => {
+      if (this.infoOpen === 'boards') this.ui.setPilotName(name ?? '', this.backend.online ? (name ? '3 to 16 letters, numbers, spaces, - or _. once an hour' : '') : 'names come with the server');
+    });
+  }
+
+  private async showBoard(id: string): Promise<void> {
+    const tab = BOARD_TABS.find((t) => t.id === id) ?? BOARD_TABS[0];
+    this.boardTab = tab.id;
+    this.ui.setBoardTab(tab.id);
+    const seq = ++this.boardSeq;
+    const caption = boardCaption(tab, this.leagues.league);
+    const mine = this.localBest(tab.id);
+    const own = mine > 0 ? [{ rank: 0, name: 'you', score: formatScore(mine), you: true }] : [];
+    if (!this.backend.online) {
+      this.ui.renderLeaderboard(caption, own, 'global boards need the server. this is your best on this device.');
+      return;
+    }
+    this.ui.renderLeaderboard(caption, [], 'loading');
+    await this.outbox.flush(); // so a run you just finished is on the board you're about to read
+    const rows = await this.backend.board(boardQuery(tab, this.leagues.league));
+    if (seq !== this.boardSeq || this.infoOpen !== 'boards') return; // moved on while it loaded
+    if (rows === null) this.ui.renderLeaderboard(caption, own, "couldn't load the board. check your connection");
+    else if (rows.length === 0) this.ui.renderLeaderboard(caption, [], 'nobody yet. fly a run to be first');
+    else this.ui.renderLeaderboard(caption, rows.map((r) => ({ rank: r.rank, name: r.name, score: formatScore(r.score), you: r.you })), '');
+  }
+
+  private async savePilotName(name: string): Promise<void> {
+    const res = await this.backend.setPilotName(name);
+    this.ui.setPilotName(res.ok ? res.message : '', res.ok ? 'saved' : res.message);
+    if (res.ok) void this.showBoard(this.boardTab);
   }
 
   /** How far through the current rank's XP band the player is (0..1). */
@@ -1593,6 +1662,7 @@ export class Game {
       this.openShop();
     }
     else if (name === 'pass') this.openPass();
+    else if (name === 'boards') this.openBoards();
     else if (name === 'daily') this.openDaily();
   };
 
@@ -1666,7 +1736,7 @@ export class Game {
   };
 
   private onKey = (e: KeyboardEvent): void => {
-    if (e.repeat) return;
+    if (e.repeat || (e.target as HTMLElement | null)?.tagName === 'INPUT') return; // typing a name is not a shortcut
     if ((e.code === 'Space' || e.code === 'Enter') && this.state !== 'paused') {
       if (this.state === 'title' && !this.settingsOpen && !this.infoOpen) this.startRanked();
       else this.onTap();

@@ -68,7 +68,9 @@ Accept the certificate warning once on the phone.
 | `npm run build` | Typecheck, then build into `dist/` |
 | `npm run preview` | Serve the built `dist/` |
 | `npm run typecheck` | TypeScript only |
-| `npm test` | Fairness tests (see [Testing](#testing)) |
+| `npm test` | Fairness, collision, database and server tests (see [Testing](#testing)) |
+| `npm run db:setup` | Rebuild `supabase/setup.sql` from the migrations |
+| `npm run check-server` | Check the Supabase keys and database, and say what's missing |
 
 ## Controls
 
@@ -367,7 +369,12 @@ Solo has two tabs.
 **Environments:** pick open ground, canyon, ship interior, ice field,
 asteroid belt or volcanic plain and fly it endlessly. It stays there and
 keeps getting harder, through its three flavours. Each has its own high
-score.
+score and its own leaderboard. They open as you get to them: an environment
+unlocks when a ranked or endless run reaches the level where its area first
+appears (canyon at level 4, ship at 7, ice field at 10, asteroid belt at 13,
+volcanic plain at 19). Locked ones show what opens them and a bar for how far
+off that is, and the solo screen names the next unlock. Solo runs, set levels
+and dev starts don't count towards it.
 
 **Levels:** the set levels, hand-built runs that are the same every time,
 with a finish line. Each is a script of named sections: an area, how hard it
@@ -388,8 +395,8 @@ events, a chosen order of ship rooms).
 
 Each runs about 2-4 minutes and has three stars: **finish**, **no hits** (a
 shield save counts as a hit) and **beat the score target**. Your best time
-and score are kept. Finishing a level opens the next. New stars are worth 50
-credits each.
+and score are kept. Finishing a level opens the next (a locked level says which to finish). New
+stars are worth 50 credits each.
 
 **Endless** runs through every area in turn, forever: open ground, canyon,
 ship, then the next loop's biomes. It has its own high score.
@@ -610,7 +617,8 @@ new build drops the old build's cached scripts and styles.
 | `src/ranks.ts` | Rank ladder, XP, skill, par, insignia, run history |
 | `src/wallet.ts` | Credits and cores |
 | `src/economy/` | Tickets, daily rewards and quests, the shop, the season pass, and their screens |
-| `src/server/` | The server behind one interface: Supabase, or the device alone; cloud save |
+| `src/server/` | The server behind one interface: Supabase, or the device alone; cloud save, the run outbox and the leaderboard boards |
+| `src/unlocks.ts` | What opens solo environments and how far off it is |
 | `src/store/` | In-app purchases (RevenueCat in the apps, nothing on the web) |
 | `src/ghost.ts` | The ghost of your weekly best |
 | `src/share.ts` | The share card |
@@ -630,13 +638,17 @@ new build drops the old build's cached scripts and styles.
 | `tests/pieces.test.ts`, `tests/pieces-pairs.test.ts` | Every ship section on paper, every route flown, every pair back to back |
 | `tests/determinism.test.ts` | No unseeded randomness or clock in course generation |
 | `tests/economy.test.ts` | Tickets, the calendar, quests, the shop, the pass and the revive |
-| `tests/server.test.ts` | Offline fallback, and the server functions agree with the game |
+| `tests/server.test.ts` | Offline fallback and the store webhook |
+| `tests/sql.test.ts`, `tests/leaderboard.test.ts` | The database run for real (PGlite): checks, boards, names, row security, and the game's server code against it |
+| `tests/collisions.test.ts` | Every solid pool checked against its mesh across every area |
+| `tests/unlocks.test.ts` | Solo environment unlocks |
 | `tests/ranks.test.ts` | Rank ladder, XP, skill and credit maths |
 | `tests/courses.test.ts` | Set levels fly to the finish; twelve weeks of ranked runs and every environment are survivable; the course depends only on its seed |
 | `tests/input.test.ts` | Double-tap and hold to boost |
 | `tests/leagues.test.ts` | League brackets, LP, divisions, promotion, weekly rewards, prices |
 | `public/` | Icons, manifest, service worker |
-| `supabase/` | Database schema and server functions |
+| `supabase/` | Database migrations, `setup.sql` (all of them in one paste) and the store webhook |
+| `docs/leaderboards.md` | Turning the leaderboards on, what's checked, and the cheating roadmap |
 | `docs/store.md` | Server, store and app setup, and the store listing |
 
 ## Tuning
@@ -731,17 +743,21 @@ Without keys, everything lives on the device. With them:
   player (linkable to Apple or Google later), a cloud save of every saved
   setting and stat (the newer save wins; a fresh install takes the cloud's),
   cores held on the server (earned cores capped per day, spending checked),
-  ranked runs submitted and checked (the score has to fit the distance and
-  time, and the path the distance), and weekly leaderboards per league.
+  and **leaderboards**: this week's ranked run per league, endless, and one
+  for each solo environment, with pilot names (see the `top` link on the title
+  screen). Runs are checked in the database (the score has to fit the distance
+  and time, and the path the distance), kept and retried if there's no signal.
+  Setup is one SQL paste and two keys: [docs/leaderboards.md](docs/leaderboards.md).
 - **RevenueCat** (`src/store/`) in the iOS and Android apps: core packs
   (100, 550, 1,200, 2,500), a one-time starter pack (500 cores, 3 tickets and
   the nova hull) and the season pass. Purchases are paid into the server
   wallet by a webhook. The web build sells nothing.
 
 What has to be set up by hand (projects, products, keys and the app builds)
-is in [docs/store.md](docs/store.md), with the store listing text and the
-screenshot list. Keys go in `.env` (copy `.env.example`), which is never
-committed.
+is in [docs/leaderboards.md](docs/leaderboards.md) for the server and
+[docs/store.md](docs/store.md) for purchases, with the store listing text and
+the screenshot list. Keys go in `.env` (copy `.env.example`), which is never
+committed; `npm run check-server` says what's missing.
 
 Still to do on the server: a full re-fly of submitted runs with the game's
 own code (it needs the run simulation pulled out of `game.ts` first), and

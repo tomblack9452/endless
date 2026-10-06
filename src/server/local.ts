@@ -1,12 +1,11 @@
-import type { Backend, BoardRow, RunSubmission } from './backend';
+import type { Backend, BoardQuery, BoardRow, RunSubmission, SubmitResult } from './backend';
 
-// No server: the device is the only record. The leaderboard shows your own
-// best of the week, so the screen still makes sense offline.
+// No server: the device is the only record. Boards can't be read, so the
+// leaderboard screen shows your own bests and says why.
 
 export class LocalBackend implements Backend {
   readonly online = false;
   readonly userId = null;
-  private best = new Map<string, number>(); // week:league -> best score this session
 
   async signIn(): Promise<boolean> {
     return false;
@@ -28,13 +27,19 @@ export class LocalBackend implements Backend {
     return true; // the device's wallet already checked
   }
 
-  async submitRun(run: RunSubmission): Promise<void> {
-    const k = `${run.week}:${run.league}`;
-    this.best.set(k, Math.max(this.best.get(k) ?? 0, Math.floor(run.score)));
+  async submitRun(_run: RunSubmission): Promise<SubmitResult> {
+    return { status: 'ok' };
   }
 
-  async board(week: string, league: number): Promise<BoardRow[]> {
-    const score = this.best.get(`${week}:${league}`);
-    return score ? [{ name: 'you', score, you: true }] : [];
+  async board(_query: BoardQuery): Promise<BoardRow[] | null> {
+    return null;
+  }
+
+  async pilotName(): Promise<null> {
+    return null;
+  }
+
+  async setPilotName(): Promise<{ ok: boolean; message: string }> {
+    return { ok: false, message: 'names need the server' };
   }
 }

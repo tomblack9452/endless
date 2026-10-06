@@ -6,25 +6,22 @@ and the web build sells nothing.
 
 ## 1. Supabase (accounts, cloud save, cores, leaderboards)
 
+The short version is in [leaderboards.md](leaderboards.md). In full:
+
 1. Create a project at supabase.com.
-2. Authentication > Providers: turn on **anonymous sign-ins**.
-3. Apply the database schema: `supabase link`, then `supabase db push` (or paste
-   `supabase/migrations/*.sql` into the SQL editor, in order).
-4. Deploy the functions:
+2. Authentication > Sign In / Providers: turn on **anonymous sign-ins**.
+3. SQL editor: paste all of `supabase/setup.sql` and run it. (Or with the CLI:
+   `supabase link`, then `supabase db push`.)
+4. Copy `.env.example` to `.env` and fill in `VITE_SUPABASE_URL` and
+   `VITE_SUPABASE_ANON_KEY` (Project settings > API). `.env` is never committed.
+5. For the live site, add the same two values as repository secrets
+   (`VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`); `deploy.yml` passes them to
+   the build.
+6. `npm run check-server` checks all of the above.
+7. Only for store purchases (section 3): deploy the webhook.
    ```
-   supabase functions deploy submit-run
    supabase secrets set REVENUECAT_WEBHOOK_SECRET=<a long random string>
    supabase functions deploy revenuecat-webhook --no-verify-jwt
-   ```
-5. Copy `.env.example` to `.env` and fill in `VITE_SUPABASE_URL` and
-   `VITE_SUPABASE_ANON_KEY` (Project settings > API). `.env` is never committed.
-6. For the live site, add the same two values as repository secrets and pass them
-   to `npm run build` in `.github/workflows/deploy.yml`:
-   ```yaml
-   - run: npm run build
-     env:
-       VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
-       VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
    ```
 
 ## 2. App Store Connect and Google Play
