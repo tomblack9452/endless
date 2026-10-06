@@ -47,6 +47,10 @@ export class LocalBackend implements Backend {
     return null;
   }
 
+  async takeMaxOut(): Promise<boolean> {
+    return false;
+  }
+
   async setShip(): Promise<boolean> {
     return false;
   }

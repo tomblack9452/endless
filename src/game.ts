@@ -316,7 +316,7 @@ export class Game {
     document.addEventListener('visibilitychange', () => {
       if (document.hidden) this.pause();
       // Back to the front: pick up any change to the balances made on the server (the dashboard).
-      else void this.wallet.refresh().then(() => this.refreshTitle());
+      else void this.wallet.refresh().then(() => this.checkMaxOut()).then(() => this.refreshTitle());
     });
     window.addEventListener('blur', () => this.pause());
 
@@ -1120,6 +1120,7 @@ export class Game {
         return;
       }
       await this.wallet.link(this.backend);
+      await this.checkMaxOut();
       this.refreshTitle();
       this.queueShip();
       void this.outbox.flush(); // runs that couldn't be sent last time
@@ -2499,14 +2500,26 @@ export class Game {
 
   /** Dev: unlock everything: top rank, every sector and star, all looks and upgrades, plenty of credits. */
   devUnlockAll(): void {
+    this.maxOut();
+    this.dev.unlockedAll = true;
+    this.ui.showNotice('dev: everything unlocked');
+  }
+
+  /** The top rank and league, every look, every upgrade at its top tier and 100,000 credits. */
+  private maxOut(): void {
     this.ranked.addXp(Math.max(0, RANKS[RANKS.length - 1].xp - this.ranked.xp));
     this.looks.buyAll();
     this.leagues.devTop();
-    this.dev.unlockedAll = true;
     for (const s of SYSTEMS) while (this.upgrades.tier(s.id) < MAX_TIER) this.upgrades.raise(s.id);
     this.wallet.add(100000);
     this.refreshTitle();
-    this.ui.showNotice('dev: everything unlocked');
+  }
+
+  /** Maxed out from the SQL editor (players.max_out): done once, when the game next opens or comes back. */
+  private async checkMaxOut(): Promise<void> {
+    if (!this.backend.online || !(await this.backend.takeMaxOut())) return;
+    this.maxOut();
+    this.ui.showNotice('maxed out: every look, every upgrade, top rank and league');
   }
 
   /** Dev: cores, standing in for purchases until the store is in. */

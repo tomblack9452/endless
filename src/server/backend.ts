@@ -83,6 +83,8 @@ export interface Backend {
   setPilotName(name: string): Promise<{ ok: boolean; message: string }>;
   /** Show these looks next to your name on the boards; false if it didn't get there. */
   setShip(ship: ShipLook): Promise<boolean>;
+  /** True once if the account was marked to be maxed out from the SQL editor (players.max_out); clears the mark. */
+  takeMaxOut(): Promise<boolean>;
   /** Delete this account and everything the server holds for it; false if that couldn't be done. */
   deleteAccount(): Promise<boolean>;
 }

@@ -422,6 +422,22 @@ describe('credits on the server', () => {
   });
 });
 
+describe('max out', () => {
+  it('is taken once after it is set from the SQL editor, and only by its player', async () => {
+    const [a, b] = [await newUser(), await newUser()];
+    const take = async () => (await db.query<{ take_max_out: boolean }>('select public.take_max_out()')).rows[0].take_max_out;
+    await as(a);
+    expect(await take()).toBe(false);
+    await admin();
+    await db.query('update public.players set max_out = true where user_id = $1', [a]);
+    await as(b);
+    expect(await take()).toBe(false);
+    await as(a);
+    expect(await take()).toBe(true);
+    expect(await take()).toBe(false);
+  });
+});
+
 describe('ships on the boards', () => {
   it('shows the ship a pilot set next to their score, and checks its shape', async () => {
     const a = await newUser();

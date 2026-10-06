@@ -84,6 +84,11 @@ if (token) {
   else if (ship.status === 404) bad('the database has no set_ship function yet', 'run `npm run db:apply` (it adds 0006_ship_looks.sql)');
   else bad(`set_ship failed (${ship.status}): ${JSON.stringify(ship.body)}`, 'run `npm run db:apply` again');
 
+  const maxed = await call('/rest/v1/rpc/take_max_out', { method: 'POST', headers, body: '{}' });
+  if (maxed.status === 200) ok('players can be maxed out from the SQL editor');
+  else if (maxed.status === 404) bad('the database has no take_max_out function yet', 'run `npm run db:apply` (it adds 0008_max_out.sql)');
+  else bad(`take_max_out failed (${maxed.status}): ${JSON.stringify(maxed.body)}`, 'run `npm run db:apply` again');
+
   // Last: deleting an account (settings > delete my account), on the throwaway one.
   const gone = await call('/rest/v1/rpc/delete_my_account', { method: 'POST', headers, body: '{}' });
   if (gone.status >= 200 && gone.status < 300) ok('players can delete their account (the check account is gone again)');

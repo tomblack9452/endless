@@ -175,6 +175,10 @@ export class SupabaseBackend implements Backend {
     return rows?.[0]?.name ?? null;
   }
 
+  async takeMaxOut(): Promise<boolean> {
+    return (await this.call<boolean>('/rest/v1/rpc/take_max_out', { method: 'POST', body: '{}' })) === true;
+  }
+
   async setShip(ship: ShipLook): Promise<boolean> {
     const { status } = await this.request('/rest/v1/rpc/set_ship', { method: 'POST', body: JSON.stringify({ p_ship: ship }) });
     return status >= 200 && status < 300;

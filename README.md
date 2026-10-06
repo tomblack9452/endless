@@ -901,10 +901,21 @@ change you make is applied on top of anything they've earned since (add
 `credits` cell that's empty means that player hasn't synced since this was
 added; it fills in when they next open the game.
 
+**Maxing out a player** (for testing): the top rank and league, every look,
+every upgrade at its top tier and 100,000 credits. In the SQL editor:
+
+```sql
+update public.players set max_out = true where name = 'Ace Pilot';
+```
+
+It happens the next time they open the game or come back to it, once (the
+flag clears itself; set it again to repeat). Their scores on the boards
+afterwards are flown with a maxed ship.
+
 After every update that adds a file to `supabase/migrations/`, run
 `npm run db:apply` (it only applies what's new), then `npm run check-server`
 to see it's all there. Recent ones: `0005` (deleting an account from
-settings), `0006` (ships on the leaderboards), `0007` (credits in `wallets`).
+settings), `0006` (ships on the leaderboards), `0007` (credits in `wallets`), `0008` (maxing out a player).
 
 Still to do on the server: a full re-fly of submitted runs with the game's
 own code (it needs the run simulation pulled out of `game.ts` first), and
