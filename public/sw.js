@@ -2,7 +2,7 @@
 // shows up as soon as you're online); everything else (hashed scripts,
 // fonts, icons) is cache-first, since a changed file gets a new name.
 
-const CACHE = 'endless-v1';
+const CACHE = 'endless-v2';
 const SHELL = ['./', './index.html', './manifest.webmanifest', './icons/icon-192.png'];
 
 self.addEventListener('install', (event) => {
@@ -25,7 +25,8 @@ self.addEventListener('fetch', (event) => {
 
   if (req.mode === 'navigate') {
     event.respondWith(
-      fetch(req)
+      // no-cache: always ask the server (GitHub Pages lets browsers keep the page 10 minutes).
+      fetch(req, { cache: 'no-cache' })
         .then((res) => {
           const copy = res.clone();
           caches.open(CACHE).then((cache) => cache.put('./index.html', copy.clone()));

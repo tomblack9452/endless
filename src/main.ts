@@ -22,6 +22,8 @@ document.addEventListener(
 );
 
 const canvas = document.getElementById('scene') as HTMLCanvasElement;
+// Which build is running, at the bottom of settings (handy for telling an old cached copy from a new one).
+document.getElementById('build')!.textContent = `version ${__BUILD__}`;
 
 // Offline support and add-to-home-screen, in real builds only.
 if (import.meta.env.PROD && 'serviceWorker' in navigator) {

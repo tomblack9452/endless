@@ -12,3 +12,6 @@ interface ImportMetaEnv {
 interface ImportMeta {
   readonly env: ImportMetaEnv;
 }
+
+/** Which build this is: the commit and the day (see vite.config.ts). */
+declare const __BUILD__: string;
