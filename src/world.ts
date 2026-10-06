@@ -597,6 +597,7 @@ export class World {
     this.vents.animate(this.distance); // steam vents
     this.tumbleweeds.animate(this.distance); // rolling across
     this.lavaBombs.animate(this.distance); // falling
+    this.obstacleRocks.animate(this.distance); // drifting asteroids
     this.greebles.animate(this.distance); // hook chains, engine pistons
     this.updateMix(dt);
   }
@@ -1384,7 +1385,12 @@ export class World {
     this.steerCentre(d, this.splitStart !== Infinity ? 0 : maxSlope * c.centreSlopeFraction);
     this.altNow = null;
     this.floorN = -1;
-    let hw = (c.halfWidthStart - c.halfWidthMin) * Math.exp(-score / c.widthRampPoints) + c.halfWidthMin;
+    // The asteroid belt is this same frame in open space: wider, no floor, its own rocks.
+    const space = this.genBiome === 'asteroids';
+    const A = TH.asteroids;
+    let hw = space
+      ? (A.halfWidthStart - A.halfWidthMin) * Math.exp(-score / A.widthRampPoints) + A.halfWidthMin
+      : (c.halfWidthStart - c.halfWidthMin) * Math.exp(-score / c.widthRampPoints) + c.halfWidthMin;
     const left = this.themeEnd - d;
     hw = lerp(c.mouthHalfWidth, hw, ease((d - this.themeStart) / c.mouth));
     // The lane may still be far out (it carries on from open ground). The walls
@@ -1401,11 +1407,11 @@ export class World {
     const widen = split.wall;
     const hwAll = hw + widen;
     const maxOffset = hwAll - (LANE + 0.4);
-    const chasm = this.planChasm(d, hw, maxSlope, left, sub);
+    const chasm = space ? false : this.planChasm(d, hw, maxSlope, left, sub); // nothing to fall into in space
     if (split.active) {
       // Ride down the middle of our branch.
       this.laneTarget = this.splitSide * (this.splitHalf + hw / 2);
-    } else if (left < c.exit + 60) this.laneTarget = 0; // line up with the interior door
+    } else if (left < c.exit + (space ? A.exitLead : 60)) this.laneTarget = 0; // line up with the interior door
     else if (inMouth || Math.abs(this.lane - this.cx) > hw - LANE - 1) this.laneTarget = 0; // head for the middle as the walls close in
     else if (chasm && this.chasmKind === 2) this.laneTarget = -this.chasmSide * Math.min(1.5, maxOffset); // leave room for the fork
     else this.retargetOffset(d, maxOffset);
@@ -1427,6 +1433,10 @@ export class World {
     // Walls: two staggered inner rocks per side so there are no gaps to slip
     // through, plus tall outer rocks for the canyon sides.
     for (let side = -1; side <= 1; side += 2) {
+      if (space) {
+        this.asteroidWall(d, side, hw);
+        continue;
+      }
       for (let k = 0; k < 2; k++) {
         const r = 0.9 + rand() * 0.8;
         this.rock(this.cx + side * (hw + r * 0.65), d + k * STEP * 0.5, r, 1.6 + rand() * 2.6);
@@ -1470,14 +1480,18 @@ export class World {
       if (this.runStart !== null && rand() < c.tumbleweedChance) this.rollTumbleweed(d, this.cx, hw, false);
     }
 
+    if (space) {
+      this.spaceDebris(d, hw);
+      this.spaceDust(d, hw);
+    }
     // Pebbles on the floor: scenery.
-    for (let i = 0; i < c.pebblesPerRow; i++) {
+    for (let i = 0; !space && i < c.pebblesPerRow; i++) {
       const r = 0.05 + rand() * 0.1; // small and flat: never mistaken for an obstacle
       const x = this.cx + (rand() * 2 - 1) * (hw - 0.3) - this.shipX;
       this.rocks.spawn(x, 0, d + (rand() - 0.5) * STEP, r * 1.4, (r * 0.5) / BOULDER_HEIGHT, r, rand() * 6.28, false, false, 0, 0, false);
     }
     // A natural bridge spanning the canyon overhead (its feet are in the walls).
-    if (d >= this.nextBridgeAt && !this.quiet(d)) {
+    if (!space && d >= this.nextBridgeAt && !this.quiet(d)) {
       this.nextBridgeAt = d + range(c.bridgeSpacing);
       const sx = (hw + 1.2) / ARCH_PILLAR_X;
       const sy = 1.3 + rand() * 0.5;
@@ -1493,6 +1507,13 @@ export class World {
     // Obstacles: dark rocks, laid out so the way through reads from a distance.
     if (d < this.nextFeatureAt) return;
     const jitter = maxSlope * STEP * 0.5;
+    if (space) {
+      // Before a split the way to the other branch has to be clear too, from where a pilot starts crossing.
+      const plannable = left - c.exit - 120 > 0 && d - this.themeStart > c.mouth + 30 && this.splitStart === Infinity;
+      if (plannable && d > this.splitAt - A.splitClear) this.nextFeatureAt = d + STEP;
+      else this.spaceFeature(d, sub, hw, jitter, score);
+      return;
+    }
     if (sub === 0) {
       // Lone boulders.
       this.nextFeatureAt = d + range(c.loneBoulderSpacing);
@@ -1519,6 +1540,167 @@ export class World {
           this.crystals.spawn(x - this.shipX, 0, d + i * 3, s, s * 1.4, s, rand() * 6.28, true, false, s * PROP_HIT[Prop.Crystal], s * PROP_HIT[Prop.Crystal]);
         }
       }
+    }
+  }
+
+  // --- the asteroid belt ----------------------------------------------------------
+
+  /** One side's boundary of the field: big asteroids packed tight enough to hold the ship in. */
+  private asteroidWall(d: number, side: number, hw: number): void {
+    const c = TH.canyon;
+    for (let k = 0; k < 2; k++) {
+      const r = 1.5 + rand() * 1.2;
+      this.rock(this.cx + side * (hw + r * 0.65), d + k * STEP * 0.5, r, r * (2 + rand() * 1.8));
+    }
+    const r = 2 + rand() * 2;
+    this.rock(this.cx + side * (hw + 3 + rand() * 9), d + (rand() - 0.5) * STEP, r, r * (2 + rand() * 2));
+    // Now and then a huge asteroid looms over the edge of the field.
+    if (rand() < c.cliffChance) {
+      const big = 4 + rand() * 3.5;
+      this.rock(this.cx + side * (hw + 3 + big), d, big, big * (2.2 + rand() * 1.6));
+    }
+  }
+
+  /** Chips of rock and dust floating about beyond the field, for depth. Look only. */
+  private spaceDebris(d: number, hw: number): void {
+    const A = TH.asteroids;
+    if (rand() >= A.debrisPerRow) return;
+    const r = 0.15 + rand() * 0.5;
+    const side = rand() < 0.5 ? -1 : 1;
+    const x = this.cx + (rand() * 2 - 1) * (hw + 2) + side * (rand() < 0.5 ? 0 : hw * 0.8 + rand() * 10);
+    this.rocks.spawn(x - this.shipX, 0.6 + rand() * 7, d, r * 1.5, (r * 0.9) / BOULDER_HEIGHT, r, rand() * 6.28, false, false, 0, 0, false);
+  }
+
+  /** Dust motes streaming past at every height: with no floor to read speed from, they carry it. Look only. */
+  private spaceDust(d: number, hw: number): void {
+    const A = TH.asteroids;
+    for (let i = 0; i < A.dustPerRow; i++) {
+      const x = this.cx + (rand() * 2 - 1) * (hw + 8);
+      const y = -3 + rand() * 9;
+      const len = 0.5 + rand() * 1.2;
+      this.strips.nextColor = rand() < 0.15 ? Light.Amber : Light.White;
+      this.strips.spawn(x - this.shipX, y, d + (rand() - 0.5) * STEP, 0.05 + rand() * 0.05, 0.05 + rand() * 0.05, len, 0, false, false, 0, 0, false);
+    }
+  }
+
+  /** Pick the next set piece of the belt: drift fields, clusters, gates, orbiting pairs. */
+  private spaceFeature(d: number, sub: number, hw: number, jitter: number, score: number): void {
+    const A = TH.asteroids;
+    const busy = Math.min(1, score / A.fullPoints); // 0 at the start, 1 at its busiest
+    const mix = A.mix[Math.min(sub, A.mix.length - 1)];
+    let roll = rand();
+    let kind = 0;
+    while (kind < 3 && roll >= mix[kind]) roll -= mix[kind++];
+    const spacing = [A.driftSpacing, A.clusterSpacing, A.gateSpacing, A.orbiterSpacing][kind];
+    this.nextFeatureAt = d + range(spacing) * (1 - 0.35 * busy) * A.spacingScale[Math.min(sub, A.spacingScale.length - 1)];
+    if (kind === 0) this.driftField(d, hw, jitter, busy);
+    else if (kind === 1) this.rockCluster(d, hw, jitter, busy);
+    else if (kind === 2) this.asteroidGate(d, hw, jitter, busy);
+    else this.orbiterPair(d, hw, jitter);
+  }
+
+  /** A spaceborne rock: round, sized freely, a little proud of the (invisible) ground. */
+  private asteroid(x: number, d: number, r: number): void {
+    const hit = r * ROCK_HIT;
+    this.obstacleRocks.spawn(x - this.shipX, 0, d, r, (r * (1.45 + rand() * 0.5)) / BOULDER_HEIGHT, r, rand() * Math.PI * 2, true, false, hit, hit);
+  }
+
+  /**
+   * A rock that swings across the field as you come up to it: x = base + amp sin(...) of the
+   * distance still to go, so where it will be on arrival is known exactly, at any speed. It
+   * ends up at `arrive` (world x); the caller has kept that clear of the lane with room for how far it moves
+   * while the ship passes it.
+   */
+  private swayingAsteroid(arrive: number, d: number, r: number, amp: number, freq: number, phase: number): void {
+    const hit = r * ROCK_HIT;
+    this.obstacleRocks.setNextMotion(amp, freq, phase);
+    this.obstacleRocks.spawn(arrive - amp * Math.sin(phase) - this.shipX, 0, d, r, (r * (1.45 + rand() * 0.5)) / BOULDER_HEIGHT, r, rand() * Math.PI * 2, true, false, hit, hit);
+  }
+
+  /** How far a swaying rock's x changes while the ship is alongside it. */
+  private swayReach(amp: number, freq: number, hit: number): number {
+    return amp * freq * (hit + CONFIG.ship.hitHalfDepth);
+  }
+
+  /** Scattered rocks across the field, some swaying, none in the lane. */
+  private driftField(d: number, hw: number, jitter: number, busy: number): void {
+    const A = TH.asteroids;
+    const n = 2 + Math.floor(busy * 2 + rand() * 2);
+    for (let i = 0; i < n; i++) {
+      const big = rand() < A.bigChance;
+      const r = big ? 1.6 + rand() * 0.6 : range(A.sizes);
+      const at = d + (rand() - 0.5) * 6;
+      const sways = rand() < A.driftChance;
+      const amp = range(A.driftAmp);
+      const freq = (Math.PI * 2) / range(A.driftPeriod);
+      const reach = sways ? this.swayReach(amp, freq, r * ROCK_HIT) : 0;
+      const clear = LANE + r * ROCK_HIT + jitter + reach + 0.3;
+      let x: number | null = null;
+      for (let t = 0; t < 4 && x === null; t++) {
+        const tryX = this.cx + (rand() * 2 - 1) * (hw - r);
+        if (Math.abs(tryX - this.lane) >= clear) x = tryX;
+      }
+      if (x === null) continue;
+      if (sways) this.swayingAsteroid(x, at, r, amp, freq, rand() * Math.PI * 2);
+      else this.asteroid(x, at, r);
+    }
+  }
+
+  /** A knot of rocks to one side of the lane: fly round it. */
+  private rockCluster(d: number, hw: number, jitter: number, busy: number): void {
+    const A = TH.asteroids;
+    const R = range(A.clusterRadius) * (1 + 0.25 * busy);
+    // To whichever side of the lane has more room.
+    const roomL = this.lane - (this.cx - hw);
+    const roomR = this.cx + hw - this.lane;
+    const side = roomL > roomR ? -1 : 1;
+    const gap = LANE + jitter + 1.4 + rand() * 2.5;
+    const centre = this.lane + side * (gap + R);
+    if (Math.abs(centre - this.cx) > hw - R * 0.4) return; // no room: skip it
+    const n = Math.round(range(A.clusterRocks) + busy * 2);
+    for (let i = 0; i < n; i++) {
+      const a = rand() * Math.PI * 2;
+      const rad = Math.sqrt(rand()) * R;
+      const r = i === 0 && n >= 6 ? 1.4 + rand() * 0.5 : 0.5 + rand() * 0.9;
+      const x = i === 0 ? centre : centre + Math.cos(a) * rad;
+      if (Math.abs(x - this.lane) < LANE + r * ROCK_HIT + jitter + 0.3) continue;
+      this.asteroid(x, d + Math.sin(a) * rad, r);
+    }
+  }
+
+  /** Two big asteroids with the way through between them, and smaller rocks trailing off either side. */
+  private asteroidGate(d: number, hw: number, jitter: number, busy: number): void {
+    const A = TH.asteroids;
+    const gap = LANE + jitter + A.gateGap + 0.35 * (1 - busy);
+    for (const side of [-1, 1]) {
+      let edge = gap;
+      for (let i = 0; i < 4; i++) {
+        const r = i === 0 ? 1.5 + rand() * 0.7 : Math.max(0.7, 1.4 - i * 0.2 + rand() * 0.4);
+        const x = this.lane + side * (edge + r * ROCK_HIT);
+        if (Math.abs(x - this.cx) > hw - 0.5) break;
+        this.asteroid(x, d + (rand() - 0.5) * 1.2, r);
+        edge += r * ROCK_HIT * 2 - 0.1;
+      }
+    }
+  }
+
+  /**
+   * Two rocks swinging opposite ways that are either side of the lane just as you reach them:
+   * you watch the gap open and close, and slip through as it opens.
+   */
+  private orbiterPair(d: number, hw: number, jitter: number): void {
+    const A = TH.asteroids;
+    const amp = range(A.orbiterAmp);
+    const freq = (Math.PI * 2) / range(A.driftPeriod);
+    const phase = rand() * Math.PI * 2;
+    const r1 = 0.9 + rand() * 0.5;
+    const r2 = 0.9 + rand() * 0.5;
+    const reach = this.swayReach(amp, freq, Math.max(r1, r2) * ROCK_HIT);
+    const gap = LANE + jitter + 0.5 + reach;
+    for (const [side, r, ph] of [[-1, r1, phase], [1, r2, phase + Math.PI]] as const) {
+      const arrive = this.lane + side * (gap + r * ROCK_HIT);
+      if (Math.abs(arrive - this.cx) > hw - 0.3) continue; // too near the edge to swing: skip this one
+      this.swayingAsteroid(arrive, d, r, amp, freq, ph);
     }
   }
 
@@ -1567,7 +1749,7 @@ export class World {
     if (this.splitStart === Infinity) return { active: false, wall: 0, island: 0 };
     const open = this.splitStart - c.splitWiden - 6;
     // After the island, a clear stretch long enough to cross back from the other branch.
-    const close = this.splitEnd + c.splitWiden + c.splitRejoin;
+    const close = this.splitEnd + c.splitWiden + c.splitRejoin + (this.genBiome === 'asteroids' ? TH.asteroids.rejoinExtra : 0);
     if (d > close + c.splitWiden) {
       // Done: plan the next one.
       this.splitStart = Infinity;
@@ -1597,7 +1779,7 @@ export class World {
         this.rock(wx, d + (rand() - 0.5) * STEP, r, 1.1 + rand() * 1.6);
       }
       // Crystals along the island's spine mark it out as a fork, not a wall.
-      if (island > this.splitHalf * 0.6 && rand() < 0.35) {
+      if (island > this.splitHalf * 0.6 && rand() < 0.35 && this.genBiome !== 'asteroids') {
         const s = 0.9 + rand() * 0.8;
         const wx = this.cx + (rand() - 0.5) * island;
         if (Math.abs(wx - this.lane) > LANE + s + jitter) this.crystals.spawn(wx - this.shipX, 0, d, s, s * (1 + rand() * 0.6), s, rand() * 6.28, true, false, s * PROP_HIT[Prop.Crystal], s * PROP_HIT[Prop.Crystal]);
@@ -1609,7 +1791,10 @@ export class World {
     this.altLane += clamp(branchCentre + this.altTarget - this.altLane, -maxSlope * STEP * 0.6, maxSlope * STEP * 0.6);
     if (d >= this.splitStart && d <= this.splitEnd) this.altNow = this.altLane;
     if (d < this.splitStart || d > this.splitEnd) return;
-    if (rand() < c.splitAltRocks) {
+    // In the belt the branches are far apart: leave the first stretch of the other branch open
+    // so whoever crosses over has room to settle onto its line before the rocks start.
+    const settled = d >= this.splitStart + (this.genBiome === 'asteroids' ? TH.asteroids.altLeadIn : 0);
+    if (rand() < c.splitAltRocks && settled) {
       const r = 0.55 + rand() * 0.45;
       const lo = this.cx - this.splitSide * (island + 0.4);
       const hi = this.cx - this.splitSide * (hw - 0.4);

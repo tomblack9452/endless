@@ -438,6 +438,42 @@ export const CONFIG = {
         altPickups: 3,
       },
     },
+    // The asteroid belt flies through the canyon generator's frame (it keeps the mouth,
+    // the exit to the ship, the winding centre and the ramps) but is open space: a
+    // wide field walled by big asteroids, no floor to fall from, and its own set
+    // pieces. Level 1 drifts, level 2 adds clusters and gates, level 3 orbiting pairs.
+    asteroids: {
+      halfWidthStart: 17, // the field is much wider than a canyon...
+      halfWidthMin: 11, // ...and closes in a little with score
+      widthRampPoints: 26000,
+      fullPoints: 14000, // score at which the field is at its busiest
+      exitLead: 120, // the lane starts for the ship's door this far before the funnel (the field is wide)
+      rejoinExtra: 60, // more clear stretch after a split: its branches are further apart in the wide field
+      altLeadIn: 30, // the first stretch of a split's other branch has no rocks
+      splitClear: 75, // nothing is placed this far before a split is due, so the way to its other branch is open
+      driftSpacing: [13, 22], // between drift fields (shrinks with score)
+      spacingScale: [1.5, 1, 0.8], // per level of the area: calmer at the start, tighter at the end
+      clusterSpacing: [30, 46],
+      gateSpacing: [34, 50],
+      orbiterSpacing: [28, 40],
+      // Chance of each set piece by level of the area (drift, cluster, gate, orbiters).
+      mix: [
+        [1, 0, 0, 0],
+        [0.4, 0.4, 0.2, 0],
+        [0.2, 0.25, 0.2, 0.35],
+      ],
+      sizes: [0.5, 1.5], // drifting rock radius
+      bigChance: 0.12, // a rock this much bigger
+      driftChance: 0.45, // of drift rocks, those that sway across the field
+      driftAmp: [1.5, 4.5],
+      driftPeriod: [38, 70], // distance for one swing
+      clusterRadius: [2.4, 3.8],
+      clusterRocks: [5, 8],
+      gateGap: 0.45, // clear room either side of the lane (plus the ship's), a little more early on
+      orbiterAmp: [2.4, 4.4],
+      debrisPerRow: 0.7, // scenery chips floating about (look only)
+      dustPerRow: 2, // dust motes streaming past (look only: the belt has no floor to show speed)
+    },
     // The ship interior is a chain of rooms joined by short corridors (see
     // interior.ts). Each room is a reusable template; which ones can appear
     // depends on the level within the theme (minSub 0 = from level 7,

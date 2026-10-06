@@ -185,8 +185,24 @@ down one branch. The other has its own clear line, more rocks and bonus
 pickups: the reward for taking it. Both are guaranteed passable, with clear
 stretches before and after to cross.
 
-- *Asteroid belt:* the same layout in space. The ground falls away, the sky
-  opens to stars and the galaxy, and the rock turns grey.
+- *Asteroid belt:* open space. The ground falls away into the dark, the sky
+  opens to stars and the galaxy, and dust streams past to show your speed. The
+  field is much wider than a canyon, held in by walls of giant asteroids, with
+  no floor to fall from (no chasms, bridges, cacti or tumbleweeds). It has its
+  own set pieces, and the ramps, splits and funnel into the ship still apply:
+  - level 1, **drift fields:** scattered rocks across the field, some swaying
+    side to side as you come up to them
+  - level 2 adds **clusters** (a knot of rocks to fly round) and **gates** (two
+    big asteroids with the way through between, trailing off either side)
+  - level 3 adds **orbiting pairs:** two rocks swinging opposite ways that are
+    either side of the lane just as you reach them, so you watch the gap open
+    and close
+
+  Swaying rocks move as a function of distance, not time, so where each will be
+  on arrival is known exactly at any speed (the same trick as pistons), and the
+  lane is kept clear of it with room for how far it moves while you pass. It
+  gets busier through the three levels and with score, and nothing is placed
+  before a split is due so the way to its other branch is open.
 
 **Interior.** A chain of rooms joined by corridors, built from a pack of
 about 40 hand-made **sections** (`src/pieces/`). Each section is drawn as a
