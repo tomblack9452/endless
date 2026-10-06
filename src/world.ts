@@ -953,10 +953,14 @@ export class World {
     if (this.runStart !== null && d >= this.nextPickupAt && !this.quiet(d)) {
       this.nextPickupAt = d + range(CONFIG.boost.pickup.spacing);
       const x = this.lane - this.shipX;
+      // Drawn every time, power-up or not, so the scanner upgrade (powerRate) can't
+      // shift the random numbers and change the course for one player.
+      const kind = Math.floor(rand() * 3);
+      const spacing = range(CONFIG.powers.spacing);
       if (d >= this.nextPowerAt) {
         // Now and then a power-up takes the boost pickup's place.
-        this.nextPowerAt = d + range(CONFIG.powers.spacing) / this.powerRate;
-        this.powers.nextColor = Math.floor(rand() * 3);
+        this.nextPowerAt = d + spacing / this.powerRate;
+        this.powers.nextColor = kind;
         this.powers.spawn(x, CONFIG.boost.pickup.height, d, 1, 1, 1, 0, false, this.theme === 'land', 0, 0);
       } else {
         this.pickups.spawn(x, CONFIG.boost.pickup.height, d, 1, 1, 1, 0, false, this.theme === 'land', 0, 0);

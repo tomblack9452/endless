@@ -209,6 +209,9 @@ export const CONFIG = {
       nudgeMs: 110,
     },
     pickupPoints: 50,
+    // Ranked (endless on the week's seed): the score the rank skill par and league
+    // par are shares of. About what a strong run of five or six levels scores.
+    rankedTarget: 10000,
     boostBonus: 0.5, // extra fraction of distance points earned while boosting
   },
 
@@ -638,7 +641,8 @@ export const CONFIG = {
   // daily rewards, quests and the pass). Nothing here can make a ship stronger
   // in ranked: purchases are looks, tickets, revives and the pass.
   economy: {
-    tickets: { max: 5, refillMinutes: 120, coreCost: 30 },
+    // Ranked tickets: a fresh set each week for attempts at the week's run; more for cores.
+    tickets: { perWeek: 5, coreCost: 30 },
     // Revive (not in ranked): once a run, free once a day, otherwise cores. The ship
     // moves onto the lane, the way ahead is cleared, and a countdown starts it again.
     revive: { coreCost: 20, clearAhead: 34, countdown: 3, graceSeconds: 2.5 },

@@ -35,7 +35,7 @@ import { shareCard } from './share';
 import { createStore, type ProductId, type StoreProduct } from './store/store';
 import { storage } from './storage';
 import { fxDistance, fxTime } from './fx';
-import { type Course, COURSES, courseLength, type Environment, ENVIRONMENTS, weeklyCourse } from './courses';
+import { type Course, COURSES, courseLength, type Environment, ENVIRONMENTS, type WeeklyRun, weeklyRun } from './courses';
 import { DIVISIONS, divisionReward, emblem, LEAGUES, leagueName, leaguePar, Leagues, LP_PER_DIVISION, weekKey } from './leagues';
 import { find, itemsIn, LOOKS, Looks, type Owner, type Slot, SLOT_NAMES, SLOTS, unlockText } from './looks';
 import type { Fin, Marking } from './looks';
@@ -130,7 +130,7 @@ export class Game {
   /** Solo: the environment being played, or null (endless, ranked, set levels). */
   private environment: Environment | null = null;
   /** This week's ranked level (rebuilt when the week turns). */
-  private weekly: Course = weeklyCourse(weekKey(Date.now()));
+  private weekly: WeeklyRun = weeklyRun(weekKey(Date.now()));
   private scoreBase = 0; // solo starts: score begins at half the skipped points
   private readonly ranked = new Ranked();
   private readonly wallet = new Wallet();
@@ -348,7 +348,7 @@ export class Game {
     this.path = [];
     this.pathTimes = [];
     this.pathNext = 0;
-    this.ghost.start(mode === 'ranked' && course ? course.id : null, this.settings.ghost);
+    this.ghost.start(mode === 'ranked' ? this.weekly.id : null, this.settings.ghost);
     this.ui.showShare(false);
     this.preview = null;
     this.seed = seed;
@@ -653,7 +653,7 @@ export class Game {
         };
       }),
       tickets: {
-        label: this.tickets.count >= T.max ? `one ranked ticket · ${this.tickets.count} now` : `one ranked ticket · next free in ${formatWait(this.tickets.nextIn(now))}`,
+        label: `one ranked ticket · ${this.tickets.count} left · ${T.perWeek} new in ${formatWait(this.tickets.nextIn(now))}`,
         button: `${T.coreCost} cores`,
         enabled: this.wallet.cores >= T.coreCost,
       },
@@ -786,7 +786,7 @@ export class Game {
       {
         kicker: 'out of tickets',
         name: 'ranked tickets',
-        lines: [`next free ticket in ${formatWait(this.tickets.nextIn(now))}`, `you have ${formatScore(this.wallet.cores)} cores`],
+        lines: [`${CONFIG.economy.tickets.perWeek} new tickets in ${formatWait(this.tickets.nextIn(now))}`, `you have ${formatScore(this.wallet.cores)} cores`],
         yes: `buy one · ${cost} cores`,
         yesEnabled: this.wallet.cores >= cost,
         no: 'not now',
@@ -955,7 +955,7 @@ export class Game {
     const best = this.progress.weeklyBest(this.weekly.id);
     await shareCard({
       score: formatScore(this.score),
-      heading: `weekly level · week of ${new Date(`${weekKey(Date.now())}T00:00:00Z`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' }).toLowerCase()}`,
+      heading: `ranked · ${this.weekly.name}`,
       lines: [rankName(this.ranked.rank), leagueName(lg.league, lg.division), `best this week ${formatScore(best)}`],
       sky: '#' + this.palette.sky.getHexString(),
       text: this.palette.textCss(),
@@ -963,7 +963,7 @@ export class Game {
   }
 
   private refreshBar(now = Date.now()): void {
-    const wait = this.tickets.count < CONFIG.economy.tickets.max ? formatWait(this.tickets.nextIn(now)) : '';
+    const wait = this.tickets.count === 0 ? formatWait(this.tickets.nextIn(now)) : '';
     this.econ.setBar(this.wallet.credits, this.wallet.cores, this.tickets.count, wait);
     this.econ.setNews('daily', this.daily.loginDue(dayKey(now)) >= 0);
   }
@@ -1255,7 +1255,7 @@ export class Game {
 
   /** What the HUD and game-over screen call this run. */
   private modeLabel(): string {
-    if (this.mode === 'ranked') return 'ranked · weekly level';
+    if (this.mode === 'ranked') return `ranked · ${this.weekly.name}`;
     if (this.course) return `level ${COURSES.indexOf(this.course) + 1} · ${this.course.name}`;
     if (this.environment) return `solo · ${this.environment.name}`;
     return 'endless';
@@ -1495,8 +1495,8 @@ export class Game {
     }
     // The week may have turned since the game started.
     const week = weekKey(Date.now());
-    if (this.weekly.id !== `week-${week}`) this.weekly = weeklyCourse(week);
-    this.beginRun(0, this.weekly.seed, 'ranked', this.weekly);
+    if (this.weekly.id !== weeklyRun(week).id) this.weekly = weeklyRun(week);
+    this.beginRun(0, this.weekly.seed, 'ranked');
   }
 
   /** Solo in one environment: endless there, getting harder. */
@@ -1540,8 +1540,8 @@ export class Game {
     const now = Date.now();
     this.tickets.refill(now);
     const t = this.tickets.count;
-    const tickets = t > 0 ? `${t} ticket${t === 1 ? '' : 's'}` : `no tickets · next in ${formatWait(this.tickets.nextIn(now))}`;
-    this.ui.setRankedSub(`${wb > 0 ? `best this week ${formatScore(wb)}` : 'new level every week'} · ${tickets}`);
+    const tickets = t > 0 ? `${t} ${t === 1 ? 'try' : 'tries'} left` : `no tries left · ${CONFIG.economy.tickets.perWeek} more in ${formatWait(this.tickets.nextIn(now))}`;
+    this.ui.setRankedSub(`${wb > 0 ? `best this week ${formatScore(wb)}` : 'new run every week'} · ${tickets}`);
     this.refreshBar(now);
     this.cloud.push(); // most changes end here: keep the cloud save current
     this.ui.setBests([['endless', this.progress.endlessBest]]);
@@ -2156,16 +2156,6 @@ export class Game {
     this.boosting = false;
     this.sound.level(true, musicFor(1));
     this.haptics.level(true);
-    if (this.mode === 'ranked') {
-      // The weekly level: rank, league and the week's best.
-      const { best, isNew } = this.recordBest(true);
-      this.ui.setOverHeading('weekly level complete');
-      this.ui.setGameOver(this.score, best, isNew, this.nearMissCount, this.bestChain, this.seed);
-      this.ui.setGameOverExtra(`${formatTime(this.runTime)} · ${this.finishRun(null)}`);
-      this.ui.setGameOverMissions(this.poolMissions().lines());
-      this.refreshTitle();
-      return;
-    }
     let stars = 1;
     if (!this.hitThisRun && !this.assisted) stars |= 2;
     if (!this.assisted && this.score >= c.target) stars |= 4;
