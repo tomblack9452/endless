@@ -1,6 +1,6 @@
 import type { BufferGeometry } from 'three';
 import { describe, expect, it } from 'vitest';
-import { alienCactus, boulder, bush, crystalCluster, deadTree, mesa, MESA_RADIUS, mushroomTree, rockSpire, spireTree } from '../src/props';
+import { alienCactus, basaltColumns, boulder, bush, crystalCluster, deadTree, mesa, MESA_RADIUS, mushroomTree, rockSpire, spireTree } from '../src/props';
 import { MESA_HIT, Prop, PROP_HIT, ROCK_HIT } from '../src/world';
 
 // Nothing solid may look wider than it collides: at the height the ship flies,
@@ -28,6 +28,7 @@ const SHAPES: [string, () => BufferGeometry, number][] = [
   ['dead tree', deadTree, PROP_HIT[Prop.DeadTree]],
   ['rock spire', rockSpire, PROP_HIT[Prop.RockSpire]],
   ['alien cactus', alienCactus, PROP_HIT[Prop.Cactus]],
+  ['basalt columns', basaltColumns, PROP_HIT[Prop.Basalt]],
   ['mesa', mesa, MESA_RADIUS * MESA_HIT],
 ];
 

@@ -243,6 +243,7 @@ export const CONFIG = {
     maxHolos: 120,
     maxFans: 80,
     maxVents: 400,
+    maxColumns: 500,
     maxDeadTrees: 500,
     maxRockSpires: 500,
     maxCacti: 500,
@@ -725,7 +726,12 @@ export const CONFIG = {
     lava: { firstAfter: 80, spacing: [[90, 150], [60, 110], [40, 80]], halfWidth: [2.2, 4.5], halfLength: [3, 7], gap: [0.6, 3] },
     // Lava bombs from eruptions: they fall in front of you, landing off the lane, a
     // ring marking the spot as they come down. None at level 1 of the plain.
-    bombs: { spacing: [[0, 0], [70, 120], [40, 80]], height: 26, fallOver: 90, landAhead: [18, 28], radius: [0.8, 1.3], gap: [0.4, 2.6] },
+    // Bombs come in salvos: one at level 2 of the plain, a pair, three at level 3, a few units apart, landing either side.
+    bombs: { spacing: [[0, 0], [90, 150], [60, 110]], salvo: [0, 2, 3], salvoGap: [5, 9], height: 26, fallOver: 90, landAhead: [18, 28], radius: [0.8, 1.3], gap: [0.4, 2.6] },
+    // Lava rivers cross the whole way; a basalt causeway carries the lane over, narrower deeper in.
+    river: { firstAfter: 150, spacing: [[300, 420], [220, 320], [160, 240]], length: [10, 18], half: [2.6, 2.3, 2.0] },
+    // Lava geysers: a vent that erupts on a cycle of distance. One on the lane is always down when you arrive.
+    geysers: { firstAfter: 100, spacing: [[90, 140], [60, 100], [40, 70]], count: [1, 2.6], half: [0.45, 0.7], period: [16, 26], height: [2.2, 3.2], laneChance: [0.15, 0.3, 0.4] },
     // How much denser the ice field and volcanic plain are than other open ground.
     density: { ice: 1.25, volcanic: 1.3 },
   },
@@ -774,9 +780,9 @@ export const CONFIG = {
   biomes: {
     // Prop mixes for open ground by biome (relative chances).
     mix: {
-      alien: { mushroom: 0.28, spire: 0.14, rock: 0.18, crystal: 0.1, bush: 0.15, deadTree: 0, rockSpire: 0.05, cactus: 0.1 },
-      ice: { mushroom: 0, spire: 0.22, rock: 0.2, crystal: 0.38, bush: 0, deadTree: 0.05, rockSpire: 0.15, cactus: 0 },
-      volcanic: { mushroom: 0, spire: 0.08, rock: 0.43, crystal: 0.1, bush: 0, deadTree: 0.2, rockSpire: 0.15, cactus: 0.04 },
+      alien: { mushroom: 0.28, spire: 0.14, rock: 0.18, crystal: 0.1, bush: 0.15, deadTree: 0, rockSpire: 0.05, cactus: 0.1, basalt: 0 },
+      ice: { mushroom: 0, spire: 0.22, rock: 0.2, crystal: 0.38, bush: 0, deadTree: 0.05, rockSpire: 0.15, cactus: 0, basalt: 0 },
+      volcanic: { mushroom: 0, spire: 0.08, rock: 0.3, crystal: 0.08, bush: 0, deadTree: 0.14, rockSpire: 0.12, cactus: 0, basalt: 0.28 },
     },
     lavaChance: 0.6, // per row on the volcanic plain: a glowing crack off the lane
     iceLake: '#cfe6f2',

@@ -91,42 +91,38 @@ on anonymous sign-ins, add `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` (loc
 
 ## 3. Asteroid belt and volcanic plain (B)
 
-### The asteroid belt
+### The asteroid belt (built)
 
-Today: the canyon generator with a dark palette, no ground and no cacti. Walls wind
-through space, bridges span chasms with nothing under them. It reads as "a canyon in
-the dark".
+Was: the canyon generator with a dark palette. Now: open space in the canyon's
+frame. It keeps what the rest of the game needs (the mouth, the winding centre,
+ramps, splits and the funnel into the ship) but is much wider, walled by giant
+asteroids, with no floor, chasms, bridges, cacti or tumbleweeds, and dust streaming
+past to show speed.
 
-Design: open space. No walls; the lane threads a drifting field.
+- **Drift fields** (level 1): scattered rocks, some swaying across the field. Swaying
+  rocks use the field's distance-based sine motion, so where one is on arrival is
+  exact at any speed, and the lane is kept clear of it with room for its movement
+  while the ship is alongside.
+- **Clusters and gates** (level 2): a knot of rocks to fly round, and two big
+  asteroids with the way through between.
+- **Orbiting pairs** (level 3): two rocks swinging opposite ways that are either side of
+  the lane on arrival, so the gap opens and closes as you come up to it.
+- Splits needed three adjustments for the wider field: nothing placed before one is
+  due, a longer clear stretch to cross back afterwards, and a rock-free lead-in on
+  the other branch.
 
-- **Drift field** (level 1): scattered rocks of every size, a few on slow sideways
-  drifts. Moving rocks use the field's distance-based sine motion, so where one will
-  be when the ship arrives is known to the generator, as with pistons.
-- **Clusters and gates** (level 2): dense knots of rocks with a wide gap on the lane,
-  and "gates", two big asteroids with a gap between.
-- **Orbiters and ring** (level 3): rock pairs on opposed sines that open and close,
-  timed so the lane is clear at arrival; a slow rock ring around a big asteroid.
-- **Wreckage:** hull plates and girders as hazards and scenery, a hint of a story.
-- Scenery: a huge asteroid and a planet on the horizon, parallax dust, and the
-  existing meteor-shower event for extra streaks (look only).
+### The volcanic plain (built)
 
-Every piece is a function of distance and seed, so the course stays deterministic.
+Was: open ground with lava lakes and bombs. Now the ground itself is the hazard.
 
-### The volcanic plain
-
-Today: open ground, dark basalt, glowing cracks, lava lakes off the lane, bombs
-that land off the lane.
-
-Design: make the ground itself the hazard.
-
-- **Lava rivers** cross the lane in places; a basalt causeway carries the lane
-  across, wider on level 1, narrowing and cracking later.
-- **Geysers**: vents that erupt on a distance cycle with a glow beforehand (the
-  field's pulse motion), placed off the lane or timed to be down on arrival.
-- **Eruption bursts**: before a salvo of bombs the ground shakes and the sky flares;
-  rings mark each landing as now.
-- **Basalt columns and obsidian spires** replace some of the generic rocks, and
-  ash thickens as before.
+- **Lava rivers** across the whole plain, crossed on a basalt causeway that follows
+  the lane and narrows deeper in (5.2, 4.6, 4.0 wide). Off the causeway is lava.
+- **Lava geysers** on a cycle of distance: one on the lane is always down on arrival
+  (phase fixed, as with the ship's steam vents), the rest stand off the lane.
+- **Bomb salvos**: none at level 1, a pair at level 2, three at level 3, alternating
+  sides, each with its landing ring.
+- **Basalt columns**: a new prop, fitted to its hitbox by `tests/props.test.ts` and
+  `tests/collisions.test.ts`.
 
 ### Acceptance
 
@@ -134,7 +130,7 @@ Both areas pass `fairness`, `courses` and `collisions` tests across all seeds, t
 README's area descriptions are rewritten, and a screenshot of each level of each area
 is checked by eye.
 
-**Status: see the end of this file.**
+**Status: done.** The belt and the plain are rebuilt as designed below, each with tests that prove the features happen and fairness tests across many seeds (the belt on both the main route and the other branch of every split).
 
 ## 4. Shop revamp (E)
 
