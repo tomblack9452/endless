@@ -678,7 +678,7 @@ export const CONFIG = {
   // Ice field and volcanic plain hazards (see world.ts: land()).
   hazards: {
     // Ice lakes: open ice the lane runs across. On it you slow a little and slide.
-    ice: { firstAfter: 120, spacing: [130, 240], halfWidth: [6, 12], halfLength: [16, 32], slow: 0.86, grip: 0.24, runoff: 16 },
+    ice: { firstAfter: 120, spacing: [130, 240], halfWidth: [6, 12], halfLength: [16, 32], slow: 0.86, grip: 0.24, runoff: 16, laneSlope: 0.5 },
     // Lava lakes: glowing pools off the lane. Touch one and the run ends, shield or not.
     lava: { firstAfter: 80, spacing: [[90, 150], [60, 110], [40, 80]], halfWidth: [2.2, 4.5], halfLength: [3, 7], gap: [0.6, 3] },
     // Lava bombs from eruptions: they fall in front of you, landing off the lane, a

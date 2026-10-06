@@ -288,6 +288,9 @@ export function grassTuft(): BufferGeometry {
 }
 
 /** Flat-topped mesa for the horizon: strata of wide jittered slabs. About 14 wide, 9 tall. */
+/** A mesa's widest radius at scale 1 (its bottom layer). */
+export const MESA_RADIUS = 7.2;
+
 export function mesa(): BufferGeometry {
   const strata: [number, number, number, string][] = [
     // radius, height, y, colour
