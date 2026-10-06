@@ -1,13 +1,13 @@
 import { storage } from '../storage';
-import type { Backend, BoardRow, RunSubmission } from './backend';
+import type { Backend, BoardQuery, BoardRow, RunSubmission, SubmitResult } from './backend';
 
 // Supabase over plain fetch (no SDK, to keep the bundle small):
 //   auth      anonymous sign-in, refreshed as it expires
 //   saves     one row per player: every saved key as JSON (cloud save)
 //   wallets   cores, written only by the server (RPCs and the store webhook)
-//   runs      ranked runs, written by the submit-run function, which checks them
-//   board     a view of each week's best run per player, per league
-// The tables, policies and functions are in supabase/ (see the README).
+//   runs      every submitted run, written only by the submit_run function, which checks it
+//   bests     each player's best per board; read through the leaderboard function
+// The tables, policies and functions are in supabase/ (see docs/leaderboards.md).
 
 const SESSION_KEY = 'endless.session';
 
@@ -59,10 +59,10 @@ export class SupabaseBackend implements Backend {
     return this.session;
   }
 
-  /** A request as the signed-in player; null on any failure (the game carries on). */
-  private async call<T>(path: string, init: RequestInit = {}): Promise<T | null> {
-    if (!this.session) return null;
-    if (this.session.expires - Date.now() < 60_000 && !(await this.signIn())) return null;
+  /** A request as the signed-in player, with the status so callers can tell "no signal" from "no". */
+  private async request(path: string, init: RequestInit = {}): Promise<{ status: number; body: unknown }> {
+    if (!this.session) return { status: 0, body: null };
+    if (this.session.expires - Date.now() < 60_000 && !(await this.signIn())) return { status: 0, body: null };
     try {
       const res = await fetch(`${this.url}${path}`, {
         ...init,
@@ -73,12 +73,29 @@ export class SupabaseBackend implements Backend {
           ...(init.headers as Record<string, string> | undefined),
         },
       });
-      if (!res.ok) return null;
       const text = await res.text();
-      return (text ? JSON.parse(text) : {}) as T;
+      let body: unknown = null;
+      try {
+        body = text ? JSON.parse(text) : {};
+      } catch {
+        body = text;
+      }
+      return { status: res.status, body };
     } catch {
-      return null;
+      return { status: 0, body: null }; // offline
     }
+  }
+
+  /** A request as the signed-in player; null on any failure (the game carries on). */
+  private async call<T>(path: string, init: RequestInit = {}): Promise<T | null> {
+    const { status, body } = await this.request(path, init);
+    return status >= 200 && status < 300 ? (body as T) : null;
+  }
+
+  /** The server's reason for turning something down ("score too high for the distance"). */
+  private static reason(body: unknown): string {
+    const m = (body as { message?: unknown } | null)?.message;
+    return typeof m === 'string' ? m : 'turned down';
   }
 
   async loadSave(): Promise<{ data: Record<string, string>; savedAt: number } | null> {
@@ -109,14 +126,47 @@ export class SupabaseBackend implements Backend {
     return ok === true;
   }
 
-  async submitRun(run: RunSubmission): Promise<void> {
-    await this.call('/functions/v1/submit-run', { method: 'POST', body: JSON.stringify(run) });
+  async submitRun(run: RunSubmission): Promise<SubmitResult> {
+    const { status, body } = await this.request('/rest/v1/rpc/submit_run', {
+      method: 'POST',
+      body: JSON.stringify({
+        p_board: run.board,
+        p_league: run.league,
+        p_score: Math.floor(run.score),
+        p_seconds: run.seconds,
+        p_distance: run.distance,
+        p_finished: run.finished,
+        p_path: run.path,
+      }),
+    });
+    if (status >= 200 && status < 300) {
+      const r = body as { rank?: number; best?: number; newBest?: boolean };
+      return { status: 'ok', rank: r.rank, best: r.best, newBest: r.newBest };
+    }
+    // No signal, a busy server, or a session that needs renewing: try again later.
+    // Any other answer is the server saying no, and asking again won't change it.
+    // The "too quickly" rate limit is the one 4xx worth another try.
+    const message = SupabaseBackend.reason(body);
+    if (status === 0 || status >= 500 || status === 401 || status === 403 || status === 429 || /too many runs too quickly/.test(message)) return { status: 'retry', message };
+    return { status: 'rejected', message };
   }
 
-  async board(week: string, league: number): Promise<BoardRow[]> {
-    const rows = await this.call<{ user_id: string; name: string; score: number }[]>(
-      `/rest/v1/board?select=user_id,name,score&week=eq.${week}&league=eq.${league}&order=score.desc&limit=50`,
-    );
-    return (rows ?? []).map((r) => ({ name: r.name, score: r.score, you: r.user_id === this.session?.user }));
+  async board(q: BoardQuery): Promise<BoardRow[] | null> {
+    const rows = await this.call<{ rank: number; name: string; score: number; you: boolean }[]>('/rest/v1/rpc/leaderboard', {
+      method: 'POST',
+      body: JSON.stringify({ p_board: q.board, p_period: q.period, p_league: q.league, p_limit: q.limit ?? 50 }),
+    });
+    return rows ? rows.map((r) => ({ rank: Number(r.rank), name: r.name, score: r.score, you: r.you })) : null;
+  }
+
+  async pilotName(): Promise<string | null> {
+    const rows = await this.call<{ name: string }[]>(`/rest/v1/players?select=name&user_id=eq.${this.session?.user}`);
+    return rows?.[0]?.name ?? null;
+  }
+
+  async setPilotName(name: string): Promise<{ ok: boolean; message: string }> {
+    const { status, body } = await this.request('/rest/v1/rpc/set_pilot_name', { method: 'POST', body: JSON.stringify({ p_name: name }) });
+    if (status >= 200 && status < 300) return { ok: true, message: String(body) };
+    return { ok: false, message: status === 0 ? 'no connection' : SupabaseBackend.reason(body) };
   }
 }

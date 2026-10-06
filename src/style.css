@@ -2444,3 +2444,92 @@ body {
 .reduce-motion .coin.bump {
   animation: none;
 }
+
+/* Leaderboard screen. */
+.board-tabs {
+  display: flex;
+  gap: 8px;
+  margin: 6px -24px 12px 0;
+  padding: 2px 24px 4px 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.board-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.board-tabs .tab {
+  flex: none;
+  white-space: nowrap;
+}
+
+.board-row {
+  display: grid;
+  grid-template-columns: 2.4em 1fr auto;
+  align-items: baseline;
+  gap: 10px;
+  padding: 11px 0;
+  border-bottom: 1px solid color-mix(in srgb, currentColor 18%, transparent);
+}
+
+.board-row .rank {
+  opacity: 0.55;
+  font-variant-numeric: tabular-nums;
+}
+
+.board-row .who {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.board-row .pts {
+  font-variant-numeric: tabular-nums;
+}
+
+.board-row.you {
+  font-weight: 600;
+  background: color-mix(in srgb, currentColor 9%, transparent);
+  margin: 0 -10px;
+  padding-left: 10px;
+  padding-right: 10px;
+  border-radius: 10px;
+}
+
+.board-row.you .rank {
+  opacity: 1;
+}
+
+.board-gap {
+  text-align: center;
+  opacity: 0.4;
+  letter-spacing: 0.4em;
+  padding: 2px 0;
+}
+
+.name-edit {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-top: 8px;
+}
+
+.name-edit input {
+  flex: 1;
+  min-width: 0;
+  font: inherit;
+  font-size: calc(14px * var(--ui-scale));
+  letter-spacing: 0.08em;
+  color: inherit;
+  padding: 9px 14px;
+  background: none;
+  border: 1px solid color-mix(in srgb, currentColor 35%, transparent);
+  border-radius: 999px;
+}
+
+.name-edit input:focus {
+  outline: none;
+  border-color: currentColor;
+}

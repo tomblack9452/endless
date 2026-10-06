@@ -3,22 +3,47 @@ import { SupabaseBackend } from './supabase';
 
 // The server, behind one interface. With Supabase keys in .env the game signs
 // in (anonymously at first), keeps a cloud save, holds cores on the server,
-// submits ranked runs and reads the weekly leaderboards. Without keys,
-// LocalBackend stands in and everything keeps working on the device.
+// submits runs to the leaderboards and reads them. Without keys, LocalBackend
+// stands in and everything keeps working on the device.
 
-/** A ranked run as submitted for the weekly leaderboard. */
+/** A leaderboard: the week's ranked run, endless, or one solo environment. */
+export type BoardId = 'ranked' | 'endless' | `solo:${string}`;
+
+/** A finished run as submitted for a leaderboard. */
 export interface RunSubmission {
-  week: string; // weekKey
+  board: BoardId;
+  /** The league the run was flown in (ranked only; 0 elsewhere). */
   league: number;
   score: number;
   seconds: number;
   distance: number;
   finished: boolean;
-  /** The ship's sideways position every few units (the ghost, and a check on the run). */
+  /** Ranked: the ship's sideways position every few units (the ghost, and a check on the run). Empty elsewhere. */
   path: number[];
 }
 
+/** How a submission went: ok, worth retrying later (no signal, server busy), or turned down for good. */
+export interface SubmitResult {
+  status: 'ok' | 'retry' | 'rejected';
+  /** Where the run ranks on its board, when it went through. */
+  rank?: number;
+  /** The player's best on that board after this run. */
+  best?: number;
+  newBest?: boolean;
+  /** Why it was turned down. */
+  message?: string;
+}
+
+/** Which board to read. period is the week's Monday for ranked, 'all' otherwise. */
+export interface BoardQuery {
+  board: BoardId;
+  period: string;
+  league: number;
+  limit?: number;
+}
+
 export interface BoardRow {
+  rank: number;
   name: string;
   score: number;
   you: boolean;
@@ -40,9 +65,13 @@ export interface Backend {
   earnCores(amount: number, reason: string): Promise<void>;
   /** Spend cores; resolves false if the server says there aren't enough. */
   spendCores(amount: number, reason: string): Promise<boolean>;
-  submitRun(run: RunSubmission): Promise<void>;
-  /** The week's leaderboard in a league, best first. */
-  board(week: string, league: number): Promise<BoardRow[]>;
+  submitRun(run: RunSubmission): Promise<SubmitResult>;
+  /** A board, best first (your own row last if you're below the top), or null if it couldn't be read. */
+  board(query: BoardQuery): Promise<BoardRow[] | null>;
+  /** Your pilot name on the boards, or null. */
+  pilotName(): Promise<string | null>;
+  /** Change it; says why not when the server turns it down. */
+  setPilotName(name: string): Promise<{ ok: boolean; message: string }>;
 }
 
 export function createBackend(): Backend {
