@@ -4,10 +4,12 @@ import {
   DoubleSide,
   FogExp2,
   Group,
+  Matrix4,
   Mesh,
   MeshBasicMaterial,
   PerspectiveCamera,
   PlaneGeometry,
+  Quaternion,
   RingGeometry,
   Scene,
   Vector2,
@@ -71,6 +73,18 @@ export class Stage {
   fovBoost = 0; // extra horizontal degrees
   pullBack = 0; // extra distance behind the ship (boost)
   drop = 0; // camera lowered by this much (boost)
+  /**
+   * Showroom (hangar and shop): 0 = the normal chase camera, 1 = close in,
+   * circling the ship at `showroomAngle` (radians, 0 = behind), with the ship
+   * at `showroomY` down the screen (0 top, 1 bottom).
+   */
+  showroom = 0;
+  showroomAngle = 0;
+  showroomY = 0.5;
+  private readonly orbitAt = new Vector3();
+  private readonly orbitLook = new Matrix4();
+  private readonly orbitTurn = new Quaternion();
+  private readonly orbitPitch = new Quaternion();
   private width = 1;
   private height = 1;
 
@@ -292,6 +306,22 @@ float gNoise(vec2 p) {
     this.planetVisible = k;
   }
 
+  /** Swing the camera from the chase view towards the showroom orbit. */
+  private placeShowroom(): void {
+    const S = CONFIG.camera.showroom;
+    const cam = this.camera;
+    const a = this.showroomAngle;
+    this.orbitAt.set(Math.sin(a) * S.distance, S.height, Math.cos(a) * S.distance);
+    this.orbitLook.lookAt(this.orbitAt, SHIP_CENTRE, UP);
+    this.orbitTurn.setFromRotationMatrix(this.orbitLook);
+    // Tilt so the ship sits at showroomY on screen rather than on the horizon line.
+    const tilt = Math.atan((this.showroomY - CONFIG.camera.horizonY) * 2 * Math.tan((cam.fov * DEG) / 2));
+    this.orbitTurn.multiply(this.orbitPitch.setFromAxisAngle(X_AXIS, tilt));
+    const k = this.showroom * this.showroom * (3 - 2 * this.showroom);
+    cam.position.lerp(this.orbitAt, k);
+    cam.quaternion.slerp(this.orbitTurn, k);
+  }
+
   resize = (): void => {
     // Play area: full screen on phones, a centred column on wider screens.
     const h = window.innerHeight;
@@ -336,11 +366,16 @@ float gNoise(vec2 p) {
       cam.fov = fov;
       cam.updateProjectionMatrix();
     }
+    if (this.showroom > 0.001) this.placeShowroom();
     this.renderer.render(this.scene, cam);
   }
 }
 
 export { DEG };
+
+const SHIP_CENTRE = new Vector3(0, CONFIG.ship.hoverY + 0.05, 0);
+const UP = new Vector3(0, 1, 0);
+const X_AXIS = new Vector3(1, 0, 0);
 
 /**
  * The ground: 2000 x 2000, finely divided along the run (hills, chasm edges)

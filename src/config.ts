@@ -121,6 +121,8 @@ export const CONFIG = {
     shipY: 0.8, // vertical FOV never gets so narrow that the ship drops below this
     height: 2.0,
     distanceBehind: 2.5,
+    // Hangar and shop: the camera circles close to the ship so looks can be seen.
+    showroom: { distance: 1.75, height: 1.0, angle: 2.2, spin: 0.22, ease: 4, shopY: 0.29, hangarY: 0.79 },
     maxRollDeg: 10,
     rollEase: 6, // higher = snappier
     near: 0.1,

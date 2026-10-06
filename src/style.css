@@ -2026,23 +2026,6 @@ body {
   cursor: pointer;
 }
 
-.shop-row.trying .shop-text .label:first-child::after {
-  content: ' · trying on';
-  opacity: 0.6;
-}
-
-.swatch {
-  flex: none;
-  width: 30px;
-  height: 30px;
-  border-radius: 50%;
-  border: 1px solid color-mix(in srgb, currentColor 30%, transparent);
-}
-
-.swatch.empty {
-  background: repeating-linear-gradient(45deg, color-mix(in srgb, currentColor 18%, transparent) 0 3px, transparent 3px 7px);
-}
-
 .shop-text {
   flex: 1;
   display: flex;
@@ -2069,8 +2052,142 @@ body {
   cursor: default;
 }
 
-.shop-buy .was {
-  opacity: 0.55;
+/* The shop is a showroom: the camera circles the ship in the clear top half,
+   and the looks sit on a sheet at the bottom. */
+.screen.panel.showroom {
+  background: linear-gradient(to bottom, color-mix(in srgb, var(--sky, #f1ede4) 70%, transparent), transparent 18%);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+.showroom-note {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(var(--safe-top) + 80px);
+  text-align: center;
+}
+
+.settings.sheet {
+  top: auto;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 54%;
+  padding: 4px calc(var(--safe-right) + 20px) calc(var(--safe-bottom) + 20px) calc(var(--safe-left) + 20px);
+  border-radius: 22px 22px 0 0;
+  background: color-mix(in srgb, var(--sky, #f1ede4) 94%, transparent);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  box-shadow: 0 -10px 30px -18px color-mix(in srgb, var(--text) 60%, transparent);
+}
+
+.sheet .settings-group:first-child {
+  margin-top: 14px;
+}
+
+/* Today's looks: a row of cards that scrolls sideways. */
+.offer-cards {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: calc(31% - 6px);
+  gap: 8px;
+  margin: 10px calc(-1 * (var(--safe-right) + 20px)) 0 calc(-1 * (var(--safe-left) + 20px));
+  padding: 4px calc(var(--safe-right) + 20px) 6px calc(var(--safe-left) + 20px);
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+  touch-action: pan-x pan-y;
+}
+
+.offer-cards::-webkit-scrollbar {
+  display: none;
+}
+
+.offer-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 14px 6px 12px;
+  font: inherit;
+  color: inherit;
+  text-align: center;
+  background: color-mix(in srgb, currentColor 4%, transparent);
+  border: 1px solid color-mix(in srgb, currentColor 22%, transparent);
+  border-radius: 16px;
+  scroll-snap-align: start;
+  cursor: pointer;
+}
+
+.offer-card.picked {
+  border: 2px solid currentColor;
+  padding: 13px 5px 11px;
+  background: color-mix(in srgb, currentColor 9%, transparent);
+}
+
+.offer-card:active {
+  transform: scale(0.97);
+}
+
+.card-swatch {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  margin-bottom: 6px;
+  border-radius: 50%;
+  border: 1px solid color-mix(in srgb, currentColor 30%, transparent);
+}
+
+.card-swatch svg {
+  width: 30px;
+  height: 30px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linejoin: round;
+}
+
+.card-name {
+  font-size: calc(13px * var(--ui-scale));
+  font-weight: 500;
+}
+
+.card-slot {
+  font-size: calc(10px * var(--ui-scale));
+}
+
+.card-price {
+  margin-top: 6px;
+  font-size: calc(12px * var(--ui-scale));
+  letter-spacing: 0.04em;
+}
+
+.card-price.premium {
+  color: #8a63d2;
+}
+
+.offer-card.owned .card-price {
+  opacity: 0.6;
+}
+
+.card-deal {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  padding: 2px 6px;
+  font-size: calc(10px * var(--ui-scale));
+  font-weight: 600;
+  color: var(--sky, #f1ede4);
+  background: #e0503f;
+  border-radius: 999px;
+}
+
+.pill.sheet-buy {
+  width: 100%;
+  margin-top: 12px;
 }
 
 /* Season pass */

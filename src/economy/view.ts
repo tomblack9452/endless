@@ -24,19 +24,22 @@ function stopTaps(e: HTMLElement): void {
 
 export interface ShopOfferView {
   name: string;
-  slot: string;
+  slot: string; // 'hull', 'paint', ...
+  slotName: string; // shown under the name
   swatch: string | null; // css colours for paints and engines
   price: string;
-  was: string; // the full price, when on a deal
+  premium: boolean; // priced in cores
+  deal: boolean;
   owned: boolean;
-  trying: boolean; // on the ship now
-  canAfford: boolean;
+  picked: boolean; // tapped: on the ship now
 }
 
 export interface ShopView {
   wallet: string;
   reset: string;
   offers: ShopOfferView[];
+  /** The one buy button, for the picked look. */
+  buy: { text: string; enabled: boolean };
   tickets: { label: string; button: string; enabled: boolean };
   cores: { label: string; button: string; enabled: boolean }[];
 }
@@ -80,6 +83,13 @@ export interface OfferView {
   seconds: number;
 }
 
+/** Pictures for looks that aren't a colour. */
+const SLOT_ICONS: Record<string, string> = {
+  hull: '<svg viewBox="0 0 24 24"><path d="M12 3l7 17-7-4-7 4z"/></svg>',
+  fins: '<svg viewBox="0 0 24 24"><path d="M12 3l7 17-7-4-7 4z"/><path d="M12 12v6M8 15l-3 5M16 15l3 5"/></svg>',
+  markings: '<svg viewBox="0 0 24 24"><path d="M12 3l7 17-7-4-7 4z"/><path d="M10 9l2 7 2-7"/></svg>',
+};
+
 export class EconomyView {
   private readonly offerEl = $('offer');
   private offerYes: (() => void) | null = null;
@@ -119,14 +129,12 @@ export class EconomyView {
 
   // --- shop ---
 
-  bindShop(onOffer: (i: number) => void, onBuy: (i: number) => void, onTicket: () => void, onCores: (i: number) => void): void {
+  bindShop(onOffer: (i: number) => void, onBuy: () => void, onTicket: () => void, onCores: (i: number) => void): void {
     $('shop-offers').addEventListener('click', (e) => {
-      const t = e.target as HTMLElement;
-      const buy = t.closest<HTMLElement>('[data-buy]');
-      if (buy) return onBuy(Number(buy.dataset.buy));
-      const row = t.closest<HTMLElement>('[data-offer]');
-      if (row) onOffer(Number(row.dataset.offer));
+      const card = (e.target as HTMLElement).closest<HTMLElement>('[data-offer]');
+      if (card) onOffer(Number(card.dataset.offer));
     });
+    $('shop-buy').addEventListener('click', onBuy);
     $('shop-tickets').addEventListener('click', (e) => {
       if ((e.target as HTMLElement).closest('button')) onTicket();
     });
@@ -141,27 +149,21 @@ export class EconomyView {
     $('shop-reset').textContent = v.reset;
     $('shop-offers').replaceChildren(
       ...v.offers.map((o, i) => {
-        const row = el('div', `shop-row${o.trying ? ' trying' : ''}`);
-        row.dataset.offer = String(i);
-        const sw = el('span', 'swatch');
+        const card = el('button', `offer-card${o.picked ? ' picked' : ''}${o.owned ? ' owned' : ''}`) as HTMLButtonElement;
+        card.type = 'button';
+        card.dataset.offer = String(i);
+        const sw = el('span', 'card-swatch');
         if (o.swatch) sw.style.background = o.swatch;
-        else sw.classList.add('empty');
-        const text = el('span', 'shop-text');
-        text.append(el('span', 'label', o.name), el('span', 'label dim shop-slot', o.slot));
-        const buy = el('button', 'pill shop-buy') as HTMLButtonElement;
-        buy.type = 'button';
-        if (o.owned) {
-          buy.textContent = 'owned';
-          buy.disabled = true;
-        } else {
-          buy.dataset.buy = String(i);
-          buy.disabled = !o.canAfford;
-          buy.replaceChildren(...(o.was ? [el('s', 'was', o.was), document.createTextNode(' ')] : []), document.createTextNode(o.price));
-        }
-        row.append(sw, text, buy);
-        return row;
+        else sw.innerHTML = SLOT_ICONS[o.slot] ?? '';
+        const price = el('span', `card-price${o.premium ? ' premium' : ''}`, o.owned ? 'owned' : o.price);
+        card.append(sw, el('span', 'label card-name', o.name), el('span', 'label dim card-slot', o.slotName), price);
+        if (o.deal && !o.owned) card.append(el('span', 'card-deal', '-25%'));
+        return card;
       }),
     );
+    const buy = $('shop-buy') as HTMLButtonElement;
+    buy.textContent = v.buy.text;
+    buy.disabled = !v.buy.enabled;
     const action = (label: string, button: string, enabled: boolean, data?: [string, string]) => {
       const row = el('div', 'shop-row');
       const text = el('span', 'shop-text');

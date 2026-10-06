@@ -146,11 +146,14 @@ export class Game {
   private shopPacks: (ProductId | 'dev' | 'restore')[] = [];
   /** One-time products already bought. */
   private ownedProducts = new Set<string>();
+  /** The shop card tapped (on the ship to try), or -1. */
+  private shopPick = -1;
   // Ranked: the ship's sideways position every PATH_STEP units (the leaderboard check, and later the ghost).
   private path: number[] = [];
   private pathTimes: number[] = [];
   private pathNext = 0;
   private economyTimer = 0;
+  private showroomTime = 0; // turns the showroom camera
   // Revive (not in ranked): once a run. While the offer is up the run isn't recorded yet.
   private revived = false;
   private revivePending = false;
@@ -639,19 +642,21 @@ export class Game {
     this.econ.renderShop({
       wallet: `${formatScore(this.wallet.credits)} credits · ${formatScore(this.wallet.cores)} cores · ${this.tickets.count} tickets`,
       reset: `new in ${formatWait(untilTomorrow(now))}`,
-      offers: offers.map((f) => {
+      offers: offers.map((f, i) => {
         const colors = f.item.colors;
         return {
           name: f.item.name,
-          slot: `${SLOT_NAMES[f.item.slot]}${f.deal ? ' · deal of the day' : ''}`,
+          slot: f.item.slot,
+          slotName: SLOT_NAMES[f.item.slot],
           swatch: colors ? `linear-gradient(135deg, ${colors[0]} 50%, ${colors[1]} 50%)` : null,
           price: `${formatScore(f.price)} ${f.currency}`,
-          was: f.deal ? formatScore(f.full) : '',
+          premium: f.currency === 'cores',
+          deal: f.deal,
           owned: this.looks.owns(f.item, o),
-          trying: this.preview?.slot === f.item.slot && this.preview.id === f.item.id,
-          canAfford: (f.currency === 'cores' ? this.wallet.cores : this.wallet.credits) >= f.price,
+          picked: i === this.shopPick,
         };
       }),
+      buy: this.shopBuyButton(offers),
       tickets: {
         label: `one ranked ticket · ${this.tickets.count} left · ${T.perWeek} new in ${formatWait(this.tickets.nextIn(now))}`,
         button: `${T.coreCost} cores`,
@@ -690,17 +695,37 @@ export class Game {
   }
 
   /** Tap a shop look: try it on the ship (tap again to take it off). */
+  /** The buy button under the cards: for the picked look, or a prompt to pick one. */
+  private shopBuyButton(offers: ReturnType<typeof shopFor>): { text: string; enabled: boolean } {
+    const f = offers[this.shopPick];
+    if (!f) return { text: 'tap a look to try it on', enabled: false };
+    if (this.looks.owns(f.item, this.owner())) return { text: `${f.item.name} is on your ship`, enabled: false };
+    const have = f.currency === 'cores' ? this.wallet.cores : this.wallet.credits;
+    const price = `${formatScore(f.price)} ${f.currency}`;
+    return have >= f.price ? { text: `buy ${f.item.name} · ${price}`, enabled: true } : { text: `${price} · you have ${formatScore(have)}`, enabled: false };
+  }
+
+  /** Tap a look: it goes on the ship to try (owned ones are just put on). Tap again to take it off. */
   private onShopOffer = (i: number): void => {
     const f = shopFor(dayKey(Date.now()))[i];
     if (!f) return;
-    const same = this.preview?.slot === f.item.slot && this.preview.id === f.item.id;
-    this.preview = same || this.looks.owns(f.item, this.owner()) ? null : { slot: f.item.slot, id: f.item.id };
+    if (this.shopPick === i && !this.looks.owns(f.item, this.owner())) {
+      this.shopPick = -1;
+      this.preview = null;
+    } else {
+      this.shopPick = i;
+      if (this.looks.owns(f.item, this.owner())) {
+        this.preview = null;
+        this.looks.equip(f.item.slot, f.item.id);
+      } else this.preview = { slot: f.item.slot, id: f.item.id };
+    }
+    this.haptics.pickup();
     this.applyLooks();
     this.openShop();
   };
 
-  private onShopBuy = (i: number): void => {
-    const f = shopFor(dayKey(Date.now()))[i];
+  private onShopBuy = (): void => {
+    const f = shopFor(dayKey(Date.now()))[this.shopPick];
     if (!f || this.looks.owns(f.item, this.owner())) return;
     const paid = f.currency === 'cores' ? this.wallet.spendCores(f.price) : this.wallet.spend(f.price);
     if (!paid) return;
@@ -1525,7 +1550,11 @@ export class Game {
     else if (name === 'stats') this.openStats();
     else if (name === 'missions') this.openMissions();
     else if (name === 'hangar') this.openHangar();
-    else if (name === 'shop') this.openShop();
+    else if (name === 'shop') {
+      this.shopPick = -1;
+      this.preview = null;
+      this.openShop();
+    }
     else if (name === 'pass') this.openPass();
     else if (name === 'daily') this.openDaily();
   };
@@ -1881,7 +1910,15 @@ export class Game {
 
   private updateTitle(dt: number): void {
     this.titleTime += dt;
-    if (this.infoOpen === 'hangar') this.trail.update(dt, 0, this.player.engineHalfSpan);
+    const showroom = this.infoOpen === 'hangar' || this.infoOpen === 'shop';
+    const S = CONFIG.camera.showroom;
+    if (showroom) {
+      this.trail.update(dt, 0, this.player.engineHalfSpan);
+      this.showroomTime += dt;
+      this.stage.showroomY = this.infoOpen === 'shop' ? S.shopY : S.hangarY;
+    }
+    this.stage.showroom += ((showroom ? 1 : 0) - this.stage.showroom) * (1 - Math.exp(-S.ease * dt));
+    this.stage.showroomAngle = S.angle + this.showroomTime * S.spin;
     this.speed = CONFIG.speed.titleDrift;
     // Slow lateral sway so the idle scene feels alive.
     const lateral = Math.sin(this.titleTime * 0.23) * 2.2;
