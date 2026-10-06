@@ -24,7 +24,7 @@ import { type Block, type Parsed, parse, type Piece, routeX } from './pieces/for
 import { FAMILIES, pickPiece, pieceById } from './pieces';
 import { ceilingFan } from './props';
 import { alienCactus, ARCH_PILLAR_X, bush, deadTree, grassTuft, mesa, rockArch, rockSpire, tumbleweed } from './props';
-import { BOULDER_HEIGHT, boulder, canister, crystalCluster, greebleBox, mushroomTree, pipeSegment, powerGem, shuttle, spireTree } from './props';
+import { BOULDER_HEIGHT, boulder, MESA_RADIUS, canister, crystalCluster, greebleBox, mushroomTree, pipeSegment, powerGem, shuttle, spireTree } from './props';
 
 // The world ahead of the ship: obstacle pools plus the generator that lays
 // out each theme row by row.
@@ -75,12 +75,14 @@ const PIT_LIP = 0.3;
 const CHASM_INSET = 1.4; // the drop starts this far in from the bridge ends
 const BRIDGE_JUMP = 0.8;
 /** Rocks and boulders collide out to this many times their size (about where the shape is). */
-const ROCK_HIT = 0.88;
+export const ROCK_HIT = 0.88;
+/** Mesas are round: a box this fraction of the radius fits them closely. */
+export const MESA_HIT = 0.92;
 /** Room families in the order of CONFIG.themes.interior.familyLooks. */
 const FAMILY_LOOK_IDS = Object.keys(CONFIG.themes.interior.familyLooks); // a bridge edge moving more than this in a row has jumped, not bent // pit sides: a thin steel lip, then black
 
 /** Open-ground prop kinds. */
-const enum Prop {
+export const enum Prop {
   Mushroom,
   Spire,
   Rock,
@@ -91,15 +93,18 @@ const enum Prop {
   Cactus,
 }
 
-/** Collision radius per unit of size, by prop kind (trees collide at the trunk only). */
-const PROP_HIT: Record<Prop, number> = {
+/**
+ * Collision radius per unit of size, by prop kind: the shape's widest point at
+ * ship height (trees collide at the trunk only). tests/props.test.ts measures them.
+ */
+export const PROP_HIT: Record<Prop, number> = {
   [Prop.Mushroom]: 0.2,
   [Prop.Spire]: 0.16,
-  [Prop.Rock]: 0.8,
-  [Prop.Crystal]: 0.62,
-  [Prop.Bush]: 0.7,
-  [Prop.DeadTree]: 0.16,
-  [Prop.RockSpire]: 0.6,
+  [Prop.Rock]: ROCK_HIT,
+  [Prop.Crystal]: 0.68,
+  [Prop.Bush]: 0.8,
+  [Prop.DeadTree]: 0.19,
+  [Prop.RockSpire]: 0.68,
   [Prop.Cactus]: 0.45,
 };
 
@@ -794,6 +799,8 @@ export class World {
 
   /** A course's set piece laid over the generator's own work, clear of the lane. */
   private overlay(d: number, kind: Section['overlay'], maxSlope: number): void {
+    // No slaloms or gates on the ice: the ship can hardly turn there. They wait until it's behind.
+    if ((kind === 'slalom' || kind === 'gates') && this.onLake(this.iceLakes, this.lane, d, 2, CONFIG.hazards.ice.runoff)) return;
     if (!kind || this.quiet(d) || d < this.nextOverlayAt || this.inChasm(d)) return;
     const jitter = maxSlope * STEP * 0.5;
     const land = this.theme === 'land';
@@ -812,8 +819,10 @@ export class World {
         this.nextOverlayAt = d + 13 + rand() * 4;
         this.overlaySide = -this.overlaySide;
         const r = 0.55 + rand() * 0.25;
-        const x = this.lane + this.overlaySide * (LANE + r + jitter + 0.5);
-        if (land) this.rockSpires.spawn(wrap(x - this.shipX), 0, d, r / 0.6, (r / 0.6) * 1.2, r / 0.6, rand() * 6.28, true, true, r, r);
+        const s = r / 0.6; // spire scale
+        const hit = land ? s * PROP_HIT[Prop.RockSpire] : r * ROCK_HIT;
+        const x = this.lane + this.overlaySide * (LANE + hit + jitter + 0.5);
+        if (land) this.rockSpires.spawn(wrap(x - this.shipX), 0, d, s, s * 1.2, s, rand() * 6.28, true, true, hit, hit);
         else this.obstacle(x, d, r, 4 + rand() * 3);
         break;
       }
@@ -1047,11 +1056,12 @@ export class World {
     }
     // Tumbleweeds rolling across (not on the ice).
     if (biome !== 'ice' && this.runStart !== null && rand() < lt.tumbleweedChance) this.rollTumbleweed(d, laneRel + this.shipX, 14, true);
-    // Mesas on the horizon.
+    // Mesas on the horizon. Solid: on open ground you can fly out to them.
     if (rand() < lt.mesaChance) {
       const side = rand() < 0.5 ? -1 : 1;
       const s = 0.8 + rand() * 1.0;
-      this.mesas.spawn(wrap(laneRel + side * (30 + rand() * 40)), 0, d, s, s * (0.7 + rand() * 0.6), s, rand() * 6.28, false, true, 0, 0, false);
+      const hit = MESA_RADIUS * s * MESA_HIT;
+      this.mesas.spawn(wrap(laneRel + side * (30 + rand() * 40)), 0, d, s, s * (0.7 + rand() * 0.6), s, rand() * 6.28, true, true, hit, hit, false);
     }
     if (this.runStart === null) return; // the title keeps to scenery
     // Rock faces: a wall of tall rock alongside the path for a stretch.
@@ -1097,7 +1107,9 @@ export class World {
       this.laneTarget = this.lane + (rand() * 2 - 1) * wander;
       this.laneRetargetAt = d + range([TH.lane.retargetMin, TH.lane.retargetMax]);
     }
-    this.lane += clamp(this.laneTarget - this.lane, -maxSlope * STEP, maxSlope * STEP);
+    // On the ice (and its run-off) the ship turns slowly: the lane drifts more gently there.
+    const iceSlope = this.onLake(this.iceLakes, this.lane, d, 2, CONFIG.hazards.ice.runoff) ? maxSlope * CONFIG.hazards.ice.laneSlope : maxSlope;
+    this.lane += clamp(this.laneTarget - this.lane, -iceSlope * STEP, iceSlope * STEP);
     if (this.quiet(d)) return; // clear runway out of the interior and into the canyon
 
     const laneRel = this.lane - this.shipX;
