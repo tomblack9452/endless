@@ -38,6 +38,7 @@ interface Saved {
   weekly?: { week: string; best: number; finished: boolean };
   envBest?: Record<string, number>;
   endlessBest?: number;
+  allOpen?: boolean; // maxed out: every solo environment, set level and part of the game open
 }
 
 /** Best results on a set course. */
@@ -77,6 +78,8 @@ export class Progress {
   /** Solo high scores by environment id (see ENVIRONMENTS in courses.ts). */
   envBest: Record<string, number> = {};
   endlessBest = 0;
+  /** Maxed out (players.max_out, or the dev panel): every solo environment, set level and part of the game open. */
+  allOpen = false;
 
   async load(): Promise<void> {
     const raw = await storage.get(KEY);
@@ -90,6 +93,7 @@ export class Progress {
       if (s.weekly) this.weekly = s.weekly;
       this.envBest = s.envBest ?? {};
       this.endlessBest = s.endlessBest ?? 0;
+      this.allOpen = s.allOpen === true;
     } catch {
       // Corrupt value: start fresh.
     }
@@ -104,6 +108,7 @@ export class Progress {
       weekly: this.weekly,
       envBest: this.envBest,
       endlessBest: this.endlessBest,
+      allOpen: this.allOpen,
     };
     void storage.set(KEY, JSON.stringify(s));
   }
@@ -112,6 +117,12 @@ export class Progress {
    * Note that a ranked or endless run reached `level`. Returns the previous furthest level,
    * so the caller can tell what just opened. Solo, set levels and dev starts don't call this.
    */
+  /** Open everything for good (maxing out). */
+  openAll(): void {
+    this.allOpen = true;
+    this.save();
+  }
+
   reachedLevel(level: number): number {
     const before = this.furthest;
     if (level > this.furthest) {

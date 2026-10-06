@@ -765,9 +765,9 @@ that opens a panel. It isn't in production builds.
 - **Show routes:** draws each section's routes on the floor (main white,
   alternative teal, risky amber)
 - **Add 500 cores:** a stand-in for purchases
-- **Unlock all:** General Grade 4, Grand Champion, every look, every
-  upgrade maxed and 100,000 credits (saved in that browser), and every set
-  level open until you reload
+- **Unlock all:** the same as maxing out a player (below): the top rank and
+  league, every look, every upgrade, every solo environment and set level,
+  and 100,000 credits (saved in that browser)
 - **Reset all progress:** clears everything but settings
 - an FPS readout with the pixel ratio and draw calls
 
@@ -901,8 +901,11 @@ change you make is applied on top of anything they've earned since (add
 `credits` cell that's empty means that player hasn't synced since this was
 added; it fills in when they next open the game.
 
-**Maxing out a player** (for testing): the top rank and league, every look,
-every upgrade at its top tier and 100,000 credits. In the SQL editor:
+**Maxing out a player** (for testing): the top rank and league, every look
+of every kind (shop, vault, pass, premium, rank, league, stars and
+achievement looks), every upgrade at its top tier, every solo environment and
+set level and every part of the game open, and 100,000 credits. In the SQL
+editor:
 
 ```sql
 update public.players set max_out = true where name = 'Ace Pilot';

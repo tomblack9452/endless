@@ -216,9 +216,9 @@ export class Looks {
     return done;
   }
 
-  /** Mark everything bought (dev). */
+  /** Own every look, whatever unlocks it (maxing out, and the dev panel). */
   buyAll(): void {
-    for (const l of LOOKS) if (l.unlock.by === 'credits' || l.unlock.by === 'cores' || l.unlock.by === 'vault' || l.unlock.by === 'reward') this.bought.add(keyOf(l));
+    for (const l of LOOKS) this.bought.add(keyOf(l));
     this.save();
   }
 

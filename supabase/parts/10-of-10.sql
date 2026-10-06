@@ -37,8 +37,8 @@ grant execute on function public.sync_credits to authenticated;
 -- Max out a player from the SQL editor (for testing):
 --   update public.players set max_out = true where name = 'Ace Pilot';
 -- The next time they open the game (or come back to it) it gives them the top
--- rank and league, every look, every upgrade at its top tier and 100,000
--- credits, then clears the flag. Set it again to do it again.
+-- rank and league, every look, every upgrade at its top tier, every level and
+-- 100,000 credits, then clears the flag. Set it again to do it again.
 
 alter table public.players add column if not exists max_out boolean not null default false;
 

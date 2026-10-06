@@ -244,7 +244,7 @@ export class Game {
   seed = 0;
 
   /** Dev-only switches, set from the dev panel (never shown in production builds). */
-  readonly dev = { invincible: false, fullBoost: false, autopilot: false, unlockedAll: false };
+  readonly dev = { invincible: false, fullBoost: false, autopilot: false };
 
   private boostMeter = 0; // 0..1
   private boosting = false;
@@ -1659,8 +1659,8 @@ export class Game {
   }
 
   private ownerFor(snap: Snapshot): Owner {
-    // Dev "unlock all" opens every look: plenty of stars, every goal done.
-    const all = this.dev.unlockedAll;
+    // Maxed out: plenty of stars, premium looks on.
+    const all = this.allOpen;
     return {
       rank: this.ranked.rank,
       stars: all ? 999 : this.progress.totalStars(),
@@ -1978,13 +1978,13 @@ export class Game {
 
   /** Is this solo environment open to fly? */
   private envOpen(env: Environment): boolean {
-    return this.dev.unlockedAll || envStatus(env, this.progress.furthest).open;
+    return this.allOpen || envStatus(env, this.progress.furthest).open;
   }
 
   /** Solo: pick an environment (endless in it, with a high score each) or a set level. */
   private openSolo(): void {
     const furthest = this.progress.furthest;
-    const next = this.dev.unlockedAll ? null : nextEnvironment(furthest);
+    const next = this.allOpen ? null : nextEnvironment(furthest);
     this.ui.renderEnvironments(
       ENVIRONMENTS.map((e, i) => {
         const st = envStatus(e, furthest);
@@ -2201,7 +2201,7 @@ export class Game {
   }
 
   private open(f: Feature): boolean {
-    return this.dev.unlockedAll || isOpen(f, this.revealStage());
+    return this.allOpen || isOpen(f, this.revealStage());
   }
 
   /** The big button: ranked once it's open, endless before. */
@@ -2260,7 +2260,7 @@ export class Game {
     if (this.open('ranked')) this.ui.setPrimary('ranked', wb > 0 ? `your best this week ${formatScore(wb)}` : 'the same run for everyone, all week');
     else this.ui.setPrimary('fly', this.progress.endlessBest > 0 ? `endless · best ${formatScore(this.progress.endlessBest)}` : 'endless: every area in turn');
     this.ui.setFeatures((f) => (f === 'endless' || f === 'league' ? this.open('ranked') : f === 'boards' ? this.open('leaderboard') : f === 'solo' || f === 'shop' || f === 'record' ? this.open(f) : true));
-    this.ui.setTitleNext(this.dev.unlockedAll ? '' : nextStageText(runs, this.onboarding.done));
+    this.ui.setTitleNext(this.allOpen ? '' : nextStageText(runs, this.onboarding.done));
     this.ui.renderTitleCards(this.titleCards(now));
     this.refreshBar(now);
     this.announceReveal();
@@ -2501,7 +2501,6 @@ export class Game {
   /** Dev: unlock everything: top rank, every sector and star, all looks and upgrades, plenty of credits. */
   devUnlockAll(): void {
     this.maxOut();
-    this.dev.unlockedAll = true;
     this.ui.showNotice('dev: everything unlocked');
   }
 
@@ -2511,15 +2510,22 @@ export class Game {
     this.looks.buyAll();
     this.leagues.devTop();
     for (const s of SYSTEMS) while (this.upgrades.tier(s.id) < MAX_TIER) this.upgrades.raise(s.id);
+    this.progress.openAll(); // every solo environment, set level and part of the game
+    if (!this.onboarding.done) this.onboarding.set('done');
     this.wallet.add(100000);
     this.refreshTitle();
+  }
+
+  /** Everything open: maxed out (the SQL editor's max_out, or the dev panel's "unlock all"). */
+  private get allOpen(): boolean {
+    return this.progress.allOpen;
   }
 
   /** Maxed out from the SQL editor (players.max_out): done once, when the game next opens or comes back. */
   private async checkMaxOut(): Promise<void> {
     if (!this.backend.online || !(await this.backend.takeMaxOut())) return;
     this.maxOut();
-    this.ui.showNotice('maxed out: every look, every upgrade, top rank and league');
+    this.ui.showNotice('maxed out: every look, upgrade and level, top rank and league');
   }
 
   /** Dev: cores, standing in for purchases until the store is in. */
@@ -2969,7 +2975,7 @@ export class Game {
     const tiles = COURSES.map((c, i) => {
       const r = this.progress.course(c.id);
       const prev = i === 0 ? null : this.progress.course(COURSES[i - 1].id);
-      const locked = !(i === 0 || (prev && prev.stars & 1)) && !this.dev.unlockedAll;
+      const locked = !(i === 0 || (prev && prev.stars & 1)) && !this.allOpen;
       return {
         index: i,
         name: c.name,
