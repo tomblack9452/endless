@@ -18,15 +18,14 @@ import { Ghost } from './ghost';
 import { DECAL_SVG } from './decals';
 import { Haptics } from './haptics';
 import { Hints } from './hints';
-import { migrateMissionLooks } from './legacy';
+import { migrateMissionLooks, migrateTickets } from './legacy';
 import { Progress } from './progress';
-import { creditsFor, insignia, par, promotionBonus, Ranked, rankName, RANKS, type RunMode, xpToRank } from './ranks';
+import { creditsFor, insignia, promotionBonus, Ranked, rankName, RANKS, type RunMode, xpToRank } from './ranks';
 import { Wallet } from './wallet';
 import { Daily, questText } from './economy/daily';
 import { Pass, premiumReward, freeReward, runXp, seasonAt } from './economy/pass';
 import { type Reward, rewardLook, rewardParts, rewardText } from './economy/reward';
 import { DailyShop, setOffer, vaultAt } from './economy/shop';
-import { Tickets } from './economy/tickets';
 import { dayKey, formatWait, untilTomorrow } from './economy/time';
 import { EconomyView } from './economy/view';
 import { type BoardId, createBackend } from './server/backend';
@@ -141,7 +140,6 @@ export class Game {
   private scoreBase = 0; // solo starts: score begins at half the skipped points
   private readonly ranked = new Ranked();
   private readonly wallet = new Wallet();
-  private readonly tickets = new Tickets();
   private readonly daily = new Daily();
   private readonly pass = new Pass();
   private readonly econ = new EconomyView();
@@ -173,6 +171,8 @@ export class Game {
   private showroomTime = 0; // turns the showroom camera
   // Revive (not in ranked): once a run. While the offer is up the run isn't recorded yet.
   private revived = false;
+  /** The run as it stood at the first crash, when revived: what the boards get (a paid revive never adds to a board score). */
+  private preRevive: { score: number; seconds: number; distance: number } | null = null;
   private revivePending = false;
   private reviveAsked = false;
   private countdownT = 0; // seconds of 3-2-1 left
@@ -292,7 +292,6 @@ export class Game {
       this.wallet.load(),
       this.leagues.load(),
       this.upgrades.load(),
-      this.tickets.load(now),
       this.daily.load(dayKey(now)),
       this.pass.load(now),
       this.dailyShop.load(),
@@ -311,7 +310,7 @@ export class Game {
       this.claimLogin();
       void this.connect();
     });
-    this.econ.bindShop(this.onShopOffer, this.onShopBuy, this.onShopTicket, this.onShopCores, this.onShopTab);
+    this.econ.bindShop(this.onShopOffer, this.onShopBuy, this.onShopCores, this.onShopTab);
     this.hangarUi.bindHangar({
       tab: (tab) => this.onHangarTab(tab),
       pick: (id) => this.onHangarPick(id),
@@ -357,6 +356,7 @@ export class Game {
     this.econ.setCountdown(0);
     this.econ.setOverRewards([]);
     this.revived = this.revivePending = this.reviveAsked = false;
+    this.preRevive = null;
     this.path = [];
     this.pathTimes = [];
     this.pathNext = 0;
@@ -520,14 +520,13 @@ export class Game {
     });
     const lines: string[] = [];
     // Ranked pays full rate; solo, set levels and endless half.
-    let credits = creditsFor(this.assisted ? 0 : this.score, this.mode === 'ranked');
-    if (this.mode === 'ranked') credits += this.recordRanked(this.state === 'finished');
-    else {
-      this.ui.setGameOverRank(null);
-      if (this.assisted) lines.push('assist mode. not counted as a best');
-    }
+    const score = this.assisted ? 0 : this.score;
+    const fromPickups = this.assisted ? 0 : this.pickupCount * CONFIG.economy.runCredits.pickupCredits;
+    let credits = creditsFor(score, this.mode === 'ranked') + fromPickups;
+    credits += this.recordRank(this.state === 'finished');
+    if (this.assisted) lines.push('assist mode. not counted as a best');
     this.wallet.add(credits);
-    lines.push(`+${formatScore(credits)} credits`);
+    lines.push(`+${formatScore(credits)} credits${fromPickups > 0 ? ` (${formatScore(fromPickups)} from pickups)` : ''}`);
     const board = boardForRun(this.mode, this.environment?.id ?? null, this.course !== null);
     if (board && board !== 'ranked') this.submitToBoard(board, this.state === 'finished');
     if (this.unlockable) {
@@ -574,7 +573,7 @@ export class Game {
     return out;
   }
 
-  /** Pay a reward into the wallet, tickets or looks; returns it in words. */
+  /** Pay a reward into the wallet or looks; returns it in words. */
   private grant(r: Reward): string[] {
     if (r.credits) {
       this.wallet.add(r.credits);
@@ -583,10 +582,6 @@ export class Game {
     if (r.cores) {
       this.wallet.addCores(r.cores);
       this.econ.bump('cores');
-    }
-    if (r.tickets) {
-      this.tickets.add(r.tickets);
-      this.econ.bump('tickets');
     }
     const look = rewardLook(r);
     if (look) this.looks.give(`${look.slot}:${look.id}`);
@@ -704,11 +699,9 @@ export class Game {
       const it = byKey(key);
       return !!it && this.looks.owns(it, o);
     };
-    const T = CONFIG.economy.tickets;
     const v = this.shopTabView(now, owned);
-    this.tickets.refill(now);
     this.econ.renderShop({
-      wallet: `${formatScore(this.wallet.credits)} credits · ${formatScore(this.wallet.cores)} cores · ${this.tickets.count} tickets`,
+      wallet: `${formatScore(this.wallet.credits)} credits · ${formatScore(this.wallet.cores)} cores`,
       reset: v.reset,
       tabs: [
         { id: 'today', label: 'today' },
@@ -730,11 +723,6 @@ export class Game {
         picked: i === this.shopPick,
       })),
       buy: v.buy,
-      tickets: {
-        label: `one ranked ticket · ${this.tickets.count} left · ${T.perWeek} new in ${formatWait(this.tickets.nextIn(now))}`,
-        button: `${T.coreCost} cores`,
-        enabled: this.wallet.cores >= T.coreCost,
-      },
       cores: this.coreRows(),
     });
     this.player.reset();
@@ -760,7 +748,7 @@ export class Game {
     for (const p of CONFIG.economy.store.products) {
       const cost = price.get(p.id);
       if (!cost || 'pass' in p || ('once' in p && this.ownedProducts.has(p.id))) continue;
-      const label = 'once' in p ? `starter pack · ${formatScore(p.cores)} cores, ${p.tickets} tickets and ${rewardText({ look: p.look })}` : `${formatScore(p.cores)} cores`;
+      const label = 'once' in p ? `starter pack · ${formatScore(p.cores)} cores and ${rewardText({ look: p.look })}` : `${formatScore(p.cores)} cores`;
       rows.push({ label, button: cost, enabled: true });
       this.shopPacks.push(p.id);
     }
@@ -841,22 +829,6 @@ export class Game {
     this.openShop();
   };
 
-  private onShopTicket = (): void => {
-    if (!this.buyTicket()) return;
-    this.openShop();
-  };
-
-  /** One ranked ticket for cores; false if there aren't enough. */
-  private buyTicket(): boolean {
-    if (!this.wallet.spendCores(CONFIG.economy.tickets.coreCost)) return false;
-    this.tickets.add(1);
-    this.econ.bump('tickets');
-    this.sound.pickup();
-    this.haptics.pickup();
-    this.refreshTitle();
-    return true;
-  }
-
   /** Cores packs: real purchases come with the store (stage D); the dev build adds them free. */
   private onShopCores = (i: number): void => {
     const pack = this.shopPacks[i];
@@ -904,27 +876,6 @@ export class Game {
     this.openPass();
   };
 
-  /** Ranked with no tickets left: offer one for cores, or the wait. */
-  private offerTicket(): void {
-    const now = Date.now();
-    const cost = CONFIG.economy.tickets.coreCost;
-    this.econ.offer(
-      {
-        kicker: 'out of tickets',
-        name: 'ranked tickets',
-        lines: [`${CONFIG.economy.tickets.perWeek} new tickets in ${formatWait(this.tickets.nextIn(now))}`, `you have ${formatScore(this.wallet.cores)} cores`],
-        yes: `buy one · ${cost} cores`,
-        yesEnabled: this.wallet.cores >= cost,
-        no: 'not now',
-        seconds: 0,
-      },
-      () => {
-        if (this.buyTicket()) this.startRanked();
-      },
-      () => {},
-    );
-  }
-
   // --- revive ----------------------------------------------------------------
 
   /** A revive is offered once a run, outside ranked, where the lane is known. */
@@ -960,6 +911,7 @@ export class Game {
     const R = CONFIG.economy.revive;
     this.revivePending = false;
     this.revived = true;
+    this.preRevive = { score: Math.floor(this.score), seconds: this.runTime, distance: this.world.distance - this.runStart };
     this.hitThisRun = true;
     this.world.revive(R.clearAhead);
     this.world.sync();
@@ -999,18 +951,15 @@ export class Game {
     this.sound.ignite();
   }
 
-  /** The wallet bar, ticket refills and the day turning, about once a second on the title. */
+  /** The wallet bar and the day turning, about once a second on the title. */
   private tickEconomy(dt: number): void {
     this.economyTimer -= dt;
     if (this.economyTimer > 0) return;
     this.economyTimer = 1;
     const now = Date.now();
-    const before = this.tickets.count;
-    this.tickets.refill(now);
     this.daily.turn(dayKey(now));
     this.pass.turn(now);
-    if (this.tickets.count !== before) this.refreshTitle();
-    else this.refreshBar(now);
+    this.refreshBar(now);
   }
 
   /** Sign in and sync with the server, if there is one (see src/server). */
@@ -1023,6 +972,11 @@ export class Game {
       await this.wallet.link(this.backend);
       this.refreshTitle();
       void this.outbox.flush(); // runs that couldn't be sent last time
+    }
+    const refund = await migrateTickets((n) => this.wallet.addCores(n, 'tickets'));
+    if (refund > 0) {
+      this.ui.showNotice(`ranked is unlimited now: your spare tickets became ${formatScore(refund)} cores`);
+      this.refreshTitle();
     }
     this.ownedProducts = new Set(JSON.parse((await storage.get(OWNED_KEY)) ?? '[]') as string[]);
     await this.store.start(this.backend.userId);
@@ -1047,7 +1001,7 @@ export class Game {
         window.setTimeout(() => void this.wallet.link(this.backend).then(() => this.refreshTitle()), 2500);
       } else lines.push(...this.grant({ cores: p.cores }));
     }
-    if ('tickets' in p) lines.push(...this.grant({ tickets: p.tickets, look: p.look }));
+    if ('look' in p) lines.push(...this.grant({ look: p.look }));
     if ('pass' in p && !this.pass.premium) lines.push(...this.pass.unlockPremium().flatMap((r) => this.grant(r)), 'season pass premium');
     if ('once' in p) {
       this.ownedProducts.add(id);
@@ -1090,23 +1044,24 @@ export class Game {
   }
 
   private refreshBar(now = Date.now()): void {
-    const wait = this.tickets.count === 0 ? formatWait(this.tickets.nextIn(now)) : '';
-    this.econ.setBar(this.wallet.credits, this.wallet.cores, this.tickets.count, wait);
+    this.econ.setBar(this.wallet.credits, this.wallet.cores);
     this.econ.setNews('daily', this.daily.loginDue(dayKey(now)) >= 0);
   }
 
-  /** Fold a ranked run into the rank and league; fills the game-over block. Returns bonus credits. */
-  private recordRanked(finished: boolean): number {
+  /** Fold a run into the rank (every mode) and, for ranked, the league; fills the game-over block. Returns bonus credits. */
+  private recordRank(finished: boolean): number {
     const lg = this.leagues;
-    this.submitToBoard('ranked', finished);
-    this.ui.showShare(true);
+    const ranked = this.mode === 'ranked';
+    const score = this.assisted ? 0 : this.score;
     const target = this.weekly.target;
-    const r = this.ranked.record(this.mode, this.score, this.level, this.seed, Date.now(), target, this.weekly.id);
+    const r = this.ranked.record(this.mode, score, this.level, this.seed, Date.now(), ranked ? this.weekly.id : undefined);
     const promoted = r.rankAfter > r.rankBefore;
     const leagueLines: string[] = [];
     const party: Celebration[] = [];
     let bonus = r.credits;
-    {
+    if (ranked) {
+      this.submitToBoard('ranked', finished);
+      this.ui.showShare(true);
       const res = lg.record(this.score, target);
       bonus += res.credits;
       leagueLines.push(`${leagueName(lg.league, lg.division)} · ${res.lp >= 0 ? '+' : ''}${res.lp} lp (${lg.lp}/${LP_PER_DIVISION})`);
@@ -1128,12 +1083,8 @@ export class Game {
       for (let k = r.rankBefore + 1; k <= r.rankAfter; k++) gives.push(...this.rankGives(k));
       party.unshift({ kicker: 'promoted', icon: insignia(r.rankAfter), name: rankName(r.rankAfter), lines: mergeCredits(gives), color: '#d4a63a' });
     }
-    const lines = [
-      ...leagueLines,
-      `+${r.xp} xp${r.doubled ? ' (double)' : ''}`,
-      r.skillAfter === r.skillBefore ? `skill ${r.skillAfter}` : `skill ${r.skillBefore} → ${r.skillAfter}`,
-      `par for skill ${r.skillAfter}: ${formatScore(par(r.skillAfter, target))}`,
-    ];
+    const lines = [...leagueLines, `+${r.xp} xp${r.doubled ? ' (double)' : ''}`];
+    if (ranked) lines.push(`league par this week: ${formatScore(leaguePar(lg.league, target))}`);
     if (promoted) lines.splice(leagueLines.length, 0, `+${formatScore(r.credits)} promotion credits`);
     const view: RankResultView = {
       icon: insignia(r.rankAfter),
@@ -1288,15 +1239,16 @@ export class Game {
   /** Send a finished run to its board. Assisted and dev runs never go. */
   private submitToBoard(board: BoardId, finished: boolean): void {
     if (this.assisted || this.dev.invincible || this.dev.autopilot) return;
-    const distance = this.world.distance - this.runStart;
-    if (distance < 60 || this.runTime < 5 || this.score <= 0) return; // a crash at the start isn't a result
+    // A revived run counts as it stood at its first crash.
+    const run = this.preRevive ?? { score: Math.floor(this.score), seconds: this.runTime, distance: this.world.distance - this.runStart };
+    if (run.distance < 60 || run.seconds < 5 || run.score <= 0) return; // a crash at the start isn't a result
     void this.outbox
       .send({
         board,
         league: board === 'ranked' ? this.leagues.league : 0,
-        score: Math.floor(this.score),
-        seconds: this.runTime,
-        distance,
+        score: run.score,
+        seconds: run.seconds,
+        distance: run.distance,
         finished,
         path: board === 'ranked' ? [...this.path] : [],
       })
@@ -1366,16 +1318,9 @@ export class Game {
     const checks: ProgressView['checks'] = [];
     if (next) {
       checks.push({ label: `${formatScore(next.xp)} xp`, value: `${formatScore(rk.xp)} now`, met: xpLeft === 0 });
-      if (next.skill > 0) checks.push({ label: `skill ${next.skill}`, value: `best ${rk.highestSkill} · now ${rk.skill}`, met: rk.highestSkill >= next.skill });
     }
-    let big = formatScore(xpLeft);
-    let goal = next ? `xp to ${rankName(i + 1)}` : 'xp. top rank reached';
-    // Enough XP but not the skill: the skill is the headline.
-    if (next && xpLeft === 0 && rk.highestSkill < next.skill) {
-      big = `skill ${next.skill}`;
-      goal = `needed for ${rankName(i + 1)}`;
-    }
-    if (!next) big = formatScore(rk.xp);
+    const big = formatScore(next ? xpLeft : rk.xp);
+    const goal = next ? `xp to ${rankName(i + 1)}` : 'xp. top rank reached';
 
     const recent = this.recentRanked(20);
     const xpSum = recent.reduce((t, h) => t + h.xp, 0);
@@ -1401,7 +1346,7 @@ export class Game {
         unit: 'xp',
       },
       rows: [
-        ['skill par this week', `${formatScore(par(rk.skill, this.weekly.target))} to climb`],
+        ['xp a run', `ranked 1 per ${CONFIG.rank.rankedPointsPerXp} points · others 1 per ${formatScore(CONFIG.rank.pointsPerXp)} · goals ${CONFIG.rank.goalXp}`],
         ['double xp runs left today', String(rk.bonusRunsLeft())],
         ['best this week', formatScore(b.week)],
         ['best ever', formatScore(b.all)],
@@ -1410,7 +1355,7 @@ export class Game {
       ladder: RANKS.map((r, k) => ({
         icon: insignia(k),
         name: rankName(k),
-        needs: r.skill > 0 ? `${formatScore(r.xp)} xp · skill ${r.skill}` : `${formatScore(r.xp)} xp`,
+        needs: `${formatScore(r.xp)} xp`,
         gives: k === 0 ? '' : this.rankGives(k).join(' · '),
         state: k < i ? 'done' : k === i ? 'current' : 'locked',
       })),
@@ -1630,6 +1575,9 @@ export class Game {
         credits += a.credits;
       }
       if (fresh.length > 0) this.goalLog.save();
+      const promo = this.ranked.addXp(fresh.length * CONFIG.rank.goalXp);
+      credits += promo.credits;
+      if (promo.rankAfter > promo.rankBefore) party.push({ kicker: 'promoted', icon: insignia(promo.rankAfter), name: rankName(promo.rankAfter), lines: mergeCredits(Array.from({ length: promo.rankAfter - promo.rankBefore }, (_, k) => this.rankGives(promo.rankBefore + 1 + k)).flat()), color: '#d4a63a' });
       if (credits > 0) this.grant({ credits });
       if (fresh.length > 3) {
         party.push({ kicker: `${fresh.length} goals complete`, icon: GOAL_ICON, name: `${fresh.length} goals`, lines: [...fresh.slice(0, 5).map((a) => a.name), `+${credits.toLocaleString('en-US')} credits`] });
@@ -1746,11 +1694,6 @@ export class Game {
       this.openHangar({ upgrades: true });
       return;
     }
-    // One ticket per attempt.
-    if (!this.tickets.use(Date.now())) {
-      this.offerTicket();
-      return;
-    }
     // The week may have turned since the game started.
     const week = weekKey(Date.now());
     if (this.weekly.id !== weeklyRun(week).id) this.weekly = weeklyRun(week);
@@ -1801,10 +1744,7 @@ export class Game {
     this.ui.setTitleRank(insignia(i), rankName(i), `${formatScore(this.wallet.credits)} credits`);
     const wb = this.progress.weeklyBest(this.weekly.id);
     const now = Date.now();
-    this.tickets.refill(now);
-    const t = this.tickets.count;
-    const tickets = t > 0 ? `${t} ${t === 1 ? 'try' : 'tries'} left` : `no tries left · ${CONFIG.economy.tickets.perWeek} more in ${formatWait(this.tickets.nextIn(now))}`;
-    this.ui.setRankedSub(`${wb > 0 ? `best this week ${formatScore(wb)}` : 'new run every week'} · ${tickets}`);
+    this.ui.setRankedSub(wb > 0 ? `best this week ${formatScore(wb)} · new run every monday` : 'the same run for everyone · new every monday');
     this.refreshBar(now);
     this.cloud.push(); // most changes end here: keep the cloud save current
     this.ui.setBests([['endless', this.progress.endlessBest]]);
@@ -2010,9 +1950,7 @@ export class Game {
 
   /** Dev: unlock everything: top rank, every sector and star, all looks and upgrades, plenty of credits. */
   devUnlockAll(): void {
-    this.ranked.xp = Math.max(this.ranked.xp, RANKS[RANKS.length - 1].xp);
-    this.ranked.skill = this.ranked.highestSkill = 50;
-    this.ranked.save();
+    this.ranked.addXp(Math.max(0, RANKS[RANKS.length - 1].xp - this.ranked.xp));
     this.looks.buyAll();
     this.leagues.devTop();
     this.dev.unlockedAll = true;
@@ -2026,13 +1964,6 @@ export class Game {
   devAddCores(n: number): void {
     this.wallet.addCores(n);
     this.econ.bump('cores');
-    this.refreshTitle();
-  }
-
-  /** Dev: ranked tickets. */
-  devAddTickets(n: number): void {
-    this.tickets.add(n);
-    this.econ.bump('tickets');
     this.refreshTitle();
   }
 

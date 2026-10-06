@@ -611,34 +611,41 @@ export const CONFIG = {
     markerEvery: 3, // rows between safe-line markers
   },
 
+  // Rank (ranks.ts): XP from every run, ranked paying the most, and from goals.
+  rank: { pointsPerXp: 4000, rankedPointsPerXp: 800, goalXp: 30 },
+
   // The economy (src/economy/): two currencies, ranked tickets, revives, daily
   // rewards and quests, the shop and the season pass. Credits are earned by
   // playing; cores are the premium currency (bought later; for now earned from
   // daily rewards, quests and the pass). Nothing here can make a ship stronger
-  // in ranked: purchases are looks, tickets, revives and the pass.
+  // in ranked: purchases are looks, revives and the pass.
   economy: {
-    // Ranked tickets: a fresh set each week for attempts at the week's run; more for cores.
-    tickets: { perWeek: 5, coreCost: 30 },
+    // Ranked is unlimited; saves from when it took tickets get 30 cores for each spare one (legacy.ts).
+    ticketCores: 30,
+    // Credits for a run's score (pickups pay on top: pickupCredits each).
+    runCredits: { pointsPerCredit: 250, rankedPointsPerCredit: 125, pickupCredits: 1 },
     // Revive (not in ranked): once a run, free once a day, otherwise cores. The ship
     // moves onto the lane, the way ahead is cleared, and a countdown starts it again.
     revive: { coreCost: 20, clearAhead: 34, countdown: 3, graceSeconds: 2.5 },
     // The 7-day login calendar: one claim a day (UTC), looping after day 7. A
     // missed day just waits: the next claim is the next day on the calendar.
     login: [
-      { credits: 200 },
+      { credits: 100 },
+      { cores: 5 },
+      { credits: 150 },
+      { credits: 250 },
       { cores: 10 },
-      { tickets: 2 },
-      { credits: 500 },
-      { cores: 20 },
-      { tickets: 3 },
-      { cores: 40, look: 'paint:aurora' },
+      { credits: 300 },
+      { cores: 15, look: 'paint:aurora' },
     ],
     // Three a day (UTC), the same for everyone. Each pays credits and pass XP;
     // finishing all three pays cores.
-    quests: { count: 3, credits: [150, 400], allDoneCores: 10, passXp: 60 },
+    quests: { count: 3, credits: [60, 120], allDoneCores: 4, passXp: 30 },
+    // Five a week (Monday, UTC), the same for everyone, harder and spanning many runs.
+    weekly: { count: 5, credits: 150, passXp: 400, allDoneCores: 15 },
     // The shop: looks a day, the weekly set's bundle discount, and how many credits a core is worth when a bundle mixes them.
     shop: { slots: 4, setDiscount: 0.8, creditsPerCore: 25 },
-    pass: { weeks: 6, tiers: 30, xpPerTier: 120, premiumCores: 950, runXpPer: 250, runXpMax: 60 },
+    pass: { weeks: 6, tiers: 30, xpPerTier: 600, premiumCores: 550, runXpPer: 500, runXpMax: 30 },
     // Real-money products (src/store): create these ids in App Store Connect,
     // Google Play and RevenueCat. Prices are set in the stores. Bonus sizes:
     // 550 is +10%, 1,200 +20%, 2,500 +25% over the 100 pack.
@@ -648,8 +655,8 @@ export const CONFIG = {
         { id: 'cores_550', cores: 550 },
         { id: 'cores_1200', cores: 1200 },
         { id: 'cores_2500', cores: 2500 },
-        // Once per account: cores, tickets and the nova hull.
-        { id: 'starter_pack', cores: 500, tickets: 3, look: 'hull:nova', once: true },
+        // Once per account: cores and the nova hull.
+        { id: 'starter_pack', cores: 500, look: 'hull:nova', once: true },
         // The season pass's premium track, for money instead of cores.
         { id: 'season_pass', pass: true },
       ],

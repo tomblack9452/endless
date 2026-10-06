@@ -20,9 +20,9 @@ export function seasonAt(ms: number): { season: number; start: number; end: numb
 
 /** The free track's reward at a tier (1-based). */
 export function freeReward(tier: number): Reward {
-  if (tier % 10 === 0) return { tickets: tier / 10 };
+  if (tier % 10 === 0) return { cores: tier };
   if (tier % 5 === 0) return { cores: 5 };
-  return { credits: 100 + 10 * tier };
+  return { credits: 50 + 5 * tier };
 }
 
 /** The premium track's reward at a tier (1-based). */
@@ -31,7 +31,7 @@ export function premiumReward(tier: number): Reward {
   if (tier === 15) return { look: 'engine:solar' };
   if (tier === 20) return { look: 'hull:raptor' };
   if (tier === 30) return { look: 'paint:ember', cores: 50 };
-  if (tier % 5 === 0) return { tickets: 2 };
+  if (tier % 5 === 0) return { cores: 20 };
   if (tier % 3 === 0) return { cores: 15 };
   return { credits: 250 + 20 * tier };
 }
@@ -42,18 +42,23 @@ interface Saved {
   premium: boolean;
   paidFree: number; // tiers paid on each track
   paidPremium: number;
+  /** 2 since tiers took 600 XP (they took 120): older saves are scaled up once to keep their tier. */
+  v?: number;
 }
 
 const KEY = 'endless.pass';
+const OLD_XP_PER_TIER = 120;
 
 export class Pass {
-  private s: Saved = { season: 0, xp: 0, premium: false, paidFree: 0, paidPremium: 0 };
+  private s: Saved = { season: 0, xp: 0, premium: false, paidFree: 0, paidPremium: 0, v: 2 };
 
   async load(now: number): Promise<void> {
     const raw = await storage.get(KEY);
     if (raw) {
       try {
-        this.s = { ...this.s, ...(JSON.parse(raw) as Partial<Saved>) };
+        const saved = JSON.parse(raw) as Partial<Saved>;
+        this.s = { ...this.s, ...saved };
+        if (!saved.v) this.s = { ...this.s, xp: Math.round(((saved.xp ?? 0) * CONFIG.economy.pass.xpPerTier) / OLD_XP_PER_TIER), v: 2 };
       } catch {
         // Corrupt value: a fresh pass.
       }
@@ -69,7 +74,7 @@ export class Pass {
   turn(now: number): void {
     const { season } = seasonAt(now);
     if (this.s.season === season) return;
-    this.s = { season, xp: 0, premium: false, paidFree: 0, paidPremium: 0 };
+    this.s = { season, xp: 0, premium: false, paidFree: 0, paidPremium: 0, v: 2 };
     this.save();
   }
 

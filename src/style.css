@@ -1831,7 +1831,7 @@ body {
 
 /* --- Economy ----------------------------------------------------------------- */
 
-/* Wallet bar, top right of the title: credits, cores, ranked tickets. */
+/* Wallet bar, top right of the title: credits and cores. */
 .wallet-bar {
   position: absolute;
   top: calc(var(--safe-top) + 12px);
@@ -1870,15 +1870,6 @@ body {
 
 .coin.premium svg {
   stroke: #8a63d2;
-}
-
-.coin-wait {
-  font-weight: 400;
-  opacity: 0.6;
-}
-
-.coin-wait:empty {
-  display: none;
 }
 
 .coin.bump {
@@ -2230,7 +2221,7 @@ body {
   display: none;
 }
 
-/* The offer dialog (revive, a ticket for cores): the promotion card's look. */
+/* The offer dialog (revive): the promotion card's look. */
 .offer {
   cursor: default;
 }

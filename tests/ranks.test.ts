@@ -1,26 +1,24 @@
 import { describe, expect, it } from 'vitest';
-import { creditsFor, insignia, par, rankFor, RANKS, skillDelta, xpFor } from '../src/ranks';
+import { CONFIG } from '../src/config';
+import { creditsFor, insignia, rankFor, Ranked, RANKS, xpFor } from '../src/ranks';
 
 describe('rank ladder', () => {
   it('has 35 ranks from recruit to general grade 4', () => {
     expect(RANKS.length).toBe(35);
     expect(RANKS[0].name).toBe('recruit');
-    expect(RANKS[34]).toMatchObject({ name: 'general', grade: 4, xp: 50000, skill: 50 });
+    expect(RANKS[34]).toMatchObject({ name: 'general', grade: 4, xp: 50000 });
   });
 
   it('only ever asks for more as you climb', () => {
-    for (let i = 1; i < RANKS.length; i++) {
-      expect(RANKS[i].xp).toBeGreaterThan(RANKS[i - 1].xp);
-      expect(RANKS[i].skill).toBeGreaterThanOrEqual(RANKS[i - 1].skill);
-    }
+    for (let i = 1; i < RANKS.length; i++) expect(RANKS[i].xp).toBeGreaterThan(RANKS[i - 1].xp);
   });
 
-  it('needs both XP and skill', () => {
-    expect(rankFor(0, 1)).toBe(0);
-    expect(rankFor(250, 4)).toBe(6); // enough XP for sergeant, not the skill
-    expect(rankFor(250, 5)).toBe(7);
-    expect(rankFor(1_000_000, 1)).toBe(6); // XP alone stops at corporal g2
-    expect(rankFor(50000, 50)).toBe(34);
+  it('is reached on XP alone', () => {
+    expect(rankFor(0)).toBe(0);
+    expect(rankFor(249)).toBe(6);
+    expect(rankFor(250)).toBe(7);
+    expect(rankFor(50000)).toBe(34);
+    expect(rankFor(1e9)).toBe(34);
   });
 
   it('draws an insignia for every rank', () => {
@@ -28,33 +26,33 @@ describe('rank ladder', () => {
   });
 });
 
-describe('xp and skill', () => {
-  it('gives nothing for instant crashes, then 1 + 1 per 400 points', () => {
-    expect(xpFor(100)).toBe(0);
-    expect(xpFor(2000)).toBe(6);
-    expect(xpFor(30000)).toBe(76);
+describe('xp', () => {
+  it('gives nothing for instant crashes, and ranked pays the most', () => {
+    expect(xpFor(100, true)).toBe(0);
+    expect(xpFor(2000, true)).toBe(1 + Math.floor(2000 / CONFIG.rank.rankedPointsPerXp));
+    expect(xpFor(8000, true)).toBeGreaterThan(xpFor(8000, false));
+    expect(xpFor(8000, false)).toBeGreaterThan(0);
   });
 
-  it('takes well over a thousand good runs to reach general grade 4', () => {
-    const runs = 50000 / xpFor(12000); // a strong run on a weekly level
-    expect(runs).toBeGreaterThan(1300);
-    expect(runs).toBeLessThan(2000);
+  it('comes from every mode, doubled for the day\'s first three runs', () => {
+    const r = new Ranked();
+    const day = Date.UTC(2026, 9, 5, 12);
+    const xp = xpFor(6000, false);
+    for (let i = 0; i < 3; i++) expect(r.record('solo', 6000, 5, 1, day).xp).toBe(2 * xp);
+    expect(r.record('endless', 6000, 5, 1, day).xp).toBe(xp);
+    expect(r.history.length).toBe(0); // only ranked runs are kept in the history
+    r.record('ranked', 6000, 5, 1, day, '2026-10-05');
+    expect(r.history.length).toBe(1);
   });
 
-  it('moves skill against par (a share of the week\'s score target)', () => {
-    expect(par(1, 10000)).toBe(3500);
-    expect(par(50, 10000)).toBe(12000);
-    expect(par(10, 20000)).toBe(2 * par(10, 10000));
-    expect(skillDelta(par(10), 10)).toBe(1);
-    expect(skillDelta(par(10) * 1.5, 10)).toBe(2);
-    expect(skillDelta(par(10) * 0.7, 10)).toBe(0);
-    expect(skillDelta(par(10) * 0.4, 10)).toBe(-1);
-    expect(skillDelta(0, 1)).toBe(0); // never below 1
-    expect(skillDelta(1e9, 50)).toBe(0); // never above 50
+  it('pays promotions when goals add XP', () => {
+    const r = new Ranked();
+    const p = r.addXp(RANKS[3].xp);
+    expect(p).toMatchObject({ rankBefore: 0, rankAfter: 3 });
+    expect(p.credits).toBeGreaterThan(0);
   });
 
-  it('pays solo half the credits of ranked', () => {
-    expect(creditsFor(5000, true)).toBe(50);
-    expect(creditsFor(5000, false)).toBe(25);
+  it('pays ranked more credits per point than solo', () => {
+    expect(creditsFor(5000, true)).toBeGreaterThan(creditsFor(5000, false));
   });
 });

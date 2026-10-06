@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { migrateMissionLooks } from '../src/legacy';
+import { migrateMissionLooks, migrateTickets } from '../src/legacy';
 import { byKey, Looks, type Owner } from '../src/looks';
 
 // Missions are gone. A save that had unlocked hulls and flames with them keeps
@@ -61,5 +61,21 @@ describe('missions carried over', () => {
     l.equip('hull', 'dart');
     await migrateMissionLooks(l);
     expect(l.equipped.hull).toBe('dart');
+  });
+});
+
+describe('tickets paid back', () => {
+  it('pays 30 cores for each ticket beyond the week, once', async () => {
+    data.set('endless.tickets', JSON.stringify({ count: 8, week: '2026-10-05' }));
+    let got = 0;
+    expect(await migrateTickets((n) => (got += n))).toBe(90);
+    expect(await migrateTickets((n) => (got += n))).toBe(0);
+    expect(got).toBe(90);
+  });
+
+  it('pays nothing for the week\'s own tickets or a new save', async () => {
+    expect(await migrateTickets(() => {})).toBe(0);
+    data.set('endless.tickets', JSON.stringify({ count: 3 }));
+    expect(await migrateTickets(() => {})).toBe(0);
   });
 });

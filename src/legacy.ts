@@ -1,3 +1,4 @@
+import { CONFIG } from './config';
 import type { Looks } from './looks';
 import { storage } from './storage';
 
@@ -26,5 +27,28 @@ export async function migrateMissionLooks(looks: Looks): Promise<void> {
     if (s.trail && s.trail !== 'none' && looks.equipped.trail === 'none' && looks.has(`trail:${s.trail}`)) looks.equip('trail', s.trail);
   } catch {
     // Corrupt value: nothing to carry over.
+  }
+}
+
+// Ranked used to take a ticket a try (5 a week, more from rewards or for cores).
+// It's unlimited now; tickets beyond the week's 5 are paid back in cores, once.
+
+const TICKETS_KEY = 'endless.tickets';
+const TICKETS_DONE_KEY = 'endless.legacy.tickets';
+const OLD_WEEKLY_TICKETS = 5;
+
+/** Pays spare tickets back as cores; returns how many cores (0 if none). */
+export async function migrateTickets(addCores: (n: number) => void): Promise<number> {
+  if ((await storage.get(TICKETS_DONE_KEY)) !== null) return 0;
+  const raw = await storage.get(TICKETS_KEY);
+  if (!raw) return 0;
+  await storage.set(TICKETS_DONE_KEY, '1');
+  try {
+    const spare = Math.max(0, Math.floor((JSON.parse(raw) as { count?: number }).count ?? 0) - OLD_WEEKLY_TICKETS);
+    const cores = spare * CONFIG.economy.ticketCores;
+    if (cores > 0) addCores(cores);
+    return cores;
+  } catch {
+    return 0;
   }
 }

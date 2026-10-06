@@ -1,17 +1,12 @@
+import { CONFIG } from './config';
 import { storage } from './storage';
 
-// Ranked progression, modelled on Halo 3's multiplayer ranks: two numbers,
-// and a rank needs both.
+// Rank: your lifetime level, a ladder of military ranks earned with XP from
+// every run (ranked pays the most) and every goal finished. It never goes
+// down. How good you are in ranked is the league's job (leagues.ts).
 //
-//   XP     - earned by every ranked run (and the daily run). Never goes down.
-//   skill  - 1..50. Each run is compared with the par score for your current
-//            skill: beat it to go up, fall well short to go down. Ranked is a
-//            weekly level with a finish, so par is a share of that week's
-//            score target: 35% of it at skill 1, 120% at skill 50.
-//
-// Rank uses the HIGHEST skill you've ever reached, so it never drops; your
-// current skill still moves. Reaching General Grade 4 takes ~50,000 XP
-// (roughly 1,200 good runs) and skill 50 (consistent 40,000+ point runs).
+// Older saves also had a skill number that a rank needed as well as XP; it's
+// gone, so a rank is now reached on XP alone and nobody drops.
 //
 // Pure maths up top (tested in tests/ranks.test.ts); the saved state below.
 
@@ -19,52 +14,50 @@ export interface Rank {
   name: string;
   grade: number; // 1..4 (1 = no grade shown)
   xp: number;
-  skill: number; // highest skill needed
   tier: number; // insignia family index, see insignia()
 }
 
-const r = (name: string, grade: number, xp: number, skill: number, tier: number): Rank => ({ name, grade, xp, skill, tier });
+const r = (name: string, grade: number, xp: number, tier: number): Rank => ({ name, grade, xp, tier });
 
 /** The full ladder, lowest first. */
 export const RANKS: readonly Rank[] = [
-  r('recruit', 1, 0, 0, 0),
-  r('apprentice', 1, 10, 0, 1),
-  r('apprentice', 2, 25, 0, 1),
-  r('private', 1, 50, 0, 2),
-  r('private', 2, 80, 0, 2),
-  r('corporal', 1, 120, 0, 3),
-  r('corporal', 2, 175, 0, 3),
-  r('sergeant', 1, 250, 5, 4),
-  r('sergeant', 2, 350, 7, 4),
-  r('sergeant', 3, 450, 9, 4),
-  r('gunnery sergeant', 1, 600, 11, 5),
-  r('gunnery sergeant', 2, 800, 13, 5),
-  r('gunnery sergeant', 3, 1000, 15, 5),
-  r('lieutenant', 1, 1300, 17, 6),
-  r('lieutenant', 2, 1650, 19, 6),
-  r('lieutenant', 3, 2000, 21, 6),
-  r('captain', 1, 2500, 23, 7),
-  r('captain', 2, 3100, 25, 7),
-  r('captain', 3, 3750, 27, 7),
-  r('major', 1, 4500, 29, 8),
-  r('major', 2, 5400, 31, 8),
-  r('major', 3, 6400, 33, 8),
-  r('commander', 1, 7500, 35, 9),
-  r('commander', 2, 9000, 36, 9),
-  r('commander', 3, 10500, 37, 9),
-  r('colonel', 1, 12500, 39, 10),
-  r('colonel', 2, 15000, 40, 10),
-  r('colonel', 3, 17500, 41, 10),
-  r('brigadier', 1, 20000, 43, 11),
-  r('brigadier', 2, 24000, 44, 11),
-  r('brigadier', 3, 28000, 45, 11),
-  r('general', 1, 33000, 47, 12),
-  r('general', 2, 38000, 48, 12),
-  r('general', 3, 44000, 49, 12),
-  r('general', 4, 50000, 50, 12),
+  r('recruit', 1, 0, 0),
+  r('apprentice', 1, 10, 1),
+  r('apprentice', 2, 25, 1),
+  r('private', 1, 50, 2),
+  r('private', 2, 80, 2),
+  r('corporal', 1, 120, 3),
+  r('corporal', 2, 175, 3),
+  r('sergeant', 1, 250, 4),
+  r('sergeant', 2, 350, 4),
+  r('sergeant', 3, 450, 4),
+  r('gunnery sergeant', 1, 600, 5),
+  r('gunnery sergeant', 2, 800, 5),
+  r('gunnery sergeant', 3, 1000, 5),
+  r('lieutenant', 1, 1300, 6),
+  r('lieutenant', 2, 1650, 6),
+  r('lieutenant', 3, 2000, 6),
+  r('captain', 1, 2500, 7),
+  r('captain', 2, 3100, 7),
+  r('captain', 3, 3750, 7),
+  r('major', 1, 4500, 8),
+  r('major', 2, 5400, 8),
+  r('major', 3, 6400, 8),
+  r('commander', 1, 7500, 9),
+  r('commander', 2, 9000, 9),
+  r('commander', 3, 10500, 9),
+  r('colonel', 1, 12500, 10),
+  r('colonel', 2, 15000, 10),
+  r('colonel', 3, 17500, 10),
+  r('brigadier', 1, 20000, 11),
+  r('brigadier', 2, 24000, 11),
+  r('brigadier', 3, 28000, 11),
+  r('general', 1, 33000, 12),
+  r('general', 2, 38000, 12),
+  r('general', 3, 44000, 12),
+  r('general', 4, 50000, 12),
 ];
 
-const MAX_SKILL = 50;
 const DAILY_BONUS_RUNS = 3; // first runs each day earn double XP
 const MIN_SCORE_FOR_XP = 500; // a run that crashes straight away earns nothing
 
@@ -73,38 +66,24 @@ export function rankName(i: number): string {
   return rk.grade > 1 ? `${rk.name} g${rk.grade}` : rk.name;
 }
 
-/** Highest rank index the player qualifies for. */
-export function rankFor(xp: number, highestSkill: number): number {
+/** The rank reached with `xp`. */
+export function rankFor(xp: number): number {
   let best = 0;
-  for (let i = 0; i < RANKS.length; i++) if (xp >= RANKS[i].xp && highestSkill >= RANKS[i].skill) best = i;
+  for (let i = 0; i < RANKS.length; i++) if (xp >= RANKS[i].xp) best = i;
   return best;
 }
 
-/** A typical weekly level's score target (for when there isn't one to hand). */
-const DEFAULT_TARGET = 10000;
-
-/** Par score at a skill level for a course with score target `target`: beat it to climb. */
-export function par(skill: number, target = DEFAULT_TARGET): number {
-  return Math.round(target * (0.35 + (0.85 * (skill - 1)) / 49));
+/** XP for one run, before any daily double: ranked pays the most. */
+export function xpFor(score: number, ranked: boolean): number {
+  if (score < MIN_SCORE_FOR_XP) return 0;
+  const R = CONFIG.rank;
+  return ranked ? 1 + Math.floor(score / R.rankedPointsPerXp) : Math.floor(score / R.pointsPerXp);
 }
 
-/** XP for one run, before any daily double. */
-export function xpFor(score: number): number {
-  return score < MIN_SCORE_FOR_XP ? 0 : 1 + Math.floor(score / 400);
-}
-
-/** Skill change for one run at `skill` on a course with score target `target`. */
-export function skillDelta(score: number, skill: number, target = DEFAULT_TARGET): number {
-  const p = par(skill, target);
-  if (score >= p * 1.5) return Math.min(2, MAX_SKILL - skill);
-  if (score >= p) return Math.min(1, MAX_SKILL - skill);
-  if (score < p * 0.5 && skill > 1) return -1;
-  return 0;
-}
-
-/** Credits for a run: ranked earns 1 per 100 points, solo and endless half that. */
+/** Credits for a run: ranked pays more per point than solo and endless. */
 export function creditsFor(score: number, ranked: boolean): number {
-  return Math.floor(score / (ranked ? 100 : 200));
+  const C = CONFIG.economy.runCredits;
+  return Math.floor(score / (ranked ? C.rankedPointsPerCredit : C.pointsPerCredit));
 }
 
 /** XP still needed for rank `i` (0 once there). */
@@ -121,7 +100,7 @@ export function promotionBonus(i: number): number {
 
 export type RunMode = 'ranked' | 'solo' | 'endless';
 
-/** One ranked run, kept for the service record and future leaderboards. */
+/** One ranked run, kept for the service record. */
 export interface RunRecord {
   mode: RunMode | 'daily'; // older saves have daily runs
   week?: string; // the weekly level it was on
@@ -130,14 +109,11 @@ export interface RunRecord {
   seed: number;
   at: number; // ms since epoch
   xp: number;
-  skill?: number; // skill after the run (older saves don't have it)
 }
 
-export interface RankedResult {
+export interface RankResult {
   xp: number;
   doubled: boolean;
-  skillBefore: number;
-  skillAfter: number;
   rankBefore: number;
   rankAfter: number;
   credits: number; // promotion bonus only (run credits are added by the caller)
@@ -145,8 +121,6 @@ export interface RankedResult {
 
 interface Saved {
   xp: number;
-  skill: number;
-  highestSkill: number;
   day: { date: string; runs: number };
   history: RunRecord[];
 }
@@ -161,8 +135,7 @@ function utcDate(ms: number): string {
 
 export class Ranked {
   xp = 0;
-  skill = 1;
-  highestSkill = 1;
+  /** Ranked runs (the service record's history and bests). */
   history: RunRecord[] = [];
   private day = { date: '', runs: 0 };
 
@@ -172,8 +145,6 @@ export class Ranked {
     try {
       const s = JSON.parse(raw) as Partial<Saved>;
       this.xp = s.xp ?? 0;
-      this.skill = s.skill ?? 1;
-      this.highestSkill = Math.max(this.skill, s.highestSkill ?? 1);
       this.day = s.day ?? this.day;
       this.history = s.history ?? [];
     } catch {
@@ -182,12 +153,12 @@ export class Ranked {
   }
 
   save(): void {
-    const s: Saved = { xp: this.xp, skill: this.skill, highestSkill: this.highestSkill, day: this.day, history: this.history };
+    const s: Saved = { xp: this.xp, day: this.day, history: this.history };
     void storage.set(KEY, JSON.stringify(s));
   }
 
   get rank(): number {
-    return rankFor(this.xp, this.highestSkill);
+    return rankFor(this.xp);
   }
 
   /** Double-XP runs left today. */
@@ -195,26 +166,30 @@ export class Ranked {
     return this.day.date === utcDate(now) ? Math.max(0, DAILY_BONUS_RUNS - this.day.runs) : DAILY_BONUS_RUNS;
   }
 
-  /** Fold a finished ranked or daily run in. */
-  record(mode: RunMode, score: number, level: number, seed: number, now = Date.now(), target = DEFAULT_TARGET, week?: string): RankedResult {
-    const rankBefore = this.rank;
-    const skillBefore = this.skill;
+  /** Fold a finished run in (any mode): XP, doubled for the day's first few. */
+  record(mode: RunMode, score: number, level: number, seed: number, now = Date.now(), week?: string): RankResult {
     const today = utcDate(now);
     if (this.day.date !== today) this.day = { date: today, runs: 0 };
-    let xp = xpFor(score);
+    let xp = xpFor(score, mode === 'ranked');
     const doubled = xp > 0 && this.day.runs < DAILY_BONUS_RUNS;
     if (doubled) xp *= 2;
     if (xp > 0) this.day.runs++;
-    this.xp += xp;
-    this.skill = Math.max(1, Math.min(MAX_SKILL, this.skill + skillDelta(score, this.skill, target)));
-    this.highestSkill = Math.max(this.highestSkill, this.skill);
+    if (mode === 'ranked') {
+      this.history.push({ mode, score: Math.floor(score), level, seed, at: now, xp, week });
+      if (this.history.length > HISTORY) this.history.splice(0, this.history.length - HISTORY);
+    }
+    return { ...this.addXp(xp), xp, doubled };
+  }
+
+  /** Add XP from anywhere (a run, a goal); returns the promotions it made. */
+  addXp(xp: number): { rankBefore: number; rankAfter: number; credits: number } {
+    const rankBefore = this.rank;
+    this.xp += Math.max(0, Math.floor(xp));
     const rankAfter = this.rank;
     let credits = 0;
     for (let i = rankBefore + 1; i <= rankAfter; i++) credits += promotionBonus(i);
-    this.history.push({ mode, score: Math.floor(score), level, seed, at: now, xp, week, skill: this.skill });
-    if (this.history.length > HISTORY) this.history.splice(0, this.history.length - HISTORY);
     this.save();
-    return { xp, doubled, skillBefore, skillAfter: this.skill, rankBefore, rankAfter, credits };
+    return { rankBefore, rankAfter, credits };
   }
 
   /** Best ranked score today, in the last 7 days, and ever (from the kept history). */

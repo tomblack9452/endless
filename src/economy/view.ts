@@ -1,7 +1,7 @@
 import { formatScore } from '../ui';
 
 // The economy's screens: the wallet bar on the title, the shop, the season
-// pass, the daily screen, the offer dialog (revive, a ticket for cores) and
+// pass, the daily screen, the offer dialog (revive) and
 // the 3-2-1 countdown. Game wires the taps; this only draws.
 
 function $(id: string): HTMLElement {
@@ -46,7 +46,6 @@ export interface ShopView {
   offers: ShopOfferView[];
   /** The one buy button, for the picked look. */
   buy: { text: string; enabled: boolean };
-  tickets: { label: string; button: string; enabled: boolean };
   cores: { label: string; button: string; enabled: boolean }[];
 }
 
@@ -113,11 +112,9 @@ export class EconomyView {
 
   // --- title ---
 
-  setBar(credits: number, cores: number, tickets: number, wait: string): void {
+  setBar(credits: number, cores: number): void {
     $('bar-credits').textContent = formatScore(credits);
     $('bar-cores').textContent = formatScore(cores);
-    $('bar-tickets').textContent = String(tickets);
-    $('bar-ticket-wait').textContent = wait;
   }
 
   /** A dot on a title chip: something there to claim or see. */
@@ -126,7 +123,7 @@ export class EconomyView {
   }
 
   /** A counter in the bar bumps when something lands in it. */
-  bump(which: 'credits' | 'cores' | 'tickets'): void {
+  bump(which: 'credits' | 'cores'): void {
     const c = $(`bar-${which}`).parentElement!;
     c.classList.remove('bump');
     void c.offsetWidth; // restart the animation
@@ -135,7 +132,7 @@ export class EconomyView {
 
   // --- shop ---
 
-  bindShop(onOffer: (i: number) => void, onBuy: () => void, onTicket: () => void, onCores: (i: number) => void, onTab: (id: string) => void): void {
+  bindShop(onOffer: (i: number) => void, onBuy: () => void, onCores: (i: number) => void, onTab: (id: string) => void): void {
     $('shop-tabs').addEventListener('click', (e) => {
       const tab = (e.target as HTMLElement).closest<HTMLElement>('[data-shoptab]');
       if (tab) onTab(tab.dataset.shoptab ?? '');
@@ -145,9 +142,6 @@ export class EconomyView {
       if (card) onOffer(Number(card.dataset.offer));
     });
     $('shop-buy').addEventListener('click', onBuy);
-    $('shop-tickets').addEventListener('click', (e) => {
-      if ((e.target as HTMLElement).closest('button')) onTicket();
-    });
     $('shop-cores').addEventListener('click', (e) => {
       const b = (e.target as HTMLElement).closest<HTMLElement>('[data-pack]');
       if (b) onCores(Number(b.dataset.pack));
@@ -195,7 +189,6 @@ export class EconomyView {
       row.append(text, b);
       return row;
     };
-    $('shop-tickets').replaceChildren(action(v.tickets.label, v.tickets.button, v.tickets.enabled));
     $('shop-cores').replaceChildren(...v.cores.map((c, i) => action(c.label, c.button, c.enabled, ['pack', String(i)])));
   }
 

@@ -4,7 +4,6 @@ import { CONFIG } from '../src/config';
 import { Daily, questsFor } from '../src/economy/daily';
 import { freeReward, Pass, premiumReward, seasonAt } from '../src/economy/pass';
 import { shopFor } from '../src/economy/shop';
-import { Tickets } from '../src/economy/tickets';
 import { dayBefore, dayKey } from '../src/economy/time';
 import { find, LOOKS } from '../src/looks';
 import { LivePalette } from '../src/palette';
@@ -12,29 +11,6 @@ import { World } from '../src/world';
 
 const HOUR = 3_600_000;
 const T0 = Date.UTC(2026, 9, 5, 9); // a Monday morning
-
-describe('ranked tickets', () => {
-  const week = CONFIG.economy.tickets.perWeek;
-
-  it('give a set each week, all the same week, and a fresh set on Monday', async () => {
-    const t = new Tickets();
-    await t.load(T0);
-    expect(t.count).toBe(week);
-    for (let i = 0; i < week; i++) expect(t.use(T0 + i * HOUR)).toBe(true);
-    expect(t.use(T0 + 3 * 24 * HOUR)).toBe(false); // still the same week: none come back
-    expect(t.nextIn(T0)).toBe(7 * 24 * HOUR - 9 * HOUR);
-    t.refill(T0 + 7 * 24 * HOUR);
-    expect(t.count).toBe(week);
-  });
-
-  it('keep extra tickets into the next week', async () => {
-    const t = new Tickets();
-    await t.load(T0);
-    t.add(3);
-    t.refill(T0 + 7 * 24 * HOUR);
-    expect(t.count).toBe(week + 3);
-  });
-});
 
 describe('daily', () => {
   it('quests are the same for everyone on a day, different types, and change day to day', () => {
@@ -151,5 +127,22 @@ describe('revive', () => {
         expect(world.hitTest(prev) || world.overPit(), `seed ${seed}`).toBe(false);
       }
     }
+  });
+});
+
+describe('pass saves from before tiers took 600 xp', () => {
+  it('keep their tier', async () => {
+    const store = new Map<string, string>([['endless.pass', JSON.stringify({ season: seasonAt(T0).season, xp: 1300, premium: false, paidFree: 10, paidPremium: 0 })]]);
+    (globalThis as { localStorage?: unknown }).localStorage = {
+      getItem: (k: string) => store.get(k) ?? null,
+      setItem: (k: string, v: string) => void store.set(k, v),
+      key: () => null,
+      length: 0,
+    };
+    const p = new Pass();
+    await p.load(T0);
+    expect(p.tier).toBe(10);
+    expect(p.addXp(T0, 0)).toEqual([]); // nothing paid twice
+    delete (globalThis as { localStorage?: unknown }).localStorage;
   });
 });
