@@ -13,6 +13,15 @@ import { World } from '../src/world';
 const HOUR = 3_600_000;
 const T0 = Date.UTC(2026, 9, 5, 9); // a Monday morning
 
+describe('cores to credits', () => {
+  it('swaps whole cores at the shop rate, from small to large', () => {
+    const S = CONFIG.economy.shop;
+    expect(S.swaps.length).toBeGreaterThan(0);
+    for (const n of S.swaps) expect(Number.isInteger(n * S.creditsPerCore) && n > 0).toBe(true);
+    expect([...S.swaps].sort((a, b) => a - b)).toEqual([...S.swaps]);
+  });
+});
+
 describe('daily', () => {
   it('words ranked goals as any run until ranked opens', () => {
     const q = { type: 'ranked' as const, target: 2, progress: 0, credits: 100, done: false };

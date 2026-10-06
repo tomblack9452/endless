@@ -650,7 +650,7 @@ export const CONFIG = {
     // Five a week (Monday, UTC), the same for everyone, harder and spanning many runs.
     weekly: { count: 5, credits: 150, passXp: 400, allDoneCores: 15 },
     // The shop: looks a day, the weekly set's bundle discount, and how many credits a core is worth when a bundle mixes them.
-    shop: { slots: 4, setDiscount: 0.8, creditsPerCore: 25 },
+    shop: { slots: 4, setDiscount: 0.8, creditsPerCore: 25, swaps: [100, 500] }, // swaps: cores to credits, in the cores tab
     pass: { weeks: 6, tiers: 30, xpPerTier: 600, premiumCores: 550, runXpPer: 500, runXpMax: 30 },
     // Real-money products (src/store): create these ids in App Store Connect,
     // Google Play and RevenueCat. Prices are set in the stores. Bonus sizes:

@@ -519,7 +519,8 @@ turn over at midnight UTC, the same moment for everyone.
 
 - **Cores** are the premium currency. They come slowly from play (login
   rewards, quests, the season pass) and, in the apps, from the store. They buy
-  premium looks, revives and the pass's premium track. Ranked used to take a
+  premium looks, revives and the pass's premium track, and swap for credits
+  in the shop's cores tab (1 core for 25 credits). Ranked used to take a
   ticket a try; it's unlimited now, and older saves were paid 30 cores for each
   ticket they had beyond the week's 5.
 - **Revive:** outside ranked, once a run, a crash offers to carry on (with a
@@ -537,12 +538,12 @@ turn over at midnight UTC, the same moment for everyone.
 - **Rewarded ads** (the apps only; free for premium players): a revive once
   the free ones are used, doubling a run's credits from the end screen, a free
   daily gift card on the title screen (150 credits and 2 cores), and swapping
-  one daily goal a day for another.
+  one daily goal a day for another (free on the web, where there are no ads).
 - **Shop:** a showroom, with the camera circling your ship above a sheet of
   cards. Tap a card to put the look on the ship, then buy it with the button
   under the cards (tap an owned one to wear it). Six tabs: three of looks, the
   same for everyone and turning over on the UTC clock, then **season pass** (its
-  premium track for cores or money), **cores** (the packs and the starter pack)
+  premium track for cores or money), **cores** (the packs, the starter pack and swapping cores for credits)
   and **premium**. Tapping cores in the top bar opens the cores tab.
   - **today:** four looks a day, at least one premium, one a deal at a quarter
     off. Looks you don't own come first, and the day's picks are kept for the

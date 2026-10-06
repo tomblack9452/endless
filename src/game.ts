@@ -163,7 +163,7 @@ export class Game {
   private storeProducts: StoreProduct[] = [];
   /** Shop rows for real-money products, in the order shown ('dev' adds cores in the dev build). */
   private deleteArmed = false;
-  private shopPacks: (ProductId | 'dev' | 'restore' | 'pass-cores' | 'pass-open' | 'dev-premium')[] = [];
+  private shopPacks: (ProductId | 'dev' | 'restore' | 'pass-cores' | 'pass-open' | 'dev-premium' | `swap-${number}`)[] = [];
   /** One-time products already bought. */
   private readonly entitlements = new Entitlements();
   private firstPlayed = Date.now();
@@ -783,7 +783,7 @@ export class Game {
       { id: 'vault', label: 'vault' },
       { id: 'pass', label: 'season pass' },
     ];
-    if (this.store.available || import.meta.env.DEV) tabs.push({ id: 'cores', label: 'cores' });
+    tabs.push({ id: 'cores', label: 'cores' });
     if (this.storeProducts.some((p) => p.id === 'premium') || import.meta.env.DEV || this.entitlements.has('premium')) tabs.push({ id: 'premium', label: 'premium' });
     return tabs;
   }
@@ -834,8 +834,13 @@ export class Game {
     }
     if (this.store.available) row('bought on another device?', 'restore', true, 'restore');
     if (import.meta.env.DEV) row('dev: add cores (purchases stand-in)', '+500', true, 'dev');
-    if (rows.length === 0) rows.push({ label: 'packs of cores come with the iOS and Android apps', button: 'soon', enabled: false });
-    return { head: 'cores', note: 'cores buy premium looks, the vault, revives and the pass. never upgrades.', rows };
+    if (rows.length === 0) {
+      rows.push({ label: 'packs of cores come with the iOS and Android apps', button: 'soon', enabled: false });
+      this.shopPacks.push('restore');
+    }
+    const S = CONFIG.economy.shop;
+    for (const n of S.swaps) row(`swap ${formatScore(n)} cores for ${formatScore(n * S.creditsPerCore)} credits`, `${formatScore(n)} cores`, this.wallet.cores >= n, `swap-${n}`);
+    return { head: 'cores', note: 'cores buy premium looks, the vault, revives and the pass, or swap for credits.', rows };
   }
 
   /** Tap a look: it goes on the ship to try (owned ones are just put on). Tap again to take it off. */
@@ -917,8 +922,22 @@ export class Game {
       this.openShop('pass'); // stay in the shop
     } else if (pack === 'pass-open') this.openPass();
     else if (pack === 'restore') void this.restorePurchases();
-    else if (pack) void this.buyProduct(pack);
+    else if (pack?.startsWith('swap-')) this.swapCores(Number(pack.slice(5)));
+    else if (pack) void this.buyProduct(pack as ProductId);
   };
+
+  /** Cores into credits, at the shop's rate. */
+  private swapCores(n: number): void {
+    if (!this.wallet.spendCores(n, 'swap')) {
+      this.ui.showNotice('not enough cores');
+      return;
+    }
+    const lines = this.grant({ credits: n * CONFIG.economy.shop.creditsPerCore });
+    this.ui.showNotice(lines.join(' · '));
+    this.sound.pickup();
+    this.refreshTitle();
+    this.openShop('cores');
+  }
 
   private openPass(): void {
     const now = Date.now();
@@ -2222,6 +2241,18 @@ export class Game {
       ['pickups', formatScore(s.pickups)],
       ['crash most in', worst ? `${worst} (${s.crashes[worst]})` : '-'],
     ]);
+  }
+
+  /** The Android back button: close what's open, pause a run; false on the title screen (leave the app). */
+  back(): boolean {
+    if (this.settingsOpen) this.closeSettings();
+    else if (this.infoOpen === 'welcome') return false;
+    else if (this.infoOpen) this.closeInfo();
+    else if (this.state === 'playing' || this.state === 'countdown') this.pause();
+    else if (this.state === 'paused') this.resume();
+    else if (this.state === 'crashed' || this.state === 'finished') this.toMainMenu();
+    else return false;
+    return true;
   }
 
   private pause(): void {
