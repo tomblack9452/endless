@@ -1255,12 +1255,6 @@ body {
   border-color: var(--text);
 }
 
-.tabs-credits {
-  margin-left: auto;
-  white-space: nowrap;
-  font-size: calc(11px * var(--ui-scale));
-}
-
 .settings.tabbed {
   top: calc(var(--safe-top) + 138px);
 }

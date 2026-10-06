@@ -134,7 +134,7 @@ function harmonyHues(t: SeasonTheme): [number, number, number] {
   return [h, h + 120, h + 240];
 }
 
-export type SeasonOverride = { name?: string; colors?: [string, string]; veto?: boolean };
+type SeasonOverride = { name?: string; colors?: [string, string]; veto?: boolean };
 
 /**
  * One season's looks. `base` is the hand-made catalogue (colours keep clear of

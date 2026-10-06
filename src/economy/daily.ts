@@ -77,7 +77,7 @@ export function questText(q: Quest): string {
   }
 }
 
-export function amount(q: QuestType, r: QuestRun): number {
+function amount(q: QuestType, r: QuestRun): number {
   switch (q) {
     case 'runs':
       return 1;
