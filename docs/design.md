@@ -258,10 +258,10 @@ Each change comes with its reason and what it costs existing saves.
 | Core packs | consumable | 100 / 550 / 1,200 / 2,500 cores | £0.99 / £4.99 / £9.99 / £19.99 | Exist. A first purchase of any pack pays double (genre norm) |
 | Starter pack | non-consumable, once | 500 cores + the nova hull (+ whatever replaces tickets) | £2.99 | Exists; shown for the first 7 days, then in the shop |
 | Season pass | per season | Premium track | £4.99, or 550 cores (one pack) | Today it's 950 cores (about £8 in packs) vs £4.99: make them match |
-| Credit packs | | | not sold | They would buy upgrades, which buy leagues: power for money |
+| Credit packs | | | not sold; cores swap for credits instead (1 core = 25 credits) | Decided at launch: one store currency, credits through cores |
 
 Cores buy looks, the vault, revives (after the free ones), the pass, and shop
-bundles. Never upgrades.
+bundles, and swap for credits in the cores tab.
 
 ### Ads
 

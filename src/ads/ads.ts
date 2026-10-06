@@ -115,20 +115,20 @@ export class Ads {
     private readonly firstPlayed: () => number,
   ) {}
 
-  /** Can this reward be offered (an ad to watch, or free for premium)? */
+  /** Can this reward be offered (an ad to watch, or free for premium)? Swapping a goal is free where there are no ads. */
   offers(p: RewardedPlacement): boolean {
-    return CONFIG.ads.rewarded[p] && (this.premium() || this.network.available);
+    return CONFIG.ads.rewarded[p] && (this.premium() || this.network.available || p === 'rerollQuest');
   }
 
   /** What the offer's button says. */
   label(): string {
-    return this.premium() ? 'free with premium' : 'watch an ad';
+    return this.premium() ? 'free with premium' : this.network.available ? 'watch an ad' : 'free';
   }
 
-  /** Earn the reward: premium at once, everyone else by watching to the end. */
+  /** Earn the reward: premium (or no ad network) at once, everyone else by watching to the end. */
   async reward(p: RewardedPlacement): Promise<boolean> {
     if (!this.offers(p)) return false;
-    if (this.premium()) return true;
+    if (this.premium() || !this.network.available) return true;
     return (await this.network.rewarded(p)) === 'rewarded';
   }
 

@@ -782,6 +782,7 @@ body {
   display: flex;
   flex-direction: column;
   padding: 0;
+  overflow-y: auto; /* a short, wide window scrolls rather than cutting off the menu */
 }
 
 .title-top {
@@ -1096,8 +1097,9 @@ body {
   min-height: 54px;
   padding: 6px 2px 2px;
   font: inherit;
-  font-size: calc(10px * var(--ui-scale));
-  letter-spacing: 0.08em;
+  min-width: 0;
+  font-size: min(calc(10px * var(--ui-scale)), 2.6vw); /* the five labels fit a narrow phone at any text size */
+  letter-spacing: 0.04em;
   line-height: 1.2;
   text-align: center;
   color: inherit;
@@ -2475,7 +2477,8 @@ body {
   margin-top: 8px;
 }
 
-.name-edit input {
+.name-edit input,
+.name-input {
   flex: 1;
   min-width: 0;
   font: inherit;
@@ -2488,7 +2491,8 @@ body {
   border-radius: 999px;
 }
 
-.name-edit input:focus {
+.name-edit input:focus,
+.name-input:focus {
   outline: none;
   border-color: currentColor;
 }
@@ -2805,4 +2809,16 @@ body {
   border: none;
   text-decoration: underline;
   cursor: pointer;
+}
+
+.name-input {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  margin-top: 8px;
+}
+
+a.setting-row {
+  color: inherit;
+  text-decoration: none;
 }

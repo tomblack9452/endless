@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { LOOKS } from '../src/catalogue';
-import { LESSONS, lessonText, Onboarding, STARTER } from '../src/onboarding';
+import { LESSON_SECONDS, LESSONS, lessonText, Onboarding, STARTER } from '../src/onboarding';
 import { byKey } from '../src/looks';
 
 const data = new Map<string, string>();
@@ -50,5 +50,12 @@ describe('onboarding', () => {
     }
     for (const k of [...STARTER.paint, ...STARTER.engine]) expect(byKey(k)!.unlock.by).toBe('free');
     expect(LOOKS.length).toBeGreaterThan(150);
+  });
+
+  it('words the lessons for a keyboard, and for boost without double-tap', () => {
+    expect(lessonText('steer', 'drag', { keys: true })).toMatch(/arrow keys/);
+    expect(lessonText('boost', 'drag', { keys: true })).toMatch(/space/);
+    expect(lessonText('boost', 'drag', { doubleTap: false })).not.toMatch(/double-tap/);
+    expect(LESSON_SECONDS).toBeGreaterThan(5);
   });
 });

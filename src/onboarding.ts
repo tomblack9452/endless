@@ -15,18 +15,23 @@ export type Lesson = 'steer' | 'nearMiss' | 'pickup' | 'boost';
 export const LESSONS: Lesson[] = ['steer', 'nearMiss', 'pickup', 'boost'];
 
 /** What a lesson asks, for the controls chosen. */
-export function lessonText(l: Lesson, controls: 'drag' | 'sides' | 'tilt'): string {
+export function lessonText(l: Lesson, controls: 'drag' | 'sides' | 'tilt', how: { keys?: boolean; doubleTap?: boolean } = {}): string {
+  const keys = how.keys ? ' (or the arrow keys)' : '';
   switch (l) {
     case 'steer':
-      return controls === 'tilt' ? 'tilt your phone to steer' : controls === 'sides' ? 'hold the left or right side to steer' : 'drag left and right to steer';
+      return (controls === 'tilt' ? 'tilt your phone to steer' : controls === 'sides' ? 'hold the left or right side to steer' : 'drag left and right to steer') + keys;
     case 'nearMiss':
       return 'fly close past a rock: a near miss scores extra';
     case 'pickup':
       return 'fly through a glowing pickup';
     case 'boost':
-      return 'double-tap and hold to boost';
+      if (how.keys) return 'hold space, or the boost button, to boost';
+      return how.doubleTap === false ? 'hold the boost button to boost' : 'hold the boost button, or double-tap and hold, to boost';
   }
 }
+
+/** A lesson that isn't done in this long moves on anyway (no one gets stuck in practice). */
+export const LESSON_SECONDS = 20;
 
 /** The starter set to dress the ship from: "slot:id" keys, three to a slot. */
 export const STARTER: Record<'hull' | 'paint' | 'engine', string[]> = {
@@ -57,4 +62,9 @@ export class Onboarding {
   get done(): boolean {
     return this.step === 'done';
   }
+}
+
+/** A touch screen (a phone or tablet), rather than a mouse and keyboard. */
+export function hasTouch(): boolean {
+  return typeof window !== 'undefined' && ('ontouchstart' in window || navigator.maxTouchPoints > 0);
 }

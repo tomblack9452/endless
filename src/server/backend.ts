@@ -76,6 +76,8 @@ export interface Backend {
   pilotName(): Promise<string | null>;
   /** Change it; says why not when the server turns it down. */
   setPilotName(name: string): Promise<{ ok: boolean; message: string }>;
+  /** Delete this account and everything the server holds for it; false if that couldn't be done. */
+  deleteAccount(): Promise<boolean>;
 }
 
 export function createBackend(): Backend {

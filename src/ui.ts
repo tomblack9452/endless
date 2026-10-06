@@ -351,6 +351,7 @@ export class UI {
     $('welcome-skip').addEventListener('click', on.skip);
     $('tutorial-skip').addEventListener('click', on.skip);
     $('welcome-done').addEventListener('click', on.done);
+    $('welcome-name').addEventListener('pointerdown', stop);
   }
 
   /** The welcome screen: choosing controls, or dressing the ship (chips: [key, label, on]). */
@@ -409,8 +410,13 @@ export class UI {
         return b;
       }),
     );
-    const input = $('board-name') as HTMLInputElement;
-    const save = $('board-name-save');
+    this.bindNameBox('board', onName);
+  }
+
+  /** A pilot name box ("board", "settings"): its save button and Enter both send the name. */
+  bindNameBox(box: string, onName: (name: string) => void): void {
+    const input = $(`${box}-name`) as HTMLInputElement;
+    const save = $(`${box}-name-save`);
     for (const el of [input, save]) el.addEventListener('pointerdown', (e) => e.stopPropagation());
     save.addEventListener('click', () => onName(input.value));
     input.addEventListener('keydown', (e) => {
@@ -465,11 +471,17 @@ export class UI {
     $('board-rows').replaceChildren(...out);
   }
 
-  /** The pilot name box: its current value and a line under it. */
-  setPilotName(name: string, note: string): void {
-    const input = $('board-name') as HTMLInputElement;
+  /** A pilot name box ("board", "settings", "welcome"): its current value and a line under it. */
+  setPilotName(name: string, note: string, box = 'board'): void {
+    const input = $(`${box}-name`) as HTMLInputElement;
     if (name && document.activeElement !== input) input.value = name;
-    $('board-name-note').textContent = note;
+    const n = document.getElementById(`${box}-name-note`);
+    if (n) n.textContent = note;
+  }
+
+  /** What's typed in a name box. */
+  nameTyped(box: string): string {
+    return ($(`${box}-name`) as HTMLInputElement).value.trim();
   }
 
   /** The league screen's weekly leaderboard. */

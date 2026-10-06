@@ -53,8 +53,11 @@ export interface QuestRun {
   beatPar?: boolean;
 }
 
-export function questText(q: Quest): string {
+/** What the goal asks, in words. `rankedOpen` false: the ranked goals take any run until ranked opens. */
+export function questText(q: Quest, rankedOpen = true): string {
   const t = q.target;
+  if (!rankedOpen && q.type === 'ranked') return `play ${t === 1 ? 'a run' : `${t} runs`} (any mode until ranked opens)`;
+  if (!rankedOpen && q.type === 'beatPar') return `beat the bronze par ${t === 1 ? 'in a run' : `in ${t} runs`} (any mode until ranked opens)`;
   switch (q.type) {
     case 'runs':
       return `play ${t} runs`;

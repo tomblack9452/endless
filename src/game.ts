@@ -20,7 +20,7 @@ import { Haptics } from './haptics';
 import { Hints } from './hints';
 import { migrateMissionLooks, migrateTickets } from './legacy';
 import { type Feature, isOpen, nextStageText, STAGES, stageFor } from './reveal';
-import { type Lesson, LESSONS, lessonText, Onboarding, PRACTICE_SEED, STARTER } from './onboarding';
+import { hasTouch, type Lesson, LESSONS, LESSON_SECONDS, lessonText, Onboarding, PRACTICE_SEED, STARTER } from './onboarding';
 import { Ads, createAdNetwork } from './ads/ads';
 import { entitlementFor, Entitlements } from './store/entitlements';
 import { Progress } from './progress';
@@ -162,13 +162,14 @@ export class Game {
   private readonly store = createStore();
   private storeProducts: StoreProduct[] = [];
   /** Shop rows for real-money products, in the order shown ('dev' adds cores in the dev build). */
-  private shopPacks: (ProductId | 'dev' | 'restore' | 'pass-cores' | 'pass-open' | 'dev-premium')[] = [];
+  private deleteArmed = false;
+  private shopPacks: (ProductId | 'dev' | 'restore' | 'pass-cores' | 'pass-open' | 'dev-premium' | `swap-${number}`)[] = [];
   /** One-time products already bought. */
   private readonly entitlements = new Entitlements();
   private firstPlayed = Date.now();
   private readonly onboarding = new Onboarding();
   /** The practice run in progress (onboarding): the lesson it's on and what's been seen. */
-  private practice: { lesson: number; steerT: number; nearMisses: number; pickups: number } | null = null;
+  private practice: { lesson: number; t: number; steerT: number; nearMisses: number; pickups: number } | null = null;
   /** The reveal stage last announced (null until read from storage). */
   private revealSeen: number | null = null;
   private readonly ads = new Ads(createAdNetwork(), () => this.entitlements.has('premium'), () => this.firstPlayed);
@@ -307,7 +308,7 @@ export class Game {
     this.ui.bindRecordTabs((tab) => this.ui.setRecordTab(tab));
     void storage.get(REVEAL_KEY).then((v) => (this.revealSeen = v === null ? -1 : Number(v) || 0));
     this.ui.titleRank.addEventListener('pointerdown', (e) => e.stopPropagation());
-    this.ui.titleRank.addEventListener('click', () => this.openRecord());
+    this.ui.titleRank.addEventListener('click', () => this.onTitleLink('record'));
     document.addEventListener('visibilitychange', () => {
       if (document.hidden) this.pause();
     });
@@ -316,6 +317,7 @@ export class Game {
     this.ui.bindCelebration();
     this.ui.bindTitleLinks(this.onTitleLink);
     this.ui.bindBoards(BOARD_TABS, (id) => void this.showBoard(id), (name) => void this.savePilotName(name));
+    this.ui.bindNameBox('settings', (name) => void this.savePilotName(name, 'settings'));
     window.addEventListener('online', () => void this.outbox.flush());
     const now = Date.now();
     // Looks load once; a login reward can give one, so it waits for them.
@@ -370,7 +372,7 @@ export class Game {
       reroll: (id) => void this.onReroll(id),
     });
     this.ui.titleLeague.addEventListener('pointerdown', (e) => e.stopPropagation());
-    this.ui.titleLeague.addEventListener('click', () => this.openLeague());
+    this.ui.titleLeague.addEventListener('click', () => (this.open('ranked') ? this.openLeague() : undefined));
     this.ui.bindSolo((i) => this.startCourse(i), (i) => this.startSolo(i));
     this.ui.bindUpgrades(this.onBuyUpgrade, (id) => {
       this.upgrades.toggle(id as SystemId);
@@ -608,8 +610,13 @@ export class Game {
       rooms: this.roomsEntered,
       beatPar: this.beatPar,
     };
+    if (!this.open('ranked')) {
+      // Ranked isn't open yet: its goals take any run, against the bronze par.
+      run.ranked = true;
+      run.beatPar = score >= leaguePar(0, this.weekly.target);
+    }
     const done = [...this.daily.recordRun(dayKey(now), run), ...this.weeklyGoals.recordRun(weekKey(now), run)];
-    for (const q of done) out.push(`goal done: ${questText(q)} · claim it in goals`);
+    for (const q of done) out.push(`goal done: ${questText(q, this.open('ranked'))} · claim it in goals`);
     const xp = runXp(score);
     const before = this.pass.tier;
     const paid = this.pass.addXp(now, xp);
@@ -776,7 +783,7 @@ export class Game {
       { id: 'vault', label: 'vault' },
       { id: 'pass', label: 'season pass' },
     ];
-    if (this.store.available || import.meta.env.DEV) tabs.push({ id: 'cores', label: 'cores' });
+    tabs.push({ id: 'cores', label: 'cores' });
     if (this.storeProducts.some((p) => p.id === 'premium') || import.meta.env.DEV || this.entitlements.has('premium')) tabs.push({ id: 'premium', label: 'premium' });
     return tabs;
   }
@@ -827,8 +834,13 @@ export class Game {
     }
     if (this.store.available) row('bought on another device?', 'restore', true, 'restore');
     if (import.meta.env.DEV) row('dev: add cores (purchases stand-in)', '+500', true, 'dev');
-    if (rows.length === 0) rows.push({ label: 'packs of cores come with the iOS and Android apps', button: 'soon', enabled: false });
-    return { head: 'cores', note: 'cores buy premium looks, the vault, revives and the pass. never upgrades.', rows };
+    if (rows.length === 0) {
+      rows.push({ label: 'packs of cores come with the iOS and Android apps', button: 'soon', enabled: false });
+      this.shopPacks.push('restore');
+    }
+    const S = CONFIG.economy.shop;
+    for (const n of S.swaps) row(`swap ${formatScore(n)} cores for ${formatScore(n * S.creditsPerCore)} credits`, `${formatScore(n)} cores`, this.wallet.cores >= n, `swap-${n}`);
+    return { head: 'cores', note: 'cores buy premium looks, the vault, revives and the pass, or swap for credits.', rows };
   }
 
   /** Tap a look: it goes on the ship to try (owned ones are just put on). Tap again to take it off. */
@@ -910,8 +922,22 @@ export class Game {
       this.openShop('pass'); // stay in the shop
     } else if (pack === 'pass-open') this.openPass();
     else if (pack === 'restore') void this.restorePurchases();
-    else if (pack) void this.buyProduct(pack);
+    else if (pack?.startsWith('swap-')) this.swapCores(Number(pack.slice(5)));
+    else if (pack) void this.buyProduct(pack as ProductId);
   };
+
+  /** Cores into credits, at the shop's rate. */
+  private swapCores(n: number): void {
+    if (!this.wallet.spendCores(n, 'swap')) {
+      this.ui.showNotice('not enough cores');
+      return;
+    }
+    const lines = this.grant({ credits: n * CONFIG.economy.shop.creditsPerCore });
+    this.ui.showNotice(lines.join(' · '));
+    this.sound.pickup();
+    this.refreshTitle();
+    this.openShop('cores');
+  }
 
   private openPass(): void {
     const now = Date.now();
@@ -1013,7 +1039,7 @@ export class Game {
     const day = dayKey(Date.now());
     if (!/^q\d$/.test(id) || !this.daily.canReroll(day) || !(await this.ads.reward('rerollQuest'))) return;
     const q = this.daily.reroll(i, day);
-    if (q) this.ui.showNotice(`new goal: ${questText(q)}`);
+    if (q) this.ui.showNotice(`new goal: ${questText(q, this.open('ranked'))}`);
     this.renderGoals();
     this.refreshTitle();
   }
@@ -1426,10 +1452,40 @@ export class Game {
     else this.ui.renderLeaderboard(caption, rows.map((r) => ({ rank: r.rank, name: r.name, score: formatScore(r.score), you: r.you, premium: r.premium })), '');
   }
 
-  private async savePilotName(name: string): Promise<void> {
+  private async savePilotName(name: string, box = 'board'): Promise<boolean> {
+    if (!this.backend.online) {
+      this.ui.setPilotName('', 'names come with the server', box);
+      return false;
+    }
     const res = await this.backend.setPilotName(name);
-    this.ui.setPilotName(res.ok ? res.message : '', res.ok ? 'saved' : res.message);
-    if (res.ok) void this.showBoard(this.boardTab);
+    this.ui.setPilotName(res.ok ? res.message : '', res.ok ? 'saved' : res.message, box);
+    if (res.ok && box === 'board') void this.showBoard(this.boardTab);
+    return res.ok;
+  }
+
+  /** Delete the account (server and device) and start again as a new player. Asks twice. */
+  private async deleteAccount(): Promise<void> {
+    const row = document.getElementById('delete-account');
+    const value = row?.querySelector('.value');
+    if (!this.deleteArmed) {
+      this.deleteArmed = true;
+      if (value) value.textContent = 'tap again';
+      this.ui.showNotice('tap again to delete everything. this can\'t be undone');
+      window.setTimeout(() => {
+        this.deleteArmed = false;
+        if (value) value.textContent = 'delete';
+      }, 5000);
+      return;
+    }
+    this.deleteArmed = false;
+    if (value) value.textContent = 'deleting';
+    if (!(await this.backend.deleteAccount())) {
+      if (value) value.textContent = 'delete';
+      this.ui.showNotice("couldn't reach the server. try again with a connection");
+      return;
+    }
+    await storage.clear('endless.');
+    location.reload();
   }
 
   /** How far through the current rank's XP band the player is (0..1). */
@@ -1696,7 +1752,7 @@ export class Game {
     const taskRows = (list: readonly Quest[], prefix: string, passXp: number): TaskRow[] =>
       list.map((q, i) => ({
         id: `${prefix}${i}`,
-        name: questText(q),
+        name: questText(q, this.open('ranked')),
         progress: `${formatScore(q.progress)} / ${formatScore(q.target)}`,
         fraction: q.progress / q.target,
         reward: `+${formatScore(q.credits)} credits · +${formatScore(passXp)} pass xp`,
@@ -1758,12 +1814,12 @@ export class Game {
     if (/^q\d$/.test(id)) {
       const q = this.daily.claim(Number(id.slice(1)));
       if (!q) return;
-      name = questText(q);
+      name = questText(q, this.open('ranked'));
       lines = [...this.grant({ credits: q.credits }), ...this.passXp(CONFIG.economy.quests.passXp)];
     } else if (/^w\d$/.test(id)) {
       const q = this.weeklyGoals.claim(Number(id.slice(1)));
       if (!q) return;
-      name = questText(q);
+      name = questText(q, this.open('ranked'));
       lines = [...this.grant({ credits: q.credits }), ...this.passXp(CONFIG.economy.weekly.passXp)];
     } else if (id === 'qall' || id === 'wall') {
       const cores = id === 'qall' ? this.daily.claimBonus() : this.weeklyGoals.claimBonus();
@@ -1944,6 +2000,13 @@ export class Game {
   }
 
   private onTitleLink = (name: string): void => {
+    // Every way in to a part of the game that isn't open yet says when it opens (the cores chip, cards...).
+    const needs: Record<string, Feature> = { solo: 'solo', record: 'record', shop: 'shop', 'shop-cores': 'shop', pass: 'shop', boards: 'leaderboard' };
+    const f = needs[name];
+    if (f && !this.open(f)) {
+      this.ui.showNotice(nextStageText(this.progress.stats.runs, this.onboarding.done) || 'not open yet');
+      return;
+    }
     if (name === 'endless') this.startEndless();
     else if (name === 'solo') this.openSolo();
     else if (name === 'record') this.openRecord();
@@ -1979,12 +2042,16 @@ export class Game {
   /** The welcome screen, on the step onboarding is at (choosing controls, or dressing the ship). */
   private openWelcome(): void {
     const step = this.onboarding.step === 'dress' ? 'dress' : 'controls';
+    if (!hasTouch() && this.settings.tilt) {
+      this.settings.tilt = false; // no tilt without a phone
+      void saveSettings(this.settings);
+    }
     const c = this.controlsNow();
     const controls: [string, string, boolean][] = [
       ['drag', 'drag', c === 'drag'],
       ['sides', 'tap sides', c === 'sides'],
     ];
-    if (typeof DeviceOrientationEvent !== 'undefined') controls.push(['tilt', 'tilt', c === 'tilt']);
+    if (hasTouch() && typeof DeviceOrientationEvent !== 'undefined') controls.push(['tilt', 'tilt', c === 'tilt']);
     const eq = this.looks.equipped;
     const chips = (slot: 'hull' | 'paint' | 'engine'): [string, string, boolean][] =>
       STARTER[slot].map((key) => [key, byKey(key)?.name ?? key, `${slot}:${eq[slot]}` === key]);
@@ -2009,22 +2076,28 @@ export class Game {
     this.infoOpen = null;
     this.beginRun(0, PRACTICE_SEED, 'endless');
     this.recorded = true; // nothing from it counts: no stats, no bests, no boards
-    this.practice = { lesson: 0, steerT: 0, nearMisses: this.nearMissCount, pickups: this.pickupCount };
+    this.unlockable = false; // ...and no unlocks
+    this.practice = { lesson: 0, t: 0, steerT: 0, nearMisses: this.nearMissCount, pickups: this.pickupCount };
     this.showLesson();
   }
 
   private showLesson(): void {
     const p = this.practice;
     if (!p) return;
-    this.ui.showTutorial(lessonText(LESSONS[p.lesson], this.controlsNow()), `practice · ${p.lesson + 1} of ${LESSONS.length}`);
+    const lesson = LESSONS[p.lesson];
+    if (lesson === 'boost') this.boostMeter = 1; // a full meter, so boost works straight away
+    const how = { keys: !hasTouch(), doubleTap: this.settings.doubleTapBoost };
+    this.ui.showTutorial(lessonText(lesson, this.controlsNow(), how), `practice · ${p.lesson + 1} of ${LESSONS.length}`);
   }
 
   /** Has the player done what the lesson asks? Then the next, and after the last, dress the ship. */
   private practiceTick(dt: number): void {
     const p = this.practice!;
     const lesson: Lesson = LESSONS[p.lesson];
+    p.t += dt;
     if (Math.abs(this.input.steering()) > 0.35) p.steerT += dt;
     const done =
+      p.t > LESSON_SECONDS ||
       (lesson === 'steer' && p.steerT > 1.2) ||
       (lesson === 'nearMiss' && this.nearMissCount > p.nearMisses) ||
       (lesson === 'pickup' && this.pickupCount > p.pickups) ||
@@ -2033,6 +2106,7 @@ export class Game {
     this.sound.pickup();
     this.haptics.pickup();
     p.lesson++;
+    p.t = 0;
     p.nearMisses = this.nearMissCount;
     p.pickups = this.pickupCount;
     if (p.lesson < LESSONS.length) {
@@ -2065,8 +2139,13 @@ export class Game {
     }
     const hull = `hull:${this.looks.equipped.hull}`;
     if (STARTER.hull.includes(hull) && !this.looks.owns(byKey(hull)!, this.owner())) this.looks.give(hull);
+    const name = this.ui.nameTyped('welcome');
+    if (name && this.backend.online)
+      void this.backend.setPilotName(name).then((res) => this.ui.showNotice(res.ok ? `welcome, ${res.message}` : `name not saved: ${res.message}. change it in settings`));
     this.onboarding.set('done');
     this.infoOpen = null;
+    this.player.setVisible(false);
+    this.trail.setVisible(false);
     this.ui.show('title');
     this.refreshTitle();
     this.claimLogin();
@@ -2164,6 +2243,18 @@ export class Game {
     ]);
   }
 
+  /** The Android back button: close what's open, pause a run; false on the title screen (leave the app). */
+  back(): boolean {
+    if (this.settingsOpen) this.closeSettings();
+    else if (this.infoOpen === 'welcome') return false;
+    else if (this.infoOpen) this.closeInfo();
+    else if (this.state === 'playing' || this.state === 'countdown') this.pause();
+    else if (this.state === 'paused') this.resume();
+    else if (this.state === 'crashed' || this.state === 'finished') this.toMainMenu();
+    else return false;
+    return true;
+  }
+
   private pause(): void {
     if (this.state !== 'playing' && this.state !== 'countdown') return;
     this.econ.setCountdown(0);
@@ -2219,12 +2310,21 @@ export class Game {
   private onMenu = (action: string): void => {
     if (action === 'resume') this.resume();
     else if (action === 'settings') this.openSettings();
+    else if (action === 'delete') void this.deleteAccount();
     else if (action === 'tutorial') {
+      if (this.state !== 'title') this.toMainMenu();
       this.onboarding.set('controls');
       this.closeSettings();
       this.openWelcome();
     }
-    else if (action === 'menu') this.toMainMenu();
+    else if (action === 'menu') {
+      const practising = this.practice !== null;
+      this.toMainMenu();
+      if (practising) {
+        this.onboarding.set('controls'); // left the practice run: back to the start of onboarding
+        this.openWelcome();
+      }
+    }
     else if (action === 'share') void this.share();
     else if (action === 'double') void this.doubleCredits();
     else if (action === 'back') {
@@ -2246,10 +2346,12 @@ export class Game {
       // Leaving the hangar takes off anything only being tried on.
       this.preview = null;
       this.applyLooks();
-      if (this.state === 'title') {
-        this.player.setVisible(false);
-        this.trail.setVisible(false);
-      }
+    }
+    if (this.infoOpen === 'welcome') return; // onboarding ends by its own buttons
+    if (this.state === 'title') {
+      // The ship only shows on the screens that show it off (hangar, shop, welcome).
+      this.player.setVisible(false);
+      this.trail.setVisible(false);
     }
     this.infoOpen = null;
     this.ui.show('title');
@@ -2284,6 +2386,7 @@ export class Game {
   private openSettings(): void {
     this.settingsOpen = true;
     this.ui.show('settings');
+    void this.backend.pilotName().then((name) => this.ui.setPilotName(name ?? '', this.backend.online ? '3 to 16 letters, numbers, spaces, - or _' : 'names come with the server', 'settings'));
   }
 
   private closeSettings(): void {
@@ -2294,6 +2397,10 @@ export class Game {
   /** Abandon the run and go back to the live title scene. Best score still counts. */
   private toMainMenu(): void {
     if (this.state === 'paused') this.finishRun(null); // abandoned mid-run: still counts for stats
+    if (this.practice) {
+      this.practice = null;
+      this.ui.showTutorial(null);
+    }
     this.econ.setCountdown(0);
     this.econ.dismissOffer();
     this.ghost.stop();
@@ -2505,8 +2612,11 @@ export class Game {
   private updatePlaying(dt: number): void {
     this.input.update(dt);
     this.runTime += dt;
-    this.offerHints();
+    // Swing back from the showroom orbit to the chase view (a run started from the welcome screen).
+    this.stage.showroom *= Math.exp(-CONFIG.camera.showroom.ease * 2 * dt);
+    if (this.stage.showroom < 0.001) this.stage.showroom = 0;
     if (this.practice) this.practiceTick(dt);
+    else this.offerHints();
     // A set level runs at its sections' difficulty; otherwise speed follows the score.
     const section = this.course ? this.world.sectionAt(this.world.distance) : null;
     // On ice you slow down a little (and slide: see the steering below).
