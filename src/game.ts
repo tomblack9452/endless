@@ -166,6 +166,7 @@ export class Game {
   private deleteArmed = false;
   private portraits = new Portraits(this.palette);
   private shipSent = ''; // the looks last sent to the boards (JSON)
+  private shipTimer = 0;
   private shopPacks: (ProductId | 'dev' | 'restore' | 'pass-cores' | 'pass-open' | 'dev-premium' | `swap-${number}`)[] = [];
   /** One-time products already bought. */
   private readonly entitlements = new Entitlements();
@@ -1118,6 +1119,7 @@ export class Game {
       }
       await this.wallet.link(this.backend);
       this.refreshTitle();
+      this.queueShip();
       void this.outbox.flush(); // runs that couldn't be sent last time
     }
     const refund = await migrateTickets((n) => this.wallet.addCores(n, 'tickets'));
@@ -1397,6 +1399,7 @@ export class Game {
   /** Send a finished run to its board. Assisted and dev runs never go. */
   private submitToBoard(board: BoardId, finished: boolean): void {
     if (this.assisted || this.invincible() || this.dev.autopilot) return;
+    this.queueShip(); // the rank and league badges may have moved
     // A revived run counts as it stood at its first crash.
     const run = this.preRevive ?? { score: Math.floor(this.score), seconds: this.runTime, distance: this.world.distance - this.runStart };
     if (run.distance < 60 || run.seconds < 5 || run.score <= 0) return; // a crash at the start isn't a result
@@ -1427,6 +1430,12 @@ export class Game {
   /** The looks you have on, as the boards keep them (with the rank and league your badge decals show). */
   private shipLook(): ShipLook {
     return { ...this.looks.equipped, rank: this.ranked.rank, league: this.leagues.league, division: this.leagues.division };
+  }
+
+  /** Send your looks to the boards a moment after they change (trying looks on sends nothing: only what's equipped). */
+  private queueShip(): void {
+    window.clearTimeout(this.shipTimer);
+    this.shipTimer = window.setTimeout(() => void this.syncShip(), 2000);
   }
 
   /** Send your looks to the boards if they've changed since last time. */
@@ -1678,6 +1687,7 @@ export class Game {
     const flame = find('engine', eq.engine).colors;
     this.trail.setTint(flame?.[0] ?? null, flame?.[1] ?? null);
     this.trail.setStyle(eq.trail as TrailId);
+    this.queueShip();
   }
 
   // --- the hangar: looks by slot, and the ship's upgrades ---------------------------------------

@@ -42,7 +42,7 @@ Never put the `service_role` key in `.env`: the game only ever needs `anon`.
 | One per solo environment | Solo runs in open ground, canyon, ship, ice, asteroids, volcanic | Never |
 
 Each row shows the pilot's ship, drawn by the game from the looks they have
-on (`players.ship`, sent with `set_ship` when the boards open; only its shape is
+on (`players.ship`, sent with `set_ship` a couple of seconds after the player changes a look, signs in or finishes a run; only its shape is
 checked, so an edited client could show a look it doesn't own). Tap a row for a
 bigger picture and the names of the looks.
 
