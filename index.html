@@ -129,6 +129,36 @@
         </div>
       </div>
 
+      <div id="screen-welcome" class="layer screen panel showroom">
+        <div class="panel-head">
+          <div class="panel-title" id="welcome-title">welcome, pilot</div>
+        </div>
+        <div class="sheet settings welcome-sheet">
+          <div data-welcome="controls">
+            <div class="label setting-note">pick how you steer. you can change it any time in settings.</div>
+            <div id="welcome-controls" class="chip-row"></div>
+            <button id="welcome-practice" class="pill primary sheet-buy" type="button">practice run</button>
+            <button id="welcome-skip" class="label link welcome-skip" type="button">skip the tutorial</button>
+          </div>
+          <div data-welcome="dress" hidden>
+            <div class="label setting-note">dress your ship. there are many more looks to earn in the hangar.</div>
+            <div class="settings-group">hull</div>
+            <div id="welcome-hull" class="chip-row"></div>
+            <div class="settings-group">paint</div>
+            <div id="welcome-paint" class="chip-row"></div>
+            <div class="settings-group">engine colour</div>
+            <div id="welcome-engine" class="chip-row"></div>
+            <button id="welcome-done" class="pill primary sheet-buy" type="button">ready</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="tutorial" class="tutorial" hidden>
+        <div id="tutorial-step" class="label dim"></div>
+        <div id="tutorial-text" class="tutorial-text"></div>
+        <button id="tutorial-skip" class="label link" type="button">skip</button>
+      </div>
+
       <div id="screen-paused" class="layer screen panel">
         <div class="screen-center">
           <div class="screen-heading">paused</div>
@@ -147,6 +177,7 @@
         </div>
         <div class="settings">
           <div class="settings-group">sound</div>
+          <button class="setting-row" type="button" data-action="tutorial"><span class="label">replay the tutorial</span><span class="value"></span></button>
           <button class="setting-row" type="button" data-setting="sound"><span class="label">sound</span><span class="value"></span></button>
           <button class="setting-row" type="button" data-setting="music"><span class="label">music</span><span class="value"></span></button>
           <button class="setting-row" type="button" data-setting="effects"><span class="label">effects</span><span class="value"></span></button>

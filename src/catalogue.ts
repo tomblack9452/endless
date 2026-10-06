@@ -57,6 +57,9 @@ const HAND_MADE: readonly LookItem[] = [
 
   // --- paints: credits (earned in play) ----------------------------------------------------------
   { slot: 'paint', id: 'standard', name: 'standard', unlock: free }, // the palette's own colours
+  // The starter set (onboarding offers these).
+  paint('scout', 'scout', free, '#5f8597', '#3d5a68'),
+  paint('rust', 'rust', free, '#b0663f', '#7a4326'),
   paint('slate', 'slate', credits(200), '#66707a', '#454c54'),
   paint('ash', 'ash', credits(250), '#9aa0a6', '#6b7075'),
   paint('crimson', 'crimson', credits(300), '#b8403c', '#812a28'),
@@ -165,6 +168,8 @@ const HAND_MADE: readonly LookItem[] = [
 
   // --- engine colours -------------------------------------------------------------------------------
   { slot: 'engine', id: 'standard', name: 'standard', unlock: free }, // the default flame
+  engine('cold', 'cold blue', free, '#6fc1ff', '#c4e8ff'),
+  engine('warm', 'warm white', free, '#fff1c9', '#ffc66b'),
   engine('amber', 'amber', credits(150), '#e2a64e'),
   engine('cyan', 'cyan', credits(150), '#4fc3d9'),
   engine('violet', 'violet', credits(250), '#a07ae0'),

@@ -1,7 +1,7 @@
 import { CONFIG } from './config';
 import { label, type SettingKey, type Settings } from './settings';
 
-export type ScreenName = 'title' | 'paused' | 'over' | 'settings' | 'goals' | 'hangar' | 'record' | 'solo' | 'league' | 'shop' | 'pass' | 'boards';
+export type ScreenName = 'title' | 'paused' | 'over' | 'settings' | 'goals' | 'hangar' | 'record' | 'solo' | 'league' | 'shop' | 'pass' | 'boards' | 'welcome';
 
 /** Everything the league screen shows. */
 /** The service record and league screens share one layout. */
@@ -129,6 +129,7 @@ export class UI {
     settings: $('screen-settings'),
     goals: $('screen-goals'),
     hangar: $('screen-hangar'),
+    welcome: $('screen-welcome'),
     record: $('screen-record'),
     solo: $('screen-sectors'),
     league: $('screen-league'),
@@ -329,6 +330,57 @@ export class UI {
         return b;
       }),
     );
+  }
+
+  // --- first launch ---
+
+  bindWelcome(on: { control: (id: string) => void; practice: () => void; skip: () => void; pick: (key: string) => void; done: () => void }): void {
+    const stop = (e: Event) => e.stopPropagation();
+    $('screen-welcome').addEventListener('pointerdown', stop);
+    $('tutorial').addEventListener('pointerdown', stop);
+    $('welcome-controls').addEventListener('click', (e) => {
+      const b = (e.target as HTMLElement).closest<HTMLElement>('[data-control]');
+      if (b) on.control(b.dataset.control ?? '');
+    });
+    for (const id of ['welcome-hull', 'welcome-paint', 'welcome-engine'])
+      $(id).addEventListener('click', (e) => {
+        const b = (e.target as HTMLElement).closest<HTMLElement>('[data-look]');
+        if (b) on.pick(b.dataset.look ?? '');
+      });
+    $('welcome-practice').addEventListener('click', on.practice);
+    $('welcome-skip').addEventListener('click', on.skip);
+    $('tutorial-skip').addEventListener('click', on.skip);
+    $('welcome-done').addEventListener('click', on.done);
+  }
+
+  /** The welcome screen: choosing controls, or dressing the ship (chips: [key, label, on]). */
+  renderWelcome(step: 'controls' | 'dress', controls: [string, string, boolean][], dress: Record<'hull' | 'paint' | 'engine', [string, string, boolean][]>): void {
+    $('welcome-title').textContent = step === 'controls' ? 'welcome, pilot' : 'dress your ship';
+    for (const p of document.querySelectorAll<HTMLElement>('[data-welcome]')) p.hidden = p.dataset.welcome !== step;
+    const chips = (into: string, list: [string, string, boolean][], attr: string) =>
+      $(into).replaceChildren(
+        ...list.map(([key, label, on]) => {
+          const b = document.createElement('button');
+          b.type = 'button';
+          b.className = `tab${on ? ' on' : ''}`;
+          b.textContent = label;
+          b.dataset[attr] = key;
+          return b;
+        }),
+      );
+    chips('welcome-controls', controls, 'control');
+    chips('welcome-hull', dress.hull, 'look');
+    chips('welcome-paint', dress.paint, 'look');
+    chips('welcome-engine', dress.engine, 'look');
+  }
+
+  /** The practice run's prompt (null hides it). */
+  showTutorial(text: string | null, step = ''): void {
+    $('tutorial').hidden = text === null;
+    if (text !== null) {
+      $('tutorial-text').textContent = text;
+      $('tutorial-step').textContent = step;
+    }
   }
 
   bindTitleCards(onCard: (id: string) => void): void {

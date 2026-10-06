@@ -2756,3 +2756,59 @@ body {
 #screen-shop .chip-row {
   margin-top: 10px;
 }
+
+/* First launch: the welcome sheet, and the practice run's prompt. */
+.welcome-sheet {
+  height: auto;
+  max-height: 60%;
+  padding-top: 16px;
+}
+
+.welcome-skip {
+  display: block;
+  margin: 14px auto 0;
+  padding: 6px;
+  font: inherit;
+  font-size: calc(12px * var(--ui-scale));
+  color: inherit;
+  background: none;
+  border: none;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.tutorial {
+  position: absolute;
+  left: calc(var(--safe-left) + 20px);
+  right: calc(var(--safe-right) + 20px);
+  top: calc(var(--safe-top) + 92px);
+  z-index: 5;
+  display: grid;
+  gap: 4px;
+  padding: 12px 16px;
+  text-align: center;
+  background: color-mix(in srgb, var(--sky, #f1ede4) 88%, transparent);
+  border-radius: 16px;
+  pointer-events: auto;
+}
+
+.tutorial[hidden] {
+  display: none;
+}
+
+.tutorial-text {
+  font-size: calc(15px * var(--ui-scale));
+  letter-spacing: 0.06em;
+}
+
+.tutorial .link {
+  justify-self: center;
+  padding: 4px 8px;
+  font: inherit;
+  font-size: calc(11px * var(--ui-scale));
+  color: inherit;
+  background: none;
+  border: none;
+  text-decoration: underline;
+  cursor: pointer;
+}

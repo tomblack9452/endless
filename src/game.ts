@@ -20,6 +20,7 @@ import { Haptics } from './haptics';
 import { Hints } from './hints';
 import { migrateMissionLooks, migrateTickets } from './legacy';
 import { type Feature, isOpen, nextStageText, STAGES, stageFor } from './reveal';
+import { type Lesson, LESSONS, lessonText, Onboarding, PRACTICE_SEED, STARTER } from './onboarding';
 import { Ads, createAdNetwork } from './ads/ads';
 import { entitlementFor, Entitlements } from './store/entitlements';
 import { Progress } from './progress';
@@ -70,7 +71,7 @@ const REVEAL_KEY = 'endless.reveal';
 /** The shop's tabs: looks as cards (today, the set, the vault), then lists (the pass, cores, premium). */
 type ShopTab = 'today' | 'set' | 'vault' | 'pass' | 'cores' | 'premium';
 
-type InfoScreen = 'goals' | 'hangar' | 'record' | 'solo' | 'league' | 'shop' | 'pass' | 'boards';
+type InfoScreen = 'welcome' | 'goals' | 'hangar' | 'record' | 'solo' | 'league' | 'shop' | 'pass' | 'boards';
 
 /** "5 oct": the Monday this week's ranked course started. */
 /** "1:23.4" */
@@ -165,8 +166,9 @@ export class Game {
   /** One-time products already bought. */
   private readonly entitlements = new Entitlements();
   private firstPlayed = Date.now();
-  /** The tutorial run is done (onboarding); until it exists, everyone counts as done. */
-  private tutorialDone = true;
+  private readonly onboarding = new Onboarding();
+  /** The practice run in progress (onboarding): the lesson it's on and what's been seen. */
+  private practice: { lesson: number; steerT: number; nearMisses: number; pickups: number } | null = null;
   /** The reveal stage last announced (null until read from storage). */
   private revealSeen: number | null = null;
   private readonly ads = new Ads(createAdNetwork(), () => this.entitlements.has('premium'), () => this.firstPlayed);
@@ -295,6 +297,13 @@ export class Game {
       if (this.state === 'title') this.startPrimary();
     });
     this.ui.bindTitleCards(this.onTitleLink);
+    this.ui.bindWelcome({
+      control: (id) => this.chooseControls(id),
+      practice: () => this.startPractice(),
+      skip: () => this.finishOnboarding(),
+      pick: (key) => this.pickStarter(key),
+      done: () => this.finishOnboarding(),
+    });
     this.ui.bindRecordTabs((tab) => this.ui.setRecordTab(tab));
     void storage.get(REVEAL_KEY).then((v) => (this.revealSeen = v === null ? -1 : Number(v) || 0));
     this.ui.titleRank.addEventListener('pointerdown', (e) => e.stopPropagation());
@@ -327,7 +336,8 @@ export class Game {
       this.dailyShop.load(),
       this.goalLog.load(),
       looksReady,
-    ]).then(() => {
+    ]).then(async () => {
+      await this.onboarding.load(this.progress.stats.runs > 0);
       // A save from before goals: what it has already done counts, with no payout.
       if (!this.goalLog.started) this.goalLog.startWith(ACHIEVEMENTS.filter((a) => progressOn(a, this.snapshot()).done).map((a) => a.id));
       // A new week: pay last week's league reward.
@@ -337,7 +347,9 @@ export class Game {
         this.ui.showNotice(`weekly league reward +${formatScore(weekly)} credits`);
       }
       this.refreshTitle();
-      this.claimLogin();
+      // A new player starts with the welcome; the first daily reward waits for the end of it.
+      if (this.onboarding.done) this.claimLogin();
+      else this.openWelcome();
       void this.connect();
     });
     this.econ.bindShop(this.onShopOffer, this.onShopBuy, this.onShopCores, this.onShopTab);
@@ -1355,7 +1367,7 @@ export class Game {
 
   /** Send a finished run to its board. Assisted and dev runs never go. */
   private submitToBoard(board: BoardId, finished: boolean): void {
-    if (this.assisted || this.dev.invincible || this.dev.autopilot) return;
+    if (this.assisted || this.invincible() || this.dev.autopilot) return;
     // A revived run counts as it stood at its first crash.
     const run = this.preRevive ?? { score: Math.floor(this.score), seconds: this.runTime, distance: this.world.distance - this.runStart };
     if (run.distance < 60 || run.seconds < 5 || run.score <= 0) return; // a crash at the start isn't a result
@@ -1387,7 +1399,9 @@ export class Game {
     this.openInfo('boards');
     void this.showBoard(this.boardTab);
     void this.backend.pilotName().then((name) => {
-      if (this.infoOpen === 'boards') this.ui.setPilotName(name ?? '', this.backend.online ? (name ? '3 to 16 letters, numbers, spaces, - or _. once an hour' : '') : 'names come with the server');
+      // The name is asked for here, when it's first needed: a generated one ("pilot-3fa2") invites a real one.
+      const generated = !name || /^pilot-[0-9a-f]{4}$/.test(name);
+      if (this.infoOpen === 'boards') this.ui.setPilotName(name ?? '', this.backend.online ? (generated ? 'pick your pilot name: 3 to 16 letters, numbers, spaces, - or _' : '3 to 16 letters, numbers, spaces, - or _. once an hour') : 'names come with the server');
     });
   }
 
@@ -1951,9 +1965,116 @@ export class Game {
     else if (name === 'gift') void this.claimGift();
   };
 
+  // --- first launch ------------------------------------------------------------------------------
+
+  /** Dev invincibility, or the practice run (which can't be failed). */
+  private invincible(): boolean {
+    return this.dev.invincible || this.practice !== null;
+  }
+
+  private controlsNow(): 'drag' | 'sides' | 'tilt' {
+    return this.settings.tilt ? 'tilt' : this.settings.touch === 1 ? 'sides' : 'drag';
+  }
+
+  /** The welcome screen, on the step onboarding is at (choosing controls, or dressing the ship). */
+  private openWelcome(): void {
+    const step = this.onboarding.step === 'dress' ? 'dress' : 'controls';
+    const c = this.controlsNow();
+    const controls: [string, string, boolean][] = [
+      ['drag', 'drag', c === 'drag'],
+      ['sides', 'tap sides', c === 'sides'],
+    ];
+    if (typeof DeviceOrientationEvent !== 'undefined') controls.push(['tilt', 'tilt', c === 'tilt']);
+    const eq = this.looks.equipped;
+    const chips = (slot: 'hull' | 'paint' | 'engine'): [string, string, boolean][] =>
+      STARTER[slot].map((key) => [key, byKey(key)?.name ?? key, `${slot}:${eq[slot]}` === key]);
+    this.ui.renderWelcome(step, controls, { hull: chips('hull'), paint: chips('paint'), engine: chips('engine') });
+    this.player.reset();
+    this.player.setVisible(true);
+    this.trail.setVisible(true);
+    this.openInfo('welcome');
+  }
+
+  private chooseControls(id: string): void {
+    this.settings.tilt = id === 'tilt';
+    this.settings.touch = id === 'sides' ? 1 : 0;
+    void saveSettings(this.settings);
+    this.applySettings();
+    this.openWelcome();
+  }
+
+  /** The practice run: a fixed course you can't fail, one lesson at a time. */
+  private startPractice(): void {
+    this.onboarding.set('practice');
+    this.infoOpen = null;
+    this.beginRun(0, PRACTICE_SEED, 'endless');
+    this.recorded = true; // nothing from it counts: no stats, no bests, no boards
+    this.practice = { lesson: 0, steerT: 0, nearMisses: this.nearMissCount, pickups: this.pickupCount };
+    this.showLesson();
+  }
+
+  private showLesson(): void {
+    const p = this.practice;
+    if (!p) return;
+    this.ui.showTutorial(lessonText(LESSONS[p.lesson], this.controlsNow()), `practice · ${p.lesson + 1} of ${LESSONS.length}`);
+  }
+
+  /** Has the player done what the lesson asks? Then the next, and after the last, dress the ship. */
+  private practiceTick(dt: number): void {
+    const p = this.practice!;
+    const lesson: Lesson = LESSONS[p.lesson];
+    if (Math.abs(this.input.steering()) > 0.35) p.steerT += dt;
+    const done =
+      (lesson === 'steer' && p.steerT > 1.2) ||
+      (lesson === 'nearMiss' && this.nearMissCount > p.nearMisses) ||
+      (lesson === 'pickup' && this.pickupCount > p.pickups) ||
+      (lesson === 'boost' && this.boosting);
+    if (!done) return;
+    this.sound.pickup();
+    this.haptics.pickup();
+    p.lesson++;
+    p.nearMisses = this.nearMissCount;
+    p.pickups = this.pickupCount;
+    if (p.lesson < LESSONS.length) {
+      this.showLesson();
+      return;
+    }
+    this.ui.showTutorial(null);
+    this.ui.showNotice('nicely flown. now dress your ship');
+    this.toMainMenu();
+    this.practice = null;
+    this.onboarding.set('dress');
+    this.openWelcome();
+  }
+
+  /** Try a look from the starter set on (owned or not; the hull chosen is given at the end). */
+  private pickStarter(key: string): void {
+    const [slot, id] = key.split(':') as [Slot, string];
+    this.looks.equip(slot, id);
+    this.applyLooks();
+    this.haptics.pickup();
+    this.openWelcome();
+  }
+
+  /** Done (or skipped): keep the hull chosen, and on to the front page. */
+  private finishOnboarding(): void {
+    if (this.practice) {
+      this.practice = null;
+      this.ui.showTutorial(null);
+      this.toMainMenu();
+    }
+    const hull = `hull:${this.looks.equipped.hull}`;
+    if (STARTER.hull.includes(hull) && !this.looks.owns(byKey(hull)!, this.owner())) this.looks.give(hull);
+    this.onboarding.set('done');
+    this.infoOpen = null;
+    this.ui.show('title');
+    this.refreshTitle();
+    this.claimLogin();
+  }
+
   /** How much of the game is open to this player (new players see it in stages: reveal.ts). */
   private revealStage(): number {
-    return stageFor(this.progress.stats.runs, this.tutorialDone);
+    return stageFor(this.progress.stats.runs, this.onboarding.done);
   }
 
   private open(f: Feature): boolean {
@@ -1972,7 +2093,7 @@ export class Game {
     const stage = this.revealStage();
     if (stage <= this.revealSeen) return;
     // A save from before the stages (or the first look at an old save): open, without a fanfare.
-    const quiet = this.revealSeen < 0 && stage === STAGES.length;
+    const quiet = (this.revealSeen < 0 && stage === STAGES.length) || stage === 0;
     if (!quiet) {
       const lines = STAGES.slice(Math.max(0, this.revealSeen), stage).map((s) => s.text);
       this.ui.celebrate([{ kicker: 'new', icon: GOAL_ICON, name: 'more to play', lines }]);
@@ -2016,7 +2137,7 @@ export class Game {
     if (this.open('ranked')) this.ui.setPrimary('ranked', wb > 0 ? `your best this week ${formatScore(wb)}` : 'the same run for everyone, all week');
     else this.ui.setPrimary('fly', this.progress.endlessBest > 0 ? `endless · best ${formatScore(this.progress.endlessBest)}` : 'endless: every area in turn');
     this.ui.setFeatures((f) => (f === 'endless' || f === 'league' ? this.open('ranked') : f === 'boards' ? this.open('leaderboard') : f === 'solo' || f === 'shop' || f === 'record' ? this.open(f) : true));
-    this.ui.setTitleNext(this.dev.unlockedAll ? '' : nextStageText(runs, this.tutorialDone));
+    this.ui.setTitleNext(this.dev.unlockedAll ? '' : nextStageText(runs, this.onboarding.done));
     this.ui.renderTitleCards(this.titleCards(now));
     this.refreshBar(now);
     this.announceReveal();
@@ -2098,6 +2219,11 @@ export class Game {
   private onMenu = (action: string): void => {
     if (action === 'resume') this.resume();
     else if (action === 'settings') this.openSettings();
+    else if (action === 'tutorial') {
+      this.onboarding.set('controls');
+      this.closeSettings();
+      this.openWelcome();
+    }
     else if (action === 'menu') this.toMainMenu();
     else if (action === 'share') void this.share();
     else if (action === 'double') void this.doubleCredits();
@@ -2356,7 +2482,7 @@ export class Game {
 
   private updateTitle(dt: number): void {
     this.titleTime += dt;
-    const showroom = this.infoOpen === 'hangar' || this.infoOpen === 'shop';
+    const showroom = this.infoOpen === 'hangar' || this.infoOpen === 'shop' || this.infoOpen === 'welcome';
     const S = CONFIG.camera.showroom;
     if (showroom) {
       this.trail.update(dt, 0, this.player.engineHalfSpan);
@@ -2380,6 +2506,7 @@ export class Game {
     this.input.update(dt);
     this.runTime += dt;
     this.offerHints();
+    if (this.practice) this.practiceTick(dt);
     // A set level runs at its sections' difficulty; otherwise speed follows the score.
     const section = this.course ? this.world.sectionAt(this.world.distance) : null;
     // On ice you slow down a little (and slide: see the steering below).
@@ -2456,7 +2583,7 @@ export class Game {
     }
 
     // Lava: the run ends, whatever shield you have.
-    if (this.world.inLava() && !this.dev.invincible) {
+    if (this.world.inLava() && !this.invincible()) {
       this.crash(false);
       this.world.sync();
       return;
@@ -2466,9 +2593,9 @@ export class Game {
     // into one and you slide along it instead of out of the course. Touching
     // one with a shield up uses the shield, like any other hit.
     let scraped = false;
-    if (!fell && (this.shield || this.graceT > 0) && !this.dev.invincible) scraped = this.world.clampToWalls(CONFIG.ship.hitHalfWidth + 0.15);
+    if (!fell && (this.shield || this.graceT > 0) && !this.invincible()) scraped = this.world.clampToWalls(CONFIG.ship.hitHalfWidth + 0.15);
     const hit = !fell && this.graceT <= 0 && (scraped || this.world.hitTest(prev));
-    if (hit && this.shield && !this.dev.invincible) {
+    if (hit && this.shield && !this.invincible()) {
       // The shield takes the hit; pass through for a moment.
       this.shield = false;
       this.player.setShield(false);
@@ -2477,7 +2604,7 @@ export class Game {
       this.sound.shieldHit();
       this.haptics.crash();
       this.nudgeMs = CONFIG.score.nearMiss.nudgeMs * 2;
-    } else if ((fell || hit) && !this.dev.invincible) {
+    } else if ((fell || hit) && !this.invincible()) {
       this.crash(fell);
       this.world.sync();
       return;

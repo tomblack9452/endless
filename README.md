@@ -282,6 +282,16 @@ and a daily reward when one is waiting. Along the bottom, a bar of five:
 with a dot when something there needs you. Settings is the gear top left;
 credits and cores sit top right (tapping them opens the shop).
 
+**First launch** (`src/onboarding.ts`) opens on a welcome: pick how you steer
+(drag, tap sides, or tilt where the phone has it), then a short **practice
+run** on a fixed course you can't fail, which asks for one thing at a time:
+steer, a near miss, a pickup, boost. Then **dress your ship** from a starter
+set (three hulls, three paints, three engine colours) and you're on the front
+page, with the first daily reward. It resumes after a restart, can be skipped,
+and can be replayed from settings; anyone who had already played skips it. The
+pilot name is asked for on the leaderboard, while it's still the generated
+one.
+
 New players see the game in stages (`src/reveal.ts`), so the first screen isn't
 a wall of buttons: at first the big button flies endless and the bar has the
 hangar and goals; solo, the shop and the service record open after 3 runs;
@@ -690,6 +700,7 @@ new build drops the old build's cached scripts and styles.
 | `src/hangar.ts`, `src/hangarView.ts` | The hangar's model and its screen (looks and the upgrades chip) |
 | `src/goalsView.ts` | The goals screen: daily, weekly and achievements, with claiming |
 | `src/reveal.ts` | What new players see, in stages |
+| `src/onboarding.ts` | First launch: controls, the practice run's lessons, the starter set |
 | `src/legacy.ts` | Carries older saves' mission unlocks over to the looks (missions were removed) |
 | `src/decals.ts` | Wing decal pictures |
 | `src/progress.ts` | Stats, set level results, weekly, endless and environment bests |
