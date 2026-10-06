@@ -35,6 +35,10 @@ export class LocalBackend implements Backend {
     return null;
   }
 
+  async purchases(): Promise<null> {
+    return null;
+  }
+
   async pilotName(): Promise<null> {
     return null;
   }

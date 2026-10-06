@@ -2330,6 +2330,12 @@ body {
   white-space: nowrap;
 }
 
+.premium-badge {
+  margin-left: 6px;
+  font-size: 0.8em;
+  color: #c9a646;
+}
+
 .board-row {
   display: grid;
   grid-template-columns: 2.4em 1fr auto;

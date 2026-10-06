@@ -294,7 +294,7 @@ bundles. Never upgrades.
 - **`src/store/entitlements.ts`**: one `Entitlements` model, `has('premium')`,
   `passSeasons`, `starterPack`.
   - Filled from RevenueCat in the apps and from the server
-    (`players.entitlements`, written by the webhook).
+    (`store_events`, written by the webhook).
   - Empty on the web.
   - The whole game reads this, never the store directly.
 - **A `premium` unlock kind** in `src/looks.ts`: owned while the entitlement
@@ -304,8 +304,8 @@ bundles. Never upgrades.
   - A do-nothing web version; the AdMob version in the apps.
   - Placements and their caps in `CONFIG.ads`.
   - Premium short-circuits every placement: rewarded ones pay at once.
-- **One product list** in `CONFIG.economy.store` (exists; add premium and the
-  bundle ids).
+- **One product list** in `CONFIG.economy.store` (premium added; offer bundle
+  ids later).
 - **The server is the source of truth for paid things:**
   - The webhook grants cores, premium and the pass; the client never grants
     them itself.

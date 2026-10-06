@@ -1,8 +1,7 @@
--- Endless Space database: part 6 of 6. Run the parts in order, 01 first.
+-- Endless Space database: part 6 of 7. Run the parts in order, 01 first.
 
--- A board, best first: the top p_limit pilots and, if you are further down,
--- your own row at the end with your rank.
-create or replace function public.leaderboard(
+-- its columns change in 0004
+create function public.leaderboard(
   p_board text,
   p_period text default 'all',
   p_league smallint default 0,
@@ -73,3 +72,10 @@ revoke execute on function public.check_run from public, anon, authenticated;
 revoke execute on function public.submit_run, public.leaderboard, public.set_pilot_name from public, anon;
 
 grant execute on function public.submit_run, public.leaderboard, public.set_pilot_name to authenticated;
+
+-- Premium: the one-off purchase that removes ads and gives premium looks. The
+-- purchase webhook already keeps every purchase in store_events, so owning
+-- premium is a row there; a player reads their own (see the "own purchases"
+-- policy), and the boards show a badge for it.
+
+create index if not exists store_events_by_user on public.store_events (user_id, product);

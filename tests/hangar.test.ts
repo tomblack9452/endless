@@ -11,6 +11,7 @@ const owner = (over: Partial<Owner> = {}, snap: Record<string, number> = {}): Ow
   rank: 0,
   stars: 0,
   league: 0,
+  premium: false,
   goal: (id) => {
     const a = achievement(id);
     return a

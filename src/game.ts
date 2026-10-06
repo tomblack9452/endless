@@ -19,6 +19,8 @@ import { decalArt } from './decals';
 import { Haptics } from './haptics';
 import { Hints } from './hints';
 import { migrateMissionLooks, migrateTickets } from './legacy';
+import { Ads, createAdNetwork } from './ads/ads';
+import { entitlementFor, Entitlements } from './store/entitlements';
 import { Progress } from './progress';
 import { creditsFor, insignia, promotionBonus, Ranked, rankName, RANKS, type RunMode, xpToRank } from './ranks';
 import { Wallet } from './wallet';
@@ -59,7 +61,7 @@ type State = 'title' | 'playing' | 'paused' | 'countdown' | 'crashed' | 'finishe
 
 const DEG = Math.PI / 180;
 const PATH_STEP = 4;
-const OWNED_KEY = 'endless.purchases';
+const FIRST_PLAYED_KEY = 'endless.firstPlayed';
 
 type InfoScreen = 'stats' | 'goals' | 'hangar' | 'record' | 'solo' | 'league' | 'shop' | 'pass' | 'daily' | 'boards';
 
@@ -154,7 +156,9 @@ export class Game {
   /** Shop rows for real-money products, in the order shown ('dev' adds cores in the dev build). */
   private shopPacks: (ProductId | 'dev' | 'restore')[] = [];
   /** One-time products already bought. */
-  private ownedProducts = new Set<string>();
+  private readonly entitlements = new Entitlements();
+  private firstPlayed = Date.now();
+  private readonly ads = new Ads(createAdNetwork(), () => this.entitlements.has('premium'), () => this.firstPlayed);
   /** The shop card tapped (on the ship to try), or -1. */
   private shopPick = -1;
   private readonly dailyShop = new DailyShop();
@@ -285,7 +289,11 @@ export class Game {
     window.addEventListener('online', () => void this.outbox.flush());
     const now = Date.now();
     // Looks load once; a login reward can give one, so it waits for them.
-    const looksReady = this.looks.load().then(() => migrateMissionLooks(this.looks));
+    const looksReady = Promise.all([this.looks.load().then(() => migrateMissionLooks(this.looks)), this.entitlements.load()]);
+    void storage.get(FIRST_PLAYED_KEY).then((v) => {
+      if (v) this.firstPlayed = Number(v) || this.firstPlayed;
+      else void storage.set(FIRST_PLAYED_KEY, String(this.firstPlayed));
+    });
     void Promise.all([
       this.progress.load(),
       this.ranked.load(),
@@ -747,8 +755,8 @@ export class Game {
     const price = new Map(this.storeProducts.map((p) => [p.id, p.price]));
     for (const p of CONFIG.economy.store.products) {
       const cost = price.get(p.id);
-      if (!cost || 'pass' in p || ('once' in p && this.ownedProducts.has(p.id))) continue;
-      const label = 'once' in p ? `starter pack · ${formatScore(p.cores)} cores and ${rewardText({ look: p.look })}` : `${formatScore(p.cores)} cores`;
+      if (!cost || 'pass' in p || 'premium' in p || ('once' in p && this.ownsProduct(p.id))) continue;
+      const label = 'look' in p ? `starter pack · ${formatScore(p.cores)} cores and ${rewardText({ look: p.look })}` : `${formatScore(p.cores)} cores`;
       rows.push({ label, button: cost, enabled: true });
       this.shopPacks.push(p.id);
     }
@@ -885,7 +893,7 @@ export class Game {
 
   private offerRevive(): void {
     const day = dayKey(Date.now());
-    const free = this.daily.freeRevive(day);
+    const free = this.daily.freeRevivesLeft(day, this.freeRevivesADay()) > 0;
     const cost = CONFIG.economy.revive.coreCost;
     this.econ.offer(
       {
@@ -904,6 +912,11 @@ export class Game {
       },
       () => this.settleCrash(),
     );
+  }
+
+  /** Free revives a day: one for everyone, more with premium. */
+  private freeRevivesADay(): number {
+    return 1 + (this.entitlements.has('premium') ? CONFIG.premium.extraFreeRevives : 0);
   }
 
   /** Back on the lane with the way ahead cleared, a shield on, and a 3-2-1. */
@@ -978,8 +991,10 @@ export class Game {
       this.ui.showNotice(`ranked is unlimited now: your spare tickets became ${formatScore(refund)} cores`);
       this.refreshTitle();
     }
-    this.ownedProducts = new Set(JSON.parse((await storage.get(OWNED_KEY)) ?? '[]') as string[]);
+    // What the account has bought, as the server's purchase records have it.
+    for (const id of (await this.backend.purchases()) ?? []) this.grantProduct(id);
     await this.store.start(this.backend.userId);
+    void this.ads.start();
     this.storeProducts = await this.store.products();
     if (this.infoOpen === 'shop') this.openShop();
   }
@@ -1003,10 +1018,8 @@ export class Game {
     }
     if ('look' in p) lines.push(...this.grant({ look: p.look }));
     if ('pass' in p && !this.pass.premium) lines.push(...this.pass.unlockPremium().flatMap((r) => this.grant(r)), 'season pass premium');
-    if ('once' in p) {
-      this.ownedProducts.add(id);
-      void storage.set(OWNED_KEY, JSON.stringify([...this.ownedProducts]));
-    }
+    if ('premium' in p) lines.push('premium: no ads, ad rewards free, the halo hull, regalia paint and crown flame, an extra free revive a day');
+    this.grantProduct(id);
     this.ui.celebrate([{ kicker: 'thank you', icon: GIFT_ICON, name: 'purchase complete', lines: mergeCredits(lines) }]);
     this.sound.power();
     this.refreshTitle();
@@ -1014,18 +1027,27 @@ export class Game {
     if (this.infoOpen === 'pass') this.openPass();
   }
 
+  /** True if a one-time product is owned (premium, the starter pack). */
+  private ownsProduct(id: string): boolean {
+    const e = entitlementFor(id);
+    return e !== null && this.entitlements.has(e);
+  }
+
+  /** Own a one-time product (bought, restored, or on the server's records); true if it's new here. */
+  private grantProduct(id: string): boolean {
+    const e = entitlementFor(id);
+    if (!e || !this.entitlements.grant(e)) return false;
+    const p = CONFIG.economy.store.products.find((x) => x.id === id);
+    if (p && 'look' in p) this.grant({ look: p.look });
+    this.applyLooks();
+    return true;
+  }
+
   /** Restore one-time purchases on a new install (cores come back with the cloud save). */
   private async restorePurchases(): Promise<void> {
     const ids = await this.store.restore();
     let n = 0;
-    for (const id of ids) {
-      const p = CONFIG.economy.store.products.find((x) => x.id === id);
-      if (!p || !('once' in p) || this.ownedProducts.has(id)) continue;
-      this.ownedProducts.add(id);
-      if ('look' in p) this.grant({ look: p.look });
-      n++;
-    }
-    void storage.set(OWNED_KEY, JSON.stringify([...this.ownedProducts]));
+    for (const id of ids) if (this.grantProduct(id)) n++;
     this.ui.showNotice(n > 0 ? `restored ${n} purchase${n === 1 ? '' : 's'}` : 'nothing to restore');
     this.openShop();
   }
@@ -1292,7 +1314,7 @@ export class Game {
     if (seq !== this.boardSeq || this.infoOpen !== 'boards') return; // moved on while it loaded
     if (rows === null) this.ui.renderLeaderboard(caption, own, "couldn't load the board. check your connection");
     else if (rows.length === 0) this.ui.renderLeaderboard(caption, [], 'nobody yet. fly a run to be first');
-    else this.ui.renderLeaderboard(caption, rows.map((r) => ({ rank: r.rank, name: r.name, score: formatScore(r.score), you: r.you })), '');
+    else this.ui.renderLeaderboard(caption, rows.map((r) => ({ rank: r.rank, name: r.name, score: formatScore(r.score), you: r.you, premium: r.premium })), '');
   }
 
   private async savePilotName(name: string): Promise<void> {
@@ -1432,6 +1454,7 @@ export class Game {
       rank: this.ranked.rank,
       stars: all ? 999 : this.progress.totalStars(),
       league: this.leagues.league,
+      premium: all || this.entitlements.has('premium'),
       goal: (id) => {
         const a = achievement(id);
         if (all) return { have: a?.target ?? 1, target: a?.target ?? 1, done: true };
@@ -1961,6 +1984,15 @@ export class Game {
   }
 
   /** Dev: cores, standing in for purchases until the store is in. */
+  /** Dev: premium on or off (as if bought, or never bought). */
+  devTogglePremium(): boolean {
+    if (this.entitlements.has('premium')) this.entitlements.clear();
+    else this.entitlements.grant('premium');
+    this.applyLooks();
+    this.refreshTitle();
+    return this.entitlements.has('premium');
+  }
+
   devAddCores(n: number): void {
     this.wallet.addCores(n);
     this.econ.bump('cores');

@@ -162,7 +162,8 @@ end $$;
 
 -- A board, best first: the top p_limit pilots and, if you are further down,
 -- your own row at the end with your rank.
-create or replace function public.leaderboard(
+drop function if exists public.leaderboard(text, text, smallint, integer); -- its columns change in 0004
+create function public.leaderboard(
   p_board text,
   p_period text default 'all',
   p_league smallint default 0,

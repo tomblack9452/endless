@@ -150,6 +150,7 @@ function install(game: Game, title: HTMLElement): void {
   };
   // Stand-ins for purchases until the store is in.
   action('add 500 cores', () => game.devAddCores(500));
+  action('premium on/off', () => game.devTogglePremium());
   action('unlock all', () => {
     game.devUnlockAll();
     show(false);

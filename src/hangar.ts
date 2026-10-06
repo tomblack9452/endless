@@ -56,6 +56,8 @@ export function shortUnlock(item: LookItem): string {
   switch (u.by) {
     case 'free':
       return '';
+    case 'premium':
+      return 'premium';
     case 'credits':
       return `${fmt(u.cost)} credits`;
     case 'cores':

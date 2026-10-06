@@ -48,6 +48,7 @@ function owner(snap: Snapshot, extra: Partial<Owner> = {}): Owner {
     rank: 0,
     stars: snap.stars,
     league: 0,
+    premium: false,
     goal: (id) => {
       const a = achievement(id);
       return a ? progressOn(a, snap) : { have: 0, target: 1, done: false };

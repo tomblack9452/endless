@@ -15,6 +15,7 @@
     "db:apply": "node scripts/apply-db.mjs"
   },
   "dependencies": {
+    "@capacitor-community/admob": "^8.2.0",
     "@capacitor/core": "^8.5.2",
     "@fontsource/jetbrains-mono": "^5.3.0",
     "@revenuecat/purchases-capacitor": "^13.7.0",

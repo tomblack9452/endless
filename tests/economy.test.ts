@@ -43,14 +43,17 @@ describe('daily', () => {
     expect(bonus).toBe(CONFIG.economy.quests.allDoneCores);
   });
 
-  it('one free revive a day', async () => {
+  it('free revives a day: one, or more for premium', async () => {
     const d = new Daily();
     const day = dayKey(T0);
     await d.load(day);
-    expect(d.freeRevive(day)).toBe(true);
+    expect(d.freeRevivesLeft(day)).toBe(1);
     d.useFreeRevive(day);
-    expect(d.freeRevive(day)).toBe(false);
-    expect(d.freeRevive(dayKey(T0 + 24 * HOUR))).toBe(true);
+    expect(d.freeRevivesLeft(day)).toBe(0);
+    expect(d.freeRevivesLeft(day, 2)).toBe(1); // premium's extra one
+    d.useFreeRevive(day);
+    expect(d.freeRevivesLeft(day, 2)).toBe(0);
+    expect(d.freeRevivesLeft(dayKey(T0 + 24 * HOUR))).toBe(1);
   });
 });
 

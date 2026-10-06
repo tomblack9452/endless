@@ -657,7 +657,8 @@ new build drops the old build's cached scripts and styles.
 | `src/economy/` | Daily rewards and quests, the shop (today, the weekly set, the vault), the season pass, and their screens |
 | `src/server/` | The server behind one interface: Supabase, or the device alone; cloud save, the run outbox and the leaderboard boards |
 | `src/unlocks.ts` | What opens solo environments and how far off it is |
-| `src/store/` | In-app purchases (RevenueCat in the apps, nothing on the web) |
+| `src/store/` | In-app purchases (RevenueCat in the apps, nothing on the web) and what's owned for good |
+| `src/ads/` | Ads (AdMob in the apps, nothing on the web) and their rules |
 | `src/ghost.ts` | The ghost of your weekly best |
 | `src/share.ts` | The share card |
 | `src/upgrades.ts` | Ship upgrade systems, points and the standard ship |
@@ -805,7 +806,13 @@ Without keys, everything lives on the device. With them:
   and time, and the path the distance), kept and retried if there's no signal.
   Setup is two keys and `npm run db:apply` (or pasting the small SQL parts): [docs/leaderboards.md](docs/leaderboards.md).
 - **RevenueCat** (`src/store/`) in the iOS and Android apps: core packs
-  (100, 550, 1,200, 2,500), a one-time starter pack (500 cores and the nova hull) and the season pass. Purchases are paid into the server
+  (100, 550, 1,200, 2,500), a one-time starter pack (500 cores and the nova
+  hull), the season pass, and **premium** (a one-off: no ads, ad rewards
+  without the ad, the halo hull, regalia paint and crown flame, an extra free
+  revive a day, a badge on the boards). What's owned for good is in
+  `src/store/entitlements.ts`.
+- **AdMob** (`src/ads/`) in the apps: rewarded ads only, with consent and
+  Apple's tracking prompt; premium players never see one. No ads on the web. Purchases are paid into the server
   wallet by a webhook. The web build sells nothing.
 
 What has to be set up by hand (projects, products, keys and the app builds)

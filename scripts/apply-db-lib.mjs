@@ -5,8 +5,8 @@
 // new migration later is applied on its own. A database set up by pasting the SQL by
 // hand (no record yet) is recognised by a table each migration creates.
 
-/** A table each migration creates: how a hand-pasted database is recognised. */
-const MADE = { '0001_init.sql': 'players', '0002_store.sql': 'store_events', '0003_leaderboards.sql': 'bests' };
+/** A table (or index) each migration creates: how a hand-pasted database is recognised. */
+const MADE = { '0001_init.sql': 'players', '0002_store.sql': 'store_events', '0003_leaderboards.sql': 'bests', '0004_premium.sql': 'store_events_by_user' };
 
 /**
  * `db.query(sql, params?)` resolving `{ rows }`. `migrations`: [[file name, sql], ...] in order.

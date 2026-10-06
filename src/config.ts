@@ -665,9 +665,23 @@ export const CONFIG = {
         { id: 'starter_pack', cores: 500, look: 'hull:nova', once: true },
         // The season pass's premium track, for money instead of cores.
         { id: 'season_pass', pass: true },
+        // One-off: no ads, ad rewards without the ad, the premium looks, +1 free revive a day, a badge on the boards.
+        { id: 'premium', premium: true, once: true },
       ],
     },
   },
+
+  // Ads (src/ads): rewarded ones offer a little convenience for watching; premium
+  // players get the reward without the ad. Interstitials are off: if turned on,
+  // never before day afterDays, at most one per everyRuns runs and minSeconds,
+  // never after a new best, never for premium.
+  ads: {
+    rewarded: { revive: true, doubleCredits: true, dailyGift: true, rerollQuest: true } as Record<'revive' | 'doubleCredits' | 'dailyGift' | 'rerollQuest', boolean>,
+    dailyGift: { credits: 150, cores: 2 },
+    interstitial: { enabled: false, afterDays: 3, everyRuns: 3, minSeconds: 180 },
+  },
+  // Premium (a one-off purchase): extra free revives a day on top of the one everyone gets.
+  premium: { extraFreeRevives: 1 },
 
   // Ice field and volcanic plain hazards (see world.ts: land()).
   hazards: {

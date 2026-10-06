@@ -15,6 +15,7 @@ import { seasonLooksThrough } from './seasonLooks';
 //   achievement finishing a goal (src/achievements.ts)
 //   reward      the login calendar or the season pass
 //   vault       sold for a month at a time in the shop, then away for a while
+//   premium     owned while the player has the one-off premium unlock
 //
 // On top of these hand-made looks, every season adds generated ones (seasonLooks.ts).
 
@@ -28,6 +29,7 @@ const goal = (id: string): Unlock => ({ by: 'achievement', id });
 const pass: Unlock = { by: 'reward', from: 'pass' };
 const login: Unlock = { by: 'reward', from: 'login' };
 const vault = (cost: number): Unlock => ({ by: 'vault', cost });
+const premium: Unlock = { by: 'premium' };
 
 const hull = (id: string, name: string, unlock: Unlock): LookItem => ({ slot: 'hull', id, name, unlock });
 const paint = (id: string, name: string, unlock: Unlock, top: string, shade: string): LookItem => ({ slot: 'paint', id, name, unlock, colors: [top, shade] });
@@ -51,6 +53,7 @@ const HAND_MADE: readonly LookItem[] = [
   hull('raptor', 'raptor', pass),
   hull('kite', 'kite', goal('level-25')),
   hull('comet', 'comet', goal('dist-500k')),
+  hull('halo', 'halo', premium),
 
   // --- paints: credits (earned in play) ----------------------------------------------------------
   { slot: 'paint', id: 'standard', name: 'standard', unlock: free }, // the palette's own colours
@@ -133,6 +136,8 @@ const HAND_MADE: readonly LookItem[] = [
   // From the vault.
   paint('eclipse', 'eclipse', vault(600), '#2a1748', '#0d0719'),
   paint('opal', 'opal', vault(500), '#e8f0f4', '#c9a6e0'),
+  // Premium only.
+  paint('regalia', 'regalia', premium, '#d4b45a', '#4a3a14'),
 
   // --- markings -------------------------------------------------------------------------------------
   mark('none', 'none', free),
@@ -216,6 +221,7 @@ const HAND_MADE: readonly LookItem[] = [
   trail('twin', 'twin', goal('chain-6')),
   trail('pulse', 'pulse', goal('endless-60k')),
   trail('ribbon', 'ribbon', vault(500)),
+  trail('crown', 'crown', premium),
 ];
 
 /** Every look: the hand-made ones, then each season's generated ones up to the current season. */

@@ -199,7 +199,7 @@ describe('db:apply (the migrations from a terminal)', () => {
     const d = await fresh();
     await applyMigrations(asClient(d), migrations.slice(0, 2));
     const later = await applyMigrations(asClient(d), migrations);
-    expect(later.applied).toEqual([migrations[2][0]]);
+    expect(later.applied).toEqual(migrations.slice(2).map(([f]) => f));
   });
 
   it('recognises a database that was set up by pasting the SQL', async () => {

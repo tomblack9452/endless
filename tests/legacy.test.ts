@@ -18,7 +18,7 @@ beforeEach(() => {
   };
 });
 
-const nobody: Owner = { rank: 0, stars: 0, league: 0, goal: () => ({ have: 0, target: 1, done: false }) };
+const nobody: Owner = { rank: 0, stars: 0, league: 0, premium: false, goal: () => ({ have: 0, target: 1, done: false }) };
 const owns = (l: Looks, key: string): boolean => l.owns(byKey(key)!, nobody);
 
 describe('missions carried over', () => {

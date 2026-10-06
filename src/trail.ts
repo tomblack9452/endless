@@ -10,6 +10,7 @@ import type { LivePalette } from './palette';
 //   triple  a flame and a short one each side  twin    two flames side by side
 //   long    one long thin flame                wide    a short fat flame
 //   pulse   a flame that swells and shrinks    ribbon  a long soft flame and streams
+//   crown   a swelling flame between two pulsing side streams (premium)
 // The engine colour (looks) tints them, root to tip; boosting stretches them.
 //
 // The ship never turns its nose, so a trail that traced the real path ran off
@@ -108,6 +109,11 @@ export const TRAIL_STYLES: Record<TrailId, FlameSpec[]> = {
     { at: 0, len: 1.05, width: 0.13, alpha: 0.6 },
     { at: -0.5, len: 0.7, width: 0.02, alpha: 0.8 },
     { at: 0.5, len: 0.7, width: 0.02, alpha: 0.8 },
+  ],
+  crown: [
+    { at: 0, len: 0.7, width: 0.11, alpha: 0.85, swell: true },
+    { at: -0.62, len: 0.55, width: 0.03, alpha: 0.85, dashes: true },
+    { at: 0.62, len: 0.55, width: 0.03, alpha: 0.85, dashes: true },
   ],
 };
 

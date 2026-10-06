@@ -108,7 +108,8 @@ interface Saved {
   questDay: string;
   quests: Quest[];
   allDonePaid: boolean;
-  reviveDay: string; // the day the free revive was used
+  reviveDay: string; // the day free revives were last used
+  reviveUsed?: number; // how many that day (older saves: 1)
 }
 
 const KEY = 'endless.daily';
@@ -203,12 +204,15 @@ export class Daily {
 
   // --- revive ---
 
-  freeRevive(day: string): boolean {
-    return this.s.reviveDay !== day;
+  /** Free revives left today, of `allowed` a day (premium allows more). */
+  freeRevivesLeft(day: string, allowed = 1): number {
+    const used = this.s.reviveDay === day ? (this.s.reviveUsed ?? 1) : 0;
+    return Math.max(0, allowed - used);
   }
 
   useFreeRevive(day: string): void {
-    this.s.reviveDay = day;
+    if (this.s.reviveDay !== day) this.s = { ...this.s, reviveDay: day, reviveUsed: 0 };
+    this.s.reviveUsed = (this.s.reviveUsed ?? 0) + 1;
     this.save();
   }
 }

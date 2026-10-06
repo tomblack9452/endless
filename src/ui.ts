@@ -319,7 +319,7 @@ export class UI {
   }
 
   /** The board's rows: rank, name, score. A pilot below the top comes after a gap. */
-  renderLeaderboard(caption: string, rows: { rank: number; name: string; score: string; you: boolean }[], status: string): void {
+  renderLeaderboard(caption: string, rows: { rank: number; name: string; score: string; you: boolean; premium?: boolean }[], status: string): void {
     $('board-caption').textContent = caption;
     $('board-status').textContent = status;
     const out: HTMLElement[] = [];
@@ -340,6 +340,13 @@ export class UI {
       const who = document.createElement('span');
       who.className = 'who';
       who.textContent = r.you ? `${r.name} (you)` : r.name;
+      if (r.premium) {
+        const badge = document.createElement('span');
+        badge.className = 'premium-badge';
+        badge.title = 'premium';
+        badge.textContent = '◆';
+        who.append(badge);
+      }
       const score = document.createElement('span');
       score.className = 'pts';
       score.textContent = r.score;

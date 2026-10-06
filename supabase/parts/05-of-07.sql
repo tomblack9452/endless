@@ -1,4 +1,4 @@
--- Endless Space database: part 5 of 6. Run the parts in order, 01 first.
+-- Endless Space database: part 5 of 7. Run the parts in order, 01 first.
 
 -- Submit a finished run: checks it, keeps it if it is a best, and says where it ranks.
 create or replace function public.submit_run(
@@ -66,3 +66,7 @@ begin
     'newBest', old_best is null or p_score > old_best
   );
 end $$;
+
+-- A board, best first: the top p_limit pilots and, if you are further down,
+-- your own row at the end with your rank.
+drop function if exists public.leaderboard(text, text, smallint, integer);
