@@ -5,6 +5,7 @@ import { lateralSpeedAt, speedAt } from '../src/difficulty';
 import { LivePalette } from '../src/palette';
 import { ROOM_IDS, type RoomId } from '../src/interior';
 import { World } from '../src/world';
+import { PRACTICE_SEED } from '../src/onboarding';
 
 // Fairness: every course must be survivable. A simple autopilot follows the
 // safe lane the generator records (steering at the normal limit, no boost)
@@ -194,4 +195,13 @@ describe('ice and fire', () => {
       expect(hazards).toBeGreaterThan(0);
     });
   }
+});
+
+// The practice run (onboarding) can't be failed, but its course should still be
+// fair to fly: the same check as everything else.
+describe('the practice run', () => {
+  it('is survivable on the safe lane', () => {
+    const r = drive(PRACTICE_SEED, 1);
+    expect(r.crashed, `crashed at score ${r.at}`).toBe(false);
+  });
 });

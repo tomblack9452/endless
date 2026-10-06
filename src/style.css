@@ -540,7 +540,7 @@ body {
 
 .dev-link {
   position: absolute;
-  left: calc(var(--safe-left) + 22px);
+  left: calc(var(--safe-left) + 66px);
   top: calc(var(--safe-top) + 18px);
 }
 
@@ -756,33 +756,10 @@ body {
   margin: 14px 0 12px;
 }
 
-.title-links {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 8px;
-  margin: 12px 0 12px;
-}
-
-.title-links .link:empty {
-  display: none;
-}
-
-.title-best {
-  margin-top: 2px;
-}
-
 .setting-note {
   padding: 12px 0 0;
   font-size: calc(12px * var(--ui-scale));
   line-height: 1.6;
-}
-
-.over-missions {
-  margin: 18px auto 0;
-  padding-top: 14px;
-  max-width: 320px;
-  line-height: 1.8;
-  border-top: 1px solid color-mix(in srgb, currentColor 22%, transparent);
 }
 
 .setting-row.locked {
@@ -890,18 +867,14 @@ body {
   #screen-title .pill {
     min-height: calc(44px * var(--ui-scale));
   }
-  .title-modes,
-  .title-links {
+  .title-modes {
     margin-top: 8px;
   }
-  .title-links {
-    margin-bottom: 4px;
+  .live-cards {
+    margin-bottom: 8px;
   }
-  .title-links .chip {
-    padding: 9px 6px;
-  }
-  .title-corners {
-    margin-top: 0;
+  .live-card {
+    padding: 8px 12px;
   }
 }
 
@@ -991,32 +964,26 @@ body {
   display: none;
 }
 
-/* Hangar bottom-left, settings bottom-right. */
-.title-corners {
-  display: flex;
-  justify-content: space-between;
-  margin: 10px -10px 0;
-}
-
-.corner-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  min-height: 48px;
-  padding: 0 10px;
-  font: inherit;
-  font-size: calc(13px * var(--ui-scale));
-  letter-spacing: 0.14em;
+/* Settings: a gear, top left. */
+.gear-btn {
+  position: absolute;
+  top: calc(var(--safe-top) + 8px);
+  left: calc(var(--safe-left) + 12px);
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
   color: inherit;
   background: none;
   border: none;
+  border-radius: 50%;
   pointer-events: auto;
   cursor: pointer;
-  -webkit-appearance: none;
-  appearance: none;
 }
 
-.corner-link svg {
+.gear-btn svg {
   width: 26px;
   height: 26px;
   fill: none;
@@ -1026,14 +993,156 @@ body {
   stroke-linejoin: round;
 }
 
-.corner-link:active {
+.gear-btn:active {
   opacity: 0.6;
 }
 
-.corner-link:focus-visible {
+.gear-btn:focus-visible {
   outline: 2px solid currentColor;
-  outline-offset: 2px;
+}
+
+/* Live cards above the ranked button: the pass, today's goals, a reward to claim. */
+.live-cards {
+  display: flex;
+  gap: 8px;
+  margin: 0 calc(-24px - var(--safe-right)) 12px 0;
+  padding-right: calc(24px + var(--safe-right));
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.live-cards::-webkit-scrollbar {
+  display: none;
+}
+
+.live-cards:empty {
+  display: none;
+}
+
+.live-card {
+  position: relative;
+  flex: 1 0 calc(46% - 4px);
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 12px;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  background: color-mix(in srgb, currentColor 5%, transparent);
+  border: 1px solid color-mix(in srgb, currentColor 22%, transparent);
+  border-radius: 14px;
+  pointer-events: auto;
+  cursor: pointer;
+}
+
+.live-card.hot {
+  border-color: color-mix(in srgb, #e0503f 70%, transparent);
+}
+
+.live-card:active {
+  transform: scale(0.98);
+}
+
+.live-card .kicker {
+  font-size: calc(10px * var(--ui-scale));
+  letter-spacing: 0.16em;
+  opacity: 0.65;
+}
+
+.live-card .title {
+  font-size: calc(13px * var(--ui-scale));
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.live-card .xp-track {
+  height: 3px;
+  margin-top: 6px;
+}
+
+/* What opens next, for new players. */
+.title-next {
+  margin-top: 10px;
+  text-align: center;
+  font-size: calc(11px * var(--ui-scale));
+}
+
+.title-next:empty {
+  display: none;
+}
+
+/* The bottom bar: the five places off the title screen. */
+.title-bar {
+  display: flex;
+  justify-content: space-around;
+  gap: 2px;
+  margin: 12px -14px 0;
+}
+
+.bar-btn {
+  position: relative;
+  flex: 1 1 0;
+  max-width: 25%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 4px;
+  min-height: 54px;
+  padding: 6px 2px 2px;
+  font: inherit;
+  font-size: calc(10px * var(--ui-scale));
+  letter-spacing: 0.08em;
+  line-height: 1.2;
+  text-align: center;
+  color: inherit;
+  background: none;
+  border: none;
   border-radius: 12px;
+  pointer-events: auto;
+  cursor: pointer;
+}
+
+.bar-btn svg {
+  width: 24px;
+  height: 24px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.bar-btn:active {
+  background: color-mix(in srgb, currentColor 8%, transparent);
+}
+
+.bar-btn:focus-visible {
+  outline: 2px solid currentColor;
+}
+
+.bar-btn .news {
+  position: absolute;
+  top: 4px;
+  left: calc(50% + 10px);
+  display: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #e0503f;
+}
+
+.bar-btn .news.on {
+  display: block;
+}
+
+[data-feature][hidden] {
+  display: none !important;
 }
 
 .title-modes .pill {
@@ -1115,7 +1224,7 @@ body {
   margin-top: 4px;
 }
 
-/* Hangar tabs. */
+/* Tabs under a screen's title (goals, solo). */
 .tabs {
   position: absolute;
   left: calc(var(--safe-left) + 24px);
@@ -1146,12 +1255,6 @@ body {
   border-color: var(--text);
 }
 
-.tabs-credits {
-  margin-left: auto;
-  white-space: nowrap;
-  font-size: calc(11px * var(--ui-scale));
-}
-
 .settings.tabbed {
   top: calc(var(--safe-top) + 138px);
 }
@@ -1160,31 +1263,10 @@ body {
   display: none;
 }
 
-/* Ship tab: compact rows so the ship stays in view below them. */
-#look-rows .setting-row {
-  min-height: calc(44px * var(--ui-scale));
-}
 
 .setting-row .value.locked {
   border-style: dashed;
   opacity: 0.75;
-}
-
-.look-buy {
-  width: 100%;
-  margin-top: 12px;
-}
-
-.look-buy[hidden] {
-  display: none;
-}
-
-.screen.panel.top {
-  background: linear-gradient(
-    to bottom,
-    color-mix(in srgb, var(--sky, #f1ede4) 92%, transparent) 64%,
-    transparent 76%
-  );
 }
 
 /* Upgrade rows: name and effect on the left, tier pips and a buy button on the right. */
@@ -1316,71 +1398,7 @@ body {
   margin-top: auto;
 }
 
-/* Sector map: a row of three sectors per loop. */
-.sector-loop {
-  margin: 22px 0 8px;
-}
-
-.sector-row {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 8px;
-}
-
-.sector {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 6px;
-  min-height: 92px;
-  padding: 12px;
-  font: inherit;
-  color: inherit;
-  text-align: left;
-  background: color-mix(in srgb, currentColor 5%, transparent);
-  border: 1px solid color-mix(in srgb, currentColor 28%, transparent);
-  border-radius: 14px;
-  cursor: pointer;
-  -webkit-appearance: none;
-  appearance: none;
-}
-
-.sector:active {
-  background: color-mix(in srgb, currentColor 14%, transparent);
-}
-
-.sector.locked {
-  opacity: 0.35;
-  cursor: default;
-}
-
-.sector-name {
-  font-size: calc(12px * var(--ui-scale));
-  letter-spacing: 0.08em;
-  line-height: 1.3;
-}
-
-.sector-levels {
-  font-size: calc(10px * var(--ui-scale));
-  letter-spacing: 0.14em;
-  opacity: 0.65;
-}
-
-.sector-stars {
-  margin-top: auto;
-  font-size: calc(15px * var(--ui-scale));
-  letter-spacing: 0.2em;
-}
-
 /* Service record. */
-.record-top {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  text-align: center;
-  padding: 10px 0 4px;
-}
-
 .record-rank {
   font-size: calc(20px * var(--ui-scale));
   letter-spacing: 0.14em;
@@ -1503,22 +1521,6 @@ body {
   backdrop-filter: blur(12px);
 }
 
-/* The hangar leaves the lower half clear so you can see the ship. */
-.screen.panel.top {
-  background: linear-gradient(
-    to bottom,
-    color-mix(in srgb, var(--sky, #f1ede4) 92%, transparent) 50%,
-    transparent 72%
-  );
-  -webkit-backdrop-filter: none;
-  backdrop-filter: none;
-}
-
-.settings.short {
-  bottom: auto;
-  overflow: visible;
-}
-
 /* No HUD behind a menu. */
 .menu-open #hud,
 .menu-open .combo,
@@ -1589,22 +1591,6 @@ body {
 
 .settings::-webkit-scrollbar {
   display: none;
-}
-
-/* Game over: one mission per row, progress on the right. */
-.over-mission {
-  display: flex;
-  justify-content: space-between;
-  gap: 16px;
-  text-align: left;
-  font-size: calc(12px * var(--ui-scale));
-  line-height: 1.5;
-  padding: 4px 0;
-}
-
-.over-mission-progress {
-  flex-shrink: 0;
-  opacity: 0.8;
 }
 
 /* --- Service record and league screens ----------------------------------- */
@@ -1956,7 +1942,7 @@ body {
 
 /* --- Economy ----------------------------------------------------------------- */
 
-/* Wallet bar, top right of the title: credits, cores, ranked tickets. */
+/* Wallet bar, top right of the title: credits and cores. */
 .wallet-bar {
   position: absolute;
   top: calc(var(--safe-top) + 12px);
@@ -1995,15 +1981,6 @@ body {
 
 .coin.premium svg {
   stroke: #8a63d2;
-}
-
-.coin-wait {
-  font-weight: 400;
-  opacity: 0.6;
-}
-
-.coin-wait:empty {
-  display: none;
 }
 
 .coin.bump {
@@ -2063,10 +2040,6 @@ body {
   flex-direction: column;
   gap: 2px;
   min-width: 0;
-}
-
-.shop-slot {
-  font-size: calc(11px * var(--ui-scale));
 }
 
 .pill.shop-buy {
@@ -2327,29 +2300,6 @@ body {
   margin-top: 12px;
 }
 
-.quest {
-  padding: 12px 0 10px;
-  border-bottom: 1px solid color-mix(in srgb, currentColor 25%, transparent);
-}
-
-.quest-top {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.quest .xp-track {
-  margin: 8px 0 4px;
-}
-
-.quest.done {
-  opacity: 0.55;
-}
-
-.quest-reward {
-  font-size: calc(11px * var(--ui-scale));
-}
-
 .over-rewards {
   margin-top: 12px;
   line-height: 1.8;
@@ -2359,7 +2309,7 @@ body {
   display: none;
 }
 
-/* The offer dialog (revive, a ticket for cores): the promotion card's look. */
+/* The offer dialog (revive): the promotion card's look. */
 .offer {
   cursor: default;
 }
@@ -2468,6 +2418,12 @@ body {
   white-space: nowrap;
 }
 
+.premium-badge {
+  margin-left: 6px;
+  font-size: 0.8em;
+  color: #c9a646;
+}
+
 .board-row {
   display: grid;
   grid-template-columns: 2.4em 1fr auto;
@@ -2537,8 +2493,8 @@ body {
   border-color: currentColor;
 }
 
-/* Wardrobe: slot chips, a scrolling grid of looks, and a panel for the one picked. */
-.settings.sheet.ward-sheet {
+/* Hangar: slot chips, a scrolling grid of looks, and a panel for the one picked. */
+.settings.sheet.hangar-sheet {
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -2546,7 +2502,7 @@ body {
   padding-top: 12px;
 }
 
-.ward-sheet .chip-row {
+.hangar-sheet .chip-row {
   flex: none;
   margin-top: 0;
   margin-bottom: 8px;
@@ -2562,7 +2518,28 @@ body {
   opacity: 0.8;
 }
 
-.ward-grid {
+.hangar-pane {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.hangar-pane[hidden] {
+  display: none;
+}
+
+.hangar-scroll {
+  overflow-y: auto;
+  scrollbar-width: none;
+  touch-action: pan-y;
+}
+
+.hangar-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.hangar-grid {
   flex: 1;
   min-height: 0;
   display: grid;
@@ -2575,11 +2552,11 @@ body {
   scrollbar-width: none;
 }
 
-.ward-grid::-webkit-scrollbar {
+.hangar-grid::-webkit-scrollbar {
   display: none;
 }
 
-.ward-card {
+.hangar-card {
   position: relative;
   display: flex;
   flex-direction: column;
@@ -2596,32 +2573,32 @@ body {
   min-width: 0;
 }
 
-.ward-card.picked {
+.hangar-card.picked {
   border: 2px solid currentColor;
   padding: 8px 2px 7px;
   background: color-mix(in srgb, currentColor 10%, transparent);
 }
 
-.ward-card.locked .card-swatch {
+.hangar-card.locked .card-swatch {
   opacity: 0.55;
 }
 
-.ward-card .card-swatch {
+.hangar-card .card-swatch {
   width: 38px;
   height: 38px;
   margin-bottom: 3px;
 }
 
-.ward-card .card-swatch svg {
+.hangar-card .card-swatch svg {
   width: 24px;
   height: 24px;
 }
 
-.ward-card .card-swatch svg[viewBox] path[fill="currentColor"] {
+.hangar-card .card-swatch svg[viewBox] path[fill="currentColor"] {
   stroke: none;
 }
 
-.ward-card .card-name {
+.hangar-card .card-name {
   font-size: calc(10.5px * var(--ui-scale));
   line-height: 1.2;
   max-width: 100%;
@@ -2630,7 +2607,7 @@ body {
   white-space: nowrap;
 }
 
-.ward-card .card-sub {
+.hangar-card .card-sub {
   font-size: calc(9px * var(--ui-scale));
   line-height: 1.2;
   opacity: 0.6;
@@ -2640,42 +2617,42 @@ body {
   white-space: nowrap;
 }
 
-.ward-card .card-tick {
+.hangar-card .card-tick {
   position: absolute;
   top: 4px;
   right: 6px;
   font-size: calc(11px * var(--ui-scale));
 }
 
-.ward-detail {
+.hangar-detail {
   flex: none;
   padding-top: 10px;
   border-top: 1px solid color-mix(in srgb, currentColor 18%, transparent);
 }
 
-.ward-head {
+.hangar-head {
   display: flex;
   justify-content: space-between;
   align-items: baseline;
   gap: 10px;
 }
 
-.ward-name {
+.hangar-name {
   font-size: calc(15px * var(--ui-scale));
   font-weight: 500;
 }
 
-.ward-status {
+.hangar-status {
   margin: 3px 0 8px;
   min-height: 2.4em;
   line-height: 1.35;
 }
 
-.ward-goal {
+.hangar-goal {
   margin: 0 0 10px;
 }
 
-.ward-detail .pill {
+.hangar-detail .pill {
   width: 100%;
 }
 
@@ -2701,6 +2678,8 @@ body {
 }
 
 .goal-count {
+  flex-shrink: 0;
+  white-space: nowrap;
   font-size: calc(11px * var(--ui-scale));
   opacity: 0.7;
   font-variant-numeric: tabular-nums;
@@ -2718,12 +2697,50 @@ body {
   opacity: 0.7;
 }
 
-.goal-row.done .goal-name::before {
+.goal-row.claimed .goal-name::before {
   content: '✓ ';
 }
 
-.goal-row.done {
+.goal-row.claimed {
   opacity: 0.6;
+}
+
+.goal-row.claim .goal-name {
+  font-weight: 500;
+}
+
+.goal-reroll {
+  display: inline-block;
+  margin-top: 6px;
+  padding: 0;
+  font: inherit;
+  font-size: calc(11px * var(--ui-scale));
+  color: inherit;
+  background: none;
+  border: none;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.pill.claim-btn {
+  min-width: 0;
+  min-height: calc(32px * var(--ui-scale));
+  padding: 0 16px;
+  font-size: calc(12px * var(--ui-scale));
+}
+
+.tab .news {
+  display: none;
+  width: 6px;
+  height: 6px;
+  margin-left: 6px;
+  vertical-align: 2px;
+  border-radius: 50%;
+  background: #e0503f;
+}
+
+.tab .news.on {
+  display: inline-block;
 }
 
 .goal-row .xp-track {
@@ -2732,4 +2749,60 @@ body {
 
 #screen-shop .chip-row {
   margin-top: 10px;
+}
+
+/* First launch: the welcome sheet, and the practice run's prompt. */
+.welcome-sheet {
+  height: auto;
+  max-height: 60%;
+  padding-top: 16px;
+}
+
+.welcome-skip {
+  display: block;
+  margin: 14px auto 0;
+  padding: 6px;
+  font: inherit;
+  font-size: calc(12px * var(--ui-scale));
+  color: inherit;
+  background: none;
+  border: none;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.tutorial {
+  position: absolute;
+  left: calc(var(--safe-left) + 20px);
+  right: calc(var(--safe-right) + 20px);
+  top: calc(var(--safe-top) + 92px);
+  z-index: 5;
+  display: grid;
+  gap: 4px;
+  padding: 12px 16px;
+  text-align: center;
+  background: color-mix(in srgb, var(--sky, #f1ede4) 88%, transparent);
+  border-radius: 16px;
+  pointer-events: auto;
+}
+
+.tutorial[hidden] {
+  display: none;
+}
+
+.tutorial-text {
+  font-size: calc(15px * var(--ui-scale));
+  letter-spacing: 0.06em;
+}
+
+.tutorial .link {
+  justify-self: center;
+  padding: 4px 8px;
+  font: inherit;
+  font-size: calc(11px * var(--ui-scale));
+  color: inherit;
+  background: none;
+  border: none;
+  text-decoration: underline;
+  cursor: pointer;
 }

@@ -1,5 +1,7 @@
 import { CONFIG } from '../config';
 import { storage } from '../storage';
+import { seasonAt } from '../season';
+import { seasonPassKeys } from '../seasonLooks';
 import type { Reward } from './reward';
 
 // The season pass: six weeks (six weekly levels), thirty tiers of XP. Runs
@@ -8,30 +10,35 @@ import type { Reward } from './reward';
 // are paid as tiers are reached; unlocking premium pays every premium tier
 // already reached.
 
-/** Monday 14 Sep 2026 (UTC): season 1 starts here. */
-const EPOCH = Date.UTC(2026, 8, 14);
-const WEEK = 7 * 86_400_000;
+export { seasonAt };
 
-export function seasonAt(ms: number): { season: number; start: number; end: number } {
-  const len = CONFIG.economy.pass.weeks * WEEK;
-  const n = Math.floor((ms - EPOCH) / len);
-  return { season: n + 1, start: EPOCH + n * len, end: EPOCH + (n + 1) * len };
+/** A generated season look as a reward, or cores if it was vetoed (CONFIG.seasons.overrides). */
+function seasonLook(key: string, cores: number): Reward {
+  return CONFIG.seasons.overrides[key]?.veto ? { cores } : { look: key };
 }
 
-/** The free track's reward at a tier (1-based). */
-export function freeReward(tier: number): Reward {
-  if (tier % 10 === 0) return { tickets: tier / 10 };
+/** The free track's reward at a tier (1-based) in `season`. From season 2 its tier 25 is a generated paint. */
+export function freeReward(tier: number, season = 1): Reward {
+  if (season >= 2 && tier === 25) return seasonLook(seasonPassKeys(season).f1, 10);
+  if (tier % 10 === 0) return { cores: tier };
   if (tier % 5 === 0) return { cores: 5 };
-  return { credits: 100 + 10 * tier };
+  return { credits: 50 + 5 * tier };
 }
 
-/** The premium track's reward at a tier (1-based). */
-export function premiumReward(tier: number): Reward {
+/** The premium track's reward at a tier (1-based) in `season`. Season 1's looks were hand-made; later ones are generated. */
+export function premiumReward(tier: number, season = 1): Reward {
+  if (season >= 2) {
+    const k = seasonPassKeys(season);
+    if (tier === 10) return seasonLook(k.p1, 30);
+    if (tier === 15) return seasonLook(k.e1, 30);
+    if (tier === 20) return seasonLook(k.d1, 30);
+    if (tier === 30) return { ...seasonLook(k.p2, 30), cores: 50 };
+  }
   if (tier === 10) return { look: 'paint:frost' };
   if (tier === 15) return { look: 'engine:solar' };
   if (tier === 20) return { look: 'hull:raptor' };
   if (tier === 30) return { look: 'paint:ember', cores: 50 };
-  if (tier % 5 === 0) return { tickets: 2 };
+  if (tier % 5 === 0) return { cores: 20 };
   if (tier % 3 === 0) return { cores: 15 };
   return { credits: 250 + 20 * tier };
 }
@@ -42,18 +49,23 @@ interface Saved {
   premium: boolean;
   paidFree: number; // tiers paid on each track
   paidPremium: number;
+  /** 2 since tiers took 600 XP (they took 120): older saves are scaled up once to keep their tier. */
+  v?: number;
 }
 
 const KEY = 'endless.pass';
+const OLD_XP_PER_TIER = 120;
 
 export class Pass {
-  private s: Saved = { season: 0, xp: 0, premium: false, paidFree: 0, paidPremium: 0 };
+  private s: Saved = { season: 0, xp: 0, premium: false, paidFree: 0, paidPremium: 0, v: 2 };
 
   async load(now: number): Promise<void> {
     const raw = await storage.get(KEY);
     if (raw) {
       try {
-        this.s = { ...this.s, ...(JSON.parse(raw) as Partial<Saved>) };
+        const saved = JSON.parse(raw) as Partial<Saved>;
+        this.s = { ...this.s, ...saved };
+        if (!saved.v) this.s = { ...this.s, xp: Math.round(((saved.xp ?? 0) * CONFIG.economy.pass.xpPerTier) / OLD_XP_PER_TIER), v: 2 };
       } catch {
         // Corrupt value: a fresh pass.
       }
@@ -69,7 +81,7 @@ export class Pass {
   turn(now: number): void {
     const { season } = seasonAt(now);
     if (this.s.season === season) return;
-    this.s = { season, xp: 0, premium: false, paidFree: 0, paidPremium: 0 };
+    this.s = { season, xp: 0, premium: false, paidFree: 0, paidPremium: 0, v: 2 };
     this.save();
   }
 
@@ -111,8 +123,8 @@ export class Pass {
   private pay(): Reward[] {
     const out: Reward[] = [];
     const t = this.tier;
-    while (this.s.paidFree < t) out.push(freeReward(++this.s.paidFree));
-    if (this.s.premium) while (this.s.paidPremium < t) out.push(premiumReward(++this.s.paidPremium));
+    while (this.s.paidFree < t) out.push(freeReward(++this.s.paidFree, this.s.season));
+    if (this.s.premium) while (this.s.paidPremium < t) out.push(premiumReward(++this.s.paidPremium, this.s.season));
     this.save();
     return out;
   }

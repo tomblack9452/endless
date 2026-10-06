@@ -6,7 +6,6 @@ import { find, type Slot } from '../looks';
 export interface Reward {
   credits?: number;
   cores?: number;
-  tickets?: number;
   look?: string;
 }
 
@@ -26,7 +25,6 @@ export function rewardParts(r: Reward): string[] {
   const out: string[] = [];
   if (r.credits) out.push(`+${n(r.credits)} credits`);
   if (r.cores) out.push(`+${n(r.cores)} cores`);
-  if (r.tickets) out.push(`+${r.tickets} ranked ticket${r.tickets === 1 ? '' : 's'}`);
   const look = rewardLook(r);
   if (look) out.push(`${find(look.slot, look.id).name} ${look.slot === 'engine' ? 'engine' : look.slot}`);
   return out;

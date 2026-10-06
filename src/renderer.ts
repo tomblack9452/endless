@@ -371,8 +371,6 @@ float gNoise(vec2 p) {
   }
 }
 
-export { DEG };
-
 const SHIP_CENTRE = new Vector3(0, CONFIG.ship.hoverY + 0.05, 0);
 const UP = new Vector3(0, 1, 0);
 const X_AXIS = new Vector3(1, 0, 0);

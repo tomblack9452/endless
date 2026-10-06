@@ -1,7 +1,7 @@
 import { CONFIG } from './config';
 import { label, type SettingKey, type Settings } from './settings';
 
-export type ScreenName = 'title' | 'paused' | 'over' | 'settings' | 'stats' | 'missions' | 'hangar' | 'record' | 'solo' | 'league' | 'shop' | 'pass' | 'daily' | 'boards' | 'wardrobe';
+export type ScreenName = 'title' | 'paused' | 'over' | 'settings' | 'goals' | 'hangar' | 'record' | 'solo' | 'league' | 'shop' | 'pass' | 'boards' | 'welcome';
 
 /** Everything the league screen shows. */
 /** The service record and league screens share one layout. */
@@ -32,16 +32,7 @@ export interface Celebration {
   color?: string; // league colour for the glow
 }
 
-/** One row on the hangar's ship tab. */
-export interface LookRow {
-  key: string;
-  label: string;
-  value: string;
-  locked: boolean;
-  note: string; // how to unlock, when locked
-}
-
-/** One row on the upgrades tab. */
+/** One row on the hangar's upgrades tab. */
 export interface UpgradeRow {
   id: string;
   name: string;
@@ -73,13 +64,14 @@ export interface EnvTile {
   fraction: number; // 0..1 towards the unlock
 }
 
-/** One tile on the sector map. */
-export interface SectorTile {
-  index: number;
-  name: string;
-  levels: string;
-  stars: number; // star bits
-  locked: boolean;
+/** A live card on the title screen. */
+export interface TitleCard {
+  id: string;
+  kicker: string;
+  title: string;
+  fraction?: number;
+  /** Something to claim or do now. */
+  hot?: boolean;
 }
 
 /** Everything the service record screen shows. */
@@ -135,34 +127,27 @@ export class UI {
     paused: $('screen-paused'),
     over: $('screen-over'),
     settings: $('screen-settings'),
-    stats: $('screen-stats'),
-    missions: $('screen-missions'),
+    goals: $('screen-goals'),
     hangar: $('screen-hangar'),
+    welcome: $('screen-welcome'),
     record: $('screen-record'),
     solo: $('screen-sectors'),
     league: $('screen-league'),
     shop: $('screen-shop'),
     pass: $('screen-pass'),
-    daily: $('screen-daily'),
     boards: $('screen-boards'),
-    wardrobe: $('screen-wardrobe'),
   };
   readonly titleLeague = $('title-league');
   private readonly hudMode = $('hud-mode');
   private readonly overMode = $('over-mode');
   private readonly overRank = $('over-rank');
   readonly titleRank = $('title-rank');
-  private readonly missionsRows = $('missions-rows');
-  private readonly missionsNext = $('missions-next');
-  private readonly hangarCount = $('hangar-count');
-  private readonly overMissions = $('over-missions');
   private readonly hudPower = $('hud-power');
   private shownPower = '';
   private readonly statsRows = $('stats-rows');
   private readonly overExtra = $('over-extra');
   readonly titleSettings = $('title-settings');
   private readonly rankedSub = $('title-ranked-sub');
-  private readonly titleBest = $('title-best');
   private readonly overScore = $('over-score');
   private readonly overBest = $('over-best');
 
@@ -301,16 +286,111 @@ export class UI {
     }
   }
 
-  /** The line under the ranked button: this week's level and your best on it. */
-  setRankedSub(text: string): void {
-    this.rankedSub.textContent = text;
+  /** The big button: ranked (its name and the line under it), or for new players, endless. */
+  setPrimary(name: string, sub: string): void {
+    $('title-ranked-name').textContent = name;
+    this.rankedSub.textContent = sub;
   }
 
-  setTitleLink(name: string, text: string): void {
-    const el = document.querySelector<HTMLElement>(`[data-title="${name}"]`);
-    if (el) el.textContent = text;
+  /** Show only what's open (data-feature on the title's buttons); a modes row with nothing in it goes. */
+  setFeatures(open: (feature: string) => boolean): void {
+    for (const el of document.querySelectorAll<HTMLElement>('#screen-title [data-feature]')) el.hidden = !open(el.dataset.feature ?? '');
+    const modes = document.querySelector<HTMLElement>('#screen-title .title-modes');
+    if (modes) modes.hidden = [...modes.children].every((c) => (c as HTMLElement).hidden);
   }
 
+  setTitleNext(text: string): void {
+    $('title-next').textContent = text;
+  }
+
+  /** The live cards above the big button. Taps call the title link named by each card's id. */
+  renderTitleCards(cards: TitleCard[]): void {
+    $('title-cards').replaceChildren(
+      ...cards.map((c) => {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = `live-card${c.hot ? ' hot' : ''}`;
+        b.dataset.card = c.id;
+        const k = document.createElement('span');
+        k.className = 'kicker label';
+        k.textContent = c.kicker;
+        const t = document.createElement('span');
+        t.className = 'title label';
+        t.textContent = c.title;
+        b.append(k, t);
+        if (c.fraction !== undefined) {
+          const track = document.createElement('span');
+          track.className = 'xp-track';
+          const fill = document.createElement('span');
+          fill.className = 'xp-fill';
+          fill.style.transform = `scaleX(${Math.max(0, Math.min(1, c.fraction))})`;
+          track.append(fill);
+          b.append(track);
+        }
+        return b;
+      }),
+    );
+  }
+
+  // --- first launch ---
+
+  bindWelcome(on: { control: (id: string) => void; practice: () => void; skip: () => void; pick: (key: string) => void; done: () => void }): void {
+    const stop = (e: Event) => e.stopPropagation();
+    $('screen-welcome').addEventListener('pointerdown', stop);
+    $('tutorial').addEventListener('pointerdown', stop);
+    $('welcome-controls').addEventListener('click', (e) => {
+      const b = (e.target as HTMLElement).closest<HTMLElement>('[data-control]');
+      if (b) on.control(b.dataset.control ?? '');
+    });
+    for (const id of ['welcome-hull', 'welcome-paint', 'welcome-engine'])
+      $(id).addEventListener('click', (e) => {
+        const b = (e.target as HTMLElement).closest<HTMLElement>('[data-look]');
+        if (b) on.pick(b.dataset.look ?? '');
+      });
+    $('welcome-practice').addEventListener('click', on.practice);
+    $('welcome-skip').addEventListener('click', on.skip);
+    $('tutorial-skip').addEventListener('click', on.skip);
+    $('welcome-done').addEventListener('click', on.done);
+  }
+
+  /** The welcome screen: choosing controls, or dressing the ship (chips: [key, label, on]). */
+  renderWelcome(step: 'controls' | 'dress', controls: [string, string, boolean][], dress: Record<'hull' | 'paint' | 'engine', [string, string, boolean][]>): void {
+    $('welcome-title').textContent = step === 'controls' ? 'welcome, pilot' : 'dress your ship';
+    for (const p of document.querySelectorAll<HTMLElement>('[data-welcome]')) p.hidden = p.dataset.welcome !== step;
+    const chips = (into: string, list: [string, string, boolean][], attr: string) =>
+      $(into).replaceChildren(
+        ...list.map(([key, label, on]) => {
+          const b = document.createElement('button');
+          b.type = 'button';
+          b.className = `tab${on ? ' on' : ''}`;
+          b.textContent = label;
+          b.dataset[attr] = key;
+          return b;
+        }),
+      );
+    chips('welcome-controls', controls, 'control');
+    chips('welcome-hull', dress.hull, 'look');
+    chips('welcome-paint', dress.paint, 'look');
+    chips('welcome-engine', dress.engine, 'look');
+  }
+
+  /** The practice run's prompt (null hides it). */
+  showTutorial(text: string | null, step = ''): void {
+    $('tutorial').hidden = text === null;
+    if (text !== null) {
+      $('tutorial-text').textContent = text;
+      $('tutorial-step').textContent = step;
+    }
+  }
+
+  bindTitleCards(onCard: (id: string) => void): void {
+    const box = $('title-cards');
+    box.addEventListener('pointerdown', (e) => e.stopPropagation());
+    box.addEventListener('click', (e) => {
+      const card = (e.target as HTMLElement).closest<HTMLElement>('[data-card]');
+      if (card) onCard(card.dataset.card ?? '');
+    });
+  }
 
   // --- leaderboard screen ---------------------------------------------------------
 
@@ -348,7 +428,7 @@ export class UI {
   }
 
   /** The board's rows: rank, name, score. A pilot below the top comes after a gap. */
-  renderLeaderboard(caption: string, rows: { rank: number; name: string; score: string; you: boolean }[], status: string): void {
+  renderLeaderboard(caption: string, rows: { rank: number; name: string; score: string; you: boolean; premium?: boolean }[], status: string): void {
     $('board-caption').textContent = caption;
     $('board-status').textContent = status;
     const out: HTMLElement[] = [];
@@ -369,6 +449,13 @@ export class UI {
       const who = document.createElement('span');
       who.className = 'who';
       who.textContent = r.you ? `${r.name} (you)` : r.name;
+      if (r.premium) {
+        const badge = document.createElement('span');
+        badge.className = 'premium-badge';
+        badge.title = 'premium';
+        badge.textContent = '◆';
+        who.append(badge);
+      }
       const score = document.createElement('span');
       score.className = 'pts';
       score.textContent = r.score;
@@ -396,35 +483,35 @@ export class UI {
     $('over-share').hidden = !on;
   }
 
-  renderStats(rows: [string, string][]): void {
-    this.fillRows(this.statsRows, rows);
+  /** The end screen's "double credits" offer (a rewarded ad, or free with premium); null hides it. */
+  showDouble(text: string | null): void {
+    const b = $('over-double') as HTMLButtonElement;
+    b.hidden = text === null;
+    b.disabled = false;
+    if (text) b.textContent = text;
   }
 
-  /** Missions screen: each mission with its progress, and what the next one unlocks. */
-  renderMissions(rows: [string, string][], next: string): void {
-    this.fillRows(this.missionsRows, rows);
-    this.missionsNext.textContent = next;
+  bindRecordTabs(onTab: (tab: 'rank' | 'stats') => void): void {
+    for (const t of document.querySelectorAll<HTMLElement>('[data-recordtab]')) {
+      t.addEventListener('pointerdown', (e) => e.stopPropagation());
+      t.addEventListener('click', () => onTab(t.dataset.recordtab as 'rank' | 'stats'));
+    }
+  }
+
+  /** The service record's tabs: your rank, and your lifetime stats. */
+  setRecordTab(tab: 'rank' | 'stats'): void {
+    for (const t of document.querySelectorAll<HTMLElement>('[data-recordtab]')) t.classList.toggle('on', t.dataset.recordtab === tab);
+    for (const p of document.querySelectorAll<HTMLElement>('[data-recordpane]')) p.hidden = p.dataset.recordpane !== tab;
+  }
+
+  renderStats(rows: [string, string][]): void {
+    this.fillRows(this.statsRows, rows);
   }
 
   /** Run mode under the level number and above the game-over score. */
   setMode(text: string): void {
     this.hudMode.textContent = text;
     this.overMode.textContent = text;
-  }
-
-  bindHangarTabs(onTab: (tab: 'ship' | 'upgrades') => void): void {
-    for (const el of document.querySelectorAll<HTMLElement>('[data-tab]')) {
-      el.addEventListener('pointerdown', (e) => e.stopPropagation());
-      el.addEventListener('click', () => onTab(el.dataset.tab as 'ship' | 'upgrades'));
-    }
-  }
-
-  /** Show a hangar tab. The ship tab leaves the lower screen clear to see the ship. */
-  setHangarTab(tab: 'ship' | 'upgrades', credits: string): void {
-    for (const el of document.querySelectorAll<HTMLElement>('[data-tab]')) el.classList.toggle('on', el.dataset.tab === tab);
-    for (const el of document.querySelectorAll<HTMLElement>('[data-pane]')) el.hidden = el.dataset.pane !== tab;
-    this.screens.hangar.classList.toggle('top', tab === 'ship');
-    $('hangar-credits').textContent = credits;
   }
 
   bindUpgrades(onBuy: (id: string) => void, onToggle: (id: string) => void): void {
@@ -575,47 +662,6 @@ export class UI {
     $('over-heading').textContent = text;
   }
 
-  /** Taps on unlocked sector tiles call `onPick` with the sector index. */
-  bindSectors(onPick: (sector: number) => void): void {
-    const grid = $('sectors-grid');
-    grid.addEventListener('pointerdown', (e) => e.stopPropagation());
-    grid.addEventListener('click', (e) => {
-      const tile = (e.target as HTMLElement).closest<HTMLElement>('.sector');
-      if (tile && !tile.classList.contains('locked')) onPick(Number(tile.dataset.sector));
-    });
-  }
-
-  renderSectors(tiles: SectorTile[], summary: string): void {
-    $('sectors-summary').textContent = summary;
-    const rows: HTMLElement[] = [];
-    for (let i = 0; i < tiles.length; i += 3) {
-      const head = document.createElement('div');
-      head.className = 'settings-group sector-loop';
-      head.textContent = `loop ${i / 3 + 1}`;
-      const row = document.createElement('div');
-      row.className = 'sector-row';
-      for (const t of tiles.slice(i, i + 3)) {
-        const b = document.createElement('button');
-        b.type = 'button';
-        b.className = `sector${t.locked ? ' locked' : ''}`;
-        b.dataset.sector = String(t.index);
-        const name = document.createElement('span');
-        name.className = 'sector-name';
-        name.textContent = t.locked ? 'locked' : t.name;
-        const levels = document.createElement('span');
-        levels.className = 'sector-levels';
-        levels.textContent = t.levels;
-        const stars = document.createElement('span');
-        stars.className = 'sector-stars';
-        stars.textContent = [1, 2, 4].map((bit) => (t.stars & bit ? '★' : '☆')).join('');
-        b.append(name, levels, stars);
-        row.append(b);
-      }
-      rows.push(head, row);
-    }
-    $('sectors-grid').replaceChildren(...rows);
-  }
-
   /** League badge on the title screen. */
   setTitleLeague(icon: string, name: string, lpFraction: number): void {
     $('title-league-icon').innerHTML = icon;
@@ -734,10 +780,10 @@ export class UI {
   }
 
   /** Rank badge on the title screen. */
-  setTitleRank(icon: string, name: string, credits: string): void {
+  setTitleRank(icon: string, name: string, sub: string): void {
     $('title-rank-icon').innerHTML = icon;
     $('title-rank-name').textContent = name;
-    $('title-credits').textContent = credits;
+    $('title-credits').textContent = sub;
   }
 
   /** Rank result on the game-over screen (null clears it, e.g. solo runs). */
@@ -788,62 +834,6 @@ export class UI {
     if (text === this.shownPower) return;
     this.shownPower = text;
     this.hudPower.textContent = text;
-  }
-
-  /** Mission progress under the game-over score. */
-  setGameOverMissions(rows: [string, string][]): void {
-    this.overMissions.replaceChildren(
-      ...rows.map(([text, prog]) => {
-        const line = document.createElement('div');
-        line.className = 'over-mission';
-        const a = document.createElement('span');
-        a.textContent = text;
-        const b = document.createElement('span');
-        b.className = 'over-mission-progress';
-        b.textContent = prog;
-        line.append(a, b);
-        return line;
-      }),
-    );
-  }
-
-  /** Ship tab: a row tap cycles that slot; the buy button buys what's being previewed. */
-  bindLooks(onRow: (key: string) => void, onBuy: () => void): void {
-    const rows = $('look-rows');
-    rows.addEventListener('pointerdown', (e) => e.stopPropagation());
-    rows.addEventListener('click', (e) => {
-      const row = (e.target as HTMLElement).closest<HTMLElement>('[data-look]');
-      if (row) onRow(row.dataset.look ?? '');
-    });
-    const buy = $('look-buy');
-    buy.addEventListener('pointerdown', (e) => e.stopPropagation());
-    buy.addEventListener('click', () => onBuy());
-  }
-
-  renderLooks(rows: LookRow[], buy: { text: string; enabled: boolean } | null, note: string): void {
-    $('look-rows').replaceChildren(
-      ...rows.map((r) => {
-        const b = document.createElement('button');
-        b.type = 'button';
-        b.className = 'setting-row';
-        b.dataset.look = r.key;
-        const name = document.createElement('span');
-        name.className = 'label';
-        name.textContent = r.label;
-        const value = document.createElement('span');
-        value.className = `value${r.locked ? ' locked' : ''}`;
-        value.textContent = r.locked ? `${r.value} · ${r.note}` : r.value;
-        b.append(name, value);
-        return b;
-      }),
-    );
-    const btn = $('look-buy') as HTMLButtonElement;
-    btn.hidden = !buy;
-    if (buy) {
-      btn.textContent = buy.text;
-      btn.disabled = !buy.enabled;
-    }
-    this.hangarCount.textContent = note;
   }
 
   fillRows(into: HTMLElement, rows: [string, string][]): void {
@@ -910,12 +900,6 @@ export class UI {
 
   hideBanner(): void {
     this.banner.classList.remove('show');
-  }
-
-  /** Title screen bests, by label (zeros are left out). */
-  setBests(bests: [string, number][]): void {
-    const parts = bests.filter(([, v]) => v > 0).map(([k, v]) => `${k} ${formatScore(v)}`);
-    this.titleBest.textContent = parts.length ? `best: ${parts.join(' · ')}` : '';
   }
 
   setGameOver(score: number, best: number, isNewBest: boolean, nearMisses: number, bestCombo: number, seed: number): void {

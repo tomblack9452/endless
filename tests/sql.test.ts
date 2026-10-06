@@ -2,12 +2,18 @@ import { PGlite } from '@electric-sql/pglite';
 import { beforeAll, describe, expect, it } from 'vitest';
 import SETUP from '../supabase/setup.sql?raw';
 import { CONFIG } from '../src/config';
+import { applyMigrations } from '../scripts/apply-db-lib.mjs';
+import { parts as splitParts, statements } from '../scripts/sql-split.mjs';
 
 // The database, run for real: PGlite is Postgres in WASM, with a stand-in for
 // the bits of Supabase the schema leans on (the auth schema and its roles).
 // This is how the leaderboard is tested without a Supabase project.
 
 const files = import.meta.glob<string>('../supabase/migrations/*.sql', { query: '?raw', import: 'default', eager: true });
+const partFiles = import.meta.glob<string>('../supabase/parts/*.sql', { query: '?raw', import: 'default', eager: true });
+/** The small parts, in order. */
+const PARTS: string[] = Object.entries(partFiles).sort((a, b) => a[0].localeCompare(b[0])).map(([, sql]) => sql);
+
 /** Every migration in order: [file name, sql]. */
 const migrations: [string, string][] = Object.entries(files)
   .map(([path, sql]): [string, string] => [path.split('/').pop() as string, sql])
@@ -113,6 +119,105 @@ describe('supabase/setup.sql', () => {
     await fresh.exec(SETUP);
     const t = await fresh.query<{ table_name: string }>("select table_name from information_schema.tables where table_schema = 'public' order by 1");
     expect(t.rows.map((r) => r.table_name)).toEqual(['bests', 'core_log', 'players', 'runs', 'saves', 'store_events', 'wallets']);
+  });
+
+  it('can run again over a database it already set up, as the Supabase GitHub integration does', async () => {
+    const twice = new PGlite();
+    await twice.exec(SUPABASE_STANDIN);
+    await twice.exec(SETUP);
+    await twice.exec("insert into auth.users (id) values ('00000000-0000-0000-0000-000000000001')");
+    await twice.exec(SETUP);
+    for (const [, sql] of migrations) await twice.exec(sql);
+    const players = await twice.query<{ n: number }>('select count(*)::int as n from public.players');
+    expect(players.rows[0].n).toBe(1); // data kept
+    const views = await twice.query<{ n: number }>("select count(*)::int as n from information_schema.views where table_schema = 'public'");
+    expect(views.rows[0].n).toBe(0); // the old board view stays gone
+  });
+});
+
+describe('supabase/parts (for pasting a little at a time)', () => {
+  it('are small enough that a paste cut off at 4 KB cannot clip one', () => {
+    expect(PARTS.length).toBeGreaterThan(1);
+    for (const p of PARTS) expect(new TextEncoder().encode(p).length).toBeLessThan(3800);
+  });
+
+  it('say which part they are, in order, with none missing', () => {
+    PARTS.forEach((p, i) => expect(p.split('\n')[0]).toContain(`part ${i + 1} of ${PARTS.length}`));
+  });
+
+  it('are the migrations, split between statements (run `npm run db:setup` if this fails)', () => {
+    const body = PARTS.map((p) => p.split('\n').slice(2).join('\n').trim());
+    const expected = splitParts(migrations.map(([, sql]) => sql.trim()).join('\n\n'), 3500);
+    expect(body).toEqual(expected);
+  });
+
+  it('never cut a statement: every part is whole statements', () => {
+    const all = statements(migrations.map(([, sql]) => sql.trim()).join('\n\n'));
+    const fromParts = PARTS.flatMap((p) => statements(p.split('\n').slice(2).join('\n')));
+    expect(fromParts).toEqual(all);
+  });
+
+  it('run one after another to the same database as the single file', async () => {
+    const names = async (d: PGlite) => {
+      const t = await d.query<{ n: string }>("select table_name n from information_schema.tables where table_schema = 'public' order by 1");
+      const f = await d.query<{ n: string }>("select routine_name n from information_schema.routines where routine_schema = 'public' order by 1");
+      return [t.rows.map((r) => r.n), f.rows.map((r) => r.n)];
+    };
+    const one = new PGlite();
+    await one.exec(SUPABASE_STANDIN);
+    await one.exec(SETUP);
+    const many = new PGlite();
+    await many.exec(SUPABASE_STANDIN);
+    for (const p of PARTS) await many.exec(p);
+    expect(await names(many)).toEqual(await names(one));
+    expect((await names(many))[1]).toEqual(expect.arrayContaining(['check_run', 'submit_run', 'leaderboard', 'set_pilot_name', 'earn_cores', 'spend_cores']));
+  });
+});
+
+describe('db:apply (the migrations from a terminal)', () => {
+  /** The throwaway database, shaped like pg's client: multi-statement strings run whole. */
+  const asClient = (d: PGlite) => ({
+    query: async (sql: string, params?: unknown[]) => (params ? d.query(sql, params) : { rows: (await d.exec(sql)).flatMap((r) => r.rows) }),
+  });
+  const fresh = async () => {
+    const d = new PGlite();
+    await d.exec(SUPABASE_STANDIN);
+    return d;
+  };
+
+  it('applies each migration once, and does nothing the second time', async () => {
+    const d = await fresh();
+    const first = await applyMigrations(asClient(d), migrations);
+    expect(first.applied).toEqual(migrations.map(([f]) => f));
+    const second = await applyMigrations(asClient(d), migrations);
+    expect(second).toEqual({ applied: [], recorded: [] });
+    const t = await d.query<{ n: string }>("select table_name n from information_schema.tables where table_schema = 'public' order by 1");
+    expect(t.rows.map((r) => r.n)).toEqual(['bests', 'core_log', 'endless_migrations', 'players', 'runs', 'saves', 'store_events', 'wallets']);
+  });
+
+  it('picks up a newer migration on its own', async () => {
+    const d = await fresh();
+    await applyMigrations(asClient(d), migrations.slice(0, 2));
+    const later = await applyMigrations(asClient(d), migrations);
+    expect(later.applied).toEqual(migrations.slice(2).map(([f]) => f));
+  });
+
+  it('recognises a database that was set up by pasting the SQL', async () => {
+    const d = await fresh();
+    await d.exec(SETUP);
+    const r = await applyMigrations(asClient(d), migrations);
+    expect(r.applied).toEqual([]);
+    expect(r.recorded).toEqual(migrations.map(([f]) => f));
+  });
+
+  it('keeps nothing from a migration that fails, and says which', async () => {
+    const d = await fresh();
+    const broken: [string, string][] = [...migrations.slice(0, 2), ['0004_broken.sql', 'create table public.half (id int); select 1 / 0;']];
+    await expect(applyMigrations(asClient(d), broken)).rejects.toThrow(/0004_broken.sql failed, nothing from it was kept/);
+    const t = await d.query<{ n: string }>("select table_name n from information_schema.tables where table_schema = 'public' and table_name = 'half'");
+    expect(t.rows).toHaveLength(0);
+    // And the earlier ones stay done.
+    expect((await d.query<{ name: string }>('select name from public.endless_migrations order by 1')).rows.map((r) => r.name)).toEqual([migrations[0][0], migrations[1][0]]);
   });
 });
 

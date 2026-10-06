@@ -1,7 +1,7 @@
 import { formatScore } from '../ui';
 
 // The economy's screens: the wallet bar on the title, the shop, the season
-// pass, the daily screen, the offer dialog (revive, a ticket for cores) and
+// pass, the offer dialog (revive) and
 // the 3-2-1 countdown. Game wires the taps; this only draws.
 
 function $(id: string): HTMLElement {
@@ -22,7 +22,7 @@ function stopTaps(e: HTMLElement): void {
   e.addEventListener('pointerdown', (ev) => ev.stopPropagation());
 }
 
-export interface ShopOfferView {
+interface ShopOfferView {
   name: string;
   slot: string; // 'hull', 'paint', ...
   slotName: string; // shown under the name
@@ -38,19 +38,24 @@ export interface ShopOfferView {
 export interface ShopView {
   wallet: string;
   reset: string;
-  /** The tabs (today, the weekly set, the vault) and which is open. */
+  /** The tabs (today, the weekly set, the vault, the pass, cores, premium) and which is open. */
   tabs: { id: string; label: string; on: boolean }[];
+  /** Looks as cards (today, the set, the vault), or a list of things to buy (the rest). */
+  pane: 'looks' | 'list';
+  /** The list pane's heading and the line under it. */
+  listHead: string;
+  listNote: string;
   heading: string;
   /** A line under the cards: what the set or the vault is. */
   info: string;
   offers: ShopOfferView[];
   /** The one buy button, for the picked look. */
   buy: { text: string; enabled: boolean };
-  tickets: { label: string; button: string; enabled: boolean };
+  /** The list pane's rows (a tap on one's button calls onCores with its index). */
   cores: { label: string; button: string; enabled: boolean }[];
 }
 
-export interface PassTierView {
+interface PassTierView {
   tier: number;
   free: string;
   premium: string;
@@ -70,13 +75,6 @@ export interface PassView {
   premiumOwned: boolean;
 }
 
-export interface DailyView {
-  calendar: { day: number; reward: string; state: 'claimed' | 'today' | 'next' }[];
-  claim: { text: string; enabled: boolean };
-  reset: string;
-  quests: { text: string; reward: string; progress: string; fraction: number; done: boolean }[];
-  bonus: string;
-}
 
 export interface OfferView {
   kicker: string;
@@ -108,16 +106,14 @@ export class EconomyView {
     stopTaps(this.offerEl);
     $('offer-yes').addEventListener('click', () => this.closeOffer(true));
     $('offer-no').addEventListener('click', () => this.closeOffer(false));
-    for (const id of ['screen-shop', 'screen-pass', 'screen-daily', 'countdown']) stopTaps($(id));
+    for (const id of ['screen-shop', 'screen-pass', 'countdown']) stopTaps($(id));
   }
 
   // --- title ---
 
-  setBar(credits: number, cores: number, tickets: number, wait: string): void {
+  setBar(credits: number, cores: number): void {
     $('bar-credits').textContent = formatScore(credits);
     $('bar-cores').textContent = formatScore(cores);
-    $('bar-tickets').textContent = String(tickets);
-    $('bar-ticket-wait').textContent = wait;
   }
 
   /** A dot on a title chip: something there to claim or see. */
@@ -126,7 +122,7 @@ export class EconomyView {
   }
 
   /** A counter in the bar bumps when something lands in it. */
-  bump(which: 'credits' | 'cores' | 'tickets'): void {
+  bump(which: 'credits' | 'cores'): void {
     const c = $(`bar-${which}`).parentElement!;
     c.classList.remove('bump');
     void c.offsetWidth; // restart the animation
@@ -135,7 +131,7 @@ export class EconomyView {
 
   // --- shop ---
 
-  bindShop(onOffer: (i: number) => void, onBuy: () => void, onTicket: () => void, onCores: (i: number) => void, onTab: (id: string) => void): void {
+  bindShop(onOffer: (i: number) => void, onBuy: () => void, onCores: (i: number) => void, onTab: (id: string) => void): void {
     $('shop-tabs').addEventListener('click', (e) => {
       const tab = (e.target as HTMLElement).closest<HTMLElement>('[data-shoptab]');
       if (tab) onTab(tab.dataset.shoptab ?? '');
@@ -145,9 +141,6 @@ export class EconomyView {
       if (card) onOffer(Number(card.dataset.offer));
     });
     $('shop-buy').addEventListener('click', onBuy);
-    $('shop-tickets').addEventListener('click', (e) => {
-      if ((e.target as HTMLElement).closest('button')) onTicket();
-    });
     $('shop-cores').addEventListener('click', (e) => {
       const b = (e.target as HTMLElement).closest<HTMLElement>('[data-pack]');
       if (b) onCores(Number(b.dataset.pack));
@@ -195,8 +188,11 @@ export class EconomyView {
       row.append(text, b);
       return row;
     };
-    $('shop-tickets').replaceChildren(action(v.tickets.label, v.tickets.button, v.tickets.enabled));
     $('shop-cores').replaceChildren(...v.cores.map((c, i) => action(c.label, c.button, c.enabled, ['pack', String(i)])));
+    $('shop-looks').hidden = v.pane !== 'looks';
+    $('shop-list').hidden = v.pane !== 'list';
+    $('shop-list-head').textContent = v.listHead;
+    $('shop-list-note').textContent = v.listNote;
   }
 
   // --- pass ---
@@ -239,40 +235,6 @@ export class EconomyView {
       const scroller = list.closest<HTMLElement>('.settings');
       if (row && scroller) scroller.scrollTop = Math.max(0, row.offsetTop - scroller.clientHeight / 2);
     });
-  }
-
-  // --- daily ---
-
-  bindDaily(onClaim: () => void): void {
-    $('daily-claim').addEventListener('click', onClaim);
-  }
-
-  renderDaily(v: DailyView): void {
-    $('daily-calendar').replaceChildren(
-      ...v.calendar.map((d) => {
-        const cell = el('div', `cal-day ${d.state}`);
-        cell.append(el('span', 'label dim cal-num', `day ${d.day}`), el('span', 'label cal-reward', d.reward));
-        return cell;
-      }),
-    );
-    const claim = $('daily-claim') as HTMLButtonElement;
-    claim.textContent = v.claim.text;
-    claim.disabled = !v.claim.enabled;
-    $('daily-reset').textContent = v.reset;
-    $('daily-quests').replaceChildren(
-      ...v.quests.map((q) => {
-        const row = el('div', `quest${q.done ? ' done' : ''}`);
-        const top = el('div', 'quest-top');
-        top.append(el('span', 'label', q.text), el('span', 'label dim', q.done ? 'done' : q.progress));
-        const track = el('div', 'xp-track');
-        const fill = el('div', 'xp-fill');
-        fill.style.transform = `scaleX(${Math.max(0, Math.min(1, q.fraction))})`;
-        track.append(fill);
-        row.append(top, track, el('div', 'label dim quest-reward', q.reward));
-        return row;
-      }),
-    );
-    $('daily-bonus').textContent = v.bonus;
   }
 
   // --- end of run ---

@@ -1,19 +1,18 @@
 import { achievement } from './achievements';
-import { DECAL_SVG } from './decals';
-import { find, itemsIn, keyOf, type Looks, type LookItem, type Owner, type Slot, SLOT_NAMES, SLOTS, unlockProgress, unlockText } from './looks';
+import { decalArt } from './decals';
+import { find, itemsIn, keyOf, type Looks, type LookItem, type Owner, type ShipId, type Slot, SLOT_NAMES, SLOTS, unlockProgress, unlockText } from './looks';
 import { shipShape } from './player';
-import type { ShipId } from './cosmetics';
 
-// The wardrobe: every look, a slot at a time. This is the model (what each card
+// The hangar: every look, a slot at a time. This is the model (what each card
 // says, what the detail panel offers); the screen and its taps are in ui and game.
 
-export interface WardrobeState {
+export interface HangarState {
   slot: Slot;
   /** The look being tried on (its id in the slot), or null. */
   pick: string | null;
 }
 
-export interface WardrobeDeps {
+export interface HangarDeps {
   looks: Looks;
   owner: Owner;
   credits: number;
@@ -22,7 +21,7 @@ export interface WardrobeDeps {
   vault: { key: string; monthsUntil: (key: string) => number };
 }
 
-export interface CardView {
+interface CardView {
   id: string;
   name: string;
   state: 'equipped' | 'owned' | 'locked';
@@ -34,7 +33,7 @@ export interface CardView {
   picked: boolean;
 }
 
-export interface DetailView {
+interface DetailView {
   name: string;
   slotName: string;
   status: string;
@@ -42,7 +41,7 @@ export interface DetailView {
   action: { kind: 'equip' | 'buy' | 'none'; text: string; enabled: boolean };
 }
 
-export interface WardrobeView {
+export interface HangarView {
   summary: string;
   slots: { slot: Slot; label: string; owned: number; total: number; on: boolean }[];
   cards: CardView[];
@@ -57,8 +56,8 @@ export function shortUnlock(item: LookItem): string {
   switch (u.by) {
     case 'free':
       return '';
-    case 'mission':
-      return 'missions';
+    case 'premium':
+      return 'premium';
     case 'credits':
       return `${fmt(u.cost)} credits`;
     case 'cores':
@@ -112,14 +111,14 @@ export function lookSwatch(item: LookItem): string | null {
 export function lookIcon(item: LookItem): string | null {
   if (item.slot === 'hull') return hullIcon(item.id);
   if (item.slot === 'decal') {
-    const art = DECAL_SVG[item.id];
+    const art = decalArt(item.id);
     if (art) return art;
     return '<svg viewBox="0 0 24 24"><path d="M12 3l7 7-7 11-7-11z"/></svg>';
   }
   return ICONS[item.slot] ?? null;
 }
 
-export function buildWardrobe(st: WardrobeState, d: WardrobeDeps): WardrobeView {
+export function buildHangar(st: HangarState, d: HangarDeps): HangarView {
   const owns = (i: LookItem) => d.looks.owns(i, d.owner);
   const slots = SLOTS.map((slot) => {
     const items = itemsIn(slot);

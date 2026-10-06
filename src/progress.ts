@@ -1,12 +1,8 @@
 import { CONFIG } from './config';
-import { weekKey } from './leagues';
 import { storage } from './storage';
 
-// Long-term progress: lifetime stats, the furthest sector reached (solo start
-// points), stars per sector, and the daily run's best. Saved as one JSON value.
-//
-// A sector is one theme's three levels: sector 0 is levels 1-3, sector 1 is
-// 4-6 and so on, through the biome loops forever.
+// Long-term progress: lifetime stats, the furthest level reached (it opens the
+// solo environments), best scores and set level results. Saved as one JSON value.
 
 export interface Stats {
   runs: number;
@@ -34,11 +30,10 @@ export interface RunResult {
 
 interface Saved {
   stats: Stats;
-  reached?: number; // older saves: highest theme start level reached (1, 4, 7)
-  sector: number; // furthest sector reached
+  reached?: number; // oldest saves: highest theme start level reached (1, 4, 7)
+  sector?: number; // older saves: furthest sector reached (a theme's three levels)
   furthest?: number; // furthest level reached in ranked or endless (opens solo environments)
-  stars: number[]; // per sector: bit 0 cleared, bit 1 no hits, bit 2 chain
-  daily: { date: string; best: number };
+  stars?: number[]; // older saves: stars per sector (bit 0 cleared, bit 1 no hits, bit 2 chain), still counted
   courses?: Record<string, CourseResult>;
   weekly?: { week: string; best: number; finished: boolean };
   envBest?: Record<string, number>;
@@ -52,54 +47,17 @@ export interface CourseResult {
   score: number;
 }
 
-/** Sector a level belongs to. */
-export function sectorOf(level: number): number {
-  return Math.floor((level - 1) / LPT);
-}
-
-/** First level of a sector. */
-export function sectorStart(sector: number): number {
-  return sector * LPT + 1;
-}
-
-/** Near-miss chain needed for a sector's third star: x5, rising by one each loop. */
-export function chainTarget(sector: number): number {
-  return 5 + Math.floor(sector / 3);
-}
-
-export const STAR_CLEAR = 1;
-export const STAR_NO_HITS = 2;
-export const STAR_CHAIN = 4;
-
 const KEY = 'endless.progress';
 const LPT = CONFIG.themes.levelsPerTheme;
 
+/** Older saves only kept the sector the player had reached: they start from its first level. */
+function legacyFurthest(s: Partial<Saved>): number {
+  const sector = s.sector ?? Math.floor(((s.reached ?? 1) - 1) / LPT);
+  return sector * LPT + 1;
+}
+
 function blankStats(): Stats {
   return { runs: 0, distance: 0, seconds: 0, bestScore: 0, bestLevel: 0, nearMisses: 0, bestChain: 0, pickups: 0, crashes: {} };
-}
-
-/** The UTC calendar date as YYYY-MM-DD (the same day for everyone). */
-export function today(): string {
-  return new Date().toISOString().slice(0, 10);
-}
-
-/** Same seed for everyone on the same date (FNV-1a hash of the date). */
-export function dailySeed(date = today()): number {
-  return hashSeed(`endless-${date}`);
-}
-
-/** The ranked course: the same for everyone all week, new every Monday. */
-export function weeklySeed(now = Date.now()): number {
-  return hashSeed(`endless-week-${weekKey(now)}`);
-}
-
-function hashSeed(text: string): number {
-  let h = 0x811c9dc5;
-  for (const ch of text) {
-    h ^= ch.charCodeAt(0);
-    h = Math.imul(h, 0x01000193);
-  }
-  return h >>> 0;
 }
 
 function countBits(n: number): number {
@@ -108,12 +66,10 @@ function countBits(n: number): number {
 
 export class Progress {
   stats: Stats = blankStats();
-  /** Furthest sector reached in ranked or endless. */
-  sector = 0;
   /** Furthest level reached in ranked or endless: what opens solo environments (see unlocks.ts). */
   furthest = 1;
-  /** Star bits per sector (see STAR_*). */
-  stars: number[] = [];
+  /** Stars earned before set levels existed, one entry per sector (bits as in Saved). */
+  private oldStars: number[] = [];
   /** Set course results by course id. */
   courses: Record<string, CourseResult> = {};
   /** This week's ranked level: your best score on it, and whether you've finished it. */
@@ -121,7 +77,6 @@ export class Progress {
   /** Solo high scores by environment id (see ENVIRONMENTS in courses.ts). */
   envBest: Record<string, number> = {};
   endlessBest = 0;
-  private daily = { date: '', best: 0 };
 
   async load(): Promise<void> {
     const raw = await storage.get(KEY);
@@ -129,15 +84,12 @@ export class Progress {
     try {
       const s = JSON.parse(raw) as Partial<Saved>;
       this.stats = { ...blankStats(), ...s.stats };
-      this.sector = s.sector ?? sectorOf(s.reached ?? 1);
-      // Older saves only kept the sector: start from its first level.
-      this.furthest = Math.max(1, s.furthest ?? sectorStart(this.sector));
-      this.stars = s.stars ?? [];
+      this.furthest = Math.max(1, s.furthest ?? legacyFurthest(s));
+      this.oldStars = s.stars ?? [];
       this.courses = s.courses ?? {};
       if (s.weekly) this.weekly = s.weekly;
       this.envBest = s.envBest ?? {};
       this.endlessBest = s.endlessBest ?? 0;
-      if (s.daily) this.daily = s.daily;
     } catch {
       // Corrupt value: start fresh.
     }
@@ -146,20 +98,14 @@ export class Progress {
   private save(): void {
     const s: Saved = {
       stats: this.stats,
-      sector: this.sector,
       furthest: this.furthest,
-      stars: this.stars,
-      daily: this.daily,
+      stars: this.oldStars,
       courses: this.courses,
       weekly: this.weekly,
       envBest: this.envBest,
       endlessBest: this.endlessBest,
     };
     void storage.set(KEY, JSON.stringify(s));
-  }
-
-  get dailyBest(): number {
-    return this.daily.date === today() ? this.daily.best : 0;
   }
 
   /**
@@ -170,30 +116,14 @@ export class Progress {
     const before = this.furthest;
     if (level > this.furthest) {
       this.furthest = level;
-      this.sector = Math.max(this.sector, sectorOf(level));
       this.save();
     }
     return before;
   }
 
-  starsIn(sector: number): number {
-    return this.stars[sector] ?? 0;
-  }
-
-  /** Add star bits for a sector; returns how many are new. */
-  addStars(sector: number, bits: number): number {
-    const had = this.starsIn(sector);
-    const now = had | bits;
-    if (now === had) return 0;
-    while (this.stars.length <= sector) this.stars.push(0);
-    this.stars[sector] = now;
-    this.save();
-    return countBits(now) - countBits(had);
-  }
-
   totalStars(): number {
     let n = 0;
-    for (const s of this.stars) n += countBits(s ?? 0);
+    for (const s of this.oldStars) n += countBits(s ?? 0);
     for (const c of Object.values(this.courses)) n += countBits(c.stars);
     return n;
   }
@@ -252,8 +182,8 @@ export class Progress {
     return { newStars: countBits(next.stars) - countBits(had.stars), bestTime };
   }
 
-  /** Fold a finished run into the stats; returns true for a new daily best. */
-  recordRun(r: RunResult, daily: boolean): boolean {
+  /** Fold a finished run into the lifetime stats. */
+  recordRun(r: RunResult): void {
     const s = this.stats;
     s.runs++;
     s.distance += r.distance;
@@ -264,16 +194,7 @@ export class Progress {
     s.bestChain = Math.max(s.bestChain, r.bestChain);
     s.pickups += r.pickups;
     if (r.crashedIn) s.crashes[r.crashedIn] = (s.crashes[r.crashedIn] ?? 0) + 1;
-    let newDaily = false;
-    if (daily) {
-      if (this.daily.date !== today()) this.daily = { date: today(), best: 0 };
-      if (r.score > this.daily.best) {
-        this.daily.best = Math.floor(r.score);
-        newDaily = true;
-      }
-    }
     this.save();
-    return newDaily;
   }
 
   /** Where you crash most, or null. */

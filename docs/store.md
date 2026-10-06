@@ -10,8 +10,9 @@ The short version is in [leaderboards.md](leaderboards.md). In full:
 
 1. Create a project at supabase.com.
 2. Authentication > Sign In / Providers: turn on **anonymous sign-ins**.
-3. SQL editor: paste all of `supabase/setup.sql` and run it. (Or with the CLI:
-   `supabase link`, then `supabase db push`.)
+3. The database: `npm run db:apply` with `SUPABASE_DB_URL` in `.env` (see
+   leaderboards.md), or paste the files in `supabase/parts/` into the SQL editor one at a
+   time, in order. (Or with the CLI: `supabase link`, then `supabase db push`.)
 4. Copy `.env.example` to `.env` and fill in `VITE_SUPABASE_URL` and
    `VITE_SUPABASE_ANON_KEY` (Project settings > API). `.env` is never committed.
 5. For the live site, add the same two values as repository secrets
@@ -36,8 +37,13 @@ The short version is in [leaderboards.md](leaderboards.md). In full:
    | `cores_550` | consumable | 550 cores | 4.99 |
    | `cores_1200` | consumable | 1,200 cores | 9.99 |
    | `cores_2500` | consumable | 2,500 cores | 19.99 |
-   | `starter_pack` | non-consumable | 500 cores, 3 tickets, the nova hull | 2.99 |
+   | `starter_pack` | non-consumable | 500 cores and the nova hull | 2.99 |
    | `season_pass` | consumable (one per season) | the pass's premium track | 4.99 |
+   | `premium` | non-consumable | no ads, ad rewards without the ad, the halo hull, regalia paint and crown flame, an extra free revive a day, a badge on the boards | 4.99 |
+
+   The webhook keeps every purchase in `store_events`; owning `premium` (or the
+   starter pack) is a row there, so it follows the account to a new device. In
+   the game, `src/store/entitlements.ts` is what everything asks.
 
 ## 3. RevenueCat
 
@@ -48,7 +54,29 @@ The short version is in [leaderboards.md](leaderboards.md). In full:
 4. Integrations > Webhooks: the `revenuecat-webhook` function's URL, with the
    Authorization header `Bearer <REVENUECAT_WEBHOOK_SECRET>`.
 
-## 4. Building the apps
+## 4. Ads (AdMob)
+
+Rewarded ads only at launch (a revive, doubled run credits, a daily gift, a new
+daily goal); interstitials are off in `CONFIG.ads.interstitial`. Premium players
+never see an ad and get those rewards free. The web build has no ads.
+
+1. Create an AdMob account and add the two apps.
+2. Make a **rewarded** ad unit in each (and an interstitial one, for later).
+3. Put the ad unit ids in `.env` (and the repository secrets, for builds):
+   `VITE_ADMOB_REWARDED_IOS`, `VITE_ADMOB_REWARDED_ANDROID`, and, for later,
+   `VITE_ADMOB_INTERSTITIAL_IOS`, `VITE_ADMOB_INTERSTITIAL_ANDROID`. Without
+   them the apps run with no ads.
+4. After `npx cap add` (below), put the AdMob **app** ids in the native projects:
+   `GADApplicationIdentifier` in `ios/App/App/Info.plist`, and the
+   `com.google.android.gms.ads.APPLICATION_ID` meta-data in
+   `android/app/src/main/AndroidManifest.xml`. On iOS also add
+   `NSUserTrackingUsageDescription` ("Lets ads be more relevant to you.").
+5. In AdMob > Privacy & messaging, publish a GDPR message (UK and EU) and an
+   IDFA explainer. The game shows Google's consent form and Apple's tracking
+   prompt on first start; if either is declined, ads are non-personalised.
+   Settings has a "privacy choices" row to change it later.
+
+## 5. Building the apps
 
 ```
 npm install @capacitor/cli @capacitor/ios @capacitor/android
@@ -61,17 +89,17 @@ npx cap sync
 
 Then open `ios/` in Xcode and `android/` in Android Studio to sign and upload.
 
-## 5. Store listing checklist
+## 6. Store listing checklist
 
 - **Name:** Endless Space
 - **Subtitle (iOS, 30 characters):** Fly the endless frontier
 - **Short description (Play, 80 characters):** A fast, calm space runner. A new
-  ranked run every week. No ads.
+  ranked run every week.
 - **Description:**
   > Steer a small ship through canyons, ice fields, volcanic plains, asteroid
   > belts and the decks of a great ship, faster and faster.
   >
-  > Every week there's a new ranked run, the same for everyone, with five tries to set your best. Climb seven
+  > Every week there's a new ranked run, the same for everyone: fly it as often as you like to set your best. Climb seven
   > leagues, earn your rank, and fly your weekly best again and again. Or play
   > solo: pick a place and see how far you get, or work through the set levels
   > for stars.
@@ -80,9 +108,12 @@ Then open `ios/` in Xcode and `android/` in Android Studio to sign and upload.
   > you can buy makes you faster in ranked.
 - **Keywords (iOS):** runner,space,arcade,endless,ship,ranked,weekly,flying
 - **Category:** Games > Arcade (Racing as the second)
-- **Age rating:** 4+ / Everyone (no violence beyond crashing, no chat)
-- **Privacy:** an anonymous account id, gameplay data (scores, runs) and
-  purchase history; nothing personal, no tracking. Needs a privacy policy URL.
+- **Age rating:** 4+ / Everyone (no violence beyond crashing, no chat), with
+  ads and in-app purchases declared. Not listed as made for children (ads can
+  be personalised, with consent).
+- **Privacy:** an anonymous account id, gameplay data (scores, runs),
+  purchase history, and for ads the device's advertising id when the player
+  allows it (AdMob). Needs a privacy policy URL.
 - **Screenshots** (6.7" iPhone 1290×2796, 5.5" 1242×2208, Android phone
   1080×1920 at least), in this order:
   1. a canyon run at speed, with a near-miss chain

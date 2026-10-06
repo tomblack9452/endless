@@ -1,4 +1,6 @@
-// RevenueCat webhook: credits cores on the server when a purchase goes through.
+// RevenueCat webhook: credits cores on the server when a purchase goes through,
+// and keeps every purchase in store_events (premium and the starter pack are
+// owned by having a row there; the game reads its own rows).
 // The app buys as the player's Supabase account id (appUserID), so the
 // event's app_user_id is the account to pay.
 //

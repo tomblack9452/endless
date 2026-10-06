@@ -11,13 +11,16 @@ import { storage } from './storage';
 
 export { LOOKS };
 
+/** The hulls and flame styles (drawn in player.ts and trail.ts). */
+export type ShipId = 'dart' | 'wing' | 'needle' | 'manta' | 'arrow' | 'talon' | 'viper' | 'nova' | 'phantom' | 'raptor' | 'kite' | 'comet' | 'halo';
+export type TrailId = 'none' | 'line' | 'dashes' | 'ion' | 'triple' | 'wide' | 'long' | 'twin' | 'pulse' | 'ribbon' | 'crown';
+
 export type Slot = 'hull' | 'paint' | 'markings' | 'fins' | 'engine' | 'decal' | 'trail';
 export type Marking = 'none' | 'stripe' | 'twin' | 'chevron' | 'twotone' | 'split' | 'nose' | 'tips' | 'spine' | 'hazard' | 'checker' | 'dots' | 'rings';
 export type Fin = 'none' | 'tail' | 'twin' | 'winglets' | 'blade' | 'crest' | 'swept';
 
 export type Unlock =
   | { by: 'free' }
-  | { by: 'mission' } // the mission unlocks: hulls and trails (see cosmetics.ts)
   | { by: 'credits'; cost: number }
   | { by: 'cores'; cost: number } // the premium currency (the shop sells these too)
   | { by: 'reward'; from: 'login' | 'pass' }
@@ -25,7 +28,8 @@ export type Unlock =
   | { by: 'stars'; stars: number }
   | { by: 'league'; league: number }
   | { by: 'achievement'; id: string } // finishing a goal (achievements.ts)
-  | { by: 'vault'; cost: number }; // sold in the shop's vault, a month at a time, for cores
+  | { by: 'vault'; cost: number } // sold in the shop's vault, a month at a time, for cores
+  | { by: 'premium' }; // owned while the player has the one-off premium unlock
 
 export interface LookItem {
   slot: Slot;
@@ -70,8 +74,8 @@ export interface Owner {
   rank: number;
   stars: number;
   league: number;
-  /** "slot:id" of the mission unlocks owned (hulls and trails). */
-  mission: ReadonlySet<string>;
+  /** Owns the one-off premium unlock (src/store/entitlements.ts). */
+  premium: boolean;
   /** A goal's progress. */
   goal(id: string): { have: number; target: number; done: boolean };
 }
@@ -81,8 +85,8 @@ export function unlockText(u: Unlock): string {
   switch (u.by) {
     case 'free':
       return '';
-    case 'mission':
-      return 'from missions';
+    case 'premium':
+      return 'premium';
     case 'credits':
       return `${u.cost.toLocaleString('en-US')} credits`;
     case 'cores':
@@ -132,7 +136,7 @@ const KEY = 'endless.looks';
 type Equipped = Record<Slot, string>;
 
 export class Looks {
-  /** Bought (credits or cores) or given as a reward; rank, star, goal, mission and free items are owned when earned. */
+  /** Bought (credits or cores) or given as a reward; rank, star, goal and free items are owned when earned. */
   private bought = new Set<string>();
   equipped: Equipped = { hull: 'dart', paint: 'standard', markings: 'none', fins: 'none', engine: 'standard', decal: 'none', trail: 'none' };
   /** Sets whose completion bonus has been paid. */
@@ -157,11 +161,12 @@ export class Looks {
 
   owns(item: LookItem, o: Owner): boolean {
     const u = item.unlock;
+    if (this.bought.has(keyOf(item))) return true; // bought, or granted (older saves keep their mission unlocks)
     switch (u.by) {
       case 'free':
         return true;
-      case 'mission':
-        return o.mission.has(keyOf(item));
+      case 'premium':
+        return o.premium;
       case 'credits':
       case 'cores':
       case 'vault':
@@ -220,10 +225,5 @@ export class Looks {
   equip(slot: Slot, id: string): void {
     this.equipped[slot] = id;
     this.save();
-  }
-
-  /** Put anything no longer owned back to the slot's default. */
-  validate(o: Owner): void {
-    for (const slot of SLOTS) if (!this.owns(find(slot, this.equipped[slot]), o)) this.equipped[slot] = itemsIn(slot)[0].id;
   }
 }

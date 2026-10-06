@@ -7,9 +7,18 @@ to a board.
 ## Turning them on
 
 1. **Create a project** at supabase.com (the free plan is plenty).
-2. **Paste the database.** SQL editor > New query > paste all of
-   `supabase/setup.sql` > Run. That is the whole backend: tables, row security,
-   the run checks and the board queries. There is no function to deploy.
+2. **Set up the database.** Either way gives the same result:
+   - **From your terminal (no pasting):** in the dashboard click **Connect**, pick
+     **Session pooler**, copy the connection string and put your database password
+     in it. Add it to `.env` as `SUPABASE_DB_URL=...`, then run `npm run db:apply`.
+     It applies each migration once, so running it again (or after a later update)
+     is safe. This is a secret; it's not a `VITE_` variable, so it never goes into
+     the game's build.
+   - **Or paste it:** SQL editor > New query > paste the files in `supabase/parts/`
+     one at a time, in order (`01-of-05.sql` first), running each. They are small
+     on purpose: pasting one big file can get cut off part way (about 4 KB), which
+     shows up as `unterminated dollar-quoted string`. If you'd rather paste one
+     file, `supabase/setup.sql` is all of it.
 3. **Allow anonymous sign-ins.** Authentication > Sign In / Providers > turn on
    *Allow anonymous sign-ins*. (Players get an account without a sign-up screen.)
 4. **Add the keys.** Project settings > API: copy the project URL and the
@@ -83,8 +92,8 @@ the run. If that starts to matter, the next steps in order of effort:
 ## Changing the database
 
 Add a new file in `supabase/migrations/` (`0004_...sql`), run `npm run db:setup`
-to rebuild `supabase/setup.sql`, and run the new migration in the SQL editor on
-a live project. `npm test` runs every migration on a real Postgres (PGlite), the
+to rebuild `supabase/setup.sql` and `supabase/parts/`, then `npm run db:apply` on a
+live project (it applies only what's new). `npm test` runs every migration on a real Postgres (PGlite), the
 client against it, and checks `setup.sql` is up to date.
 
 ## Running costs and limits

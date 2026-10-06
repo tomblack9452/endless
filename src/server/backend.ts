@@ -47,6 +47,8 @@ export interface BoardRow {
   name: string;
   score: number;
   you: boolean;
+  /** Owns the premium unlock (a badge on the board). */
+  premium?: boolean;
 }
 
 export interface Backend {
@@ -68,6 +70,8 @@ export interface Backend {
   submitRun(run: RunSubmission): Promise<SubmitResult>;
   /** A board, best first (your own row last if you're below the top), or null if it couldn't be read. */
   board(query: BoardQuery): Promise<BoardRow[] | null>;
+  /** One-time products this account has bought (the purchase webhook's records), or null if unknown. */
+  purchases(): Promise<string[] | null>;
   /** Your pilot name on the boards, or null. */
   pilotName(): Promise<string | null>;
   /** Change it; says why not when the server turns it down. */

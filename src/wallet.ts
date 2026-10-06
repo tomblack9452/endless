@@ -4,7 +4,7 @@ import { storage } from './storage';
 // Credits: earned by every run (ranked at full rate, the rest at half),
 // promotions and stars; spent in the hangar on upgrades and looks.
 // Cores: the premium currency. Earned slowly (daily rewards, quests, the season
-// pass) and, later, bought; spent on premium looks, tickets, revives and the
+// pass) and, later, bought; spent on premium looks, revives and the
 // pass. A server version (stage C) keeps the same methods.
 
 const KEY = 'endless.wallet';

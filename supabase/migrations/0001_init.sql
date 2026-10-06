@@ -3,14 +3,14 @@
 -- anonymous sign-ins under Authentication > Providers.
 
 -- A short public name for the leaderboard ("pilot-3fa2" until there are names).
-create table public.players (
+create table if not exists public.players (
   user_id uuid primary key references auth.users on delete cascade,
   name text not null default ('pilot-' || substr(md5(random()::text), 1, 4)),
   created_at timestamptz not null default now()
 );
 
 -- Cloud save: every saved key as JSON, and when the device wrote it (ms).
-create table public.saves (
+create table if not exists public.saves (
   user_id uuid primary key references auth.users on delete cascade,
   data jsonb not null,
   saved_at bigint not null
@@ -18,14 +18,14 @@ create table public.saves (
 
 -- Cores live here. Players can read their balance; only the functions below
 -- (and the store webhook, with the service key) change it.
-create table public.wallets (
+create table if not exists public.wallets (
   user_id uuid primary key references auth.users on delete cascade,
   cores integer not null default 0 check (cores >= 0),
   earned_today integer not null default 0,
   earned_day date not null default current_date
 );
 
-create table public.core_log (
+create table if not exists public.core_log (
   id bigserial primary key,
   user_id uuid not null references auth.users on delete cascade,
   delta integer not null,
@@ -34,7 +34,7 @@ create table public.core_log (
 );
 
 -- Ranked runs, written by the submit-run function after its checks.
-create table public.runs (
+create table if not exists public.runs (
   id bigserial primary key,
   user_id uuid not null references auth.users on delete cascade,
   week date not null,
@@ -46,10 +46,10 @@ create table public.runs (
   path real[] not null,
   at timestamptz not null default now()
 );
-create index runs_board on public.runs (week, league, score desc);
+create index if not exists runs_board on public.runs (week, league, score desc);
 
 -- Each player's best run per week and league.
-create view public.board with (security_invoker = false) as
+create or replace view public.board with (security_invoker = false) as
   select distinct on (r.week, r.league, r.user_id)
     r.week, r.league, r.user_id, coalesce(p.name, 'pilot') as name, r.score
   from public.runs r
@@ -62,15 +62,20 @@ alter table public.wallets enable row level security;
 alter table public.core_log enable row level security;
 alter table public.runs enable row level security;
 
+drop policy if exists "own player" on public.players;
 create policy "own player" on public.players for select using (auth.uid() = user_id);
+drop policy if exists "own save read" on public.saves;
 create policy "own save read" on public.saves for select using (auth.uid() = user_id);
+drop policy if exists "own save write" on public.saves;
 create policy "own save write" on public.saves for insert with check (auth.uid() = user_id);
+drop policy if exists "own save update" on public.saves;
 create policy "own save update" on public.saves for update using (auth.uid() = user_id);
+drop policy if exists "own wallet" on public.wallets;
 create policy "own wallet" on public.wallets for select using (auth.uid() = user_id);
 grant select on public.board to anon, authenticated;
 
 -- New accounts get a player row and an empty wallet.
-create function public.on_new_user() returns trigger
+create or replace function public.on_new_user() returns trigger
 language plpgsql security definer set search_path = public as $$
 begin
   insert into public.players (user_id) values (new.id) on conflict do nothing;
@@ -78,12 +83,12 @@ begin
   return new;
 end $$;
 
-create trigger on_auth_user_created after insert on auth.users
+create or replace trigger on_auth_user_created after insert on auth.users
   for each row execute function public.on_new_user();
 
 -- Cores earned in play (login calendar, quests, the pass): capped per day, so
 -- an edited client can't print them.
-create function public.earn_cores(amount integer, reason text) returns integer
+create or replace function public.earn_cores(amount integer, reason text) returns integer
 language plpgsql security definer set search_path = public as $$
 declare
   cap constant integer := 120;
@@ -105,7 +110,7 @@ begin
   return give;
 end $$;
 
-create function public.spend_cores(amount integer, reason text) returns boolean
+create or replace function public.spend_cores(amount integer, reason text) returns boolean
 language plpgsql security definer set search_path = public as $$
 begin
   if amount <= 0 then return false; end if;
@@ -116,7 +121,7 @@ begin
 end $$;
 
 -- Purchases (the store webhook calls this with the service key).
-create function public.grant_cores(player uuid, amount integer, reason text) returns void
+create or replace function public.grant_cores(player uuid, amount integer, reason text) returns void
 language plpgsql security definer set search_path = public as $$
 begin
   insert into public.wallets (user_id, cores) values (player, amount)

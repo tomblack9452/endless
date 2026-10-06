@@ -5,7 +5,7 @@ import { DECAL_SVG } from '../src/decals';
 import { itemsIn } from '../src/looks';
 import { MARKING_ID, shipGeometry } from '../src/player';
 import { TRAIL_STYLES } from '../src/trail';
-import type { ShipId } from '../src/cosmetics';
+import type { ShipId } from '../src/looks';
 
 // Every look in the catalogue can be drawn, and none of them changes how the
 // ship flies: the hitbox is the same whatever you wear.

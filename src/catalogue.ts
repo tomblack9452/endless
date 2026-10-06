@@ -1,4 +1,6 @@
 import type { LookItem, Slot, Unlock } from './looks';
+import { seasonAt } from './season';
+import { seasonLooksThrough } from './seasonLooks';
 
 // Every look in the game, and how to get each. Purely cosmetic (every hull
 // shares one hitbox), so all of it is allowed in ranked.
@@ -11,12 +13,13 @@ import type { LookItem, Slot, Unlock } from './looks';
 //   league      reaching a league
 //   stars       earning set level stars
 //   achievement finishing a goal (src/achievements.ts)
-//   mission     the mission unlocks (hulls and trails, see cosmetics.ts)
 //   reward      the login calendar or the season pass
 //   vault       sold for a month at a time in the shop, then away for a while
+//   premium     owned while the player has the one-off premium unlock
+//
+// On top of these hand-made looks, every season adds generated ones (seasonLooks.ts).
 
 const free: Unlock = { by: 'free' };
-const mission: Unlock = { by: 'mission' };
 const credits = (cost: number): Unlock => ({ by: 'credits', cost });
 const cores = (cost: number): Unlock => ({ by: 'cores', cost });
 const rank = (r: number): Unlock => ({ by: 'rank', rank: r });
@@ -26,6 +29,7 @@ const goal = (id: string): Unlock => ({ by: 'achievement', id });
 const pass: Unlock = { by: 'reward', from: 'pass' };
 const login: Unlock = { by: 'reward', from: 'login' };
 const vault = (cost: number): Unlock => ({ by: 'vault', cost });
+const premium: Unlock = { by: 'premium' };
 
 const hull = (id: string, name: string, unlock: Unlock): LookItem => ({ slot: 'hull', id, name, unlock });
 const paint = (id: string, name: string, unlock: Unlock, top: string, shade: string): LookItem => ({ slot: 'paint', id, name, unlock, colors: [top, shade] });
@@ -35,12 +39,12 @@ const engine = (id: string, name: string, unlock: Unlock, a: string, b = a): Loo
 const decal = (id: string, name: string, unlock: Unlock): LookItem => ({ slot: 'decal', id, name, unlock });
 const trail = (id: string, name: string, unlock: Unlock): LookItem => ({ slot: 'trail', id, name, unlock });
 
-export const LOOKS: readonly LookItem[] = [
+const HAND_MADE: readonly LookItem[] = [
   // --- hulls ----------------------------------------------------------------------------------
   hull('dart', 'dart', free),
-  hull('wing', 'wing', mission),
-  hull('needle', 'needle', mission),
-  hull('manta', 'manta', mission),
+  hull('wing', 'wing', goal('runs-5')),
+  hull('needle', 'needle', goal('near-25')),
+  hull('manta', 'manta', goal('level-4')),
   hull('arrow', 'arrow', credits(1500)),
   hull('talon', 'talon', credits(4000)),
   hull('viper', 'viper', credits(6000)),
@@ -49,9 +53,13 @@ export const LOOKS: readonly LookItem[] = [
   hull('raptor', 'raptor', pass),
   hull('kite', 'kite', goal('level-25')),
   hull('comet', 'comet', goal('dist-500k')),
+  hull('halo', 'halo', premium),
 
   // --- paints: credits (earned in play) ----------------------------------------------------------
   { slot: 'paint', id: 'standard', name: 'standard', unlock: free }, // the palette's own colours
+  // The starter set (onboarding offers these).
+  paint('scout', 'scout', free, '#5f8597', '#3d5a68'),
+  paint('rust', 'rust', free, '#b0663f', '#7a4326'),
   paint('slate', 'slate', credits(200), '#66707a', '#454c54'),
   paint('ash', 'ash', credits(250), '#9aa0a6', '#6b7075'),
   paint('crimson', 'crimson', credits(300), '#b8403c', '#812a28'),
@@ -126,11 +134,13 @@ export const LOOKS: readonly LookItem[] = [
   paint('ion', 'ion', goal('endless-5k'), '#7fe8ff', '#2f9fd0'),
   paint('sovereign', 'sovereign', goal('endless-30k'), '#d4af37', '#7a5f12'),
   paint('finish', 'finish line', goal('courses-9'), '#f2f2f2', '#2b2b2b'),
-  paint('mission', 'mission', goal('missions-11'), '#6fc3e0', '#2e7aa0'),
+  paint('signal', 'signal', goal('stars-10'), '#6fc3e0', '#2e7aa0'),
   paint('gilt', 'gilt', goal('looks-25'), '#e0c36a', '#8f7a2f'),
   // From the vault.
   paint('eclipse', 'eclipse', vault(600), '#2a1748', '#0d0719'),
   paint('opal', 'opal', vault(500), '#e8f0f4', '#c9a6e0'),
+  // Premium only.
+  paint('regalia', 'regalia', premium, '#d4b45a', '#4a3a14'),
 
   // --- markings -------------------------------------------------------------------------------------
   mark('none', 'none', free),
@@ -158,6 +168,8 @@ export const LOOKS: readonly LookItem[] = [
 
   // --- engine colours -------------------------------------------------------------------------------
   { slot: 'engine', id: 'standard', name: 'standard', unlock: free }, // the default flame
+  engine('cold', 'cold blue', free, '#6fc1ff', '#c4e8ff'),
+  engine('warm', 'warm white', free, '#fff1c9', '#ffc66b'),
   engine('amber', 'amber', credits(150), '#e2a64e'),
   engine('cyan', 'cyan', credits(150), '#4fc3d9'),
   engine('violet', 'violet', credits(250), '#a07ae0'),
@@ -179,7 +191,7 @@ export const LOOKS: readonly LookItem[] = [
   engine('sunrise', 'sunrise', goal('pickups-200'), '#ffd27a', '#ff9a4a'),
   engine('rose', 'rose', goal('courses-6'), '#ff9fb8'),
   engine('mint', 'mint', goal('stars-5'), '#9fffd6'),
-  engine('aurora', 'aurora', goal('missions-5'), '#4fffa0', '#4f8fff'),
+  engine('aurora', 'aurora', goal('courses-1'), '#4fffa0', '#4f8fff'),
   engine('frostfire', 'frostfire', goal('env-ice'), '#bfeaff', '#7f8fff'),
   engine('stardust', 'stardust', goal('env-belt'), '#fff2c0', '#9fb0ff'),
   engine('magma', 'magma', goal('env-lava'), '#ff4a1f', '#ffd24a'),
@@ -205,18 +217,22 @@ export const LOOKS: readonly LookItem[] = [
 
   // --- trails (engine flames) -----------------------------------------------------------------------
   trail('none', 'glow only', free),
-  trail('line', 'line', mission),
-  trail('dashes', 'dashes', mission),
-  trail('ion', 'ion', mission),
+  trail('line', 'line', goal('pickups-50')),
+  trail('dashes', 'dashes', goal('chain-3')),
+  trail('ion', 'ion', goal('time-15m')),
   trail('triple', 'triple', credits(800)),
   trail('wide', 'wide', cores(100)),
   trail('long', 'long', goal('dist-100k')),
   trail('twin', 'twin', goal('chain-6')),
   trail('pulse', 'pulse', goal('endless-60k')),
   trail('ribbon', 'ribbon', vault(500)),
+  trail('crown', 'crown', premium),
 ];
 
-/** Looks by slot, in the order the wardrobe shows them. */
+/** Every look: the hand-made ones, then each season's generated ones up to the current season. */
+export const LOOKS: readonly LookItem[] = [...HAND_MADE, ...seasonLooksThrough(seasonAt(Date.now()).season, HAND_MADE)];
+
+/** Looks by slot, in the order the hangar shows them. */
 export const SLOT_ORDER: Slot[] = ['hull', 'paint', 'markings', 'fins', 'engine', 'decal', 'trail'];
 
 // --- sets ---------------------------------------------------------------------------------------------

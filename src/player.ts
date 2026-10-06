@@ -13,9 +13,8 @@ import {
   Scene,
   Vector3,
 } from 'three';
-import type { Fin, Marking } from './looks';
+import type { Fin, Marking, ShipId } from './looks';
 import { CONFIG } from './config';
-import type { ShipId } from './cosmetics';
 import type { LivePalette } from './palette';
 
 const DEG = Math.PI / 180;
@@ -163,6 +162,22 @@ export function shipShape(id: ShipId): { light: Vector3[]; shade: Vector3[]; out
         shade: [nose, ridge, rt, rt, ridge, tail],
         outline: [nose, lt, rt, lt, tail, rt],
         tail: l * 0.62,
+      };
+    }
+    case 'halo': {
+      // A crescent: wing tips swept forward round a short body, a tall fin and a split tail.
+      const nose = v(0, 0, -l * 0.6);
+      const lw = v(-w * 1.45, 0, -l * 0.28);
+      const rw = v(w * 1.45, 0, -l * 0.28);
+      const lb = v(-w * 0.85, 0, l * 0.32);
+      const rb = v(w * 0.85, 0, l * 0.32);
+      const notch = v(0, 0, l * 0.2);
+      const ridge = v(0, h * 1.5, l * 0.05);
+      return {
+        light: [nose, lw, ridge, lw, lb, ridge, lb, notch, ridge],
+        shade: [nose, ridge, rw, rw, ridge, rb, rb, ridge, notch],
+        outline: [nose, lw, lb, notch, rb, rw],
+        tail: l * 0.32,
       };
     }
     case 'raptor': {

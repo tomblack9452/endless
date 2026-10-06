@@ -13,82 +13,19 @@ export interface Palette {
   text: string;
 }
 
-// Hand-picked. Level n uses PALETTES[(n - 1) % PALETTES.length].
-// Only the first is in use for now; the rest are candidates for later levels.
-export const PALETTES: Palette[] = [
-  {
-    name: 'bone',
-    ground: '#e6e1d6',
-    sky: '#f1ede4',
-    fog: '#d8d2c4',
-    cubeLight: '#d9a27a',
-    cubeMid: '#c07a4f',
-    cubeDark: '#8a5236',
-    ship: '#2b2824',
-    shipShade: '#57514a',
-    text: '#2b2824',
-  },
-  {
-    name: 'tidewater',
-    ground: '#dadfdb',
-    sky: '#ecefeb',
-    fog: '#c9d1cd',
-    cubeLight: '#8fb0ac',
-    cubeMid: '#5f8784',
-    cubeDark: '#3d5d5b',
-    ship: '#1f2a2a',
-    shipShade: '#4a5857',
-    text: '#1f2a2a',
-  },
-  {
-    name: 'clay',
-    ground: '#d9cfc2',
-    sky: '#ebe4d9',
-    fog: '#c8bcad',
-    cubeLight: '#a39483',
-    cubeMid: '#73665a',
-    cubeDark: '#4a4038',
-    ship: '#2e2620',
-    shipShade: '#5c5148',
-    text: '#2e2620',
-  },
-  {
-    name: 'lichen',
-    ground: '#e1dfd0',
-    sky: '#efede2',
-    fog: '#d1cebb',
-    cubeLight: '#aaa982',
-    cubeMid: '#7f805a',
-    cubeDark: '#56583c',
-    ship: '#2a2b1e',
-    shipShade: '#55573f',
-    text: '#2a2b1e',
-  },
-  {
-    name: 'ink',
-    ground: '#1c1b19',
-    sky: '#2a2825',
-    fog: '#33302c',
-    cubeLight: '#ece5d5',
-    cubeMid: '#c6bdaa',
-    cubeDark: '#8c8476',
-    ship: '#ece5d5',
-    shipShade: '#9a9284',
-    text: '#e6dfd0',
-  },
-  {
-    name: 'ember',
-    ground: '#1f2325',
-    sky: '#2c3133',
-    fog: '#363d3f',
-    cubeLight: '#e3a679',
-    cubeMid: '#c28056',
-    cubeDark: '#87573b',
-    ship: '#e9e0d1',
-    shipShade: '#9b9286',
-    text: '#e9e0d1',
-  },
-];
+// The world's base colours; the time of day and each area's biome tint them (atmosphere.ts).
+export const BASE_PALETTE: Palette = {
+  name: 'bone',
+  ground: '#e6e1d6',
+  sky: '#f1ede4',
+  fog: '#d8d2c4',
+  cubeLight: '#d9a27a',
+  cubeMid: '#c07a4f',
+  cubeDark: '#8a5236',
+  ship: '#2b2824',
+  shipShade: '#57514a',
+  text: '#2b2824',
+};
 
 export const CONFIG = {
   render: {
@@ -122,7 +59,7 @@ export const CONFIG = {
     height: 2.0,
     distanceBehind: 2.5,
     // Hangar and shop: the camera circles close to the ship so looks can be seen.
-    showroom: { distance: 1.75, height: 1.0, angle: 2.2, spin: 0.22, ease: 4, shopY: 0.29, hangarY: 0.79 },
+    showroom: { distance: 1.75, height: 1.0, angle: 2.2, spin: 0.22, ease: 4, y: 0.29 },
     maxRollDeg: 10,
     rollEase: 6, // higher = snappier
     near: 0.1,
@@ -674,34 +611,47 @@ export const CONFIG = {
     markerEvery: 3, // rows between safe-line markers
   },
 
+  // Season looks (seasonLooks.ts): generated from the season number. Rename,
+  // recolour or veto any of them here by key, e.g.
+  //   'paint:s4-p1': { name: 'harbour light', colors: ['#7fb8e6', '#4f84b5'] },
+  //   'decal:s5-d1': { veto: true },
+  seasons: { overrides: {} as Record<string, { name?: string; colors?: [string, string]; veto?: boolean }> },
+
+  // Rank (ranks.ts): XP from every run, ranked paying the most, and from goals.
+  rank: { pointsPerXp: 4000, rankedPointsPerXp: 800, goalXp: 30 },
+
   // The economy (src/economy/): two currencies, ranked tickets, revives, daily
   // rewards and quests, the shop and the season pass. Credits are earned by
   // playing; cores are the premium currency (bought later; for now earned from
   // daily rewards, quests and the pass). Nothing here can make a ship stronger
-  // in ranked: purchases are looks, tickets, revives and the pass.
+  // in ranked: purchases are looks, revives and the pass.
   economy: {
-    // Ranked tickets: a fresh set each week for attempts at the week's run; more for cores.
-    tickets: { perWeek: 5, coreCost: 30 },
+    // Ranked is unlimited; saves from when it took tickets get 30 cores for each spare one (legacy.ts).
+    ticketCores: 30,
+    // Credits for a run's score (pickups pay on top: pickupCredits each).
+    runCredits: { pointsPerCredit: 250, rankedPointsPerCredit: 125, pickupCredits: 1 },
     // Revive (not in ranked): once a run, free once a day, otherwise cores. The ship
     // moves onto the lane, the way ahead is cleared, and a countdown starts it again.
     revive: { coreCost: 20, clearAhead: 34, countdown: 3, graceSeconds: 2.5 },
     // The 7-day login calendar: one claim a day (UTC), looping after day 7. A
     // missed day just waits: the next claim is the next day on the calendar.
     login: [
-      { credits: 200 },
+      { credits: 100 },
+      { cores: 5 },
+      { credits: 150 },
+      { credits: 250 },
       { cores: 10 },
-      { tickets: 2 },
-      { credits: 500 },
-      { cores: 20 },
-      { tickets: 3 },
-      { cores: 40, look: 'paint:aurora' },
+      { credits: 300 },
+      { cores: 15, look: 'paint:aurora' },
     ],
     // Three a day (UTC), the same for everyone. Each pays credits and pass XP;
     // finishing all three pays cores.
-    quests: { count: 3, credits: [150, 400], allDoneCores: 10, passXp: 60 },
+    quests: { count: 3, credits: [60, 120], allDoneCores: 4, passXp: 30 },
+    // Five a week (Monday, UTC), the same for everyone, harder and spanning many runs.
+    weekly: { count: 5, credits: 150, passXp: 400, allDoneCores: 15 },
     // The shop: looks a day, the weekly set's bundle discount, and how many credits a core is worth when a bundle mixes them.
     shop: { slots: 4, setDiscount: 0.8, creditsPerCore: 25 },
-    pass: { weeks: 6, tiers: 30, xpPerTier: 120, premiumCores: 950, runXpPer: 250, runXpMax: 60 },
+    pass: { weeks: 6, tiers: 30, xpPerTier: 600, premiumCores: 550, runXpPer: 500, runXpMax: 30 },
     // Real-money products (src/store): create these ids in App Store Connect,
     // Google Play and RevenueCat. Prices are set in the stores. Bonus sizes:
     // 550 is +10%, 1,200 +20%, 2,500 +25% over the 100 pack.
@@ -711,13 +661,27 @@ export const CONFIG = {
         { id: 'cores_550', cores: 550 },
         { id: 'cores_1200', cores: 1200 },
         { id: 'cores_2500', cores: 2500 },
-        // Once per account: cores, tickets and the nova hull.
-        { id: 'starter_pack', cores: 500, tickets: 3, look: 'hull:nova', once: true },
+        // Once per account: cores and the nova hull.
+        { id: 'starter_pack', cores: 500, look: 'hull:nova', once: true },
         // The season pass's premium track, for money instead of cores.
         { id: 'season_pass', pass: true },
+        // One-off: no ads, ad rewards without the ad, the premium looks, +1 free revive a day, a badge on the boards.
+        { id: 'premium', premium: true, once: true },
       ],
     },
   },
+
+  // Ads (src/ads): rewarded ones offer a little convenience for watching; premium
+  // players get the reward without the ad. Interstitials are off: if turned on,
+  // never before day afterDays, at most one per everyRuns runs and minSeconds,
+  // never after a new best, never for premium.
+  ads: {
+    rewarded: { revive: true, doubleCredits: true, dailyGift: true, rerollQuest: true } as Record<'revive' | 'doubleCredits' | 'dailyGift' | 'rerollQuest', boolean>,
+    dailyGift: { credits: 150, cores: 2 },
+    interstitial: { enabled: false, afterDays: 3, everyRuns: 3, minSeconds: 180 },
+  },
+  // Premium (a one-off purchase): extra free revives a day on top of the one everyone gets.
+  premium: { extraFreeRevives: 1 },
 
   // Ice field and volcanic plain hazards (see world.ts: land()).
   hazards: {
@@ -907,7 +871,6 @@ export const CONFIG = {
   },
 
   ui: {
-    paletteFadeSeconds: 1.2, // palette cross-fade at each loop of the themes
     fadeMs: 200,
   },
 

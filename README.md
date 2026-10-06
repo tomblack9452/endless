@@ -10,8 +10,7 @@ effects and the music. There are no image or audio files apart from the app
 icons. The ship's interior is built from a pack of hand-made sections drawn
 as text grids.
 
-There's a light free-to-play layer on top: ranked tickets, daily rewards and
-quests, a daily shop of ship looks, a season pass and a premium currency
+There's a light free-to-play layer on top: daily rewards and quests, a daily shop of ship looks, a season pass and a premium currency
 (cores). It all works on the device; a Supabase server and RevenueCat store
 plug in behind it when their keys are set (see [Server and store](#server-and-store)).
 Nothing you can buy makes a ship faster in ranked.
@@ -30,8 +29,7 @@ Play it at https://tomblack9452.github.io/endless/.
 - [Leagues](#leagues)
 - [Solo and endless](#solo-and-endless)
 - [Credits, upgrades and looks](#credits-upgrades-and-looks)
-- [Cores, tickets and daily rewards](#cores-tickets-and-daily-rewards)
-- [Missions](#missions)
+- [Cores and daily rewards](#cores-and-daily-rewards)
 - [Settings](#settings)
 - [Sound](#sound)
 - [How it works](#how-it-works)
@@ -69,7 +67,8 @@ Accept the certificate warning once on the phone.
 | `npm run preview` | Serve the built `dist/` |
 | `npm run typecheck` | TypeScript only |
 | `npm test` | Fairness, collision, database and server tests (see [Testing](#testing)) |
-| `npm run db:setup` | Rebuild `supabase/setup.sql` from the migrations |
+| `npm run db:setup` | Rebuild `supabase/setup.sql` and `supabase/parts/` from the migrations |
+| `npm run db:apply` | Set up or update the Supabase database from your terminal (needs `SUPABASE_DB_URL`) |
 | `npm run check-server` | Check the Supabase keys and database, and say what's missing |
 
 ## Controls
@@ -276,9 +275,28 @@ Events change the look and sound only, never the course.
 ## Modes
 
 The title screen leads with **ranked**, a big button showing your best on
-this week's run and the tries you have left. **Solo** and **endless** sit under
-it, then record, missions, stats, daily, shop and pass; the hangar is bottom
-left and settings bottom right. Credits, cores and tickets sit top right.
+this week's run, with **solo** and **endless** under it. Above it, **live
+cards** show the season pass (your tier and the XP to the next), today's goals,
+and a daily reward when one is waiting. Along the bottom, a bar of five:
+**hangar**, **shop**, **goals**, **leaderboard** and **service record**, each
+with a dot when something there needs you. Settings is the gear top left;
+credits and cores sit top right (tapping them opens the shop).
+
+**First launch** (`src/onboarding.ts`) opens on a welcome: pick how you steer
+(drag, tap sides, or tilt where the phone has it), then a short **practice
+run** on a fixed course you can't fail, which asks for one thing at a time:
+steer, a near miss, a pickup, boost. Then **dress your ship** from a starter
+set (three hulls, three paints, three engine colours) and you're on the front
+page, with the first daily reward. It resumes after a restart, can be skipped,
+and can be replayed from settings; anyone who had already played skips it. The
+pilot name is asked for on the leaderboard, while it's still the generated
+one.
+
+New players see the game in stages (`src/reveal.ts`), so the first screen isn't
+a wall of buttons: at first the big button flies endless and the bar has the
+hangar and goals; solo, the shop and the service record open after 3 runs;
+ranked, leagues and the leaderboard after 5 (and the tutorial). Each stage is
+announced once, and a line under the menu says what opens next.
 
 | | Ranked | Solo | Endless |
 |---|---|---|---|
@@ -287,15 +305,14 @@ left and settings bottom right. Credits, cores and tickets sit top right.
 | Assist mode | Off | Allowed | Allowed |
 | Revive | No | Once a run | Once a run |
 | Ghost | Your weekly best | - | - |
-| Earns | XP, skill, league points, full credits | Credits at half rate | Credits at half rate |
+| Earns | The most XP, league points, full credits | XP, credits at half rate | XP, credits at half rate |
 | Best score | Your best this week | One per environment (and set level) | Endless best |
-| Missions | Ranked missions | Solo missions | Solo missions |
 
 **The weekly run** is endless, through every area in turn, on a seed that
 belongs to the week. Everyone flies the same course all week (it doesn't
 change with how you steer, boost or which upgrades you own), and a new one
-starts every Monday at midnight UTC. You get **5 tries a week** (ranked
-tickets, below); your best counts. Out of tries, more cost cores.
+starts every Monday at midnight UTC. Fly it as often as you like; your best
+counts.
 
 Ranked is played in leagues (below), so everyone in a league flies a ship
 with about the same upgrades. Every ranked run is kept with its score, date,
@@ -308,46 +325,43 @@ everywhere, because every hull shares one hitbox.
 
 ## Ranked
 
-Ranks follow the Halo 3 ladder, and like Halo 3 there are two numbers:
+Your **rank** is your lifetime level: 35 ranks from recruit to general grade
+4, earned with **XP** from everything you do. It never goes down; how well
+you do in ranked is what leagues are for.
 
-- **XP:** every ranked run earns 1 + 1 per 400 points (nothing for a run
-  under 500). Your first 3 runs each day earn double.
-- **Skill (1-50):** each run is compared with the par score for your current
-  skill on that week's level: 35% of the level's score target at skill 1,
-  rising to 120% at skill 50. Beat par for +1, beat it by half again for +2,
-  score under half of it for -1.
+- **Runs:** ranked earns 1 + 1 per 800 points, solo and endless 1 per 4,000
+  (nothing for a run under 500). Your first 3 runs each day earn double.
+- **Goals:** 30 XP each.
 
-A rank needs enough XP **and** a high enough highest-ever skill, so your rank
-never drops even when your skill does.
+| Rank | XP |
+|---|---|
+| Recruit | 0 |
+| Apprentice, G2 | 10, 25 |
+| Private, G2 | 50, 80 |
+| Corporal, G2 | 120, 175 |
+| Sergeant, G2, G3 | 250, 350, 450 |
+| Gunnery Sergeant, G2, G3 | 600, 800, 1,000 |
+| Lieutenant, G2, G3 | 1,300, 1,650, 2,000 |
+| Captain, G2, G3 | 2,500, 3,100, 3,750 |
+| Major, G2, G3 | 4,500, 5,400, 6,400 |
+| Commander, G2, G3 | 7,500, 9,000, 10,500 |
+| Colonel, G2, G3 | 12,500, 15,000, 17,500 |
+| Brigadier, G2, G3 | 20,000, 24,000, 28,000 |
+| General, G2, G3, G4 | 33,000, 38,000, 44,000, 50,000 |
 
-| Rank | XP | Highest skill |
-|---|---|---|
-| Recruit | 0 | - |
-| Apprentice, G2 | 10, 25 | - |
-| Private, G2 | 50, 80 | - |
-| Corporal, G2 | 120, 175 | - |
-| Sergeant, G2, G3 | 250, 350, 450 | 5, 7, 9 |
-| Gunnery Sergeant, G2, G3 | 600, 800, 1,000 | 11, 13, 15 |
-| Lieutenant, G2, G3 | 1,300, 1,650, 2,000 | 17, 19, 21 |
-| Captain, G2, G3 | 2,500, 3,100, 3,750 | 23, 25, 27 |
-| Major, G2, G3 | 4,500, 5,400, 6,400 | 29, 31, 33 |
-| Commander, G2, G3 | 7,500, 9,000, 10,500 | 35, 36, 37 |
-| Colonel, G2, G3 | 12,500, 15,000, 17,500 | 39, 40, 41 |
-| Brigadier, G2, G3 | 20,000, 24,000, 28,000 | 43, 44, 45 |
-| General, G2, G3, G4 | 33,000, 38,000, 44,000, 50,000 | 47, 48, 49, 50 |
+Older saves also needed a skill number for each rank; it's gone, so ranks are
+reached on XP alone and nobody dropped.
 
-General Grade 4 is roughly 1,200 strong runs, and skill 50 means beating
-the weekly target consistently. Every promotion pays credits (50 x the new
+A regular player (15 runs a day) reaches general in about a year. Every promotion pays credits (50 x the new
 rank's place on the ladder) and gets its own moment: a full-screen card with
 the new insignia, turning rays and what it gave you.
 
 Insignia are drawn in code: chevrons for enlisted ranks (with rockers for
 sergeants), bars and diamonds for officers, stars for generals, and pips for
-grades. The **service record** (tap your rank on the title screen) leads
+grades. The **service record** (the bar, or tap your rank on the title screen) leads
 with the XP you need for the next rank, big, with a bar and roughly how many
-runs that is. Under it: the skill the next rank needs (ticked once you have
-it), what the next rank gives (credits, a new insignia, any looks), a chart of
-the XP from your last 20 runs, your skill par this week, double-XP runs left
+runs that is. Under it: what the next rank gives (credits, a new insignia,
+any looks), a chart of the XP from your last 20 ranked runs, how XP is earned, double-XP runs left
 today, your bests, and the whole ladder in its own scrolling box, opened at
 your rank, with what every rank needs and gives.
 
@@ -359,12 +373,12 @@ power. Every upgrade tier you own is one **upgrade point** (30 at most).
 | League | Active points allowed | Get in by | Par (of the weekly target) | Promotion reward |
 |---|---|---|---|---|
 | Bronze | 0-4 | starting | 55% | - |
-| Silver | 5-9 | finish Bronze 3, own 5 points | 65% | 2,000 |
-| Gold | 10-14 | finish Silver 3, own 10 | 75% | 5,000 |
-| Platinum | 15-19 | finish Gold 3, own 15 | 85% | 10,000 |
-| Diamond | 20-24 | finish Platinum 3, own 20 | 95% | 20,000 |
-| Champion | 25-29 | finish Diamond 3, own 25 | 105% | 35,000 |
-| Grand Champion | 30 | finish Champion 3, own 30 | 115% | 50,000 |
+| Silver | 5-9 | finish Bronze 3, own 5 points | 65% | 500 |
+| Gold | 10-14 | finish Silver 3, own 10 | 75% | 1,250 |
+| Platinum | 15-19 | finish Gold 3, own 15 | 85% | 2,500 |
+| Diamond | 20-24 | finish Platinum 3, own 20 | 95% | 5,000 |
+| Champion | 25-29 | finish Diamond 3, own 25 | 105% | 8,750 |
+| Grand Champion | 30 | finish Champion 3, own 30 | 115% | 12,500 |
 
 - **Cap:** in a league your switched-on upgrades can't be over its top. If
   they are, ranked opens the hangar to switch some off first.
@@ -375,7 +389,7 @@ power. Every upgrade tier you own is one **upgrade point** (30 at most).
   league's points leaves you "promotion ready" until you buy them (buying the
   last one promotes you straight away).
 - **Weekly reward:** credits for the highest division you reach each week
-  (1,000 in Bronze 1 up to 15,000 in Grand Champion), paid when the next week
+  (150 in Bronze 1 up to 2,250 in Grand Champion), paid when the next week
   starts.
 - Each league above Bronze unlocks a paint, and the wing decal can show your
   league emblem.
@@ -427,8 +441,9 @@ ship, then the next loop's biomes. It has its own high score.
 
 ## Credits, upgrades and looks
 
-**Credits** come from runs (1 per 100 points in ranked, 1 per 200 in solo
-and endless), promotions, league rewards and set level stars. Spend them in
+**Credits** come mostly from runs (1 per 125 points in ranked, 1 per 250 in
+solo and endless, plus 1 for every pickup), and also from quests, goals,
+promotions, league rewards and set level stars. Spend them in
 the **hangar**.
 
 **Upgrades** work everywhere: solo and endless have no cap, ranked is up to
@@ -446,65 +461,89 @@ tier 5 Diamond. Any bought system can be switched off in the hangar.
 | Stabilisers | Steering 3% quicker | +15% |
 | Scanner | Power-ups 8% more often | +40% |
 
-**Looks** (any mode) are the ship's wardrobe: **157 of them** across seven slots,
-every one allowed in ranked because every hull shares one hitbox. Open the
-**wardrobe** from the hangar (tap any slot) or the shop. Tap a look to see it on
-the ship; the button under the grid puts it on, buys it, or says how to get it,
-with how far along you are. Each slot is a tab with its count.
+**The hangar** is where the ship is dressed and upgraded: one screen over the
+ship, opened from the title screen or from the shop. The chips along the top
+are the slots of looks, with an **upgrades** chip at the end.
+
+**Looks** (any mode) are **157 of them** across seven slots, every one allowed
+in ranked because every hull shares one hitbox. Tap a look to see it on the
+ship; the button under the grid puts it on, buys it, or says how to get it, with
+how far along you are. Each slot is a chip with its count.
 
 | Slot | What's in it |
 |---|---|
-| Hull (12) | dart; wing, needle, manta (missions); arrow, talon, viper (credits); nova, phantom (cores); raptor (season pass); kite, comet (goals) |
+| Hull (12) | dart; wing, needle, manta (early goals); arrow, talon, viper (credits); nova, phantom (cores); raptor (season pass); kite, comet (goals) |
 | Paint (72) | plain colours for credits, rank paints (copper to pearl), a paint for each league, star paints, premium paints for cores, and paints for finishing goals (one for each area you reach, and each place you master) |
 | Markings (13) | stripe, twin stripes, split, hazard (credits); dots, bands (cores); chevron, two-tone (stars); spine, wing tips, checker, nose cap (goals) |
 | Fins (7) | tail fin, winglets, crest (credits); twin fins (stars); blade, swept fins (goals) |
 | Engine colour (27) | single colours and two-colour flames (root to tip) for credits, cores, rank, goals and the pass |
 | Wing decal (16) | your rank insignia, your league emblem, and pictures: flame, wings, rocket (credits); star, moon, target, crown, skull, bolt, laurel, atom, planet (goals) |
-| Flame (10) | glow only, line, dashes, ion (missions); triple (credits); wide (cores); long, twin, pulse (goals); ribbon (the vault) |
+| Flame (10) | glow only; line, dashes, ion, long, twin, pulse (goals); triple (credits); wide (cores); ribbon (the vault) |
 
 **Ways to get a look:** credits, cores, a rank, a league, set level stars, a
-**goal**, the mission unlocks, the login calendar or the season pass, or the
+**goal**, the login calendar or the season pass, or the
 vault. Each look says which on its card.
 
-**Goals** (the second tab of the missions screen): 47 of them in four groups
+**Goals** (the bar's goals button) has three tabs. **Daily**: the login
+calendar and today's three goals. **Weekly**: five harder goals, the same for
+everyone, new every Monday (UTC), that span many runs (60 runs, 800 near
+misses, beat your league's par in ranked twice...); each pays 150 credits and
+400 pass XP, and all five 15 cores. **Achievements**: 53 long-term goals in four groups
 (flying, skill, places, collection), each with a progress bar. They count what
 the game already keeps, so a save that existed before has its progress already.
-Finishing one pays credits and unlocks a look to wear; there's a card for each
-when you finish a run. Examples: fly 50 runs, 10,000 near misses, a chain of
+Finishing one unlocks a look to wear and is announced after the run; claiming
+it pays credits and 30 rank XP. Examples: fly 50 runs, 10,000 near misses, a chain of
 15, reach level 19 (the volcanic plain), score 4,000 in each area on its own,
 finish all nine set levels, own 25 looks.
+
+**Season looks** are made by code (`src/seasonLooks.ts`), so every six-week
+season brings new ones with no drawing and no app update. Each season has a
+theme (a name like "hollow relay" and a base hue that steps round the colour
+wheel) and makes nine looks: a paint, an engine colour, a wing decal and a
+two-tone paint on the pass's premium track, a paint on the free track at tier
+25, and two paints and two engine colours for 2,000 to 20,000 credits, one of
+which the daily shop features each day of the season. Season 1's pass keeps its
+hand-made looks, so it only adds the shop four. Colours keep clear of the
+hand-made paints, decals are built from an outline, a mark and pips, and a look
+stays in the catalogue for good once its season has come.
+`CONFIG.seasons.overrides` renames, recolours or vetoes any of them.
 
 **Sets** are themed groups of four or five looks you can buy (ember forge, deep sea, neon
 night, royal guard, toxic waste, sunset strip). Own every look in one for a
 bonus of cores.
 
-Missions still unlock trail styles and world colour palettes.
-
-## Cores, tickets and daily rewards
+## Cores and daily rewards
 
 Everything here is in `src/economy/` and tuned in `CONFIG.economy`. Days
 turn over at midnight UTC, the same moment for everyone.
 
 - **Cores** are the premium currency. They come slowly from play (login
   rewards, quests, the season pass) and, in the apps, from the store. They buy
-  premium looks, ranked tickets, revives and the pass's premium track.
-- **Ranked tickets:** each try at the week's ranked run uses one. You get 5
-  every Monday (UTC). Out of tickets, the ranked button offers one for 30
-  cores, or shows when the next 5 arrive. Tickets from rewards and purchases
-  come on top and carry over to the next week.
+  premium looks, revives and the pass's premium track. Ranked used to take a
+  ticket a try; it's unlimited now, and older saves were paid 30 cores for each
+  ticket they had beyond the week's 5.
 - **Revive:** outside ranked, once a run, a crash offers to carry on (with a
   6 s timer). The first each day is free, then 20 cores. The ship goes back
   onto the safe lane, obstacles near the lane just ahead are cleared, it gets
   a shield and a moment of grace, and a 3-2-1 starts it again.
-- **Daily:** a 7-day login calendar (credits, cores, tickets, and the aurora
+- **Daily:** a 7-day login calendar (credits, cores, and the aurora
   paint on day 7), collected with a card when you open the game. A missed day
-  just waits. Three **daily quests**, the same for everyone that day (play
+  just waits. Three **daily goals**, the same for everyone that day (play
   runs, score, reach a level, near misses, pickups, boost time, ranked runs,
-  ship rooms), each paying credits and pass XP; all three pay 10 cores.
+  ship rooms), each paying 60 to 120 credits and 30 pass XP; all three pay 4
+  cores. Every finished goal (daily, weekly or achievement) waits on the goals
+  screen to be **claimed** with a tap; the bar's goals button has a dot while
+  anything is waiting.
+- **Rewarded ads** (the apps only; free for premium players): a revive once
+  the free ones are used, doubling a run's credits from the end screen, a free
+  daily gift card on the title screen (150 credits and 2 cores), and swapping
+  one daily goal a day for another.
 - **Shop:** a showroom, with the camera circling your ship above a sheet of
   cards. Tap a card to put the look on the ship, then buy it with the button
-  under the cards (tap an owned one to wear it). Three tabs, all the same for
-  everyone and all turning over on the UTC clock:
+  under the cards (tap an owned one to wear it). Six tabs: three of looks, the
+  same for everyone and turning over on the UTC clock, then **season pass** (its
+  premium track for cores or money), **cores** (the packs and the starter pack)
+  and **premium**. Tapping cores in the top bar opens the cores tab.
   - **today:** four looks a day, at least one premium, one a deal at a quarter
     off. Looks you don't own come first, and the day's picks are kept for the
     day, so buying one doesn't reshuffle the rest.
@@ -512,36 +551,17 @@ turn over at midnight UTC, the same moment for everyone.
     at a fifth off (in cores). Every set comes round once before any repeats.
   - **vault:** one rare look a month, for cores. When it goes it's away for the
     rest of the cycle.
-  Also: a ranked ticket for cores, and core packs in the apps.
-- **Season pass:** six weeks (six weekly runs), 30 tiers of 120 XP. Runs
-  earn XP (1 per 250 points, up to 60) and each quest 60. The free track pays
-  credits, cores and tickets; the premium track (950 cores, or a purchase in
+- **Season pass:** six weeks (six weekly runs), 30 tiers of 600 XP, paced so
+  a regular player finishes in about five weeks. Runs earn XP (1 per 500
+  points, up to 30) and each quest 30. The free track pays credits and cores;
+  the premium track (550 cores, or a purchase in
   the apps) pays more, with the frost and ember paints, the solar engine and
   the raptor hull. Rewards are paid as you reach each tier, and unlocking
   premium pays every premium tier already reached.
-- After a run, the end screen lists any quests finished and the pass XP
-  earned, and the counters in the top bar bump as things land.
+- After a run, the end screen lists any goals finished (to claim) and the pass
+  XP earned, and the counters in the top bar bump as things land.
 
-## Missions
-
-Missions come in two pools, three active at a time in each.
-
-- **Ranked** (the week's run): score in a run, near misses, chain length,
-  beat your league's par, reach a level, pickups in a run,
-  ranked runs played.
-- **Solo** (environments, set levels and endless): reach a level, score in a
-  run, near misses, chain length, pickups, boost time, ship rooms passed,
-  score without boosting, set level stars.
-
-Each one gets harder every time you complete it. Every completed mission
-unlocks the next item, in a fixed order:
-
-- **Hulls:** wing, needle, manta.
-- **Flames:** line, dashes, ion. Short engine flames behind the ship.
-- **World colours:** tidewater, clay, lichen, ink, ember. At each loop of the
-  themes the world fades to your next unlocked palette.
-
-**Stats** (title screen) show runs, time played, distance, your best this
+**Stats** (the service record's second tab) show runs, time played, distance, your best this
 week, your endless best and your best in each solo environment, furthest
 level, best chain, near misses, pickups, and where you crash most. Every run has a seed, and the same seed always builds the same course.
 
@@ -608,8 +628,8 @@ random parts, so they always fit together.
 **Look.** Block textures are drawn to canvases at startup and mapped in
 world space through a material patch. Props are low-poly meshes with shading
 baked into vertex colours, so there's no lighting cost. Colours come from
-one live palette. Time of day, theme blends, biome tints, events and palette
-cross-fades all write into it each frame.
+one live palette. Time of day, theme blends, biome tints and events all write
+into it each frame.
 
 **A course is its seed.** Generation only uses the seeded `rand()`, never
 `Math.random`, the clock or frame timing, and nothing is placed relative to
@@ -662,21 +682,26 @@ new build drops the old build's cached scripts and styles.
 | `src/blockTextures.ts` | Procedural metal textures |
 | `src/speedLines.ts` | Boost streaks |
 | `src/input.ts` | Drag, side taps, tilt, keyboard, boost control |
-| `src/missions.ts`, `src/cosmetics.ts` | Missions and mission unlocks |
-| `src/ranks.ts` | Rank ladder, XP, skill, par, insignia, run history |
+| `src/ranks.ts` | Rank ladder, XP, run credits, insignia, ranked history |
 | `src/wallet.ts` | Credits and cores |
-| `src/economy/` | Tickets, daily rewards and quests, the shop (today, the weekly set, the vault), the season pass, and their screens |
+| `src/economy/` | Daily rewards and goals, weekly goals, the shop (today, the weekly set, the vault), the season pass, and their screens |
 | `src/server/` | The server behind one interface: Supabase, or the device alone; cloud save, the run outbox and the leaderboard boards |
 | `src/unlocks.ts` | What opens solo environments and how far off it is |
-| `src/store/` | In-app purchases (RevenueCat in the apps, nothing on the web) |
+| `src/store/` | In-app purchases (RevenueCat in the apps, nothing on the web) and what's owned for good |
+| `src/ads/` | Ads (AdMob in the apps, nothing on the web) and their rules |
 | `src/ghost.ts` | The ghost of your weekly best |
 | `src/share.ts` | The share card |
 | `src/upgrades.ts` | Ship upgrade systems, points and the standard ship |
 | `src/leagues.ts` | Leagues, divisions, league points, weekly rewards, emblems |
-| `src/catalogue.ts` | Every look, how to get each, the sets and the vault |
+| `src/catalogue.ts` | Every hand-made look, how to get each, the sets and the vault (plus the season looks) |
+| `src/season.ts`, `src/seasonLooks.ts` | Season timing, and each season's generated looks |
 | `src/looks.ts` | What you own and what's on; how an unlock reads |
-| `src/achievements.ts`, `src/goals.ts` | The 47 goals (counted from existing stats) and which have paid |
-| `src/wardrobe.ts`, `src/wardrobeView.ts` | The wardrobe's model and its screen, and the goals list |
+| `src/achievements.ts`, `src/goals.ts` | The 53 goals (counted from existing stats) and which have paid |
+| `src/hangar.ts`, `src/hangarView.ts` | The hangar's model and its screen (looks and the upgrades chip) |
+| `src/goalsView.ts` | The goals screen: daily, weekly and achievements, with claiming |
+| `src/reveal.ts` | What new players see, in stages |
+| `src/onboarding.ts` | First launch: controls, the practice run's lessons, the starter set |
+| `src/legacy.ts` | Carries older saves' mission unlocks over to the looks (missions were removed) |
 | `src/decals.ts` | Wing decal pictures |
 | `src/progress.ts` | Stats, set level results, weekly, endless and environment bests |
 | `src/courses.ts` | The set levels, the solo environments and the week's ranked run |
@@ -690,17 +715,17 @@ new build drops the old build's cached scripts and styles.
 | `tests/fairness.test.ts` | Headless survivability test |
 | `tests/pieces.test.ts`, `tests/pieces-pairs.test.ts` | Every ship section on paper, every route flown, every pair back to back |
 | `tests/determinism.test.ts` | No unseeded randomness or clock in course generation |
-| `tests/economy.test.ts` | Tickets, the calendar, quests, the shop, the pass and the revive |
+| `tests/economy.test.ts` | The calendar, quests, the shop, the pass and the revive |
 | `tests/server.test.ts` | Offline fallback and the store webhook |
 | `tests/sql.test.ts`, `tests/leaderboard.test.ts` | The database run for real (PGlite): checks, boards, names, row security, and the game's server code against it |
 | `tests/collisions.test.ts` | Every solid pool checked against its mesh across every area |
 | `tests/unlocks.test.ts` | Solo environment unlocks |
-| `tests/ranks.test.ts` | Rank ladder, XP, skill and credit maths |
+| `tests/ranks.test.ts` | Rank ladder, XP and credit maths |
 | `tests/courses.test.ts` | Set levels fly to the finish; twelve weeks of ranked runs and every environment are survivable; the course depends only on its seed |
 | `tests/input.test.ts` | Double-tap and hold to boost |
 | `tests/leagues.test.ts` | League brackets, LP, divisions, promotion, weekly rewards, prices |
 | `public/` | Icons, manifest, service worker |
-| `supabase/` | Database migrations, `setup.sql` (all of them in one paste) and the store webhook |
+| `supabase/` | Database migrations, `setup.sql` (all of them in one file), `parts/` (the same in small pieces to paste) and the store webhook |
 | `docs/leaderboards.md` | Turning the leaderboards on, what's checked, and the cheating roadmap |
 | `docs/store.md` | Server, store and app setup, and the store listing |
 
@@ -719,7 +744,7 @@ Nearly every number lives in `src/config.ts`, grouped by system:
   `ranks.ts`, `upgrades.ts` and `looks.ts`)
 - `audio`: every gain, the music and the engine
 - `hazards`, `weather`: ice and lava lakes, lava bombs, snow and ash
-- `economy`: tickets, revives, the login calendar, quests, the shop, the
+- `economy`: run credits, revives, the login calendar, quests, the shop, the
   pass and the store's products
 - `render`: pixel ratio, adaptive-resolution thresholds and performance mode
 
@@ -738,7 +763,7 @@ that opens a panel. It isn't in production builds.
 - **Section:** forces one hand-made ship section wherever it fits
 - **Show routes:** draws each section's routes on the floor (main white,
   alternative teal, risky amber)
-- **Add 500 cores**, **add 5 tickets:** stand-ins for purchases
+- **Add 500 cores:** a stand-in for purchases
 - **Unlock all:** General Grade 4, Grand Champion, every look, every
   upgrade maxed and 100,000 credits (saved in that browser), and every set
   level open until you reload
@@ -770,8 +795,9 @@ three seeds.
 a slow one, a long press, a drag or taps on opposite sides don't, and the
 ship still steers while boosting.
 
-`tests/ranks.test.ts` checks the rank ladder, that ranks need both XP and
-skill, the XP and skill rules, the length of the grind and credit rates.
+`tests/ranks.test.ts` checks the rank ladder, that ranks are reached on XP
+alone, XP from every mode (doubled for the day's first three) and from goals,
+and credit rates.
 
 The pilots steer the way the ship really does: through its easing, sliding on
 ice, and dying in lava or pits as a player would. Courses also have to be the
@@ -783,13 +809,17 @@ lane matches row for row.
 its routes slow and fast; `tests/pieces-pairs.test.ts` flies every pair of
 sections back to back. `tests/determinism.test.ts` bans `Math.random`,
 `Date.now` and `performance.now` from the generator files.
-`tests/economy.test.ts` covers ticket refills, the login calendar, quests,
+`tests/economy.test.ts` covers the login calendar, quests,
 the shop, the pass, and that a revive leaves a clear lane.
 `tests/looks.test.ts` checks the catalogue: every way to get a look is real,
-every goal unlocks something, sets are buyable, old ids and prices are kept.
+every goal unlocks something, sets are buyable, old ids and prices are kept;
+`tests/legacy.test.ts` that a save with mission unlocks keeps them.
+`tests/seasons.test.ts` checks the season looks are the same every time, nine a
+season, unique, clear of the hand-made colours, priced right, overridable, and
+the pass's rewards from season 2.
 `tests/shop.test.ts` covers the day's picks (no reshuffle on a purchase), the
 weekly set's cycle and bundle price, and the vault's calendar.
-`tests/wardrobe.test.ts` covers the cards and the buy or equip button for each kind
+`tests/hangar.test.ts` covers the cards and the buy or equip button for each kind
 of unlock. `tests/ships.test.ts` checks every hull, marking, decal and flame can be
 drawn and that no hull is wider than the ship's footprint allows.
 `tests/server.test.ts` checks the game runs without a server and that the
@@ -807,10 +837,15 @@ Without keys, everything lives on the device. With them:
   for each solo environment, with pilot names (see the `top` link on the title
   screen). Runs are checked in the database (the score has to fit the distance
   and time, and the path the distance), kept and retried if there's no signal.
-  Setup is one SQL paste and two keys: [docs/leaderboards.md](docs/leaderboards.md).
+  Setup is two keys and `npm run db:apply` (or pasting the small SQL parts): [docs/leaderboards.md](docs/leaderboards.md).
 - **RevenueCat** (`src/store/`) in the iOS and Android apps: core packs
-  (100, 550, 1,200, 2,500), a one-time starter pack (500 cores, 3 tickets and
-  the nova hull) and the season pass. Purchases are paid into the server
+  (100, 550, 1,200, 2,500), a one-time starter pack (500 cores and the nova
+  hull), the season pass, and **premium** (a one-off: no ads, ad rewards
+  without the ad, the halo hull, regalia paint and crown flame, an extra free
+  revive a day, a badge on the boards). What's owned for good is in
+  `src/store/entitlements.ts`.
+- **AdMob** (`src/ads/`) in the apps: rewarded ads only, with consent and
+  Apple's tracking prompt; premium players never see one. No ads on the web. Purchases are paid into the server
   wallet by a webhook. The web build sells nothing.
 
 What has to be set up by hand (projects, products, keys and the app builds)

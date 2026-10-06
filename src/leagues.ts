@@ -22,13 +22,13 @@ export interface League {
 }
 
 export const LEAGUES: readonly League[] = [
-  { name: 'bronze', min: 0, max: 4, par: 0.55, promotion: 0, weekly: [1000, 1250, 1500], color: '#b07a4a' },
-  { name: 'silver', min: 5, max: 9, par: 0.65, promotion: 2000, weekly: [1800, 2200, 2600], color: '#a3a9b1' },
-  { name: 'gold', min: 10, max: 14, par: 0.75, promotion: 5000, weekly: [3000, 3500, 4000], color: '#d4a63a' },
-  { name: 'platinum', min: 15, max: 19, par: 0.85, promotion: 10000, weekly: [4500, 5250, 6000], color: '#6fb8bd' },
-  { name: 'diamond', min: 20, max: 24, par: 0.95, promotion: 20000, weekly: [6500, 7500, 8500], color: '#6d9be0' },
-  { name: 'champion', min: 25, max: 29, par: 1.05, promotion: 35000, weekly: [9000, 10500, 12000], color: '#9a78dc' },
-  { name: 'grand champion', min: 30, max: 30, par: 1.15, promotion: 50000, weekly: [12000, 13500, 15000], color: '#e0573f' },
+  { name: 'bronze', min: 0, max: 4, par: 0.55, promotion: 0, weekly: [150, 200, 200], color: '#b07a4a' },
+  { name: 'silver', min: 5, max: 9, par: 0.65, promotion: 500, weekly: [250, 350, 400], color: '#a3a9b1' },
+  { name: 'gold', min: 10, max: 14, par: 0.75, promotion: 1250, weekly: [450, 500, 600], color: '#d4a63a' },
+  { name: 'platinum', min: 15, max: 19, par: 0.85, promotion: 2500, weekly: [700, 800, 900], color: '#6fb8bd' },
+  { name: 'diamond', min: 20, max: 24, par: 0.95, promotion: 5000, weekly: [1000, 1100, 1300], color: '#6d9be0' },
+  { name: 'champion', min: 25, max: 29, par: 1.05, promotion: 8750, weekly: [1350, 1600, 1800], color: '#9a78dc' },
+  { name: 'grand champion', min: 30, max: 30, par: 1.15, promotion: 12500, weekly: [1800, 2000, 2250], color: '#e0573f' },
 ];
 
 export const DIVISIONS = ['1', '2', '3']; // shown as numbers: the UI is lowercase

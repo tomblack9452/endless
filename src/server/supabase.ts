@@ -152,11 +152,16 @@ export class SupabaseBackend implements Backend {
   }
 
   async board(q: BoardQuery): Promise<BoardRow[] | null> {
-    const rows = await this.call<{ rank: number; name: string; score: number; you: boolean }[]>('/rest/v1/rpc/leaderboard', {
+    const rows = await this.call<{ rank: number; name: string; score: number; you: boolean; premium?: boolean }[]>('/rest/v1/rpc/leaderboard', {
       method: 'POST',
       body: JSON.stringify({ p_board: q.board, p_period: q.period, p_league: q.league, p_limit: q.limit ?? 50 }),
     });
-    return rows ? rows.map((r) => ({ rank: Number(r.rank), name: r.name, score: r.score, you: r.you })) : null;
+    return rows ? rows.map((r) => ({ rank: Number(r.rank), name: r.name, score: r.score, you: r.you, premium: r.premium === true })) : null;
+  }
+
+  async purchases(): Promise<string[] | null> {
+    const rows = await this.call<{ product: string }[]>(`/rest/v1/store_events?select=product&user_id=eq.${this.session?.user}`);
+    return rows ? [...new Set(rows.map((r) => r.product))] : null;
   }
 
   async pilotName(): Promise<string | null> {

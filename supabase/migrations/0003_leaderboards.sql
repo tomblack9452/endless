@@ -10,16 +10,16 @@
 -- Everything is plain SQL: there is no function to deploy.
 
 -- Pilot names: shown on the boards. hidden takes a player off them.
-alter table public.players add column hidden boolean not null default false;
-alter table public.players add column name_changed_at timestamptz;
+alter table public.players add column if not exists hidden boolean not null default false;
+alter table public.players add column if not exists name_changed_at timestamptz;
 
 -- Every submitted run, kept for checking and clean-up. Written only by submit_run.
-alter table public.runs add column board text not null default 'ranked';
-create index runs_by_user on public.runs (user_id, at desc);
+alter table public.runs add column if not exists board text not null default 'ranked';
+create index if not exists runs_by_user on public.runs (user_id, at desc);
 
 -- The best run per player on each board (period is the week's Monday for
 -- ranked, 'all' for the rest; league is 0 outside ranked).
-create table public.bests (
+create table if not exists public.bests (
   board text not null,
   period text not null,
   league smallint not null default 0,
@@ -29,7 +29,7 @@ create table public.bests (
   achieved_at timestamptz not null default now(),
   primary key (board, period, league, user_id)
 );
-create index bests_top on public.bests (board, period, league, score desc, achieved_at);
+create index if not exists bests_top on public.bests (board, period, league, score desc, achieved_at);
 
 alter table public.bests enable row level security; -- no policies: read through leaderboard()
 
@@ -42,38 +42,25 @@ on conflict do nothing;
 
 drop view if exists public.board;
 
--- Submit a finished run. Checks it is possible (not that it is honest: a full
--- re-fly on the server is the next step, see docs/leaderboards.md), keeps it
--- if it is a best, and says where it ranks.
-create function public.submit_run(
+-- The checks on a run: is it possible? (not that it's honest: a full re-fly on the
+-- server is the next step, see docs/leaderboards.md). Raises a reason if not.
+create or replace function public.check_run(
   p_board text,
   p_league smallint,
   p_score integer,
   p_seconds real,
   p_distance real,
-  p_finished boolean,
-  p_path real[] default '{}'
-) returns jsonb
-language plpgsql security definer set search_path = public as $$
+  p_path real[]
+) returns void
+language plpgsql immutable as $$
 declare
-  -- Keep these in step with CONFIG (tests/server.test.ts checks).
-  c_points_per_unit constant numeric := 0.85;     -- CONFIG.score.pointsPerUnit
-  c_bonus_share constant numeric := 1.5;           -- pickups, near-miss chains and boost on top of distance (generous)
-  c_top_speed constant numeric := 115;             -- units/s: CONFIG.speed.max with full boost, plus a margin
-  c_path_step constant integer := 4;               -- units of distance per path sample
-  c_max_sideways constant numeric := 12;           -- sideways travel per path sample, at most
-  c_min_gap constant interval := interval '8 seconds'; -- between submissions from one player
-  c_max_per_day constant integer := 400;
-  me uuid := auth.uid();
-  week_start date := (date_trunc('week', now() at time zone 'utc'))::date;
-  per text;
-  lg smallint;
-  last_at timestamptz;
-  today integer;
-  old_best integer;
-  now_rank integer;
+  -- Keep these in step with CONFIG (tests/sql.test.ts checks).
+  c_points_per_unit constant numeric := 0.85;  -- CONFIG.score.pointsPerUnit
+  c_bonus_share constant numeric := 1.5;       -- pickups, near-miss chains and boost on top of distance (generous)
+  c_top_speed constant numeric := 115;         -- units/s: CONFIG.speed.max with full boost, plus a margin
+  c_path_step constant integer := 4;           -- units of distance per path sample
+  c_max_sideways constant numeric := 12;       -- sideways travel per path sample, at most
 begin
-  if me is null then raise exception 'sign in first' using errcode = '28000'; end if;
   if p_board !~ '^(ranked|endless|solo:(open-ground|canyon|ship|ice|asteroids|volcanic))$' then
     raise exception 'unknown board' using errcode = '22023';
   end if;
@@ -89,7 +76,6 @@ begin
   if p_distance / greatest(0.1, p_seconds) > c_top_speed then
     raise exception 'too fast' using errcode = '22023';
   end if;
-
   if p_board = 'ranked' then
     if p_league is null or p_league < 0 or p_league > 6 then
       raise exception 'bad league' using errcode = '22023';
@@ -104,6 +90,35 @@ begin
     ) then
       raise exception 'path jumps' using errcode = '22023';
     end if;
+  end if;
+end $$;
+
+-- Submit a finished run: checks it, keeps it if it is a best, and says where it ranks.
+create or replace function public.submit_run(
+  p_board text,
+  p_league smallint,
+  p_score integer,
+  p_seconds real,
+  p_distance real,
+  p_finished boolean,
+  p_path real[] default '{}'
+) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare
+  c_min_gap constant interval := interval '8 seconds'; -- between submissions from one player
+  c_max_per_day constant integer := 400;
+  me uuid := auth.uid();
+  week_start date := (date_trunc('week', now() at time zone 'utc'))::date;
+  per text;
+  lg smallint;
+  last_at timestamptz;
+  today integer;
+  old_best integer;
+  now_rank integer;
+begin
+  if me is null then raise exception 'sign in first' using errcode = '28000'; end if;
+  perform public.check_run(p_board, p_league, p_score, p_seconds, p_distance, p_path);
+  if p_board = 'ranked' then
     per := week_start::text;
     lg := p_league;
   else
@@ -147,6 +162,7 @@ end $$;
 
 -- A board, best first: the top p_limit pilots and, if you are further down,
 -- your own row at the end with your rank.
+drop function if exists public.leaderboard(text, text, smallint, integer); -- its columns change in 0004
 create function public.leaderboard(
   p_board text,
   p_period text default 'all',
@@ -190,7 +206,7 @@ end $$;
 
 -- Change your pilot name: 3 to 16 letters, numbers, spaces, - or _; not taken;
 -- once an hour at most.
-create function public.set_pilot_name(p_name text) returns text
+create or replace function public.set_pilot_name(p_name text) returns text
 language plpgsql security definer set search_path = public as $$
 declare
   me uuid := auth.uid();
@@ -212,5 +228,6 @@ begin
   return clean;
 end $$;
 
+revoke execute on function public.check_run from public, anon, authenticated; -- only submit_run calls it
 revoke execute on function public.submit_run, public.leaderboard, public.set_pilot_name from public, anon;
 grant execute on function public.submit_run, public.leaderboard, public.set_pilot_name to authenticated;

@@ -26,17 +26,17 @@ export interface Settings {
 
 export type SettingKey = keyof Settings;
 
-export const LEVELS = ['off', 'low', 'medium', 'full'];
+const LEVELS = ['off', 'low', 'medium', 'full'];
 export const LEVEL_GAIN = [0, 0.4, 0.7, 1];
-export const STEERING = ['gentle', 'normal', 'quick'];
+const STEERING = ['gentle', 'normal', 'quick'];
 /** Finger travel for full steer, as a fraction of screen width. Smaller = quicker. */
 export const STEERING_RANGE = [0.19, CONFIG.steering.dragRangeFraction, 0.1];
-export const TILT = ['low', 'medium', 'high'];
+const TILT = ['low', 'medium', 'high'];
 export const TILT_GAIN = [0.7, 1, 1.4];
-export const TOUCH = ['drag', 'tap sides'];
+const TOUCH = ['drag', 'tap sides'];
 // Saved as an index, so the order stays: 0 right, 1 left, 2 middle.
-export const SIDES = ['right', 'left', 'middle'];
-export const TEXT = ['normal', 'large', 'larger'];
+const SIDES = ['right', 'left', 'middle'];
+const TEXT = ['normal', 'large', 'larger'];
 export const TEXT_SCALE = [1, 1.2, 1.4];
 
 /** Option lists for the numbered settings (booleans show on/off). */

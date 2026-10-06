@@ -13,7 +13,7 @@ export interface StoreProduct {
   price: string; // in the player's currency, from the store
 }
 
-export type BuyResult = 'ok' | 'cancelled' | 'failed';
+type BuyResult = 'ok' | 'cancelled' | 'failed';
 
 export interface Store {
   /** True in the apps, with a key set. */

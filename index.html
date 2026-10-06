@@ -60,19 +60,17 @@
       </div>
 
       <div id="screen-title" class="layer screen">
+        <button id="title-settings" class="gear-btn" type="button" aria-label="settings">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.2" /><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1" /><circle cx="12" cy="12" r="6.3" /></svg>
+        </button>
         <div class="wallet-bar">
           <button class="coin" type="button" data-title="shop" aria-label="credits">
             <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" /><path d="M14.8 9.2a4 4 0 1 0 0 5.6" /></svg>
             <span id="bar-credits">0</span>
           </button>
-          <button class="coin premium" type="button" data-title="shop" aria-label="cores">
+          <button class="coin premium" type="button" data-title="shop-cores" aria-label="cores">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l7.5 4.5v9L12 21l-7.5-4.5v-9z" /><path d="M12 8l3.5 2v4L12 16l-3.5-2v-4z" /></svg>
             <span id="bar-cores">0</span>
-          </button>
-          <button class="coin" type="button" data-title="shop" aria-label="ranked tickets">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 8V6.5h17V8a2.5 2.5 0 0 0 0 5v4.5h-17V13a2.5 2.5 0 0 0 0-5z" /><path d="M14 7v2M14 11.5v2M14 16v1" /></svg>
-            <span id="bar-tickets">5</span>
-            <span id="bar-ticket-wait" class="coin-wait"></span>
           </button>
         </div>
         <div class="title-top">
@@ -87,7 +85,7 @@
             <span id="title-credits" class="label dim"></span>
           </span>
         </button>
-        <button id="title-league" class="title-rank title-league" type="button">
+        <button id="title-league" class="title-rank title-league" type="button" data-feature="league">
           <span id="title-league-icon" class="insignia"></span>
           <span class="title-rank-text">
             <span id="title-league-name" class="label"></span>
@@ -96,35 +94,69 @@
         </button>
         </div>
         <div class="screen-foot">
+          <div id="title-cards" class="live-cards"></div>
           <button id="title-start" class="pill primary title-ranked" type="button">
-            <span class="title-ranked-name">ranked</span>
+            <span id="title-ranked-name" class="title-ranked-name">ranked</span>
             <span id="title-ranked-sub" class="title-ranked-sub"></span>
           </button>
           <div class="title-modes">
-            <button class="pill" type="button" data-title="solo">solo</button>
-            <button class="pill" type="button" data-title="endless">endless</button>
+            <button class="pill" type="button" data-title="solo" data-feature="solo">solo</button>
+            <button class="pill" type="button" data-title="endless" data-feature="endless">endless</button>
           </div>
-          <div class="title-links">
-            <span class="chip link" data-title="record">record</span>
-            <span class="chip link" data-title="missions">missions</span>
-            <span class="chip link" data-title="stats">stats</span>
-            <span class="chip link" data-title="daily">daily<i class="news"></i></span>
-            <span class="chip link" data-title="shop">shop</span>
-            <span class="chip link" data-title="pass">pass</span>
-            <span class="chip link" data-title="boards">top</span>
-          </div>
-          <div id="title-best" class="label dim title-best"></div>
-          <div class="title-corners">
-            <button class="corner-link" type="button" data-title="hangar">
+          <div id="title-next" class="label dim title-next"></div>
+          <nav class="title-bar" aria-label="menu">
+            <button class="bar-btn" type="button" data-title="hangar" data-feature="hangar">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 20V10l9-6 9 6v10" /><path d="M7 20v-6h10v6" /><path d="M12 14v3M9.5 17.5h5" /></svg>
-              <span>hangar</span>
+              <span>hangar</span><i class="news"></i>
             </button>
-            <button id="title-settings" class="corner-link" type="button">
-              <span>settings</span>
-              <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.2" /><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1" /><circle cx="12" cy="12" r="6.3" /></svg>
+            <button class="bar-btn" type="button" data-title="shop" data-feature="shop">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 8h14l-1.2 12H6.2z" /><path d="M9 8V6.5a3 3 0 0 1 6 0V8" /></svg>
+              <span>shop</span><i class="news"></i>
             </button>
+            <button class="bar-btn" type="button" data-title="goals" data-feature="goals">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5" /><circle cx="12" cy="12" r="4.5" /><circle cx="12" cy="12" r="0.8" /></svg>
+              <span>goals</span><i class="news"></i>
+            </button>
+            <button class="bar-btn" type="button" data-title="boards" data-feature="boards">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20v-6h5v6M9.5 20V9h5v11M15 20v-8h5v8" /><path d="M12 3.5l.9 1.8 2 .3-1.4 1.4.3 2-1.8-.9-1.8.9.3-2-1.4-1.4 2-.3z" /></svg>
+              <span>leaderboard</span><i class="news"></i>
+            </button>
+            <button class="bar-btn" type="button" data-title="record" data-feature="record">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 4h12v6l-6 4-6-4z" /><path d="M6 13l6 4 6-4M6 17l6 4 6-4" /></svg>
+              <span>service record</span><i class="news"></i>
+            </button>
+          </nav>
+        </div>
+      </div>
+
+      <div id="screen-welcome" class="layer screen panel showroom">
+        <div class="panel-head">
+          <div class="panel-title" id="welcome-title">welcome, pilot</div>
+        </div>
+        <div class="sheet settings welcome-sheet">
+          <div data-welcome="controls">
+            <div class="label setting-note">pick how you steer. you can change it any time in settings.</div>
+            <div id="welcome-controls" class="chip-row"></div>
+            <button id="welcome-practice" class="pill primary sheet-buy" type="button">practice run</button>
+            <button id="welcome-skip" class="label link welcome-skip" type="button">skip the tutorial</button>
+          </div>
+          <div data-welcome="dress" hidden>
+            <div class="label setting-note">dress your ship. there are many more looks to earn in the hangar.</div>
+            <div class="settings-group">hull</div>
+            <div id="welcome-hull" class="chip-row"></div>
+            <div class="settings-group">paint</div>
+            <div id="welcome-paint" class="chip-row"></div>
+            <div class="settings-group">engine colour</div>
+            <div id="welcome-engine" class="chip-row"></div>
+            <button id="welcome-done" class="pill primary sheet-buy" type="button">ready</button>
           </div>
         </div>
+      </div>
+
+      <div id="tutorial" class="tutorial" hidden>
+        <div id="tutorial-step" class="label dim"></div>
+        <div id="tutorial-text" class="tutorial-text"></div>
+        <button id="tutorial-skip" class="label link" type="button">skip</button>
       </div>
 
       <div id="screen-paused" class="layer screen panel">
@@ -145,6 +177,7 @@
         </div>
         <div class="settings">
           <div class="settings-group">sound</div>
+          <button class="setting-row" type="button" data-action="tutorial"><span class="label">replay the tutorial</span><span class="value"></span></button>
           <button class="setting-row" type="button" data-setting="sound"><span class="label">sound</span><span class="value"></span></button>
           <button class="setting-row" type="button" data-setting="music"><span class="label">music</span><span class="value"></span></button>
           <button class="setting-row" type="button" data-setting="effects"><span class="label">effects</span><span class="value"></span></button>
@@ -169,60 +202,32 @@
         </div>
       </div>
 
-      <div id="screen-stats" class="layer screen panel">
+      <div id="screen-goals" class="layer screen panel">
         <div class="panel-head">
           <button class="label link back" type="button" data-action="back">back</button>
-          <div class="panel-title">stats</div>
-        </div>
-        <div class="settings">
-          <div id="stats-rows"></div>
-        </div>
-      </div>
-
-      <div id="screen-missions" class="layer screen panel">
-        <div class="panel-head">
-          <button class="label link back" type="button" data-action="back">back</button>
-          <div class="panel-title">missions</div>
+          <div class="panel-title">goals</div>
         </div>
         <div class="tabs">
-          <button class="tab on" type="button" data-missiontab="missions">missions</button>
-          <button class="tab" type="button" data-missiontab="goals">goals</button>
-          <span id="goals-count" class="label dim tabs-credits"></span>
+          <button class="tab on" type="button" data-goaltab="daily">daily<i class="news"></i></button>
+          <button class="tab" type="button" data-goaltab="weekly">weekly<i class="news"></i></button>
+          <button class="tab" type="button" data-goaltab="achievements">achievements<i class="news"></i></button>
         </div>
-        <div class="settings tabbed" data-missionpane="missions">
-          <div id="missions-rows"></div>
-          <div id="missions-next" class="label dim setting-note"></div>
+        <div class="settings tabbed" data-goalpane="daily">
+          <div class="settings-group">login rewards</div>
+          <div id="daily-calendar" class="calendar"></div>
+          <button id="daily-claim" class="pill primary daily-claim" type="button"></button>
+          <div class="settings-group">today <span id="daily-reset" class="group-note"></span></div>
+          <div id="daily-quests" class="task-list"></div>
         </div>
-        <div class="settings tabbed" data-missionpane="goals" hidden>
+        <div class="settings tabbed" data-goalpane="weekly" hidden>
+          <div class="settings-group">this week <span id="weekly-reset" class="group-note"></span></div>
+          <div id="weekly-goals" class="task-list"></div>
+        </div>
+        <div class="settings tabbed" data-goalpane="achievements" hidden>
           <div id="goals-note" class="label dim setting-note"></div>
-          <div id="goals-list"></div>
+          <div id="goals-list" class="task-list"></div>
         </div>
       </div>
-
-      <div id="screen-hangar" class="layer screen panel top">
-        <div class="panel-head">
-          <button class="label link back" type="button" data-action="back">back</button>
-          <div class="panel-title">hangar</div>
-        </div>
-        <div class="tabs">
-          <button class="tab on" type="button" data-tab="ship">ship</button>
-          <button class="tab" type="button" data-tab="upgrades">upgrades</button>
-          <span id="hangar-credits" class="label dim tabs-credits"></span>
-        </div>
-        <div class="settings short tabbed" data-pane="ship">
-          <div id="look-rows"></div>
-          <button id="look-buy" class="pill primary look-buy" type="button" hidden></button>
-          <button id="open-wardrobe" class="pill primary look-buy" type="button">open the wardrobe</button>
-          <div id="hangar-count" class="label dim setting-note"></div>
-        </div>
-        <div class="settings tabbed" data-pane="upgrades" hidden>
-          <div class="label dim setting-note">
-            <span id="upgrade-note">upgrades work everywhere; in ranked, only up to your league's cap.</span>
-          </div>
-          <div id="upgrade-rows"></div>
-        </div>
-      </div>
-
       <div id="screen-sectors" class="layer screen panel">
         <div class="panel-head">
           <button class="label link back" type="button" data-action="back">back</button>
@@ -250,7 +255,7 @@
       <div id="screen-boards" class="layer screen panel">
         <div class="panel-head">
           <button class="label link back" type="button" data-action="back">back</button>
-          <div class="panel-title">leaderboard</div>
+          <div class="panel-title">leaderboards</div>
         </div>
         <div class="settings">
           <div id="board-tabs" class="board-tabs"></div>
@@ -306,7 +311,11 @@
           <button class="label link back" type="button" data-action="back">back</button>
           <div class="panel-title">service record</div>
         </div>
-        <div class="settings prog">
+        <div class="tabs">
+          <button class="tab on" type="button" data-recordtab="rank">rank</button>
+          <button class="tab" type="button" data-recordtab="stats">stats</button>
+        </div>
+        <div class="settings prog tabbed" data-recordpane="rank">
           <div class="prog-hero">
             <span id="record-icon" class="insignia big"></span>
             <div>
@@ -327,6 +336,9 @@
           <div class="settings-group">all ranks</div>
           <div id="record-ladder" class="ladder"></div>
         </div>
+        <div class="settings tabbed" data-recordpane="stats" hidden>
+          <div id="stats-rows"></div>
+        </div>
       </div>
 
       <div id="screen-shop" class="layer screen panel showroom">
@@ -337,32 +349,42 @@
         <div id="shop-wallet" class="label dim showroom-note"></div>
         <div class="sheet settings">
           <div id="shop-tabs" class="chip-row"></div>
-          <div class="settings-group"><span id="shop-heading">today's looks</span> <span id="shop-reset" class="group-note"></span></div>
-          <div id="shop-offers" class="offer-cards"></div>
-          <div id="shop-info" class="label dim setting-note"></div>
-          <button id="shop-buy" class="pill primary sheet-buy" type="button"></button>
-          <button id="shop-wardrobe" class="pill sheet-buy" type="button">open your wardrobe</button>
-          <div class="settings-group">ranked tickets</div>
-          <div id="shop-tickets"></div>
-          <div class="settings-group">cores</div>
-          <div id="shop-cores"></div>
+          <div id="shop-looks">
+            <div class="settings-group"><span id="shop-heading">today's looks</span> <span id="shop-reset" class="group-note"></span></div>
+            <div id="shop-offers" class="offer-cards"></div>
+            <div id="shop-info" class="label dim setting-note"></div>
+            <button id="shop-buy" class="pill primary sheet-buy" type="button"></button>
+            <button id="shop-hangar" class="pill sheet-buy" type="button">open your hangar</button>
+          </div>
+          <div id="shop-list" hidden>
+            <div id="shop-list-head" class="settings-group"></div>
+            <div id="shop-list-note" class="label dim setting-note"></div>
+            <div id="shop-cores"></div>
+          </div>
         </div>
       </div>
+      </div>
 
-      <div id="screen-wardrobe" class="layer screen panel showroom">
+      <div id="screen-hangar" class="layer screen panel showroom">
         <div class="panel-head">
           <button class="label link back" type="button" data-action="back">back</button>
-          <div class="panel-title">wardrobe</div>
+          <div class="panel-title">hangar</div>
         </div>
-        <div id="wardrobe-summary" class="label dim showroom-note"></div>
-        <div class="sheet settings ward-sheet">
-          <div id="wardrobe-slots" class="chip-row"></div>
-          <div id="wardrobe-grid" class="ward-grid"></div>
-          <div class="ward-detail">
-            <div class="ward-head"><span id="wardrobe-name" class="label ward-name"></span><span id="wardrobe-slot" class="label dim"></span></div>
-            <div id="wardrobe-status" class="label dim ward-status"></div>
-            <div id="wardrobe-goal" class="xp-track ward-goal" hidden><div id="wardrobe-goal-fill" class="xp-fill"></div></div>
-            <button id="wardrobe-action" class="pill primary" type="button"></button>
+        <div id="hangar-summary" class="label dim showroom-note"></div>
+        <div class="sheet settings hangar-sheet">
+          <div id="hangar-slots" class="chip-row"></div>
+          <div id="hangar-looks" class="hangar-pane">
+            <div id="hangar-grid" class="hangar-grid"></div>
+            <div class="hangar-detail">
+              <div class="hangar-head"><span id="hangar-name" class="label hangar-name"></span><span id="hangar-slot" class="label dim"></span></div>
+              <div id="hangar-status" class="label dim hangar-status"></div>
+              <div id="hangar-goal" class="xp-track hangar-goal" hidden><div id="hangar-goal-fill" class="xp-fill"></div></div>
+              <button id="hangar-action" class="pill primary" type="button"></button>
+            </div>
+          </div>
+          <div id="hangar-upgrades" class="hangar-pane hangar-scroll" hidden>
+            <div id="upgrade-note" class="label dim setting-note"></div>
+            <div id="upgrade-rows"></div>
           </div>
         </div>
       </div>
@@ -387,21 +409,6 @@
         </div>
       </div>
 
-      <div id="screen-daily" class="layer screen panel">
-        <div class="panel-head">
-          <button class="label link back" type="button" data-action="back">back</button>
-          <div class="panel-title">daily</div>
-        </div>
-        <div class="settings">
-          <div class="settings-group">login rewards</div>
-          <div id="daily-calendar" class="calendar"></div>
-          <button id="daily-claim" class="pill primary daily-claim" type="button"></button>
-          <div class="settings-group">today's quests <span id="daily-reset" class="group-note"></span></div>
-          <div id="daily-quests"></div>
-          <div id="daily-bonus" class="label dim setting-note"></div>
-        </div>
-      </div>
-
       <div id="screen-over" class="layer screen panel">
         <div class="screen-center">
           <div id="over-heading" class="screen-heading">crashed</div>
@@ -411,11 +418,11 @@
           <div id="over-stats" class="label dim"></div>
           <div id="over-extra" class="label dim"></div>
           <div id="over-rank" class="over-rank"></div>
-          <div id="over-missions" class="label dim over-missions"></div>
           <div id="over-rewards" class="label over-rewards"></div>
           <div class="menu">
             <div class="pill primary">tap to retry</div>
             <button id="over-share" class="pill" type="button" data-action="share" hidden>share</button>
+            <button id="over-double" class="pill" type="button" data-action="double" hidden></button>
             <button class="pill" type="button" data-action="menu">main menu</button>
           </div>
         </div>
