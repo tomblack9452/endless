@@ -1,7 +1,7 @@
 import { CONFIG } from './config';
 import { label, type SettingKey, type Settings } from './settings';
 
-export type ScreenName = 'title' | 'paused' | 'over' | 'settings' | 'stats' | 'missions' | 'hangar' | 'record' | 'solo' | 'league' | 'shop' | 'pass' | 'daily';
+export type ScreenName = 'title' | 'paused' | 'over' | 'settings' | 'stats' | 'missions' | 'hangar' | 'record' | 'solo' | 'league' | 'shop' | 'pass' | 'daily' | 'boards' | 'wardrobe';
 
 /** Everything the league screen shows. */
 /** The service record and league screens share one layout. */
@@ -60,6 +60,17 @@ export interface CourseTile {
   stars: number;
   time: string;
   locked: boolean;
+}
+
+/** One solo environment tile: open (with its best) or locked (with what opens it). */
+export interface EnvTile {
+  index: number;
+  name: string;
+  best: number;
+  locked: boolean;
+  need: string;
+  toGo: string;
+  fraction: number; // 0..1 towards the unlock
 }
 
 /** One tile on the sector map. */
@@ -133,6 +144,8 @@ export class UI {
     shop: $('screen-shop'),
     pass: $('screen-pass'),
     daily: $('screen-daily'),
+    boards: $('screen-boards'),
+    wardrobe: $('screen-wardrobe'),
   };
   readonly titleLeague = $('title-league');
   private readonly hudMode = $('hud-mode');
@@ -298,6 +311,80 @@ export class UI {
     if (el) el.textContent = text;
   }
 
+
+  // --- leaderboard screen ---------------------------------------------------------
+
+  /** Wire the tabs and the name box. Taps and keys here never start a run. */
+  bindBoards(tabs: readonly { id: string; label: string }[], onTab: (id: string) => void, onName: (name: string) => void): void {
+    const bar = $('board-tabs');
+    bar.addEventListener('pointerdown', (e) => e.stopPropagation());
+    bar.replaceChildren(
+      ...tabs.map((t) => {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'tab';
+        b.dataset.board = t.id;
+        b.textContent = t.label;
+        b.addEventListener('click', () => onTab(t.id));
+        return b;
+      }),
+    );
+    const input = $('board-name') as HTMLInputElement;
+    const save = $('board-name-save');
+    for (const el of [input, save]) el.addEventListener('pointerdown', (e) => e.stopPropagation());
+    save.addEventListener('click', () => onName(input.value));
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') onName(input.value);
+    });
+  }
+
+  /** Mark a tab as the open one (scrolling it into view). */
+  setBoardTab(id: string): void {
+    for (const el of document.querySelectorAll<HTMLElement>('[data-board]')) {
+      const on = el.dataset.board === id;
+      el.classList.toggle('on', on);
+      if (on) el.scrollIntoView({ block: 'nearest', inline: 'center' });
+    }
+  }
+
+  /** The board's rows: rank, name, score. A pilot below the top comes after a gap. */
+  renderLeaderboard(caption: string, rows: { rank: number; name: string; score: string; you: boolean }[], status: string): void {
+    $('board-caption').textContent = caption;
+    $('board-status').textContent = status;
+    const out: HTMLElement[] = [];
+    let last = 0;
+    for (const r of rows) {
+      if (last > 0 && r.rank > last + 1) {
+        const gap = document.createElement('div');
+        gap.className = 'board-gap label';
+        gap.textContent = '···';
+        out.push(gap);
+      }
+      last = r.rank;
+      const row = document.createElement('div');
+      row.className = `board-row label${r.you ? ' you' : ''}`;
+      const rank = document.createElement('span');
+      rank.className = 'rank';
+      rank.textContent = r.rank > 0 ? String(r.rank) : '–';
+      const who = document.createElement('span');
+      who.className = 'who';
+      who.textContent = r.you ? `${r.name} (you)` : r.name;
+      const score = document.createElement('span');
+      score.className = 'pts';
+      score.textContent = r.score;
+      row.append(rank, who, score);
+      out.push(row);
+    }
+    $('board-rows').replaceChildren(...out);
+  }
+
+  /** The pilot name box: its current value and a line under it. */
+  setPilotName(name: string, note: string): void {
+    const input = $('board-name') as HTMLInputElement;
+    if (name && document.activeElement !== input) input.value = name;
+    $('board-name-note').textContent = note;
+  }
+
   /** The league screen's weekly leaderboard. */
   renderBoard(rows: [string, string][], note: string): void {
     this.fillRows($('league-board'), rows);
@@ -400,7 +487,7 @@ export class UI {
     envs.addEventListener('pointerdown', (e) => e.stopPropagation());
     envs.addEventListener('click', (e) => {
       const tile = (e.target as HTMLElement).closest<HTMLElement>('.course-tile');
-      if (tile) onEnv(Number(tile.dataset.env));
+      if (tile && !tile.classList.contains('locked')) onEnv(Number(tile.dataset.env));
     });
     for (const el of document.querySelectorAll<HTMLElement>('[data-solotab]')) {
       el.addEventListener('pointerdown', (e) => e.stopPropagation());
@@ -414,22 +501,39 @@ export class UI {
     });
   }
 
-  /** Solo environments: a tile each with its high score. */
-  renderEnvironments(tiles: { index: number; name: string; best: number }[]): void {
+  /** Solo environments: a tile each with its high score, or what opens it and how far off that is. */
+  renderEnvironments(tiles: EnvTile[], note: string): void {
+    $('env-note').textContent = note;
     const grid = document.createElement('div');
     grid.className = 'course-grid';
     for (const t of tiles) {
       const b = document.createElement('button');
       b.type = 'button';
-      b.className = 'course-tile';
+      b.className = `course-tile${t.locked ? ' locked' : ''}`;
       b.dataset.env = String(t.index);
       const name = document.createElement('span');
       name.className = 'course-name';
       name.textContent = t.name;
-      const best = document.createElement('span');
-      best.className = 'course-time';
-      best.textContent = t.best > 0 ? `best ${formatScore(t.best)}` : 'no runs yet';
-      b.append(name, best);
+      b.append(name);
+      if (t.locked) {
+        const need = document.createElement('span');
+        need.className = 'course-need';
+        need.textContent = t.need;
+        const bar = document.createElement('span');
+        bar.className = 'unlock-bar';
+        const fill = document.createElement('span');
+        fill.style.width = `${Math.round(t.fraction * 100)}%`;
+        bar.append(fill);
+        const togo = document.createElement('span');
+        togo.className = 'course-time';
+        togo.textContent = t.toGo;
+        b.append(need, bar, togo);
+      } else {
+        const best = document.createElement('span');
+        best.className = 'course-time';
+        best.textContent = t.best > 0 ? `best ${formatScore(t.best)}` : 'no runs yet';
+        b.append(best);
+      }
       grid.append(b);
     }
     $('env-grid').replaceChildren(grid);

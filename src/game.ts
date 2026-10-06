@@ -15,6 +15,7 @@ import { cycle, DEFAULT_SETTINGS, LEVEL_GAIN, loadSettings, saveSettings, type S
 import { EVENT_NOTICE, Events } from './events';
 import { Weather } from './weather';
 import { Ghost } from './ghost';
+import { DECAL_SVG } from './decals';
 import { Cosmetics, describe } from './cosmetics';
 import { Haptics } from './haptics';
 import { Hints } from './hints';
@@ -25,21 +26,29 @@ import { Wallet } from './wallet';
 import { Daily, questText } from './economy/daily';
 import { Pass, premiumReward, freeReward, runXp, seasonAt } from './economy/pass';
 import { type Reward, rewardLook, rewardParts, rewardText } from './economy/reward';
-import { shopFor } from './economy/shop';
+import { DailyShop, setOffer, vaultAt } from './economy/shop';
 import { Tickets } from './economy/tickets';
 import { dayKey, formatWait, untilTomorrow } from './economy/time';
 import { EconomyView } from './economy/view';
-import { createBackend } from './server/backend';
+import { type BoardId, createBackend } from './server/backend';
+import { BOARD_TABS, boardCaption, boardForRun, boardName, boardQuery } from './server/boards';
+import { Outbox } from './server/outbox';
 import { CloudSave } from './server/sync';
 import { shareCard } from './share';
 import { createStore, type ProductId, type StoreProduct } from './store/store';
 import { storage } from './storage';
 import { fxDistance, fxTime } from './fx';
 import { type Course, COURSES, courseLength, type Environment, ENVIRONMENTS, type WeeklyRun, weeklyRun } from './courses';
+import { envStatus, nextEnvironment, newlyOpened } from './unlocks';
 import { DIVISIONS, divisionReward, emblem, LEAGUES, leagueName, leaguePar, Leagues, LP_PER_DIVISION, weekKey } from './leagues';
-import { find, itemsIn, LOOKS, Looks, type Owner, type Slot, SLOT_NAMES, SLOTS, unlockText } from './looks';
+import { ACHIEVEMENTS, type Achievement, GROUP_NAMES, type Group, type Snapshot, achievement, progressOn, rewardKeys } from './achievements';
+import { SETS, VAULT_ORDER } from './catalogue';
+import { GoalLog } from './goals';
+import { buildWardrobe, lookIcon, lookSwatch, monthsUntilVault, type WardrobeState } from './wardrobe';
+import { WardrobeScreen } from './wardrobeView';
+import { byKey, find, itemsIn, keyOf, LOOKS, Looks, type LookItem, type Owner, type Slot, SLOT_NAMES, SLOTS, unlockText } from './looks';
 import type { Fin, Marking } from './looks';
-import type { ShipId } from './cosmetics';
+import type { ShipId, TrailId } from './cosmetics';
 import { MAX_TIER, type ShipStats, STANDARD, SYSTEMS, type SystemId, TIER_COST, TIER_LEAGUE, Upgrades } from './upgrades';
 import { newSeed } from './rng';
 import { loadNumber } from './storage';
@@ -55,7 +64,7 @@ const DEG = Math.PI / 180;
 const PATH_STEP = 4;
 const OWNED_KEY = 'endless.purchases';
 
-type InfoScreen = 'stats' | 'missions' | 'hangar' | 'record' | 'solo' | 'league' | 'shop' | 'pass' | 'daily';
+type InfoScreen = 'stats' | 'missions' | 'hangar' | 'record' | 'solo' | 'league' | 'shop' | 'pass' | 'daily' | 'boards' | 'wardrobe';
 
 /** "5 oct": the Monday this week's ranked course started. */
 /** "1:23.4" */
@@ -82,6 +91,9 @@ const POWER_NOTICE = ['shield. takes one hit', 'magnet. pulls in boost', 'slow-m
 /** A wrapped present, for the daily reward. */
 const GIFT_ICON =
   '<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round"><rect x="12" y="26" width="40" height="28" rx="3"/><rect x="8" y="18" width="48" height="10" rx="2"/><path d="M32 18v36"/><path d="M32 18c-4-8-14-10-14-4s10 4 14 4c4 0 14 2 14-4s-10-4-14 4z"/></svg>';
+/** A goal badge: a star in a ring. */
+const GOAL_ICON =
+  '<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round"><circle cx="32" cy="32" r="26"/><path d="M32 14l5.4 11.4 12.1 1.6-8.9 8.4 2.3 12.3L32 41.7l-10.9 6 2.3-12.3-8.9-8.4 12.1-1.6z"/></svg>';
 /** A season pass badge. */
 const PASS_ICON =
   '<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round"><path d="M32 6l22 10v16c0 13-9 22-22 26C19 54 10 45 10 32V16z"/><path d="M32 20l4 8 9 1-7 6 2 9-8-5-8 5 2-9-7-6 9-1z"/></svg>';
@@ -107,6 +119,8 @@ export class Game {
   private readonly weather: Weather;
   private readonly ghost: Ghost;
   private onIce = false;
+  /** This run counts towards opening solo environments: ranked or endless, from the start (not solo, set levels or dev starts). */
+  private unlockable = false;
   private readonly sound = new Sound();
   private readonly audio: AudioState = {
     playing: false,
@@ -140,6 +154,10 @@ export class Game {
   private readonly econ = new EconomyView();
   private readonly backend = createBackend();
   private readonly cloud = new CloudSave(this.backend);
+  /** Finished runs on their way to the leaderboards (kept and retried when there's no signal). */
+  private readonly outbox = new Outbox(this.backend);
+  private boardTab = 'week';
+  private boardSeq = 0;
   private readonly store = createStore();
   private storeProducts: StoreProduct[] = [];
   /** Shop rows for real-money products, in the order shown ('dev' adds cores in the dev build). */
@@ -148,6 +166,12 @@ export class Game {
   private ownedProducts = new Set<string>();
   /** The shop card tapped (on the ship to try), or -1. */
   private shopPick = -1;
+  private readonly dailyShop = new DailyShop();
+  private readonly goalLog = new GoalLog();
+  private readonly wardrobeUi = new WardrobeScreen();
+  private ward: WardrobeState = { slot: 'hull', pick: null };
+  private wardrobeFrom: 'shop' | 'hangar' | null = null;
+  private missionsTab: 'missions' | 'goals' = 'missions';
   // Ranked: the ship's sideways position every PATH_STEP units (the leaderboard check, and later the ghost).
   private path: number[] = [];
   private pathTimes: number[] = [];
@@ -273,6 +297,8 @@ export class Game {
 
     this.ui.bindCelebration();
     this.ui.bindTitleLinks(this.onTitleLink);
+    this.ui.bindBoards(BOARD_TABS, (id) => void this.showBoard(id), (name) => void this.savePilotName(name));
+    window.addEventListener('online', () => void this.outbox.flush());
     const now = Date.now();
     // Looks load once; a login reward can give one, so it waits for them.
     const looksReady = Promise.all([this.cosmetics.load(), this.looks.load()]);
@@ -285,8 +311,12 @@ export class Game {
       this.tickets.load(now),
       this.daily.load(dayKey(now)),
       this.pass.load(now),
+      this.dailyShop.load(),
+      this.goalLog.load(),
       looksReady,
     ]).then(() => {
+      // A save from before goals: what it has already done counts, with no payout.
+      if (!this.goalLog.started) this.goalLog.startWith(ACHIEVEMENTS.filter((a) => progressOn(a, this.snapshot()).done).map((a) => a.id));
       // A new week: pay last week's league reward.
       const weekly = this.leagues.rollWeek();
       if (weekly > 0) {
@@ -297,7 +327,18 @@ export class Game {
       this.claimLogin();
       void this.connect();
     });
-    this.econ.bindShop(this.onShopOffer, this.onShopBuy, this.onShopTicket, this.onShopCores);
+    this.econ.bindShop(this.onShopOffer, this.onShopBuy, this.onShopTicket, this.onShopCores, this.onShopTab);
+    this.wardrobeUi.bindWardrobe({
+      slot: (slot) => this.onWardrobeSlot(slot),
+      pick: (id) => this.onWardrobePick(id),
+      action: () => this.onWardrobeAction(),
+      open: () => this.openWardrobe(undefined, this.infoOpen === 'shop' ? 'shop' : 'hangar'),
+    });
+    this.wardrobeUi.bindGoals((tab) => {
+      this.missionsTab = tab;
+      this.wardrobeUi.setMissionsTab(tab);
+      if (tab === 'goals') this.renderGoals();
+    });
     this.econ.bindPass(this.onPassPremium, () => void this.buyProduct('season_pass'));
     this.econ.bindDaily(() => this.claimLogin());
     this.ui.titleLeague.addEventListener('pointerdown', (e) => e.stopPropagation());
@@ -318,6 +359,8 @@ export class Game {
     void looksReady.then(() => {
       // Saves from before the hangar had looks: carry the mission hull across.
       if (this.looks.equipped.hull === 'dart' && this.cosmetics.ship !== 'dart') this.looks.equip('hull', this.cosmetics.ship);
+      // Flames used to be picked on their own; they're a look now.
+      if (this.looks.equipped.trail === 'none' && this.cosmetics.trail !== 'none') this.looks.equip('trail', this.cosmetics.trail);
       this.applyCosmetics();
     });
     void loadSettings().then((s) => {
@@ -356,6 +399,7 @@ export class Game {
     this.preview = null;
     this.seed = seed;
     this.mode = mode;
+    this.unlockable = (mode === 'ranked' || mode === 'endless') && startScore === 0;
     this.course = course;
     this.environment = env;
     this.world.setCourse(course);
@@ -416,7 +460,7 @@ export class Game {
     this.level = level;
     const progress = startScore / CONFIG.score.levelLength;
     this.ui.setScore(this.score);
-    this.progress.reachedLevel(level);
+    if (this.unlockable) this.progress.reachedLevel(level);
     this.ui.setLevel(level);
     this.ui.setProgress(progress - (level - 1));
     this.applyLook(progress);
@@ -528,8 +572,15 @@ export class Game {
     }
     this.wallet.add(credits);
     lines.push(`+${formatScore(credits)} credits`);
+    const board = boardForRun(this.mode, this.environment?.id ?? null, this.course !== null);
+    if (board && board !== 'ranked') this.submitToBoard(board, this.state === 'finished');
+    if (this.unlockable) {
+      const next = nextEnvironment(this.progress.furthest);
+      if (next) lines.push(`solo: ${next.env.name} opens at level ${next.status.level} (${next.status.toGo} to go)`);
+    }
     this.econ.setOverRewards(this.runRewards());
     this.refreshTitle();
+    this.checkGoals(); // the stats are in: any goal this run finished pays out now
     return lines.join(' · ');
   }
 
@@ -633,30 +684,96 @@ export class Game {
     this.openInfo('daily');
   }
 
+  private shopTab: 'today' | 'set' | 'vault' = 'today';
+
+  /** The cards for the open shop tab, and the line, heading and buy button that go with them. */
+  private shopTabView(now: number, owned: (key: string) => boolean): { heading: string; reset: string; info: string; items: LookItem[]; cards: { price: string; premium: boolean; deal: boolean }[]; buy: { text: string; enabled: boolean } } {
+    const priceOf = (item: LookItem): string => {
+      const u = item.unlock;
+      return u.by === 'credits' ? `${formatScore(u.cost)} credits` : u.by === 'cores' || u.by === 'vault' ? `${formatScore(u.cost)} cores` : '';
+    };
+    if (this.shopTab === 'set') {
+      const week = weekKey(now);
+      const so = setOffer(week, owned);
+      const left = Date.parse(`${week}T00:00:00Z`) + 7 * 86_400_000 - now;
+      const saved = so.full - so.price;
+      return {
+        heading: so.set.name,
+        reset: `this week · new in ${formatWait(left)}`,
+        info: so.complete
+          ? `you have the whole set. its bonus of ${so.set.bonusCores} cores is yours`
+          : `${so.missing.length} of ${so.items.length} looks left · the lot for ${formatScore(so.price)} cores, ${formatScore(saved)} less than one by one · own the whole set for +${so.set.bonusCores} cores`,
+        items: so.items,
+        cards: so.items.map((item) => ({ price: priceOf(item), premium: item.unlock.by === 'cores', deal: false })),
+        buy: so.complete ? { text: 'set complete', enabled: false } : { text: `buy the set · ${formatScore(so.price)} cores`, enabled: this.wallet.cores >= so.price },
+      };
+    }
+    if (this.shopTab === 'vault') {
+      const v = vaultAt(now);
+      const mine = owned(keyOf(v.item));
+      return {
+        heading: 'the vault',
+        reset: `leaves in ${formatWait(v.leaves)}`,
+        info: `a rare look, for sale a month at a time. when it goes it's away for ${VAULT_ORDER.length - 1} months`,
+        items: [v.item],
+        cards: [{ price: priceOf(v.item), premium: true, deal: false }],
+        buy: mine ? { text: `${v.item.name} is yours`, enabled: false } : { text: `buy ${v.item.name} · ${formatScore(v.price)} cores`, enabled: this.wallet.cores >= v.price },
+      };
+    }
+    const offers = this.dailyShop.offers(dayKey(now), owned);
+    const f = offers[this.shopPick];
+    let buy: { text: string; enabled: boolean } = { text: 'tap a look to try it on', enabled: false };
+    if (f) {
+      if (owned(keyOf(f.item))) buy = { text: `${f.item.name} is on your ship`, enabled: false };
+      else {
+        const have = f.currency === 'cores' ? this.wallet.cores : this.wallet.credits;
+        const price = `${formatScore(f.price)} ${f.currency}`;
+        buy = have >= f.price ? { text: `buy ${f.item.name} · ${price}`, enabled: true } : { text: `${price} · you have ${formatScore(have)}`, enabled: false };
+      }
+    }
+    return {
+      heading: "today's looks",
+      reset: `new in ${formatWait(untilTomorrow(now))}`,
+      info: '',
+      items: offers.map((o) => o.item),
+      cards: offers.map((o) => ({ price: `${formatScore(o.price)} ${o.currency}`, premium: o.currency === 'cores', deal: o.deal })),
+      buy,
+    };
+  }
+
   private openShop(): void {
     const now = Date.now();
     const o = this.owner();
+    const owned = (key: string): boolean => {
+      const it = byKey(key);
+      return !!it && this.looks.owns(it, o);
+    };
     const T = CONFIG.economy.tickets;
-    const offers = shopFor(dayKey(now));
+    const v = this.shopTabView(now, owned);
     this.tickets.refill(now);
     this.econ.renderShop({
       wallet: `${formatScore(this.wallet.credits)} credits · ${formatScore(this.wallet.cores)} cores · ${this.tickets.count} tickets`,
-      reset: `new in ${formatWait(untilTomorrow(now))}`,
-      offers: offers.map((f, i) => {
-        const colors = f.item.colors;
-        return {
-          name: f.item.name,
-          slot: f.item.slot,
-          slotName: SLOT_NAMES[f.item.slot],
-          swatch: colors ? `linear-gradient(135deg, ${colors[0]} 50%, ${colors[1]} 50%)` : null,
-          price: `${formatScore(f.price)} ${f.currency}`,
-          premium: f.currency === 'cores',
-          deal: f.deal,
-          owned: this.looks.owns(f.item, o),
-          picked: i === this.shopPick,
-        };
-      }),
-      buy: this.shopBuyButton(offers),
+      reset: v.reset,
+      tabs: [
+        { id: 'today', label: 'today' },
+        { id: 'set', label: 'weekly set' },
+        { id: 'vault', label: 'vault' },
+      ].map((t) => ({ ...t, on: t.id === this.shopTab })),
+      heading: v.heading,
+      info: v.info,
+      offers: v.items.map((item, i) => ({
+        name: item.name,
+        slot: item.slot,
+        slotName: SLOT_NAMES[item.slot],
+        swatch: lookSwatch(item),
+        icon: lookIcon(item),
+        price: v.cards[i].price,
+        premium: v.cards[i].premium,
+        deal: v.cards[i].deal,
+        owned: owned(keyOf(item)),
+        picked: i === this.shopPick,
+      })),
+      buy: v.buy,
       tickets: {
         label: `one ranked ticket · ${this.tickets.count} left · ${T.perWeek} new in ${formatWait(this.tickets.nextIn(now))}`,
         button: `${T.coreCost} cores`,
@@ -669,6 +786,15 @@ export class Game {
     this.trail.setVisible(true);
     this.openInfo('shop');
   }
+
+  private onShopTab = (id: string): void => {
+    if (id !== 'today' && id !== 'set' && id !== 'vault') return;
+    this.shopTab = id;
+    this.shopPick = -1;
+    this.preview = null;
+    this.applyLooks();
+    this.openShop();
+  };
 
   /** The shop's real-money rows: store products in the apps, a note on the web. */
   private coreRows(): { label: string; button: string; enabled: boolean }[] {
@@ -694,49 +820,68 @@ export class Game {
     return rows;
   }
 
-  /** Tap a shop look: try it on the ship (tap again to take it off). */
-  /** The buy button under the cards: for the picked look, or a prompt to pick one. */
-  private shopBuyButton(offers: ReturnType<typeof shopFor>): { text: string; enabled: boolean } {
-    const f = offers[this.shopPick];
-    if (!f) return { text: 'tap a look to try it on', enabled: false };
-    if (this.looks.owns(f.item, this.owner())) return { text: `${f.item.name} is on your ship`, enabled: false };
-    const have = f.currency === 'cores' ? this.wallet.cores : this.wallet.credits;
-    const price = `${formatScore(f.price)} ${f.currency}`;
-    return have >= f.price ? { text: `buy ${f.item.name} · ${price}`, enabled: true } : { text: `${price} · you have ${formatScore(have)}`, enabled: false };
-  }
-
   /** Tap a look: it goes on the ship to try (owned ones are just put on). Tap again to take it off. */
   private onShopOffer = (i: number): void => {
-    const f = shopFor(dayKey(Date.now()))[i];
-    if (!f) return;
-    if (this.shopPick === i && !this.looks.owns(f.item, this.owner())) {
+    const now = Date.now();
+    const o = this.owner();
+    const owned = (key: string): boolean => {
+      const it = byKey(key);
+      return !!it && this.looks.owns(it, o);
+    };
+    const item = this.shopTabView(now, owned).items[i];
+    if (!item) return;
+    if (this.shopPick === i && !owned(keyOf(item))) {
       this.shopPick = -1;
       this.preview = null;
     } else {
       this.shopPick = i;
-      if (this.looks.owns(f.item, this.owner())) {
+      if (owned(keyOf(item))) {
         this.preview = null;
-        this.looks.equip(f.item.slot, f.item.id);
-      } else this.preview = { slot: f.item.slot, id: f.item.id };
+        this.looks.equip(item.slot, item.id);
+      } else this.preview = { slot: item.slot, id: item.id };
     }
     this.haptics.pickup();
     this.applyLooks();
     this.openShop();
   };
 
-  private onShopBuy = (): void => {
-    const f = shopFor(dayKey(Date.now()))[this.shopPick];
-    if (!f || this.looks.owns(f.item, this.owner())) return;
-    const paid = f.currency === 'cores' ? this.wallet.spendCores(f.price) : this.wallet.spend(f.price);
-    if (!paid) return;
-    this.looks.buy(f.item);
-    this.looks.equip(f.item.slot, f.item.id);
+  /** Something was bought: put it on, play the sound, and see whether it finished a goal or a set. */
+  private afterBuy(items: LookItem[], notice: string): void {
+    for (const item of items) this.looks.equip(item.slot, item.id);
     this.preview = null;
     this.sound.pickup();
     this.haptics.pickup();
-    this.ui.showNotice(`${f.item.name} bought and on your ship`);
+    this.ui.showNotice(notice);
     this.applyLooks();
     this.refreshTitle();
+    this.checkGoals();
+  }
+
+  private onShopBuy = (): void => {
+    const now = Date.now();
+    const o = this.owner();
+    const owned = (key: string): boolean => {
+      const it = byKey(key);
+      return !!it && this.looks.owns(it, o);
+    };
+    if (this.shopTab === 'set') {
+      const so = setOffer(weekKey(now), owned);
+      if (so.complete || !this.wallet.spendCores(so.price)) return;
+      for (const item of so.missing) this.looks.buy(item);
+      this.afterBuy(so.items, `${so.set.name} bought and on your ship`);
+    } else if (this.shopTab === 'vault') {
+      const v = vaultAt(now);
+      if (owned(keyOf(v.item)) || !this.wallet.spendCores(v.price)) return;
+      this.looks.buy(v.item);
+      this.afterBuy([v.item], `${v.item.name} from the vault is on your ship`);
+    } else {
+      const f = this.dailyShop.offers(dayKey(now), owned)[this.shopPick];
+      if (!f || owned(keyOf(f.item))) return;
+      const paid = f.currency === 'cores' ? this.wallet.spendCores(f.price) : this.wallet.spend(f.price);
+      if (!paid) return;
+      this.looks.buy(f.item);
+      this.afterBuy([f.item], `${f.item.name} bought and on your ship`);
+    }
     this.openShop();
   };
 
@@ -921,6 +1066,7 @@ export class Game {
       }
       await this.wallet.link(this.backend);
       this.refreshTitle();
+      void this.outbox.flush(); // runs that couldn't be sent last time
     }
     this.ownedProducts = new Set(JSON.parse((await storage.get(OWNED_KEY)) ?? '[]') as string[]);
     await this.store.start(this.backend.userId);
@@ -996,16 +1142,7 @@ export class Game {
   /** Fold a ranked run into the rank and league; fills the game-over block. Returns bonus credits. */
   private recordRanked(finished: boolean): number {
     const lg = this.leagues;
-    if (!this.assisted)
-      void this.backend.submitRun({
-        week: weekKey(Date.now()),
-        league: lg.league,
-        score: Math.floor(this.score),
-        seconds: this.runTime,
-        distance: this.world.distance - this.runStart,
-        finished,
-        path: this.path,
-      });
+    this.submitToBoard('ranked', finished);
     this.ui.showShare(true);
     const target = this.weekly.target;
     this.beatPar = this.score >= leaguePar(lg.league, target);
@@ -1180,15 +1317,82 @@ export class Game {
   /** This week's leaderboard in your league (just your best when offline). */
   private async loadBoard(): Promise<void> {
     const lg = this.leagues;
+    const tab = BOARD_TABS[0];
     this.ui.renderBoard([], this.backend.online ? 'loading' : '');
-    const rows = await this.backend.board(weekKey(Date.now()), lg.league);
+    const rows = await this.backend.board(boardQuery(tab, lg.league));
     const mine = this.progress.weeklyBest(this.weekly.id);
-    const view: [string, string][] = rows.map((r, i) => [`${i + 1}. ${r.you ? 'you' : r.name}`, formatScore(r.score)]);
-    if (!this.backend.online) {
-      this.ui.renderBoard(mine > 0 ? [['your best', formatScore(mine)]] : [['no ranked run yet this week', '']], 'online leaderboards come with accounts');
+    if (!this.backend.online || rows === null) {
+      this.ui.renderBoard(mine > 0 ? [['your best', formatScore(mine)]] : [['no ranked run yet this week', '']], this.backend.online ? "couldn't load the board" : 'the leaderboards need the server');
       return;
     }
+    const view: [string, string][] = rows.map((r) => [`${r.rank}. ${r.you ? 'you' : r.name}`, formatScore(r.score)]);
     this.ui.renderBoard(view.length > 0 ? view : [['no runs yet this week', '']], LEAGUES[lg.league].name);
+  }
+
+  // --- leaderboards ----------------------------------------------------------------
+
+  /** Send a finished run to its board. Assisted and dev runs never go. */
+  private submitToBoard(board: BoardId, finished: boolean): void {
+    if (this.assisted || this.dev.invincible || this.dev.autopilot) return;
+    const distance = this.world.distance - this.runStart;
+    if (distance < 60 || this.runTime < 5 || this.score <= 0) return; // a crash at the start isn't a result
+    void this.outbox
+      .send({
+        board,
+        league: board === 'ranked' ? this.leagues.league : 0,
+        score: Math.floor(this.score),
+        seconds: this.runTime,
+        distance,
+        finished,
+        path: board === 'ranked' ? [...this.path] : [],
+      })
+      .then((res) => {
+        if (!res) return; // waiting for a signal
+        if (res.status === 'ok' && res.rank) this.ui.showNotice(`${res.newBest ? 'new best: ' : ''}#${res.rank} on the ${boardName(board)} board`);
+        else if (res.status === 'rejected' && import.meta.env.DEV) console.warn(`leaderboard turned the run down: ${res.message}`);
+      });
+  }
+
+  /** Your own best on a tab, for when the board can't be read. */
+  private localBest(id: string): number {
+    if (id === 'week') return this.progress.weeklyBest(this.weekly.id);
+    if (id === 'endless') return this.progress.endlessBest;
+    return this.progress.envBest[id] ?? 0;
+  }
+
+  private openBoards(): void {
+    this.openInfo('boards');
+    void this.showBoard(this.boardTab);
+    void this.backend.pilotName().then((name) => {
+      if (this.infoOpen === 'boards') this.ui.setPilotName(name ?? '', this.backend.online ? (name ? '3 to 16 letters, numbers, spaces, - or _. once an hour' : '') : 'names come with the server');
+    });
+  }
+
+  private async showBoard(id: string): Promise<void> {
+    const tab = BOARD_TABS.find((t) => t.id === id) ?? BOARD_TABS[0];
+    this.boardTab = tab.id;
+    this.ui.setBoardTab(tab.id);
+    const seq = ++this.boardSeq;
+    const caption = boardCaption(tab, this.leagues.league);
+    const mine = this.localBest(tab.id);
+    const own = mine > 0 ? [{ rank: 0, name: 'you', score: formatScore(mine), you: true }] : [];
+    if (!this.backend.online) {
+      this.ui.renderLeaderboard(caption, own, 'global boards need the server. this is your best on this device.');
+      return;
+    }
+    this.ui.renderLeaderboard(caption, [], 'loading');
+    await this.outbox.flush(); // so a run you just finished is on the board you're about to read
+    const rows = await this.backend.board(boardQuery(tab, this.leagues.league));
+    if (seq !== this.boardSeq || this.infoOpen !== 'boards') return; // moved on while it loaded
+    if (rows === null) this.ui.renderLeaderboard(caption, own, "couldn't load the board. check your connection");
+    else if (rows.length === 0) this.ui.renderLeaderboard(caption, [], 'nobody yet. fly a run to be first');
+    else this.ui.renderLeaderboard(caption, rows.map((r) => ({ rank: r.rank, name: r.name, score: formatScore(r.score), you: r.you })), '');
+  }
+
+  private async savePilotName(name: string): Promise<void> {
+    const res = await this.backend.setPilotName(name);
+    this.ui.setPilotName(res.ok ? res.message : '', res.ok ? 'saved' : res.message);
+    if (res.ok) void this.showBoard(this.boardTab);
   }
 
   /** How far through the current rank's XP band the player is (0..1). */
@@ -1326,13 +1530,13 @@ export class Game {
     this.ui.showNotice(u ? `done: ${text}. unlocked ${describe(u)}` : `done: ${text}`);
     this.sound.pickup();
     this.haptics.level(false);
+    this.checkGoals();
   }
 
   /** Ship shape, trail and the chosen palette (outside a run's later loops). */
   private applyCosmetics(): void {
     const c = this.cosmetics;
     this.applyLooks();
-    this.trail.setStyle(c.trail);
     this.basePalette.set(PALETTES.find((p) => p.name === c.palette) ?? PALETTES[0]);
     this.applyLook(this.distanceScore / CONFIG.score.levelLength);
   }
@@ -1347,9 +1551,55 @@ export class Game {
     this.fadeT = 0;
   }
 
+  /** The player as the goals see them (everything here is already saved: nothing extra is tracked). */
+  private snapshot(): Snapshot {
+    const base = this.baseSnapshot();
+    // "Own N looks" counts the looks goals unlock too, so count once without it and then again with.
+    base.looksOwned = this.looks.count(this.ownerFor(base));
+    return base;
+  }
+
+  private baseSnapshot(): Snapshot {
+    const st = this.progress.stats;
+    return {
+      runs: st.runs,
+      distance: st.distance,
+      seconds: st.seconds,
+      nearMisses: st.nearMisses,
+      bestChain: st.bestChain,
+      pickups: st.pickups,
+      crashes: Object.values(st.crashes).reduce((n, v) => n + v, 0),
+      furthest: this.progress.furthest,
+      endlessBest: this.progress.endlessBest,
+      envBest: this.progress.envBest,
+      coursesDone: COURSES.filter((c) => this.progress.course(c.id).stars & 1).length,
+      stars: this.progress.totalStars(),
+      missions: this.cosmetics.unlocked,
+      upgradePoints: this.upgrades.points(),
+      looksOwned: 0,
+    };
+  }
+
+  private ownerFor(snap: Snapshot): Owner {
+    // Dev "unlock all" opens every look: every mission unlock, plenty of stars, every goal done.
+    const all = this.dev.unlockedAll;
+    const mission = new Set<string>(all ? LOOKS.filter((l) => l.unlock.by === 'mission').map(keyOf) : [...this.cosmetics.ships().map((id) => `hull:${id}`), ...this.cosmetics.trails().map((id) => `trail:${id}`)]);
+    return {
+      rank: this.ranked.rank,
+      stars: all ? 999 : this.progress.totalStars(),
+      league: this.leagues.league,
+      mission,
+      goal: (id) => {
+        const a = achievement(id);
+        if (all) return { have: a?.target ?? 1, target: a?.target ?? 1, done: true };
+        return a ? progressOn(a, snap) : { have: 0, target: 1, done: false };
+      },
+    };
+  }
+
   /** What the player has, for unlocking looks. */
   private owner(): Owner {
-    return { rank: this.ranked.rank, stars: this.progress.totalStars(), league: this.leagues.league, missionHulls: this.cosmetics.ships() };
+    return this.ownerFor(this.snapshot());
   }
 
   /** Put the equipped looks (plus any preview) on the ship. */
@@ -1358,48 +1608,26 @@ export class Game {
     if (this.preview) eq[this.preview.slot] = this.preview.id;
     this.player.setShape(eq.hull as ShipId);
     this.player.setPaint(find('paint', eq.paint).colors ?? null);
-    const decal = eq.decal === 'rank' ? insignia(this.ranked.rank) : eq.decal === 'league' ? emblem(this.leagues.league, this.leagues.division) : null;
+    const decal = eq.decal === 'rank' ? insignia(this.ranked.rank) : eq.decal === 'league' ? emblem(this.leagues.league, this.leagues.division) : (DECAL_SVG[eq.decal] ?? null);
     this.player.setDressing(eq.markings as Marking, eq.fins as Fin, decal);
-    this.trail.setTint(find('engine', eq.engine).colors?.[0] ?? null);
+    const flame = find('engine', eq.engine).colors;
+    this.trail.setTint(flame?.[0] ?? null, flame?.[1] ?? null);
+    this.trail.setStyle(eq.trail as TrailId);
   }
 
-  /** Ship tab rows: the looks slots, then trail style and world colours (from missions). */
+  /** Ship tab rows: tap a slot to open the wardrobe on it; world colours cycle (they come from missions). */
   private onLookRow = (key: string): void => {
-    if (key === 'trail' || key === 'palette') {
+    if (key === 'palette') {
       this.preview = null;
       this.cosmetics.cycle(key);
       this.applyCosmetics();
       this.openHangar();
       return;
     }
-    const slot = key as Slot;
-    const items = itemsIn(slot);
-    const current = this.preview?.slot === slot ? this.preview.id : this.looks.equipped[slot];
-    const next = items[(items.findIndex((i) => i.id === current) + 1) % items.length];
-    if (this.looks.owns(next, this.owner())) {
-      this.preview = null;
-      this.looks.equip(slot, next.id);
-    } else {
-      this.preview = { slot, id: next.id };
-    }
-    this.applyLooks();
-    this.openHangar();
+    this.openWardrobe(key as Slot, 'hangar');
   };
 
-  private onLookBuy = (): void => {
-    if (!this.preview) return;
-    const item = find(this.preview.slot, this.preview.id);
-    const u = item.unlock;
-    if (u.by === 'credits' ? !this.wallet.spend(u.cost) : u.by === 'cores' ? !this.wallet.spendCores(u.cost) : true) return;
-    this.looks.buy(item);
-    this.looks.equip(item.slot, item.id);
-    this.preview = null;
-    this.sound.pickup();
-    this.haptics.pickup();
-    this.refreshTitle();
-    this.applyLooks();
-    this.openHangar();
-  };
+  private onLookBuy = (): void => {};
 
   private renderLooks(): void {
     const o = this.owner();
@@ -1417,19 +1645,139 @@ export class Game {
       };
     });
     const c = this.cosmetics;
-    rows.push(
-      { key: 'trail', label: 'trail', value: `${c.trail} (${c.trails().length})`, locked: false, note: '' },
-      { key: 'palette', label: 'world colours', value: `${c.palette} (${c.palettes().length})`, locked: false, note: '' },
-    );
-    let buy: { text: string; enabled: boolean } | null = null;
-    if (this.preview) {
-      const item = find(this.preview.slot, this.preview.id);
-      const u = item.unlock;
-      if (u.by === 'credits') buy = { text: `buy ${item.name} · ${formatScore(u.cost)} credits`, enabled: this.wallet.credits >= u.cost };
-      else if (u.by === 'cores') buy = { text: `buy ${item.name} · ${formatScore(u.cost)} cores`, enabled: this.wallet.cores >= u.cost };
-    }
+    rows.push({ key: 'palette', label: 'world colours', value: `${c.palette} (${c.palettes().length})`, locked: false, note: '' });
     const owned = LOOKS.filter((l) => this.looks.owns(l, o)).length;
-    this.ui.renderLooks(rows, buy, `${owned} of ${LOOKS.length} looks unlocked · missions unlock trails, hulls and world colours`);
+    this.ui.renderLooks(rows, null, `${owned} of ${LOOKS.length} looks · tap one to open the wardrobe`);
+  }
+
+  // --- the wardrobe ----------------------------------------------------------------------------
+
+  private openWardrobe(slot: Slot | undefined, from: 'shop' | 'hangar'): void {
+    if (slot) this.ward = { slot, pick: null };
+    else this.ward = { ...this.ward, pick: null };
+    this.wardrobeFrom = from;
+    this.preview = null;
+    this.applyLooks();
+    this.renderWardrobe(false);
+    this.player.reset();
+    this.player.setVisible(true);
+    this.trail.setVisible(true);
+    this.openInfo('wardrobe');
+  }
+
+  private renderWardrobe(keepScroll: boolean): void {
+    const now = new Date();
+    const v = vaultAt(now.getTime());
+    const month = now.getUTCFullYear() * 12 + now.getUTCMonth();
+    this.wardrobeUi.renderWardrobe(
+      buildWardrobe(this.ward, {
+        looks: this.looks,
+        owner: this.owner(),
+        credits: this.wallet.credits,
+        cores: this.wallet.cores,
+        vault: { key: keyOf(v.item), monthsUntil: (key) => monthsUntilVault(key, VAULT_ORDER, month) },
+      }),
+      keepScroll,
+    );
+  }
+
+  private onWardrobeSlot(slot: Slot): void {
+    this.ward = { slot, pick: null };
+    this.preview = null;
+    this.applyLooks();
+    this.renderWardrobe(false);
+  }
+
+  /** Tap a look: it goes on the ship to see (owned or not); the button underneath puts it on for good, or buys it. */
+  private onWardrobePick(id: string): void {
+    this.ward.pick = id;
+    this.preview = { slot: this.ward.slot, id };
+    this.haptics.pickup();
+    this.applyLooks();
+    this.renderWardrobe(true);
+  }
+
+  private onWardrobeAction(): void {
+    const id = this.ward.pick;
+    if (!id) return;
+    const item = find(this.ward.slot, id);
+    if (this.looks.owns(item, this.owner())) {
+      this.looks.equip(item.slot, item.id);
+      this.preview = null;
+      this.sound.pickup();
+      this.applyLooks();
+      this.renderWardrobe(true);
+      return;
+    }
+    const u = item.unlock;
+    if (u.by === 'credits') {
+      if (!this.wallet.spend(u.cost)) return;
+    } else if (u.by === 'cores') {
+      if (!this.wallet.spendCores(u.cost)) return;
+    } else if (u.by === 'vault') {
+      if (keyOf(item) !== keyOf(vaultAt(Date.now()).item) || !this.wallet.spendCores(u.cost)) return;
+    } else return;
+    this.looks.buy(item);
+    this.afterBuy([item], `${item.name} bought and on your ship`);
+    this.renderWardrobe(true);
+  }
+
+  // --- goals ---------------------------------------------------------------------------------------
+
+  /** What finishing a goal gives, in words. */
+  private goalRewardText(a: Achievement): string {
+    const looks = rewardKeys(a.id).map((k) => byKey(k)).filter((l): l is LookItem => !!l);
+    return [`+${a.credits.toLocaleString('en-US')} credits`, ...looks.map((l) => `${l.name} ${SLOT_NAMES[l.slot]}`)].join(' · ');
+  }
+
+  private renderGoals(): void {
+    const snap = this.snapshot();
+    const groups = (Object.keys(GROUP_NAMES) as Group[]).map((g) => ({
+      name: GROUP_NAMES[g],
+      rows: ACHIEVEMENTS.filter((a) => a.group === g).map((a) => {
+        const p = progressOn(a, snap);
+        return { name: a.name, text: a.text, have: p.have, target: p.target, done: p.done, reward: this.goalRewardText(a) };
+      }),
+    }));
+    const done = ACHIEVEMENTS.filter((a) => progressOn(a, snap).done).length;
+    this.wardrobeUi.renderGoals(`${done} of ${ACHIEVEMENTS.length}`, 'finish a goal for credits and a look to wear. they count everything you do, from the start', groups);
+  }
+
+  /**
+   * Pay and announce goals finished since last time, and any set a purchase just made whole.
+   * Goals can unlock looks and looks can finish goals ("own 25 looks"), so go round until nothing new.
+   */
+  private checkGoals(): void {
+    const party: Celebration[] = [];
+    for (let pass = 0; pass < 4; pass++) {
+      const snap = this.snapshot();
+      const fresh = ACHIEVEMENTS.filter((a) => progressOn(a, snap).done && !this.goalLog.has(a.id));
+      const sets = this.looks.completedSets(SETS, this.owner());
+      if (fresh.length === 0 && sets.length === 0) break;
+      let credits = 0;
+      for (const a of fresh) {
+        this.goalLog.add(a.id);
+        credits += a.credits;
+      }
+      if (fresh.length > 0) this.goalLog.save();
+      if (credits > 0) this.grant({ credits });
+      if (fresh.length > 3) {
+        party.push({ kicker: `${fresh.length} goals complete`, icon: GOAL_ICON, name: `${fresh.length} goals`, lines: [...fresh.slice(0, 5).map((a) => a.name), `+${credits.toLocaleString('en-US')} credits`] });
+      } else {
+        for (const a of fresh) party.push({ kicker: 'goal complete', icon: GOAL_ICON, name: a.name, lines: [a.text, ...this.goalRewardText(a).split(' · ')] });
+      }
+      for (const id of sets) {
+        const set = SETS.find((x) => x.id === id);
+        if (!set) continue;
+        this.grant({ cores: set.bonusCores });
+        party.push({ kicker: 'set complete', icon: GOAL_ICON, name: set.name, lines: [`you own every look in it`, `+${set.bonusCores} cores`] });
+      }
+    }
+    if (party.length > 0) {
+      this.ui.celebrate(party);
+      this.refreshTitle();
+      this.haptics.level(false);
+    }
   }
 
   private onBuyUpgrade = (id: string): void => {
@@ -1484,6 +1832,8 @@ export class Game {
     const next = this.cosmetics.next();
     const rows: [string, string][] = [['RANKED', ''], ...this.rankedMissions.lines(), ['SOLO, LEVELS AND ENDLESS', ''], ...this.soloMissions.lines()];
     this.ui.renderMissions(rows, next ? `next unlock: ${describe(next)}` : 'everything unlocked');
+    this.renderGoals();
+    this.wardrobeUi.setMissionsTab(this.missionsTab);
     this.openInfo('missions');
   }
 
@@ -1492,10 +1842,39 @@ export class Game {
     this.ui.show(which);
   }
 
+  /** A ranked or endless run reached `level`: remember it, and say so when it opens a solo environment. */
+  private noteReached(level: number): void {
+    const before = this.progress.reachedLevel(level);
+    const opened = newlyOpened(before, level);
+    if (opened.length > 0) this.ui.showNotice(`solo unlocked: ${opened.map((e) => e.name).join(', ')}`);
+  }
+
+  /** Is this solo environment open to fly? */
+  private envOpen(env: Environment): boolean {
+    return this.dev.unlockedAll || envStatus(env, this.progress.furthest).open;
+  }
+
   /** Solo: pick an environment (endless in it, with a high score each) or a set level. */
   private openSolo(): void {
+    const furthest = this.progress.furthest;
+    const next = this.dev.unlockedAll ? null : nextEnvironment(furthest);
     this.ui.renderEnvironments(
-      ENVIRONMENTS.map((e, i) => ({ index: i, name: e.name, best: this.progress.envBest[e.id] ?? 0 })),
+      ENVIRONMENTS.map((e, i) => {
+        const st = envStatus(e, furthest);
+        const locked = !this.envOpen(e);
+        return {
+          index: i,
+          name: e.name,
+          best: this.progress.envBest[e.id] ?? 0,
+          locked,
+          need: locked ? `reach level ${st.level} in ranked or endless` : '',
+          toGo: locked ? `${st.toGo} level${st.toGo === 1 ? '' : 's'} to go` : '',
+          fraction: st.fraction,
+        };
+      }),
+      next
+        ? `next to unlock: ${next.env.name}, ${next.status.toGo} level${next.status.toGo === 1 ? '' : 's'} to go. environments open as you reach them in ranked or endless (you're furthest at level ${furthest}).`
+        : 'every environment is open. pick a place and see how far you get: it stays there and keeps getting harder.',
     );
     this.openCourses();
     this.openInfo('solo');
@@ -1527,7 +1906,7 @@ export class Game {
   /** Solo in one environment: endless there, getting harder. */
   private startSolo(index: number): void {
     const env = ENVIRONMENTS[index];
-    if (env) this.beginRun(0, newSeed(), 'solo', null, env);
+    if (env && this.envOpen(env)) this.beginRun(0, newSeed(), 'solo', null, env);
   }
 
   /** Endless: open ground, then every area and biome in turn, forever. */
@@ -1556,6 +1935,7 @@ export class Game {
       this.openShop();
     }
     else if (name === 'pass') this.openPass();
+    else if (name === 'boards') this.openBoards();
     else if (name === 'daily') this.openDaily();
   };
 
@@ -1629,7 +2009,7 @@ export class Game {
   };
 
   private onKey = (e: KeyboardEvent): void => {
-    if (e.repeat) return;
+    if (e.repeat || (e.target as HTMLElement | null)?.tagName === 'INPUT') return; // typing a name is not a shortcut
     if ((e.code === 'Space' || e.code === 'Enter') && this.state !== 'paused') {
       if (this.state === 'title' && !this.settingsOpen && !this.infoOpen) this.startRanked();
       else this.onTap();
@@ -1661,7 +2041,17 @@ export class Game {
   };
 
   private closeInfo(): void {
-    if (this.infoOpen === 'hangar' || this.infoOpen === 'shop') {
+    if (this.infoOpen === 'wardrobe' && this.wardrobeFrom) {
+      // Back to where the wardrobe was opened from, not all the way out.
+      const from = this.wardrobeFrom;
+      this.wardrobeFrom = null;
+      this.preview = null;
+      this.applyLooks();
+      if (from === 'shop') this.openShop();
+      else this.openHangar();
+      return;
+    }
+    if (this.infoOpen === 'hangar' || this.infoOpen === 'shop' || this.infoOpen === 'wardrobe') {
       // Leaving the hangar takes off anything only being tried on.
       this.preview = null;
       this.applyLooks();
@@ -1910,12 +2300,12 @@ export class Game {
 
   private updateTitle(dt: number): void {
     this.titleTime += dt;
-    const showroom = this.infoOpen === 'hangar' || this.infoOpen === 'shop';
+    const showroom = this.infoOpen === 'hangar' || this.infoOpen === 'shop' || this.infoOpen === 'wardrobe';
     const S = CONFIG.camera.showroom;
     if (showroom) {
       this.trail.update(dt, 0, this.player.engineHalfSpan);
       this.showroomTime += dt;
-      this.stage.showroomY = this.infoOpen === 'shop' ? S.shopY : S.hangarY;
+      this.stage.showroomY = this.infoOpen === 'hangar' ? S.hangarY : S.shopY;
     }
     this.stage.showroom += ((showroom ? 1 : 0) - this.stage.showroom) * (1 - Math.exp(-S.ease * dt));
     this.stage.showroomAngle = S.angle + this.showroomTime * S.spin;
@@ -1995,7 +2385,7 @@ export class Game {
       const themeChange = this.areaName(level) !== this.areaName(this.level) || themeForLevel(level) !== themeForLevel(this.level);
       this.level = level;
       this.ui.setLevel(level);
-      this.progress.reachedLevel(level);
+      if (this.unlockable) this.noteReached(level);
       this.ui.announceLevel(level, this.areaName(level));
       this.sound.level(themeChange, this.areaMusic(level));
       this.haptics.level(themeChange);
@@ -2243,12 +2633,13 @@ export class Game {
     const tiles = COURSES.map((c, i) => {
       const r = this.progress.course(c.id);
       const prev = i === 0 ? null : this.progress.course(COURSES[i - 1].id);
+      const locked = !(i === 0 || (prev && prev.stars & 1)) && !this.dev.unlockedAll;
       return {
         index: i,
         name: c.name,
         stars: r.stars,
-        time: r.time > 0 ? formatTime(r.time) : '',
-        locked: !(i === 0 || (prev && prev.stars & 1)) && !this.dev.unlockedAll,
+        time: locked ? `finish ${COURSES[i - 1].name}` : r.time > 0 ? formatTime(r.time) : '',
+        locked,
       };
     });
     const stars = COURSES.reduce((n, c) => n + [1, 2, 4].filter((b) => this.progress.course(c.id).stars & b).length, 0);

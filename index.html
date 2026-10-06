@@ -111,6 +111,7 @@
             <span class="chip link" data-title="daily">daily<i class="news"></i></span>
             <span class="chip link" data-title="shop">shop</span>
             <span class="chip link" data-title="pass">pass</span>
+            <span class="chip link" data-title="boards">top</span>
           </div>
           <div id="title-best" class="label dim title-best"></div>
           <div class="title-corners">
@@ -183,9 +184,18 @@
           <button class="label link back" type="button" data-action="back">back</button>
           <div class="panel-title">missions</div>
         </div>
-        <div class="settings">
+        <div class="tabs">
+          <button class="tab on" type="button" data-missiontab="missions">missions</button>
+          <button class="tab" type="button" data-missiontab="goals">goals</button>
+          <span id="goals-count" class="label dim tabs-credits"></span>
+        </div>
+        <div class="settings tabbed" data-missionpane="missions">
           <div id="missions-rows"></div>
           <div id="missions-next" class="label dim setting-note"></div>
+        </div>
+        <div class="settings tabbed" data-missionpane="goals" hidden>
+          <div id="goals-note" class="label dim setting-note"></div>
+          <div id="goals-list"></div>
         </div>
       </div>
 
@@ -202,6 +212,7 @@
         <div class="settings short tabbed" data-pane="ship">
           <div id="look-rows"></div>
           <button id="look-buy" class="pill primary look-buy" type="button" hidden></button>
+          <button id="open-wardrobe" class="pill primary look-buy" type="button">open the wardrobe</button>
           <div id="hangar-count" class="label dim setting-note"></div>
         </div>
         <div class="settings tabbed" data-pane="upgrades" hidden>
@@ -222,7 +233,7 @@
           <button class="tab" type="button" data-solotab="levels">levels</button>
         </div>
         <div class="settings tabbed" data-solopane="envs">
-          <div class="label dim setting-note">pick a place and see how far you get: it stays there and keeps getting harder.</div>
+          <div id="env-note" class="label dim setting-note"></div>
           <div id="env-grid"></div>
         </div>
         <div class="settings tabbed" data-solopane="levels" hidden>
@@ -234,6 +245,25 @@
           </div>
         </div>
 
+      </div>
+
+      <div id="screen-boards" class="layer screen panel">
+        <div class="panel-head">
+          <button class="label link back" type="button" data-action="back">back</button>
+          <div class="panel-title">leaderboard</div>
+        </div>
+        <div class="settings">
+          <div id="board-tabs" class="board-tabs"></div>
+          <div id="board-caption" class="label dim setting-note"></div>
+          <div id="board-rows"></div>
+          <div id="board-status" class="label dim setting-note"></div>
+          <div class="settings-group">your pilot name</div>
+          <div class="name-edit">
+            <input id="board-name" type="text" maxlength="16" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="pilot name" aria-label="pilot name" />
+            <button id="board-name-save" class="tab" type="button">save</button>
+          </div>
+          <div id="board-name-note" class="label dim setting-note"></div>
+        </div>
       </div>
 
       <div id="screen-league" class="layer screen panel">
@@ -306,13 +336,34 @@
         </div>
         <div id="shop-wallet" class="label dim showroom-note"></div>
         <div class="sheet settings">
-          <div class="settings-group">today's looks <span id="shop-reset" class="group-note"></span></div>
+          <div id="shop-tabs" class="chip-row"></div>
+          <div class="settings-group"><span id="shop-heading">today's looks</span> <span id="shop-reset" class="group-note"></span></div>
           <div id="shop-offers" class="offer-cards"></div>
+          <div id="shop-info" class="label dim setting-note"></div>
           <button id="shop-buy" class="pill primary sheet-buy" type="button"></button>
+          <button id="shop-wardrobe" class="pill sheet-buy" type="button">open your wardrobe</button>
           <div class="settings-group">ranked tickets</div>
           <div id="shop-tickets"></div>
           <div class="settings-group">cores</div>
           <div id="shop-cores"></div>
+        </div>
+      </div>
+
+      <div id="screen-wardrobe" class="layer screen panel showroom">
+        <div class="panel-head">
+          <button class="label link back" type="button" data-action="back">back</button>
+          <div class="panel-title">wardrobe</div>
+        </div>
+        <div id="wardrobe-summary" class="label dim showroom-note"></div>
+        <div class="sheet settings ward-sheet">
+          <div id="wardrobe-slots" class="chip-row"></div>
+          <div id="wardrobe-grid" class="ward-grid"></div>
+          <div class="ward-detail">
+            <div class="ward-head"><span id="wardrobe-name" class="label ward-name"></span><span id="wardrobe-slot" class="label dim"></span></div>
+            <div id="wardrobe-status" class="label dim ward-status"></div>
+            <div id="wardrobe-goal" class="xp-track ward-goal" hidden><div id="wardrobe-goal-fill" class="xp-fill"></div></div>
+            <button id="wardrobe-action" class="pill primary" type="button"></button>
+          </div>
         </div>
       </div>
 

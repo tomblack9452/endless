@@ -12,7 +12,9 @@ import { World } from '../src/world';
 // crash or fall is a generator bug.
 
 const SEEDS = [1, 7, 42, 99, 314, 1234, 2024, 65535];
-const STARTS = [1, 4, 7, 10, 13, 16, 19, 22]; // each theme across the first loops (incl. biomes)
+// Each theme across the first loops (incl. biomes), plus the second and last levels of the
+// asteroid belt: its busier set pieces, and its hand-off to the ship.
+const STARTS = [1, 4, 7, 10, 13, 14, 15, 16, 19, 22];
 const SECONDS = 40;
 const DT = 1 / 60;
 
@@ -171,9 +173,9 @@ describe('other routes', () => {
         splits += r.splits;
         chasms += r.chasms;
       }
-      // The test only means something if there are routes and chasms to fly.
+      // The test only means something if there are routes (and, on the ground, chasms) to fly.
       expect(splits).toBeGreaterThan(0);
-      expect(chasms).toBeGreaterThan(0);
+      if (level !== 13 && level !== 15) expect(chasms).toBeGreaterThan(0); // the asteroid belt has no floor to fall from
     });
   }
 });

@@ -243,6 +243,7 @@ export const CONFIG = {
     maxHolos: 120,
     maxFans: 80,
     maxVents: 400,
+    maxColumns: 500,
     maxDeadTrees: 500,
     maxRockSpires: 500,
     maxCacti: 500,
@@ -437,6 +438,42 @@ export const CONFIG = {
         riseChance: 0.35,
         altPickups: 3,
       },
+    },
+    // The asteroid belt flies through the canyon generator's frame (it keeps the mouth,
+    // the exit to the ship, the winding centre and the ramps) but is open space: a
+    // wide field walled by big asteroids, no floor to fall from, and its own set
+    // pieces. Level 1 drifts, level 2 adds clusters and gates, level 3 orbiting pairs.
+    asteroids: {
+      halfWidthStart: 17, // the field is much wider than a canyon...
+      halfWidthMin: 11, // ...and closes in a little with score
+      widthRampPoints: 26000,
+      fullPoints: 14000, // score at which the field is at its busiest
+      exitLead: 120, // the lane starts for the ship's door this far before the funnel (the field is wide)
+      rejoinExtra: 60, // more clear stretch after a split: its branches are further apart in the wide field
+      altLeadIn: 30, // the first stretch of a split's other branch has no rocks
+      splitClear: 75, // nothing is placed this far before a split is due, so the way to its other branch is open
+      driftSpacing: [13, 22], // between drift fields (shrinks with score)
+      spacingScale: [1.5, 1, 0.8], // per level of the area: calmer at the start, tighter at the end
+      clusterSpacing: [30, 46],
+      gateSpacing: [34, 50],
+      orbiterSpacing: [28, 40],
+      // Chance of each set piece by level of the area (drift, cluster, gate, orbiters).
+      mix: [
+        [1, 0, 0, 0],
+        [0.4, 0.4, 0.2, 0],
+        [0.2, 0.25, 0.2, 0.35],
+      ],
+      sizes: [0.5, 1.5], // drifting rock radius
+      bigChance: 0.12, // a rock this much bigger
+      driftChance: 0.45, // of drift rocks, those that sway across the field
+      driftAmp: [1.5, 4.5],
+      driftPeriod: [38, 70], // distance for one swing
+      clusterRadius: [2.4, 3.8],
+      clusterRocks: [5, 8],
+      gateGap: 0.45, // clear room either side of the lane (plus the ship's), a little more early on
+      orbiterAmp: [2.4, 4.4],
+      debrisPerRow: 0.7, // scenery chips floating about (look only)
+      dustPerRow: 2, // dust motes streaming past (look only: the belt has no floor to show speed)
     },
     // The ship interior is a chain of rooms joined by short corridors (see
     // interior.ts). Each room is a reusable template; which ones can appear
@@ -662,7 +699,8 @@ export const CONFIG = {
     // Three a day (UTC), the same for everyone. Each pays credits and pass XP;
     // finishing all three pays cores.
     quests: { count: 3, credits: [150, 400], allDoneCores: 10, passXp: 60 },
-    shop: { slots: 4 },
+    // The shop: looks a day, the weekly set's bundle discount, and how many credits a core is worth when a bundle mixes them.
+    shop: { slots: 4, setDiscount: 0.8, creditsPerCore: 25 },
     pass: { weeks: 6, tiers: 30, xpPerTier: 120, premiumCores: 950, runXpPer: 250, runXpMax: 60 },
     // Real-money products (src/store): create these ids in App Store Connect,
     // Google Play and RevenueCat. Prices are set in the stores. Bonus sizes:
@@ -689,7 +727,12 @@ export const CONFIG = {
     lava: { firstAfter: 80, spacing: [[90, 150], [60, 110], [40, 80]], halfWidth: [2.2, 4.5], halfLength: [3, 7], gap: [0.6, 3] },
     // Lava bombs from eruptions: they fall in front of you, landing off the lane, a
     // ring marking the spot as they come down. None at level 1 of the plain.
-    bombs: { spacing: [[0, 0], [70, 120], [40, 80]], height: 26, fallOver: 90, landAhead: [18, 28], radius: [0.8, 1.3], gap: [0.4, 2.6] },
+    // Bombs come in salvos: one at level 2 of the plain, a pair, three at level 3, a few units apart, landing either side.
+    bombs: { spacing: [[0, 0], [90, 150], [60, 110]], salvo: [0, 2, 3], salvoGap: [5, 9], height: 26, fallOver: 90, landAhead: [18, 28], radius: [0.8, 1.3], gap: [0.4, 2.6] },
+    // Lava rivers cross the whole way; a basalt causeway carries the lane over, narrower deeper in.
+    river: { firstAfter: 150, spacing: [[300, 420], [220, 320], [160, 240]], length: [10, 18], half: [2.6, 2.3, 2.0] },
+    // Lava geysers: a vent that erupts on a cycle of distance. One on the lane is always down when you arrive.
+    geysers: { firstAfter: 100, spacing: [[90, 140], [60, 100], [40, 70]], count: [1, 2.6], half: [0.45, 0.7], period: [16, 26], height: [2.2, 3.2], laneChance: [0.15, 0.3, 0.4] },
     // How much denser the ice field and volcanic plain are than other open ground.
     density: { ice: 1.25, volcanic: 1.3 },
   },
@@ -738,9 +781,9 @@ export const CONFIG = {
   biomes: {
     // Prop mixes for open ground by biome (relative chances).
     mix: {
-      alien: { mushroom: 0.28, spire: 0.14, rock: 0.18, crystal: 0.1, bush: 0.15, deadTree: 0, rockSpire: 0.05, cactus: 0.1 },
-      ice: { mushroom: 0, spire: 0.22, rock: 0.2, crystal: 0.38, bush: 0, deadTree: 0.05, rockSpire: 0.15, cactus: 0 },
-      volcanic: { mushroom: 0, spire: 0.08, rock: 0.43, crystal: 0.1, bush: 0, deadTree: 0.2, rockSpire: 0.15, cactus: 0.04 },
+      alien: { mushroom: 0.28, spire: 0.14, rock: 0.18, crystal: 0.1, bush: 0.15, deadTree: 0, rockSpire: 0.05, cactus: 0.1, basalt: 0 },
+      ice: { mushroom: 0, spire: 0.22, rock: 0.2, crystal: 0.38, bush: 0, deadTree: 0.05, rockSpire: 0.15, cactus: 0, basalt: 0 },
+      volcanic: { mushroom: 0, spire: 0.08, rock: 0.3, crystal: 0.08, bush: 0, deadTree: 0.14, rockSpire: 0.12, cactus: 0, basalt: 0.28 },
     },
     lavaChance: 0.6, // per row on the volcanic plain: a glowing crack off the lane
     iceLake: '#cfe6f2',

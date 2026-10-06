@@ -23,7 +23,7 @@ import { fxMaterial, Liquid, LIQUID_COLOURS, Sparks } from './fx';
 import { type Block, type Parsed, parse, type Piece, routeX } from './pieces/format';
 import { FAMILIES, pickPiece, pieceById } from './pieces';
 import { ceilingFan } from './props';
-import { alienCactus, ARCH_PILLAR_X, bush, deadTree, grassTuft, mesa, rockArch, rockSpire, tumbleweed } from './props';
+import { alienCactus, ARCH_PILLAR_X, basaltColumns, bush, deadTree, grassTuft, mesa, rockArch, rockSpire, tumbleweed } from './props';
 import { BOULDER_HEIGHT, boulder, MESA_RADIUS, canister, crystalCluster, greebleBox, mushroomTree, pipeSegment, powerGem, shuttle, spireTree } from './props';
 
 // The world ahead of the ship: obstacle pools plus the generator that lays
@@ -41,6 +41,13 @@ export type ThemeId = 'land' | 'canyon' | 'interior';
 /** Power-up kinds: 0 shield, 1 magnet, 2 slow-mo. */
 export type PowerKind = 0 | 1 | 2;
 const THEMES: ThemeId[] = ['land', 'canyon', 'interior'];
+
+/** A lava river across the whole way, with a causeway `half` either side of the lane. */
+interface River {
+  d0: number;
+  d1: number;
+  half: number;
+}
 
 /** An ice or lava lake: centre (world x, distance) and half-sizes across and along. */
 interface Lake {
@@ -78,6 +85,8 @@ const BRIDGE_JUMP = 0.8;
 export const ROCK_HIT = 0.88;
 /** Mesas are round: a box this fraction of the radius fits them closely. */
 export const MESA_HIT = 0.92;
+/** A tumbleweed is a ring of wire loops about half a unit in radius; its box is a little inside that. */
+export const TUMBLEWEED_HIT = 0.45;
 /** Room families in the order of CONFIG.themes.interior.familyLooks. */
 const FAMILY_LOOK_IDS = Object.keys(CONFIG.themes.interior.familyLooks); // a bridge edge moving more than this in a row has jumped, not bent // pit sides: a thin steel lip, then black
 
@@ -91,6 +100,7 @@ export const enum Prop {
   DeadTree,
   RockSpire,
   Cactus,
+  Basalt,
 }
 
 /**
@@ -104,8 +114,9 @@ export const PROP_HIT: Record<Prop, number> = {
   [Prop.Crystal]: 0.68,
   [Prop.Bush]: 0.8,
   [Prop.DeadTree]: 0.19,
-  [Prop.RockSpire]: 0.68,
+  [Prop.RockSpire]: 0.78,
   [Prop.Cactus]: 0.45,
+  [Prop.Basalt]: 0.86,
 };
 
 function clamp(v: number, lo: number, hi: number): number {
@@ -186,7 +197,8 @@ export class World {
   private readonly deadTrees: InstancedField;
   private readonly rockSpires: InstancedField;
   private readonly cacti: InstancedField;
-  private readonly tumbleweeds: InstancedField; // scenery rolling across
+  private readonly columns: InstancedField; // basalt columns (volcanic plain)
+  private readonly tumbleweeds: InstancedField; // rolling across; solid, but always ends its roll clear of the lane
   // Ice field and volcanic plain hazards.
   private readonly iceSheets: InstancedField;
   private readonly lavaSheets: InstancedField;
@@ -196,6 +208,9 @@ export class World {
   private lavaLakes: Lake[] = [];
   private nextIceAt = Infinity;
   private nextLavaAt = Infinity;
+  private rivers: River[] = [];
+  private nextRiverAt = Infinity;
+  private nextGeyserAt = Infinity;
   private nextBombAt = Infinity;
   private readonly tufts: InstancedField; // grass, scenery
   // Interior animation (fx.ts).
@@ -396,6 +411,7 @@ export class World {
     this.tufts = new InstancedField(scene, grassTuft(), this.propMat, F.maxTufts);
     this.mesas = new InstancedField(scene, mesa(), this.propMat, F.maxMesas);
     this.cacti = new InstancedField(scene, alienCactus(), this.propMat, F.maxCacti);
+    this.columns = new InstancedField(scene, basaltColumns(), this.propMat, F.maxColumns);
     this.tumbleweeds = new InstancedField(scene, tumbleweed(), this.propMat, F.maxTumbleweeds);
     this.tumbleweeds.rollRadius = 0.5;
     // Lakes are built a row at a time (slices that lean with the hills), so they lie on the ground.
@@ -435,7 +451,7 @@ export class World {
     this.fans = new InstancedField(scene, ceilingFan(), this.decorMat, F.maxFans);
     // A flared plume, open at both ends.
     this.vents = new InstancedField(scene, new CylinderGeometry(0.75, 0.5, 1, 12, 1, true).translate(0, 0.5, 0), fxMaterial('vent', { opacity: 0.6 }), F.maxVents);
-    this.vents.setColorTable([LIQUID_COLOURS[3]]);
+    this.vents.setColorTable([LIQUID_COLOURS[3], LIQUID_COLOURS[2]]); // steam, and lava for the volcanic plain's geysers
     this.sparks = new Sparks(scene);
     this.waters = new InstancedField(scene, unitBox, fxMaterial('water'), F.maxWaters);
     this.waters.setColorTable([LIQUID_COLOURS[1]]);
@@ -461,6 +477,9 @@ export class World {
       this.deadTrees,
       this.rockSpires,
       this.cacti,
+      this.columns,
+      this.tumbleweeds,
+      this.mesas,
       this.lavaBombs,
       this.shuttles,
       this.strips,
@@ -468,7 +487,7 @@ export class World {
       this.vents,
       this.tanks,
     ];
-    this.fields = [...this.solids, this.pools, this.steamPlumes, this.blinkers, this.holos, this.fans, this.tufts, this.mesas, this.arches, this.pickups, this.powers, this.pipes, this.greebles, this.voids, this.canisters, this.waters, this.tumbleweeds, this.iceSheets, this.lavaSheets, this.marks];
+    this.fields = [...this.solids, this.pools, this.steamPlumes, this.blinkers, this.holos, this.fans, this.tufts, this.arches, this.pickups, this.powers, this.pipes, this.greebles, this.voids, this.canisters, this.waters, this.iceSheets, this.lavaSheets, this.marks];
     this.applyPalette();
   }
 
@@ -554,7 +573,10 @@ export class World {
     this.altRoutes = 0;
     this.iceLakes = [];
     this.lavaLakes = [];
+    this.rivers = [];
     this.nextIceAt = this.nextLavaAt = this.nextBombAt = this.distance + clearance + CONFIG.hazards.ice.firstAfter;
+    this.nextRiverAt = this.distance + clearance + CONFIG.hazards.river.firstAfter;
+    this.nextGeyserAt = this.distance + clearance + CONFIG.hazards.geysers.firstAfter;
     const level = this.levelAt(this.distance);
     this.themeEnd = run ? this.levelStart(level - ((level - 1) % LPT) + LPT) : Infinity;
     if (run && this.course) {
@@ -593,6 +615,7 @@ export class World {
     this.vents.animate(this.distance); // steam vents
     this.tumbleweeds.animate(this.distance); // rolling across
     this.lavaBombs.animate(this.distance); // falling
+    this.obstacleRocks.animate(this.distance); // drifting asteroids
     this.greebles.animate(this.distance); // hook chains, engine pistons
     this.updateMix(dt);
   }
@@ -1121,6 +1144,11 @@ export class World {
     const jitter = maxSlope * STEP * 0.5;
     if (this.runStart !== null) this.landHazards(d, sub, maxSlope, jitter);
     this.lakeSlices(d);
+    const river = this.riverAt(d);
+    if (river) {
+      this.riverSlice(d, river); // the river and its causeway are the whole row
+      return;
+    }
     this.landDressing(d, laneRel, jitter);
 
     if (sub === 2) {
@@ -1191,6 +1219,7 @@ export class World {
     const ahead = this.distance - 60;
     this.iceLakes = this.iceLakes.filter((l) => l.d + l.rd + H.ice.runoff > ahead);
     this.lavaLakes = this.lavaLakes.filter((l) => l.d + l.rd > ahead);
+    this.rivers = this.rivers.filter((r) => r.d1 > ahead);
     if (this.quiet(d)) return;
     const room = this.themeEnd - d - TH.lane.beforeChange - 10; // lakes finish before the area does
     if (b === 'ice' && d >= this.nextIceAt && room > 2 * H.ice.halfLength[1] + H.ice.runoff) {
@@ -1204,6 +1233,18 @@ export class World {
       this.nextFeatureAt = Math.max(this.nextFeatureAt, d + 2 * rd + H.ice.runoff);
     }
     if (b === 'volcanic') {
+      const lv = Math.min(2, sub);
+      // A lava river across the way, crossed on a basalt causeway that follows the lane.
+      if (d >= this.nextRiverAt && room > H.river.length[1] + 60) {
+        const len = range(H.river.length);
+        this.rivers.push({ d0: d, d1: d + len, half: H.river.half[lv] });
+        this.nextRiverAt = d + len + range(H.river.spacing[lv]);
+        // Nothing else of the kind close to it: the crossing is the feature.
+        this.nextLavaAt = Math.max(this.nextLavaAt, d + len + 30);
+        this.nextBombAt = Math.max(this.nextBombAt, d + len + 25);
+        this.nextGeyserAt = Math.max(this.nextGeyserAt, d + len + 30);
+      }
+      if (d >= this.nextGeyserAt && room > 40 && !this.riverAt(d + 12)) this.geysers(d, lv, maxSlope, jitter);
       if (d >= this.nextLavaAt && room > 2 * H.lava.halfLength[1]) {
         this.nextLavaAt = d + range(H.lava.spacing[Math.min(2, sub)]);
         const rx = range(H.lava.halfWidth);
@@ -1216,19 +1257,72 @@ export class World {
           this.lavaLakes.push(lake);
         }
       }
-      const spacing = H.bombs.spacing[Math.min(2, sub)];
-      if (spacing[1] > 0 && d >= this.nextBombAt) {
+      const spacing = H.bombs.spacing[lv];
+      if (spacing[1] > 0 && d >= this.nextBombAt && !this.riverAt(d + 20)) {
         this.nextBombAt = d + range(spacing);
-        const r = range(H.bombs.radius);
-        const side = rand() < 0.5 ? -1 : 1;
-        const x = this.lane + side * (LANE + r * ROCK_HIT + jitter + maxSlope * STEP + range(H.bombs.gap));
-        const hit = r * ROCK_HIT;
-        // It falls as you approach and is down well before you reach it.
-        this.lavaBombs.setNextRamp(H.bombs.height, H.bombs.fallOver, range(H.bombs.landAhead), true);
-        this.lavaBombs.spawn(wrap(x - this.shipX), 0, d, r, (r * 1.1) / BOULDER_HEIGHT, r, rand() * 6.28, true, true, hit, hit);
-        this.marks.spawn(wrap(x - this.shipX), 0.03, d, r * 1.3, 1, r * 1.3, 0, false, true, 0, 0, false);
+        // A salvo: a few bombs a few units apart, landing either side of the lane in turn.
+        let side = rand() < 0.5 ? -1 : 1;
+        for (let i = 0; i < H.bombs.salvo[lv]; i++) {
+          const at = d + i * range(H.bombs.salvoGap);
+          const r = range(H.bombs.radius);
+          // Off the lane by its size, how far the lane can drift by the time it lands, and a gap.
+          const x = this.lane + side * (LANE + r * ROCK_HIT + jitter + maxSlope * STEP + maxSlope * (at - d) + range(H.bombs.gap));
+          const hit = r * ROCK_HIT;
+          // It falls as you approach and is down well before you reach it.
+          this.lavaBombs.setNextRamp(H.bombs.height, H.bombs.fallOver, range(H.bombs.landAhead), true);
+          this.lavaBombs.spawn(wrap(x - this.shipX), 0, at, r, (r * 1.1) / BOULDER_HEIGHT, r, rand() * 6.28, true, true, hit, hit);
+          this.marks.spawn(wrap(x - this.shipX), 0.03, at, r * 1.3, 1, r * 1.3, 0, false, true, 0, 0, false);
+          side = -side;
+        }
       }
     }
+  }
+
+  /**
+   * Lava geysers: vents that erupt on a cycle of distance (the same trick as the ship's steam
+   * vents). One on the lane is always down when you reach it, so you can see it blow, then
+   * slip through; the rest stand off the lane with their own rhythm.
+   */
+  private geysers(d: number, lv: number, maxSlope: number, jitter: number): void {
+    const G = CONFIG.hazards.geysers;
+    this.nextGeyserAt = d + range(G.spacing[lv]);
+    const n = Math.round(range(G.count));
+    const onLane = rand() < G.laneChance[lv];
+    for (let i = 0; i < n; i++) {
+      const half = range(G.half);
+      const period = range(G.period);
+      const height = range(G.height);
+      const at = d + i * (3 + rand() * 4);
+      const mine = onLane && i === 0; // the lane's own geyser: only this row's lane is known
+      const side = rand() < 0.5 ? -1 : 1;
+      const x = mine ? this.lane : this.lane + side * (LANE + half + jitter + maxSlope * (at - d) + 0.9 + rand() * 5);
+      if (this.onLake(this.lavaLakes, x, at, half + 0.6, 0) || this.riverAt(at) || this.riverAt(at + 8)) continue;
+      this.vents.nextColor = 1;
+      this.vents.setNextPulse(height, period, mine ? -Math.PI / 2 : rand() * Math.PI * 2);
+      this.vents.spawn(wrap(x - this.shipX), 0, at, half * 2, height, half * 2, 0, true, true, half, half, false);
+      this.light(x, 0.012, at, half * 2 + 0.5, 0.01, half * 2 + 0.5, Light.Red, false); // the glowing mouth
+    }
+  }
+
+  /** The river (if any) the row at `d` is part of. */
+  private riverAt(d: number): River | null {
+    for (const r of this.rivers) if (d >= r.d0 - STEP * 0.5 && d <= r.d1 + STEP * 0.5) return r;
+    return null;
+  }
+
+  /** One row of a lava river: lava either side of a basalt causeway under the lane. */
+  private riverSlice(d: number, r: River): void {
+    for (const side of [-1, 1]) {
+      const w = 60;
+      this.lavaSheets.nextColor = 0;
+      this.lavaSheets.nextTilt = true;
+      this.lavaSheets.spawn(wrap(this.lane + side * (r.half + w / 2) - this.shipX), 0.015, d, w, 1, STEP + 0.12, 0, false, true, 0, 0, false);
+      this.light(this.lane + side * (r.half + 0.25), 0.012, d, 0.5, 0.01, STEP + 0.1, Light.Dark, false); // a dark crust along the edge
+      this.light(this.lane + side * (r.half - 0.1), 0.115, d, 0.1, 0.02, STEP + 0.1, Light.Amber, false); // and a glowing seam
+    }
+    this.greebles.nextColor = Decor.Cliff;
+    this.greebles.nextTilt = true;
+    this.greebles.spawn(this.lane - this.shipX, 0, d, r.half * 2, 0.1, STEP + 0.1, 0, false, false, 0, 0, false);
   }
 
   /** This row's slice of every lake it crosses. */
@@ -1267,7 +1361,15 @@ export class World {
 
   /** The ship is over lava (the run ends, shield or not). */
   inLava(): boolean {
-    return this.lakeAtShip(this.lavaLakes, 0.8);
+    return this.lakeAtShip(this.lavaLakes, 0.8) || this.offCauseway();
+  }
+
+  /** The ship is over a lava river, off its causeway. */
+  private offCauseway(): boolean {
+    const r = this.riverAt(this.distance);
+    if (!r) return false;
+    const lane = this.laneAt(this.distance);
+    return lane !== null && Math.abs(this.shipX - lane) > r.half;
   }
 
   private lakeAtShip(lakes: Lake[], inside: number): boolean {
@@ -1293,6 +1395,7 @@ export class World {
       [Prop.DeadTree, m.deadTree, 0.8, 0.5],
       [Prop.RockSpire, m.rockSpire, 0.7, 0.6],
       [Prop.Cactus, m.cactus, 0.8, 0.5],
+      [Prop.Basalt, m.basalt, 0.8, 0.5],
     ];
     let total = 0;
     for (const w of weights) total += w[1];
@@ -1310,7 +1413,7 @@ export class World {
   /** Place the prop chosen by pickProp() at ship-relative `x`. Trees collide at the trunk only. */
   private placeProp(x: number, d: number, wraps: boolean): void {
     if (this.onLake(this.iceLakes, x + this.shipX, d, this.propHit + 1, CONFIG.hazards.ice.runoff)) return; // the ice stays open
-    if (this.onLake(this.lavaLakes, x + this.shipX, d, this.propHit, 0)) return;
+    if (this.onLake(this.lavaLakes, x + this.shipX, d, this.propHit, 0) || this.riverAt(d)) return;
     const s = this.propSize;
     const h = this.propHit;
     const rot = rand() * Math.PI * 2;
@@ -1335,6 +1438,8 @@ export class World {
         return this.rockSpires;
       case Prop.Cactus:
         return this.cacti;
+      case Prop.Basalt:
+        return this.columns;
       default:
         return this.crystals;
     }
@@ -1380,7 +1485,12 @@ export class World {
     this.steerCentre(d, this.splitStart !== Infinity ? 0 : maxSlope * c.centreSlopeFraction);
     this.altNow = null;
     this.floorN = -1;
-    let hw = (c.halfWidthStart - c.halfWidthMin) * Math.exp(-score / c.widthRampPoints) + c.halfWidthMin;
+    // The asteroid belt is this same frame in open space: wider, no floor, its own rocks.
+    const space = this.genBiome === 'asteroids';
+    const A = TH.asteroids;
+    let hw = space
+      ? (A.halfWidthStart - A.halfWidthMin) * Math.exp(-score / A.widthRampPoints) + A.halfWidthMin
+      : (c.halfWidthStart - c.halfWidthMin) * Math.exp(-score / c.widthRampPoints) + c.halfWidthMin;
     const left = this.themeEnd - d;
     hw = lerp(c.mouthHalfWidth, hw, ease((d - this.themeStart) / c.mouth));
     // The lane may still be far out (it carries on from open ground). The walls
@@ -1397,11 +1507,11 @@ export class World {
     const widen = split.wall;
     const hwAll = hw + widen;
     const maxOffset = hwAll - (LANE + 0.4);
-    const chasm = this.planChasm(d, hw, maxSlope, left, sub);
+    const chasm = space ? false : this.planChasm(d, hw, maxSlope, left, sub); // nothing to fall into in space
     if (split.active) {
       // Ride down the middle of our branch.
       this.laneTarget = this.splitSide * (this.splitHalf + hw / 2);
-    } else if (left < c.exit + 60) this.laneTarget = 0; // line up with the interior door
+    } else if (left < c.exit + (space ? A.exitLead : 60)) this.laneTarget = 0; // line up with the interior door
     else if (inMouth || Math.abs(this.lane - this.cx) > hw - LANE - 1) this.laneTarget = 0; // head for the middle as the walls close in
     else if (chasm && this.chasmKind === 2) this.laneTarget = -this.chasmSide * Math.min(1.5, maxOffset); // leave room for the fork
     else this.retargetOffset(d, maxOffset);
@@ -1423,6 +1533,10 @@ export class World {
     // Walls: two staggered inner rocks per side so there are no gaps to slip
     // through, plus tall outer rocks for the canyon sides.
     for (let side = -1; side <= 1; side += 2) {
+      if (space) {
+        this.asteroidWall(d, side, hw);
+        continue;
+      }
       for (let k = 0; k < 2; k++) {
         const r = 0.9 + rand() * 0.8;
         this.rock(this.cx + side * (hw + r * 0.65), d + k * STEP * 0.5, r, 1.6 + rand() * 2.6);
@@ -1466,14 +1580,18 @@ export class World {
       if (this.runStart !== null && rand() < c.tumbleweedChance) this.rollTumbleweed(d, this.cx, hw, false);
     }
 
+    if (space) {
+      this.spaceDebris(d, hw);
+      this.spaceDust(d, hw);
+    }
     // Pebbles on the floor: scenery.
-    for (let i = 0; i < c.pebblesPerRow; i++) {
+    for (let i = 0; !space && i < c.pebblesPerRow; i++) {
       const r = 0.05 + rand() * 0.1; // small and flat: never mistaken for an obstacle
       const x = this.cx + (rand() * 2 - 1) * (hw - 0.3) - this.shipX;
       this.rocks.spawn(x, 0, d + (rand() - 0.5) * STEP, r * 1.4, (r * 0.5) / BOULDER_HEIGHT, r, rand() * 6.28, false, false, 0, 0, false);
     }
     // A natural bridge spanning the canyon overhead (its feet are in the walls).
-    if (d >= this.nextBridgeAt && !this.quiet(d)) {
+    if (!space && d >= this.nextBridgeAt && !this.quiet(d)) {
       this.nextBridgeAt = d + range(c.bridgeSpacing);
       const sx = (hw + 1.2) / ARCH_PILLAR_X;
       const sy = 1.3 + rand() * 0.5;
@@ -1489,6 +1607,13 @@ export class World {
     // Obstacles: dark rocks, laid out so the way through reads from a distance.
     if (d < this.nextFeatureAt) return;
     const jitter = maxSlope * STEP * 0.5;
+    if (space) {
+      // Before a split the way to the other branch has to be clear too, from where a pilot starts crossing.
+      const plannable = left - c.exit - 120 > 0 && d - this.themeStart > c.mouth + 30 && this.splitStart === Infinity;
+      if (plannable && d > this.splitAt - A.splitClear) this.nextFeatureAt = d + STEP;
+      else this.spaceFeature(d, sub, hw, jitter, score);
+      return;
+    }
     if (sub === 0) {
       // Lone boulders.
       this.nextFeatureAt = d + range(c.loneBoulderSpacing);
@@ -1512,9 +1637,170 @@ export class World {
         } else {
           // Crystal spire instead of a rock pillar.
           const s = r * 1.5;
-          this.crystals.spawn(x - this.shipX, 0, d + i * 3, s, s * 1.4, s, rand() * 6.28, true, false, s * 0.62, s * 0.62);
+          this.crystals.spawn(x - this.shipX, 0, d + i * 3, s, s * 1.4, s, rand() * 6.28, true, false, s * PROP_HIT[Prop.Crystal], s * PROP_HIT[Prop.Crystal]);
         }
       }
+    }
+  }
+
+  // --- the asteroid belt ----------------------------------------------------------
+
+  /** One side's boundary of the field: big asteroids packed tight enough to hold the ship in. */
+  private asteroidWall(d: number, side: number, hw: number): void {
+    const c = TH.canyon;
+    for (let k = 0; k < 2; k++) {
+      const r = 1.5 + rand() * 1.2;
+      this.rock(this.cx + side * (hw + r * 0.65), d + k * STEP * 0.5, r, r * (2 + rand() * 1.8));
+    }
+    const r = 2 + rand() * 2;
+    this.rock(this.cx + side * (hw + 3 + rand() * 9), d + (rand() - 0.5) * STEP, r, r * (2 + rand() * 2));
+    // Now and then a huge asteroid looms over the edge of the field.
+    if (rand() < c.cliffChance) {
+      const big = 4 + rand() * 3.5;
+      this.rock(this.cx + side * (hw + 3 + big), d, big, big * (2.2 + rand() * 1.6));
+    }
+  }
+
+  /** Chips of rock and dust floating about beyond the field, for depth. Look only. */
+  private spaceDebris(d: number, hw: number): void {
+    const A = TH.asteroids;
+    if (rand() >= A.debrisPerRow) return;
+    const r = 0.15 + rand() * 0.5;
+    const side = rand() < 0.5 ? -1 : 1;
+    const x = this.cx + (rand() * 2 - 1) * (hw + 2) + side * (rand() < 0.5 ? 0 : hw * 0.8 + rand() * 10);
+    this.rocks.spawn(x - this.shipX, 0.6 + rand() * 7, d, r * 1.5, (r * 0.9) / BOULDER_HEIGHT, r, rand() * 6.28, false, false, 0, 0, false);
+  }
+
+  /** Dust motes streaming past at every height: with no floor to read speed from, they carry it. Look only. */
+  private spaceDust(d: number, hw: number): void {
+    const A = TH.asteroids;
+    for (let i = 0; i < A.dustPerRow; i++) {
+      const x = this.cx + (rand() * 2 - 1) * (hw + 8);
+      const y = -3 + rand() * 9;
+      const len = 0.5 + rand() * 1.2;
+      this.strips.nextColor = rand() < 0.15 ? Light.Amber : Light.White;
+      this.strips.spawn(x - this.shipX, y, d + (rand() - 0.5) * STEP, 0.05 + rand() * 0.05, 0.05 + rand() * 0.05, len, 0, false, false, 0, 0, false);
+    }
+  }
+
+  /** Pick the next set piece of the belt: drift fields, clusters, gates, orbiting pairs. */
+  private spaceFeature(d: number, sub: number, hw: number, jitter: number, score: number): void {
+    const A = TH.asteroids;
+    const busy = Math.min(1, score / A.fullPoints); // 0 at the start, 1 at its busiest
+    const mix = A.mix[Math.min(sub, A.mix.length - 1)];
+    let roll = rand();
+    let kind = 0;
+    while (kind < 3 && roll >= mix[kind]) roll -= mix[kind++];
+    const spacing = [A.driftSpacing, A.clusterSpacing, A.gateSpacing, A.orbiterSpacing][kind];
+    this.nextFeatureAt = d + range(spacing) * (1 - 0.35 * busy) * A.spacingScale[Math.min(sub, A.spacingScale.length - 1)];
+    if (kind === 0) this.driftField(d, hw, jitter, busy);
+    else if (kind === 1) this.rockCluster(d, hw, jitter, busy);
+    else if (kind === 2) this.asteroidGate(d, hw, jitter, busy);
+    else this.orbiterPair(d, hw, jitter);
+  }
+
+  /** A spaceborne rock: round, sized freely, a little proud of the (invisible) ground. */
+  private asteroid(x: number, d: number, r: number): void {
+    const hit = r * ROCK_HIT;
+    this.obstacleRocks.spawn(x - this.shipX, 0, d, r, (r * (1.45 + rand() * 0.5)) / BOULDER_HEIGHT, r, rand() * Math.PI * 2, true, false, hit, hit);
+  }
+
+  /**
+   * A rock that swings across the field as you come up to it: x = base + amp sin(...) of the
+   * distance still to go, so where it will be on arrival is known exactly, at any speed. It
+   * ends up at `arrive` (world x); the caller has kept that clear of the lane with room for how far it moves
+   * while the ship passes it.
+   */
+  private swayingAsteroid(arrive: number, d: number, r: number, amp: number, freq: number, phase: number): void {
+    const hit = r * ROCK_HIT;
+    this.obstacleRocks.setNextMotion(amp, freq, phase);
+    this.obstacleRocks.spawn(arrive - amp * Math.sin(phase) - this.shipX, 0, d, r, (r * (1.45 + rand() * 0.5)) / BOULDER_HEIGHT, r, rand() * Math.PI * 2, true, false, hit, hit);
+  }
+
+  /** How far a swaying rock's x changes while the ship is alongside it. */
+  private swayReach(amp: number, freq: number, hit: number): number {
+    return amp * freq * (hit + CONFIG.ship.hitHalfDepth);
+  }
+
+  /** Scattered rocks across the field, some swaying, none in the lane. */
+  private driftField(d: number, hw: number, jitter: number, busy: number): void {
+    const A = TH.asteroids;
+    const n = 2 + Math.floor(busy * 2 + rand() * 2);
+    for (let i = 0; i < n; i++) {
+      const big = rand() < A.bigChance;
+      const r = big ? 1.6 + rand() * 0.6 : range(A.sizes);
+      const at = d + (rand() - 0.5) * 6;
+      const sways = rand() < A.driftChance;
+      const amp = range(A.driftAmp);
+      const freq = (Math.PI * 2) / range(A.driftPeriod);
+      const reach = sways ? this.swayReach(amp, freq, r * ROCK_HIT) : 0;
+      const clear = LANE + r * ROCK_HIT + jitter + reach + 0.3;
+      let x: number | null = null;
+      for (let t = 0; t < 4 && x === null; t++) {
+        const tryX = this.cx + (rand() * 2 - 1) * (hw - r);
+        if (Math.abs(tryX - this.lane) >= clear) x = tryX;
+      }
+      if (x === null) continue;
+      if (sways) this.swayingAsteroid(x, at, r, amp, freq, rand() * Math.PI * 2);
+      else this.asteroid(x, at, r);
+    }
+  }
+
+  /** A knot of rocks to one side of the lane: fly round it. */
+  private rockCluster(d: number, hw: number, jitter: number, busy: number): void {
+    const A = TH.asteroids;
+    const R = range(A.clusterRadius) * (1 + 0.25 * busy);
+    // To whichever side of the lane has more room.
+    const roomL = this.lane - (this.cx - hw);
+    const roomR = this.cx + hw - this.lane;
+    const side = roomL > roomR ? -1 : 1;
+    const gap = LANE + jitter + 1.4 + rand() * 2.5;
+    const centre = this.lane + side * (gap + R);
+    if (Math.abs(centre - this.cx) > hw - R * 0.4) return; // no room: skip it
+    const n = Math.round(range(A.clusterRocks) + busy * 2);
+    for (let i = 0; i < n; i++) {
+      const a = rand() * Math.PI * 2;
+      const rad = Math.sqrt(rand()) * R;
+      const r = i === 0 && n >= 6 ? 1.4 + rand() * 0.5 : 0.5 + rand() * 0.9;
+      const x = i === 0 ? centre : centre + Math.cos(a) * rad;
+      if (Math.abs(x - this.lane) < LANE + r * ROCK_HIT + jitter + 0.3) continue;
+      this.asteroid(x, d + Math.sin(a) * rad, r);
+    }
+  }
+
+  /** Two big asteroids with the way through between them, and smaller rocks trailing off either side. */
+  private asteroidGate(d: number, hw: number, jitter: number, busy: number): void {
+    const A = TH.asteroids;
+    const gap = LANE + jitter + A.gateGap + 0.35 * (1 - busy);
+    for (const side of [-1, 1]) {
+      let edge = gap;
+      for (let i = 0; i < 4; i++) {
+        const r = i === 0 ? 1.5 + rand() * 0.7 : Math.max(0.7, 1.4 - i * 0.2 + rand() * 0.4);
+        const x = this.lane + side * (edge + r * ROCK_HIT);
+        if (Math.abs(x - this.cx) > hw - 0.5) break;
+        this.asteroid(x, d + (rand() - 0.5) * 1.2, r);
+        edge += r * ROCK_HIT * 2 - 0.1;
+      }
+    }
+  }
+
+  /**
+   * Two rocks swinging opposite ways that are either side of the lane just as you reach them:
+   * you watch the gap open and close, and slip through as it opens.
+   */
+  private orbiterPair(d: number, hw: number, jitter: number): void {
+    const A = TH.asteroids;
+    const amp = range(A.orbiterAmp);
+    const freq = (Math.PI * 2) / range(A.driftPeriod);
+    const phase = rand() * Math.PI * 2;
+    const r1 = 0.9 + rand() * 0.5;
+    const r2 = 0.9 + rand() * 0.5;
+    const reach = this.swayReach(amp, freq, Math.max(r1, r2) * ROCK_HIT);
+    const gap = LANE + jitter + 0.5 + reach;
+    for (const [side, r, ph] of [[-1, r1, phase], [1, r2, phase + Math.PI]] as const) {
+      const arrive = this.lane + side * (gap + r * ROCK_HIT);
+      if (Math.abs(arrive - this.cx) > hw - 0.3) continue; // too near the edge to swing: skip this one
+      this.swayingAsteroid(arrive, d, r, amp, freq, ph);
     }
   }
 
@@ -1563,7 +1849,7 @@ export class World {
     if (this.splitStart === Infinity) return { active: false, wall: 0, island: 0 };
     const open = this.splitStart - c.splitWiden - 6;
     // After the island, a clear stretch long enough to cross back from the other branch.
-    const close = this.splitEnd + c.splitWiden + c.splitRejoin;
+    const close = this.splitEnd + c.splitWiden + c.splitRejoin + (this.genBiome === 'asteroids' ? TH.asteroids.rejoinExtra : 0);
     if (d > close + c.splitWiden) {
       // Done: plan the next one.
       this.splitStart = Infinity;
@@ -1593,10 +1879,10 @@ export class World {
         this.rock(wx, d + (rand() - 0.5) * STEP, r, 1.1 + rand() * 1.6);
       }
       // Crystals along the island's spine mark it out as a fork, not a wall.
-      if (island > this.splitHalf * 0.6 && rand() < 0.35) {
+      if (island > this.splitHalf * 0.6 && rand() < 0.35 && this.genBiome !== 'asteroids') {
         const s = 0.9 + rand() * 0.8;
         const wx = this.cx + (rand() - 0.5) * island;
-        if (Math.abs(wx - this.lane) > LANE + s + jitter) this.crystals.spawn(wx - this.shipX, 0, d, s, s * (1 + rand() * 0.6), s, rand() * 6.28, true, false, s * 0.45, s * 0.45);
+        if (Math.abs(wx - this.lane) > LANE + s + jitter) this.crystals.spawn(wx - this.shipX, 0, d, s, s * (1 + rand() * 0.6), s, rand() * 6.28, true, false, s * PROP_HIT[Prop.Crystal], s * PROP_HIT[Prop.Crystal]);
       }
     }
     // The other branch: its own line wanders a little, and rocks stay off it.
@@ -1605,7 +1891,10 @@ export class World {
     this.altLane += clamp(branchCentre + this.altTarget - this.altLane, -maxSlope * STEP * 0.6, maxSlope * STEP * 0.6);
     if (d >= this.splitStart && d <= this.splitEnd) this.altNow = this.altLane;
     if (d < this.splitStart || d > this.splitEnd) return;
-    if (rand() < c.splitAltRocks) {
+    // In the belt the branches are far apart: leave the first stretch of the other branch open
+    // so whoever crosses over has room to settle onto its line before the rocks start.
+    const settled = d >= this.splitStart + (this.genBiome === 'asteroids' ? TH.asteroids.altLeadIn : 0);
+    if (rand() < c.splitAltRocks && settled) {
       const r = 0.55 + rand() * 0.45;
       const lo = this.cx - this.splitSide * (island + 0.4);
       const hi = this.cx - this.splitSide * (hw - 0.4);
@@ -1862,9 +2151,19 @@ export class World {
     // It starts off to one side and has rolled across by the time you reach it,
     // staying between the walls (half: how far either side of centre it may go).
     const travel = Math.min(range(T.travel), Math.max(0, 2 * (half - s * 0.6)));
-    const from = centre - (dir * travel) / 2;
-    this.tumbleweeds.setNextRamp(dir * travel, range(T.over), 0, false);
-    this.tumbleweeds.spawn(from - this.shipX, 0.5 * s, d, s, s, s, 0, false, wraps, 0, 0, false);
+    const hit = TUMBLEWEED_HIT * s;
+    // It's solid, and where it ends up is where it hits: the end of the roll has to be clear
+    // of the lane (the roll's last stretch moves it about 0.3). If not, roll the other way.
+    const clear = LANE + hit + 0.9;
+    let from = centre - (dir * travel) / 2;
+    let way = dir;
+    if (Math.abs(from + way * travel - this.lane) < clear) {
+      way = -dir;
+      from = centre - (way * travel) / 2;
+      if (Math.abs(from + way * travel - this.lane) < clear) return;
+    }
+    this.tumbleweeds.setNextRamp(way * travel, range(T.over), 0, false);
+    this.tumbleweeds.spawn(from - this.shipX, 0.5 * s, d, s, s, s, 0, true, wraps, hit, hit, false);
   }
 
   /** Remember the lane after each row (for the dev autopilot). */
@@ -2095,7 +2394,7 @@ export class World {
         for (let j = 0; j < n; j++) {
           const dj = d + j * STEP;
           this.light(x, 0.28, dj, w, 0.07, 0.12, Light.Red, true);
-          this.light(x, 0.62, dj, w, 0.05, 0.1, Light.Red, true);
+          this.light(x, 0.62, dj, w, 0.05, 0.1, Light.Red, false); // above the ship: look only
           this.hullBox(this.cx + b.x0 + 0.12, 0, dj, 0.24, 1.1, 0.3, true, true);
           this.hullBox(this.cx + b.x1 - 0.12, 0, dj, 0.24, 1.1, 0.3, true, true);
         }

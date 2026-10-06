@@ -4,11 +4,14 @@ import { storage } from './storage';
 // Cosmetic unlocks: ship shapes, trails and world palettes. Missions unlock
 // them one at a time in UNLOCK_ORDER; the hangar screen picks among unlocked.
 
-export type ShipId = 'dart' | 'wing' | 'needle' | 'manta' | 'arrow' | 'talon' | 'nova' | 'raptor';
-export type TrailId = 'none' | 'line' | 'dashes' | 'ion';
+export type ShipId = 'dart' | 'wing' | 'needle' | 'manta' | 'arrow' | 'talon' | 'viper' | 'nova' | 'phantom' | 'raptor' | 'kite' | 'comet';
+/** Every engine flame style (the looks catalogue sells and awards them; the mission ones are below). */
+export type TrailId = 'none' | 'line' | 'dashes' | 'ion' | 'triple' | 'wide' | 'long' | 'twin' | 'pulse' | 'ribbon';
+type MissionTrail = 'none' | 'line' | 'dashes' | 'ion';
 
+/** The hulls and trails the missions unlock, in order (the rest of the looks are in catalogue.ts). */
 export const SHIPS: ShipId[] = ['dart', 'wing', 'needle', 'manta'];
-export const TRAILS: TrailId[] = ['none', 'line', 'dashes', 'ion'];
+export const TRAILS: MissionTrail[] = ['none', 'line', 'dashes', 'ion'];
 export const PALETTE_NAMES = PALETTES.map((p) => p.name);
 
 export type Unlock = { kind: 'ship'; id: ShipId } | { kind: 'trail'; id: TrailId } | { kind: 'palette'; id: string };
@@ -35,7 +38,7 @@ export function describe(u: Unlock): string {
 interface Saved {
   unlocked: number; // how many of UNLOCK_ORDER are unlocked
   ship: ShipId;
-  trail: TrailId;
+  trail: MissionTrail; // older saves: the flame picked here, now chosen with the looks (see game.ts)
   palette: string;
 }
 
@@ -44,7 +47,7 @@ const KEY = 'endless.cosmetics';
 export class Cosmetics {
   unlocked = 0;
   ship: ShipId = 'dart';
-  trail: TrailId = 'none';
+  trail: MissionTrail = 'none';
   palette = PALETTE_NAMES[0];
 
   async load(): Promise<void> {
@@ -75,8 +78,8 @@ export class Cosmetics {
     return ['dart', ...(this.owned('ship') as ShipId[])];
   }
 
-  trails(): TrailId[] {
-    return ['none', ...(this.owned('trail') as TrailId[])];
+  trails(): MissionTrail[] {
+    return ['none', ...(this.owned('trail') as MissionTrail[])];
   }
 
   /** Unlocked palettes in the order they appear in the config. */

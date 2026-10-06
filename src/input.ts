@@ -211,6 +211,7 @@ export class Input {
   };
 
   private onKeyDown = (e: KeyboardEvent): void => {
+    if ((e.target as HTMLElement | null)?.tagName === 'INPUT') return; // typing, not steering
     if (e.code === 'ArrowLeft' || e.code === 'KeyA') this.left = true;
     else if (e.code === 'ArrowRight' || e.code === 'KeyD') this.right = true;
     else if (BOOST_KEYS.has(e.code)) this.boostKey = true;

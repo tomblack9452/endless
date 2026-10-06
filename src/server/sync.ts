@@ -1,14 +1,14 @@
 import { storage } from '../storage';
 import type { Backend } from './backend';
 
-// Cloud save: every "endless." key (except the session itself) as one row.
+// Cloud save: every "endless." key (except the session and the outbox) as one row.
 // On start, the newer of the device and the cloud wins; a fresh install with
 // a cloud save takes it and reloads. A device that played before cloud saves
 // existed keeps whichever save has earned more credits in its lifetime.
 
 const PREFIX = 'endless.';
 const SAVED_AT = 'endless.savedAt';
-const SKIP = new Set(['endless.session', SAVED_AT]);
+const SKIP = new Set(['endless.session', 'endless.outbox', SAVED_AT]);
 
 function lifetimeCredits(data: Record<string, string>): number {
   try {

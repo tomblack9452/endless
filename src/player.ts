@@ -33,7 +33,7 @@ const RIDGE = new Vector3(0, S.height, S.length * 0.28);
  * triangles, light faces first then shaded ones, plus an outline for the
  * shadow. Units are the ship's half-width (w), length (l) and ridge height (h).
  */
-function shipShape(id: ShipId): { light: Vector3[]; shade: Vector3[]; outline: Vector3[] } {
+export function shipShape(id: ShipId): { light: Vector3[]; shade: Vector3[]; outline: Vector3[]; tail?: number } {
   const w = S.halfWidth;
   const l = S.length;
   const h = S.height;
@@ -94,6 +94,63 @@ function shipShape(id: ShipId): { light: Vector3[]; shade: Vector3[]; outline: V
         outline: [nose, v(-w * 1.1, 0, l * 0.45), v(w * 1.1, 0, l * 0.45)],
       };
     }
+    case 'viper': {
+      // Two long tail spikes behind low shoulders: a snake's head with a forked tail.
+      const nose = v(0, 0, -l * 0.9);
+      const ls = v(-w * 0.95, 0, l * 0.08);
+      const rs = v(w * 0.95, 0, l * 0.08);
+      const sl = v(-w * 0.55, 0, l * 0.62);
+      const sr = v(w * 0.55, 0, l * 0.62);
+      const notch = v(0, 0, l * 0.3);
+      const ridge = v(0, h * 1.15, -l * 0.08);
+      return {
+        light: [nose, ls, ridge, ls, sl, ridge, sl, notch, ridge],
+        shade: [nose, ridge, rs, rs, ridge, sr, sr, ridge, notch],
+        outline: [nose, ls, rs],
+        tail: l * 0.62,
+      };
+    }
+    case 'phantom': {
+      // A flat stealth chevron: tips at the back, almost no spine.
+      const nose = v(0, 0, -l * 0.62);
+      const lt = v(-w * 1.5, 0, l * 0.5);
+      const rt = v(w * 1.5, 0, l * 0.5);
+      const notch = v(0, 0, l * 0.12);
+      const ridge = v(0, h * 0.7, l * 0.02);
+      return { light: [nose, lt, ridge, lt, notch, ridge], shade: [nose, ridge, rt, rt, ridge, notch], outline: [nose, lt, rt] };
+    }
+    case 'kite': {
+      // A kite: a rounded diamond with a split tail.
+      const nose = v(0, 0, -l * 0.75);
+      const ls = v(-w * 1.05, 0, -l * 0.02);
+      const rs = v(w * 1.05, 0, -l * 0.02);
+      const tl = v(-w * 0.32, 0, l * 0.6);
+      const tr = v(w * 0.32, 0, l * 0.6);
+      const notch = v(0, 0, l * 0.42);
+      const ridge = v(0, h * 1.4, -l * 0.02);
+      return {
+        light: [nose, ls, ridge, ls, tl, ridge, tl, notch, ridge],
+        shade: [nose, ridge, rs, rs, ridge, tr, tr, ridge, notch],
+        outline: [nose, ls, rs],
+        tail: l * 0.6,
+      };
+    }
+    case 'comet': {
+      // A teardrop: a broad round head trailing to a long point.
+      const nose = v(0, 0, -l * 0.55);
+      const fl = v(-w * 0.62, 0, -l * 0.38);
+      const fr = v(w * 0.62, 0, -l * 0.38);
+      const ls = v(-w * 1.1, 0, l * 0.04);
+      const rs = v(w * 1.1, 0, l * 0.04);
+      const tail = v(0, 0, l * 0.78);
+      const ridge = v(0, h * 1.5, -l * 0.04);
+      return {
+        light: [nose, fl, ridge, fl, ls, ridge, ls, tail, ridge],
+        shade: [nose, ridge, fr, fr, ridge, rs, rs, ridge, tail],
+        outline: [nose, ls, rs],
+        tail: l * 0.78,
+      };
+    }
     case 'nova': {
       // A four-pointed star: short side blades and a long tail spike.
       const nose = v(0, 0, -l * 0.7);
@@ -105,6 +162,7 @@ function shipShape(id: ShipId): { light: Vector3[]; shade: Vector3[]; outline: V
         light: [nose, lt, ridge, lt, tail, ridge],
         shade: [nose, ridge, rt, rt, ridge, tail],
         outline: [nose, lt, rt, lt, tail, rt],
+        tail: l * 0.62,
       };
     }
     case 'raptor': {
@@ -120,6 +178,7 @@ function shipShape(id: ShipId): { light: Vector3[]; shade: Vector3[]; outline: V
         light: [nose, lw, ridge, lw, lt, ridge, lt, notch, ridge],
         shade: [nose, ridge, rw, rw, ridge, rt, rt, ridge, notch],
         outline: [nose, lw, rw, lw, lt, notch, rw, notch, rt],
+        tail: l * 0.55,
       };
     }
     default: {
@@ -171,7 +230,7 @@ function hullPoint(f: Frame, a: number, b: number): [number, number] {
 }
 
 /** Marking ids for the hull shader (0 = none). */
-const MARKING_ID: Record<Marking, number> = { none: 0, stripe: 1, twin: 2, split: 3, twotone: 4, chevron: 5 };
+export const MARKING_ID: Record<Marking, number> = { none: 0, stripe: 1, twin: 2, split: 3, twotone: 4, chevron: 5, nose: 6, tips: 7, spine: 8, hazard: 9, checker: 10, dots: 11, rings: 12 };
 
 /**
  * Markings are painted by the hull's own shader, worked out per pixel from
@@ -205,10 +264,20 @@ if (uMark > 0.5) {
   else if (uMark < 2.5) m = step(0.32, ab) * step(ab, 0.56) * step(0.04, a) * step(a, 0.85);
   else if (uMark < 3.5) m = step(b, 0.0);
   else if (uMark < 4.5) m = step(a, 0.36);
-  else {
+  else if (uMark < 5.5) {
     float lo = 0.5 - 0.22 * ab / 0.85;
     m = step(ab, 0.85) * step(lo, a) * step(a, lo + 0.14);
   }
+  else if (uMark < 6.5) m = step(0.8, a); // nose cap
+  else if (uMark < 7.5) m = step(0.7, ab) * step(a, 0.6); // wing tips
+  else if (uMark < 8.5) m = step(ab, 0.06) * step(0.03, a) * step(a, 0.97); // a thin spine
+  else if (uMark < 9.5) m = step(a, 0.5) * step(fract(a * 7.0 + ab * 3.5), 0.5); // hazard stripes at the back
+  else if (uMark < 10.5) m = mod(floor(b * 3.0 + 3.0) + floor(a * 7.0), 2.0) * step(0.06, a) * step(a, 0.62) * step(ab, 0.98); // checks
+  else if (uMark < 11.5) {
+    vec2 g = fract(vec2(vShip.x, vShip.z) / 0.15 + 0.5) - 0.5; // round dots on a grid, in the ship's own units
+    m = step(length(g), 0.27) * step(0.08, a) * step(a, 0.94) * step(ab, 0.9); // dots
+  }
+  else m = step(0.55, fract(a * 3.2)) * step(0.06, a) * step(a, 0.94); // bands
   diffuseColor.rgb = mix(diffuseColor.rgb, uMarkColor, m);
 }`,
       );
@@ -221,9 +290,9 @@ function finGeometry(geometry: BufferGeometry, f: Frame, fin: Exclude<Fin, 'none
   const len = f.left.z - f.nose.z;
   const halfW = Math.abs(f.left.x);
   const on = (x: number, z: number) => new Vector3(x, (surface(geometry, x, z)?.y ?? 0) - 0.002, z);
-  /** A wedge fin: a blade with a back face, so the chase camera sees it. */
-  const wedge = (x: number, lean: number, height: number) => {
-    const front = on(x, f.left.z - len * 0.42);
+  /** A wedge fin: a blade with a back face, so the chase camera sees it. `reach` is how far forward it starts (of the hull's length). */
+  const wedge = (x: number, lean: number, height: number, reach = 0.42) => {
+    const front = on(x, f.left.z - len * reach);
     const back = on(x, f.left.z - len * 0.08);
     const bl = back.clone().add(new Vector3(-0.035, 0, 0));
     const br = back.clone().add(new Vector3(0.035, 0, 0));
@@ -233,7 +302,16 @@ function finGeometry(geometry: BufferGeometry, f: Frame, fin: Exclude<Fin, 'none
     tri(bl, br, top);
   };
   if (fin === 'tail') wedge(0, 0, 0.26);
-  else if (fin === 'twin') {
+  else if (fin === 'blade') wedge(0, 0, 0.15, 0.72); // long and low
+  else if (fin === 'crest') {
+    wedge(0, 0, 0.34, 0.5);
+    wedge(-halfW * 0.4, -0.08, 0.12, 0.3);
+    wedge(halfW * 0.4, 0.08, 0.12, 0.3);
+  } else if (fin === 'swept') {
+    // Two long fins raked back and out.
+    wedge(-halfW * 0.5, -0.14, 0.2, 0.62);
+    wedge(halfW * 0.5, 0.14, 0.2, 0.62);
+  } else if (fin === 'twin') {
     // Canted outwards so their faces catch the light from above.
     wedge(-halfW * 0.42, -0.1, 0.19);
     wedge(halfW * 0.42, 0.1, 0.19);
@@ -399,7 +477,7 @@ export class Player {
     this.markUniforms.uMark.value = MARKING_ID[this.marking];
     this.markUniforms.uFrame.value.set(frame.nose.z, frame.left.z, Math.abs(frame.left.x));
     // The engine sits at the tail line, centred (wing tips: see engineSpan()).
-    this.engine.position.set(0, 0, frame.left.z);
+    this.engine.position.set(0, 0, s.tail ?? frame.left.z);
     this.engineHalfSpan = Math.abs(frame.left.x);
     if (this.fin !== 'none') this.decor.add(new Mesh(finGeometry(geometry, frame, this.fin), this.matFin));
     if (this.decalSvg) {

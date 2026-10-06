@@ -264,6 +264,29 @@ export function tumbleweed(): BufferGeometry {
   return build(loops);
 }
 
+/**
+ * A cluster of basalt columns: six-sided pillars of different heights packed
+ * round a tall middle one, the way lava cools. About 3 tall, 0.8 across at ship height.
+ */
+export function basaltColumns(): BufferGeometry {
+  const cols: [number, number, number, number, string][] = [
+    // x, z, height, radius, colour
+    [0, 0, 2.9, 0.32, '#3b3436'],
+    [0.5, 0.05, 1.7, 0.3, '#463e41'],
+    [0.24, 0.46, 2.2, 0.3, '#352e30'],
+    [-0.26, 0.44, 1.2, 0.29, '#4a4144'],
+    [-0.52, -0.02, 1.9, 0.3, '#3d3537'],
+    [-0.25, -0.46, 1.0, 0.29, '#463e41'],
+    [0.26, -0.45, 2.4, 0.3, '#2f292b'],
+  ];
+  return build(
+    cols.map(([x, z, h, r, col], i) =>
+      // A touch of lean and a different turn each, so the cluster isn't a honeycomb.
+      part(new CylinderGeometry(r * 0.96, r, h, 6), col, move(0, h / 2, 0), tiltX(((i % 3) - 1) * 0.03), tiltZ(((i % 2) - 0.5) * 0.04), move(x, 0, z)),
+    ),
+  );
+}
+
 /** Tall standing rock: a narrow tapering stack of lumps. About 4 tall. */
 export function rockSpire(): BufferGeometry {
   return build([
