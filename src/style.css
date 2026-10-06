@@ -540,7 +540,7 @@ body {
 
 .dev-link {
   position: absolute;
-  left: calc(var(--safe-left) + 22px);
+  left: calc(var(--safe-left) + 66px);
   top: calc(var(--safe-top) + 18px);
 }
 
@@ -756,21 +756,6 @@ body {
   margin: 14px 0 12px;
 }
 
-.title-links {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 8px;
-  margin: 12px 0 12px;
-}
-
-.title-links .link:empty {
-  display: none;
-}
-
-.title-best {
-  margin-top: 2px;
-}
-
 .setting-note {
   padding: 12px 0 0;
   font-size: calc(12px * var(--ui-scale));
@@ -882,18 +867,14 @@ body {
   #screen-title .pill {
     min-height: calc(44px * var(--ui-scale));
   }
-  .title-modes,
-  .title-links {
+  .title-modes {
     margin-top: 8px;
   }
-  .title-links {
-    margin-bottom: 4px;
+  .live-cards {
+    margin-bottom: 8px;
   }
-  .title-links .chip {
-    padding: 9px 6px;
-  }
-  .title-corners {
-    margin-top: 0;
+  .live-card {
+    padding: 8px 12px;
   }
 }
 
@@ -983,32 +964,26 @@ body {
   display: none;
 }
 
-/* Hangar bottom-left, settings bottom-right. */
-.title-corners {
-  display: flex;
-  justify-content: space-between;
-  margin: 10px -10px 0;
-}
-
-.corner-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  min-height: 48px;
-  padding: 0 10px;
-  font: inherit;
-  font-size: calc(13px * var(--ui-scale));
-  letter-spacing: 0.14em;
+/* Settings: a gear, top left. */
+.gear-btn {
+  position: absolute;
+  top: calc(var(--safe-top) + 8px);
+  left: calc(var(--safe-left) + 12px);
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
   color: inherit;
   background: none;
   border: none;
+  border-radius: 50%;
   pointer-events: auto;
   cursor: pointer;
-  -webkit-appearance: none;
-  appearance: none;
 }
 
-.corner-link svg {
+.gear-btn svg {
   width: 26px;
   height: 26px;
   fill: none;
@@ -1018,14 +993,156 @@ body {
   stroke-linejoin: round;
 }
 
-.corner-link:active {
+.gear-btn:active {
   opacity: 0.6;
 }
 
-.corner-link:focus-visible {
+.gear-btn:focus-visible {
   outline: 2px solid currentColor;
-  outline-offset: 2px;
+}
+
+/* Live cards above the ranked button: the pass, today's goals, a reward to claim. */
+.live-cards {
+  display: flex;
+  gap: 8px;
+  margin: 0 calc(-24px - var(--safe-right)) 12px 0;
+  padding-right: calc(24px + var(--safe-right));
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.live-cards::-webkit-scrollbar {
+  display: none;
+}
+
+.live-cards:empty {
+  display: none;
+}
+
+.live-card {
+  position: relative;
+  flex: 1 0 calc(46% - 4px);
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 12px;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  background: color-mix(in srgb, currentColor 5%, transparent);
+  border: 1px solid color-mix(in srgb, currentColor 22%, transparent);
+  border-radius: 14px;
+  pointer-events: auto;
+  cursor: pointer;
+}
+
+.live-card.hot {
+  border-color: color-mix(in srgb, #e0503f 70%, transparent);
+}
+
+.live-card:active {
+  transform: scale(0.98);
+}
+
+.live-card .kicker {
+  font-size: calc(10px * var(--ui-scale));
+  letter-spacing: 0.16em;
+  opacity: 0.65;
+}
+
+.live-card .title {
+  font-size: calc(13px * var(--ui-scale));
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.live-card .xp-track {
+  height: 3px;
+  margin-top: 6px;
+}
+
+/* What opens next, for new players. */
+.title-next {
+  margin-top: 10px;
+  text-align: center;
+  font-size: calc(11px * var(--ui-scale));
+}
+
+.title-next:empty {
+  display: none;
+}
+
+/* The bottom bar: the five places off the title screen. */
+.title-bar {
+  display: flex;
+  justify-content: space-around;
+  gap: 2px;
+  margin: 12px -14px 0;
+}
+
+.bar-btn {
+  position: relative;
+  flex: 1 1 0;
+  max-width: 25%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 4px;
+  min-height: 54px;
+  padding: 6px 2px 2px;
+  font: inherit;
+  font-size: calc(10px * var(--ui-scale));
+  letter-spacing: 0.08em;
+  line-height: 1.2;
+  text-align: center;
+  color: inherit;
+  background: none;
+  border: none;
   border-radius: 12px;
+  pointer-events: auto;
+  cursor: pointer;
+}
+
+.bar-btn svg {
+  width: 24px;
+  height: 24px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.bar-btn:active {
+  background: color-mix(in srgb, currentColor 8%, transparent);
+}
+
+.bar-btn:focus-visible {
+  outline: 2px solid currentColor;
+}
+
+.bar-btn .news {
+  position: absolute;
+  top: 4px;
+  left: calc(50% + 10px);
+  display: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #e0503f;
+}
+
+.bar-btn .news.on {
+  display: block;
+}
+
+[data-feature][hidden] {
+  display: none !important;
 }
 
 .title-modes .pill {

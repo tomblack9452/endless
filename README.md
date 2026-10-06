@@ -275,9 +275,18 @@ Events change the look and sound only, never the course.
 ## Modes
 
 The title screen leads with **ranked**, a big button showing your best on
-this week's run. **Solo** and **endless** sit under it, then record, goals,
-stats, daily, shop and pass; the hangar is bottom left and settings bottom
-right. Credits and cores sit top right.
+this week's run, with **solo** and **endless** under it. Above it, **live
+cards** show the season pass (your tier and the XP to the next), today's goals,
+and a daily reward when one is waiting. Along the bottom, a bar of five:
+**hangar**, **shop**, **goals**, **leaderboard** and **service record**, each
+with a dot when something there needs you. Settings is the gear top left;
+credits and cores sit top right (tapping them opens the shop).
+
+New players see the game in stages (`src/reveal.ts`), so the first screen isn't
+a wall of buttons: at first the big button flies endless and the bar has the
+hangar and goals; solo, the shop and the service record open after 3 runs;
+ranked, leagues and the leaderboard after 5 (and the tutorial). Each stage is
+announced once, and a line under the menu says what opens next.
 
 | | Ranked | Solo | Endless |
 |---|---|---|---|
@@ -339,7 +348,7 @@ the new insignia, turning rays and what it gave you.
 
 Insignia are drawn in code: chevrons for enlisted ranks (with rockers for
 sergeants), bars and diamonds for officers, stars for generals, and pips for
-grades. The **service record** (tap your rank on the title screen) leads
+grades. The **service record** (the bar, or tap your rank on the title screen) leads
 with the XP you need for the next rank, big, with a bar and roughly how many
 runs that is. Under it: what the next rank gives (credits, a new insignia,
 any looks), a chart of the XP from your last 20 ranked runs, how XP is earned, double-XP runs left
@@ -531,7 +540,7 @@ turn over at midnight UTC, the same moment for everyone.
 - After a run, the end screen lists any quests finished and the pass XP
   earned, and the counters in the top bar bump as things land.
 
-**Stats** (title screen) show runs, time played, distance, your best this
+**Stats** (the service record's second tab) show runs, time played, distance, your best this
 week, your endless best and your best in each solo environment, furthest
 level, best chain, near misses, pickups, and where you crash most. Every run has a seed, and the same seed always builds the same course.
 

@@ -60,12 +60,15 @@
       </div>
 
       <div id="screen-title" class="layer screen">
+        <button id="title-settings" class="gear-btn" type="button" aria-label="settings">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.2" /><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1" /><circle cx="12" cy="12" r="6.3" /></svg>
+        </button>
         <div class="wallet-bar">
           <button class="coin" type="button" data-title="shop" aria-label="credits">
             <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" /><path d="M14.8 9.2a4 4 0 1 0 0 5.6" /></svg>
             <span id="bar-credits">0</span>
           </button>
-          <button class="coin premium" type="button" data-title="shop" aria-label="cores">
+          <button class="coin premium" type="button" data-title="shop-cores" aria-label="cores">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l7.5 4.5v9L12 21l-7.5-4.5v-9z" /><path d="M12 8l3.5 2v4L12 16l-3.5-2v-4z" /></svg>
             <span id="bar-cores">0</span>
           </button>
@@ -82,7 +85,7 @@
             <span id="title-credits" class="label dim"></span>
           </span>
         </button>
-        <button id="title-league" class="title-rank title-league" type="button">
+        <button id="title-league" class="title-rank title-league" type="button" data-feature="league">
           <span id="title-league-icon" class="insignia"></span>
           <span class="title-rank-text">
             <span id="title-league-name" class="label"></span>
@@ -91,34 +94,38 @@
         </button>
         </div>
         <div class="screen-foot">
+          <div id="title-cards" class="live-cards"></div>
           <button id="title-start" class="pill primary title-ranked" type="button">
-            <span class="title-ranked-name">ranked</span>
+            <span id="title-ranked-name" class="title-ranked-name">ranked</span>
             <span id="title-ranked-sub" class="title-ranked-sub"></span>
           </button>
           <div class="title-modes">
-            <button class="pill" type="button" data-title="solo">solo</button>
-            <button class="pill" type="button" data-title="endless">endless</button>
+            <button class="pill" type="button" data-title="solo" data-feature="solo">solo</button>
+            <button class="pill" type="button" data-title="endless" data-feature="endless">endless</button>
           </div>
-          <div class="title-links">
-            <span class="chip link" data-title="record">record</span>
-            <span class="chip link" data-title="goals">goals</span>
-            <span class="chip link" data-title="stats">stats</span>
-            <span class="chip link" data-title="daily">daily<i class="news"></i></span>
-            <span class="chip link" data-title="shop">shop</span>
-            <span class="chip link" data-title="pass">pass</span>
-            <span class="chip link" data-title="boards">top</span>
-          </div>
-          <div id="title-best" class="label dim title-best"></div>
-          <div class="title-corners">
-            <button class="corner-link" type="button" data-title="hangar">
+          <div id="title-next" class="label dim title-next"></div>
+          <nav class="title-bar" aria-label="menu">
+            <button class="bar-btn" type="button" data-title="hangar" data-feature="hangar">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 20V10l9-6 9 6v10" /><path d="M7 20v-6h10v6" /><path d="M12 14v3M9.5 17.5h5" /></svg>
-              <span>hangar</span>
+              <span>hangar</span><i class="news"></i>
             </button>
-            <button id="title-settings" class="corner-link" type="button">
-              <span>settings</span>
-              <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.2" /><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1" /><circle cx="12" cy="12" r="6.3" /></svg>
+            <button class="bar-btn" type="button" data-title="shop" data-feature="shop">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 8h14l-1.2 12H6.2z" /><path d="M9 8V6.5a3 3 0 0 1 6 0V8" /></svg>
+              <span>shop</span><i class="news"></i>
             </button>
-          </div>
+            <button class="bar-btn" type="button" data-title="goals" data-feature="goals">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5" /><circle cx="12" cy="12" r="4.5" /><circle cx="12" cy="12" r="0.8" /></svg>
+              <span>goals</span><i class="news"></i>
+            </button>
+            <button class="bar-btn" type="button" data-title="boards" data-feature="boards">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20v-6h5v6M9.5 20V9h5v11M15 20v-8h5v8" /><path d="M12 3.5l.9 1.8 2 .3-1.4 1.4.3 2-1.8-.9-1.8.9.3-2-1.4-1.4 2-.3z" /></svg>
+              <span>leaderboard</span><i class="news"></i>
+            </button>
+            <button class="bar-btn" type="button" data-title="record" data-feature="record">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 4h12v6l-6 4-6-4z" /><path d="M6 13l6 4 6-4M6 17l6 4 6-4" /></svg>
+              <span>service record</span><i class="news"></i>
+            </button>
+          </nav>
         </div>
       </div>
 
@@ -161,16 +168,6 @@
           <div class="settings-group">assist</div>
           <button class="setting-row" type="button" data-setting="assist"><span class="label">assist mode</span><span class="value"></span></button>
           <div class="label dim setting-note">slower, with the safe line marked. scores don't count as bests</div>
-        </div>
-      </div>
-
-      <div id="screen-stats" class="layer screen panel">
-        <div class="panel-head">
-          <button class="label link back" type="button" data-action="back">back</button>
-          <div class="panel-title">stats</div>
-        </div>
-        <div class="settings">
-          <div id="stats-rows"></div>
         </div>
       </div>
 
@@ -271,7 +268,11 @@
           <button class="label link back" type="button" data-action="back">back</button>
           <div class="panel-title">service record</div>
         </div>
-        <div class="settings prog">
+        <div class="tabs">
+          <button class="tab on" type="button" data-recordtab="rank">rank</button>
+          <button class="tab" type="button" data-recordtab="stats">stats</button>
+        </div>
+        <div class="settings prog tabbed" data-recordpane="rank">
           <div class="prog-hero">
             <span id="record-icon" class="insignia big"></span>
             <div>
@@ -291,6 +292,9 @@
           <div id="record-rows"></div>
           <div class="settings-group">all ranks</div>
           <div id="record-ladder" class="ladder"></div>
+        </div>
+        <div class="settings tabbed" data-recordpane="stats" hidden>
+          <div id="stats-rows"></div>
         </div>
       </div>
 

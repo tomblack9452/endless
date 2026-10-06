@@ -19,6 +19,7 @@ import { decalArt } from './decals';
 import { Haptics } from './haptics';
 import { Hints } from './hints';
 import { migrateMissionLooks, migrateTickets } from './legacy';
+import { type Feature, isOpen, nextStageText, STAGES, stageFor } from './reveal';
 import { Ads, createAdNetwork } from './ads/ads';
 import { entitlementFor, Entitlements } from './store/entitlements';
 import { Progress } from './progress';
@@ -51,7 +52,7 @@ import type { Fin, Marking } from './looks';
 import { MAX_TIER, type ShipStats, STANDARD, SYSTEMS, type SystemId, TIER_COST, TIER_LEAGUE, Upgrades } from './upgrades';
 import { newSeed } from './rng';
 import { loadNumber } from './storage';
-import { type Celebration, formatScore, type ProgressView, type RankResultView, UI } from './ui';
+import { type Celebration, formatScore, type ProgressView, type RankResultView, type TitleCard, UI } from './ui';
 import type { RoomId } from './interior';
 import { biomeForLevel, type PowerKind, themeForLevel, themeName, World } from './world';
 import { tintBiome } from './biomes';
@@ -62,8 +63,9 @@ type State = 'title' | 'playing' | 'paused' | 'countdown' | 'crashed' | 'finishe
 const DEG = Math.PI / 180;
 const PATH_STEP = 4;
 const FIRST_PLAYED_KEY = 'endless.firstPlayed';
+const REVEAL_KEY = 'endless.reveal';
 
-type InfoScreen = 'stats' | 'goals' | 'hangar' | 'record' | 'solo' | 'league' | 'shop' | 'pass' | 'daily' | 'boards';
+type InfoScreen = 'goals' | 'hangar' | 'record' | 'solo' | 'league' | 'shop' | 'pass' | 'daily' | 'boards';
 
 /** "5 oct": the Monday this week's ranked course started. */
 /** "1:23.4" */
@@ -158,6 +160,10 @@ export class Game {
   /** One-time products already bought. */
   private readonly entitlements = new Entitlements();
   private firstPlayed = Date.now();
+  /** The tutorial run is done (onboarding); until it exists, everyone counts as done. */
+  private tutorialDone = true;
+  /** The reveal stage last announced (null until read from storage). */
+  private revealSeen: number | null = null;
   private readonly ads = new Ads(createAdNetwork(), () => this.entitlements.has('premium'), () => this.firstPlayed);
   /** The shop card tapped (on the ship to try), or -1. */
   private shopPick = -1;
@@ -274,8 +280,11 @@ export class Game {
     this.ui.pauseButton.addEventListener('pointerdown', this.onPauseButton);
     // Tapping anywhere also starts; the button is the explicit target.
     this.ui.startButton.addEventListener('click', () => {
-      if (this.state === 'title') this.startRanked();
+      if (this.state === 'title') this.startPrimary();
     });
+    this.ui.bindTitleCards(this.onTitleLink);
+    this.ui.bindRecordTabs((tab) => this.ui.setRecordTab(tab));
+    void storage.get(REVEAL_KEY).then((v) => (this.revealSeen = v === null ? -1 : Number(v) || 0));
     this.ui.titleRank.addEventListener('pointerdown', (e) => e.stopPropagation());
     this.ui.titleRank.addEventListener('click', () => this.openRecord());
     document.addEventListener('visibilitychange', () => {
@@ -1067,7 +1076,7 @@ export class Game {
 
   private refreshBar(now = Date.now()): void {
     this.econ.setBar(this.wallet.credits, this.wallet.cores);
-    this.econ.setNews('daily', this.daily.loginDue(dayKey(now)) >= 0);
+    this.econ.setNews('goals', this.daily.loginDue(dayKey(now)) >= 0);
   }
 
   /** Fold a run into the rank (every mode) and, for ranked, the league; fills the game-over block. Returns bonus credits. */
@@ -1332,7 +1341,10 @@ export class Game {
     return Math.max(0, Math.min(1, (this.ranked.xp - lo) / (hi - lo)));
   }
 
-  private openRecord(): void {
+  /** The service record: your rank (and the ladder), and your lifetime stats. */
+  private openRecord(tab: 'rank' | 'stats' = 'rank'): void {
+    this.renderStats();
+    this.ui.setRecordTab(tab);
     const rk = this.ranked;
     const i = rk.rank;
     const next = RANKS[i + 1];
@@ -1746,7 +1758,6 @@ export class Game {
     if (name === 'endless') this.startEndless();
     else if (name === 'solo') this.openSolo();
     else if (name === 'record') this.openRecord();
-    else if (name === 'stats') this.openStats();
     else if (name === 'goals') this.openGoals();
     else if (name === 'hangar') this.openHangar();
     else if (name === 'shop') {
@@ -1754,26 +1765,84 @@ export class Game {
       this.preview = null;
       this.openShop();
     }
+    else if (name === 'shop-cores') this.onTitleLink('shop');
     else if (name === 'pass') this.openPass();
     else if (name === 'boards') this.openBoards();
     else if (name === 'daily') this.openDaily();
+    else if (name === 'claim') this.claimLogin();
   };
+
+  /** How much of the game is open to this player (new players see it in stages: reveal.ts). */
+  private revealStage(): number {
+    return stageFor(this.progress.stats.runs, this.tutorialDone);
+  }
+
+  private open(f: Feature): boolean {
+    return this.dev.unlockedAll || isOpen(f, this.revealStage());
+  }
+
+  /** The big button: ranked once it's open, endless before. */
+  private startPrimary(): void {
+    if (this.open('ranked')) this.startRanked();
+    else this.startEndless();
+  }
+
+  /** Say so, once, when a new part of the game opens. */
+  private announceReveal(): void {
+    if (this.revealSeen === null) return; // not read yet
+    const stage = this.revealStage();
+    if (stage <= this.revealSeen) return;
+    // A save from before the stages (or the first look at an old save): open, without a fanfare.
+    const quiet = this.revealSeen < 0 && stage === STAGES.length;
+    if (!quiet) {
+      const lines = STAGES.slice(Math.max(0, this.revealSeen), stage).map((s) => s.text);
+      this.ui.celebrate([{ kicker: 'new', icon: GOAL_ICON, name: 'more to play', lines }]);
+    }
+    this.revealSeen = stage;
+    void storage.set(REVEAL_KEY, String(stage));
+  }
+
+  /** The live cards above the big button: the pass, today's goals, a reward waiting. */
+  private titleCards(now: number): TitleCard[] {
+    const cards: TitleCard[] = [];
+    const day = dayKey(now);
+    const due = this.daily.loginDue(day);
+    if (due >= 0) cards.push({ id: 'claim', kicker: 'daily reward', title: `day ${due + 1} ready to claim`, hot: true });
+    const quests = this.daily.quests;
+    const done = quests.filter((q) => q.done).length;
+    cards.push({ id: 'daily', kicker: "today's goals", title: done >= quests.length ? 'all done' : `${done} of ${quests.length} done`, fraction: quests.length ? done / quests.length : 0 });
+    const P = CONFIG.economy.pass;
+    const tier = this.pass.tier;
+    cards.push({
+      id: 'pass',
+      kicker: `pass · tier ${tier}`,
+      title: tier >= P.tiers ? 'complete' : `${formatScore(P.xpPerTier - (this.pass.xp % P.xpPerTier))} xp to go`,
+      fraction: this.pass.tierFraction,
+    });
+    return cards;
+  }
 
   private refreshTitle(): void {
     const i = this.ranked.rank;
     this.applyLooks(); // the wing decal follows your rank and league
     const lg = this.leagues;
     this.ui.setTitleLeague(emblem(lg.league, lg.division), `${leagueName(lg.league, lg.division)} · ${lg.lp} lp`, lg.lp / LP_PER_DIVISION);
-    this.ui.setTitleRank(insignia(i), rankName(i), `${formatScore(this.wallet.credits)} credits`);
+    const next = RANKS[i + 1];
+    this.ui.setTitleRank(insignia(i), rankName(i), next ? `${formatScore(xpToRank(this.ranked.xp, i + 1))} xp to ${rankName(i + 1)}` : 'the top rank');
     const wb = this.progress.weeklyBest(this.weekly.id);
     const now = Date.now();
-    this.ui.setRankedSub(wb > 0 ? `best this week ${formatScore(wb)} · new run every monday` : 'the same run for everyone · new every monday');
+    const runs = this.progress.stats.runs;
+    if (this.open('ranked')) this.ui.setPrimary('ranked', wb > 0 ? `your best this week ${formatScore(wb)}` : 'the same run for everyone, all week');
+    else this.ui.setPrimary('fly', this.progress.endlessBest > 0 ? `endless · best ${formatScore(this.progress.endlessBest)}` : 'endless: every area in turn');
+    this.ui.setFeatures((f) => (f === 'endless' || f === 'league' ? this.open('ranked') : f === 'boards' ? this.open('leaderboard') : f === 'solo' || f === 'shop' || f === 'record' ? this.open(f) : true));
+    this.ui.setTitleNext(this.dev.unlockedAll ? '' : nextStageText(runs, this.tutorialDone));
+    this.ui.renderTitleCards(this.titleCards(now));
     this.refreshBar(now);
+    this.announceReveal();
     this.cloud.push(); // most changes end here: keep the cloud save current
-    this.ui.setBests([['endless', this.progress.endlessBest]]);
   }
 
-  private openStats(): void {
+  private renderStats(): void {
     const s = this.progress.stats;
     const hours = Math.floor(s.seconds / 3600);
     const mins = Math.floor((s.seconds % 3600) / 60);
@@ -1791,7 +1860,6 @@ export class Game {
       ['pickups', formatScore(s.pickups)],
       ['crash most in', worst ? `${worst} (${s.crashes[worst]})` : '-'],
     ]);
-    this.openInfo('stats');
   }
 
   private pause(): void {
@@ -1828,7 +1896,7 @@ export class Game {
   private onKey = (e: KeyboardEvent): void => {
     if (e.repeat || (e.target as HTMLElement | null)?.tagName === 'INPUT') return; // typing a name is not a shortcut
     if ((e.code === 'Space' || e.code === 'Enter') && this.state !== 'paused') {
-      if (this.state === 'title' && !this.settingsOpen && !this.infoOpen) this.startRanked();
+      if (this.state === 'title' && !this.settingsOpen && !this.infoOpen) this.startPrimary();
       else this.onTap();
     }
     else if (e.code === 'Escape' || e.code === 'KeyP') {

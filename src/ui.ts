@@ -1,7 +1,7 @@
 import { CONFIG } from './config';
 import { label, type SettingKey, type Settings } from './settings';
 
-export type ScreenName = 'title' | 'paused' | 'over' | 'settings' | 'stats' | 'goals' | 'hangar' | 'record' | 'solo' | 'league' | 'shop' | 'pass' | 'daily' | 'boards';
+export type ScreenName = 'title' | 'paused' | 'over' | 'settings' | 'goals' | 'hangar' | 'record' | 'solo' | 'league' | 'shop' | 'pass' | 'daily' | 'boards';
 
 /** Everything the league screen shows. */
 /** The service record and league screens share one layout. */
@@ -64,6 +64,16 @@ export interface EnvTile {
   fraction: number; // 0..1 towards the unlock
 }
 
+/** A live card on the title screen. */
+export interface TitleCard {
+  id: string;
+  kicker: string;
+  title: string;
+  fraction?: number;
+  /** Something to claim or do now. */
+  hot?: boolean;
+}
+
 /** Everything the service record screen shows. */
 /** The rank block on the game-over screen. */
 export interface RankResultView {
@@ -117,7 +127,6 @@ export class UI {
     paused: $('screen-paused'),
     over: $('screen-over'),
     settings: $('screen-settings'),
-    stats: $('screen-stats'),
     goals: $('screen-goals'),
     hangar: $('screen-hangar'),
     record: $('screen-record'),
@@ -139,7 +148,6 @@ export class UI {
   private readonly overExtra = $('over-extra');
   readonly titleSettings = $('title-settings');
   private readonly rankedSub = $('title-ranked-sub');
-  private readonly titleBest = $('title-best');
   private readonly overScore = $('over-score');
   private readonly overBest = $('over-best');
 
@@ -278,9 +286,59 @@ export class UI {
     }
   }
 
-  /** The line under the ranked button: this week's level and your best on it. */
-  setRankedSub(text: string): void {
-    this.rankedSub.textContent = text;
+  /** The big button: ranked (its name and the line under it), or for new players, endless. */
+  setPrimary(name: string, sub: string): void {
+    $('title-ranked-name').textContent = name;
+    this.rankedSub.textContent = sub;
+  }
+
+  /** Show only what's open (data-feature on the title's buttons); a modes row with nothing in it goes. */
+  setFeatures(open: (feature: string) => boolean): void {
+    for (const el of document.querySelectorAll<HTMLElement>('#screen-title [data-feature]')) el.hidden = !open(el.dataset.feature ?? '');
+    const modes = document.querySelector<HTMLElement>('#screen-title .title-modes');
+    if (modes) modes.hidden = [...modes.children].every((c) => (c as HTMLElement).hidden);
+  }
+
+  setTitleNext(text: string): void {
+    $('title-next').textContent = text;
+  }
+
+  /** The live cards above the big button. Taps call the title link named by each card's id. */
+  renderTitleCards(cards: TitleCard[]): void {
+    $('title-cards').replaceChildren(
+      ...cards.map((c) => {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = `live-card${c.hot ? ' hot' : ''}`;
+        b.dataset.card = c.id;
+        const k = document.createElement('span');
+        k.className = 'kicker label';
+        k.textContent = c.kicker;
+        const t = document.createElement('span');
+        t.className = 'title label';
+        t.textContent = c.title;
+        b.append(k, t);
+        if (c.fraction !== undefined) {
+          const track = document.createElement('span');
+          track.className = 'xp-track';
+          const fill = document.createElement('span');
+          fill.className = 'xp-fill';
+          fill.style.transform = `scaleX(${Math.max(0, Math.min(1, c.fraction))})`;
+          track.append(fill);
+          b.append(track);
+        }
+        return b;
+      }),
+    );
+  }
+
+  bindTitleCards(onCard: (id: string) => void): void {
+    const box = $('title-cards');
+    box.addEventListener('pointerdown', (e) => e.stopPropagation());
+    box.addEventListener('click', (e) => {
+      const card = (e.target as HTMLElement).closest<HTMLElement>('[data-card]');
+      if (card) onCard(card.dataset.card ?? '');
+    });
   }
 
   // --- leaderboard screen ---------------------------------------------------------
@@ -372,6 +430,19 @@ export class UI {
   /** The share button on the end screen (ranked runs). */
   showShare(on: boolean): void {
     $('over-share').hidden = !on;
+  }
+
+  bindRecordTabs(onTab: (tab: 'rank' | 'stats') => void): void {
+    for (const t of document.querySelectorAll<HTMLElement>('[data-recordtab]')) {
+      t.addEventListener('pointerdown', (e) => e.stopPropagation());
+      t.addEventListener('click', () => onTab(t.dataset.recordtab as 'rank' | 'stats'));
+    }
+  }
+
+  /** The service record's tabs: your rank, and your lifetime stats. */
+  setRecordTab(tab: 'rank' | 'stats'): void {
+    for (const t of document.querySelectorAll<HTMLElement>('[data-recordtab]')) t.classList.toggle('on', t.dataset.recordtab === tab);
+    for (const p of document.querySelectorAll<HTMLElement>('[data-recordpane]')) p.hidden = p.dataset.recordpane !== tab;
   }
 
   renderStats(rows: [string, string][]): void {
@@ -650,10 +721,10 @@ export class UI {
   }
 
   /** Rank badge on the title screen. */
-  setTitleRank(icon: string, name: string, credits: string): void {
+  setTitleRank(icon: string, name: string, sub: string): void {
     $('title-rank-icon').innerHTML = icon;
     $('title-rank-name').textContent = name;
-    $('title-credits').textContent = credits;
+    $('title-credits').textContent = sub;
   }
 
   /** Rank result on the game-over screen (null clears it, e.g. solo runs). */
@@ -770,12 +841,6 @@ export class UI {
 
   hideBanner(): void {
     this.banner.classList.remove('show');
-  }
-
-  /** Title screen bests, by label (zeros are left out). */
-  setBests(bests: [string, number][]): void {
-    const parts = bests.filter(([, v]) => v > 0).map(([k, v]) => `${k} ${formatScore(v)}`);
-    this.titleBest.textContent = parts.length ? `best: ${parts.join(' · ')}` : '';
   }
 
   setGameOver(score: number, best: number, isNewBest: boolean, nearMisses: number, bestCombo: number, seed: number): void {
