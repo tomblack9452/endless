@@ -18,7 +18,7 @@ const QUESTS: Record<QuestType, { targets: number[]; adds: boolean }> = {
   nearMisses: { targets: [15, 25, 40], adds: true },
   pickups: { targets: [10, 20, 30], adds: true },
   boost: { targets: [20, 40, 60], adds: true },
-  ranked: { targets: [1, 2, 3], adds: true },
+  ranked: { targets: [1], adds: true }, // five tries a week: one is plenty
   rooms: { targets: [4, 6, 10], adds: true },
 };
 

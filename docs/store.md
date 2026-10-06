@@ -69,12 +69,12 @@ Then open `ios/` in Xcode and `android/` in Android Studio to sign and upload.
 - **Name:** Endless Space
 - **Subtitle (iOS, 30 characters):** Fly the endless frontier
 - **Short description (Play, 80 characters):** A fast, calm space runner. A new
-  ranked level every week. No ads.
+  ranked run every week. No ads.
 - **Description:**
   > Steer a small ship through canyons, ice fields, volcanic plains, asteroid
   > belts and the decks of a great ship, faster and faster.
   >
-  > Every week there's a new ranked level, the same for everyone. Climb seven
+  > Every week there's a new ranked run, the same for everyone, with five tries to set your best. Climb seven
   > leagues, earn your rank, and fly your weekly best again and again. Or play
   > solo: pick a place and see how far you get, or work through the set levels
   > for stars.

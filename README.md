@@ -249,14 +249,14 @@ Events change the look and sound only, never the course.
 
 ## Modes
 
-The title screen leads with **ranked**, a big button showing the weekly
-level, your best on it and your tickets. **Solo** and **endless** sit under
+The title screen leads with **ranked**, a big button showing your best on
+this week's run and the tries you have left. **Solo** and **endless** sit under
 it, then record, missions, stats, daily, shop and pass; the hangar is bottom
 left and settings bottom right. Credits, cores and tickets sit top right.
 
 | | Ranked | Solo | Endless |
 |---|---|---|---|
-| Course | The weekly level: the same for everyone, new every Monday | An environment, endless; or a set level | Every area in turn, forever |
+| Course | Endless on the week's seed: the same for everyone, new every Monday | An environment, endless; or a set level | Every area in turn, forever |
 | Ship | Your upgrades, up to your league's cap | Your upgrades, no cap | Your upgrades, no cap |
 | Assist mode | Off | Allowed | Allowed |
 | Revive | No | Once a run | Once a run |
@@ -265,11 +265,11 @@ left and settings bottom right. Credits, cores and tickets sit top right.
 | Best score | Your best this week | One per environment (and set level) | Endless best |
 | Missions | Ranked missions | Solo missions | Solo missions |
 
-**The weekly level** is a hand-built-style run about three minutes long with
-a finish line. It's generated from the week: each week starts in a different
-environment (open ground, canyon, ship, ice field, asteroid belt, volcanic
-plain, in turn) and runs through the next two, with set pieces along the way.
-Each attempt uses a ranked ticket (see below); your best counts.
+**The weekly run** is endless, through every area in turn, on a seed that
+belongs to the week. Everyone flies the same course all week (it doesn't
+change with how you steer, boost or which upgrades you own), and a new one
+starts every Monday at midnight UTC. You get **5 tries a week** (ranked
+tickets, below); your best counts. Out of tries, more cost cores.
 
 Ranked is played in leagues (below), so everyone in a league flies a ship
 with about the same upgrades. Every ranked run is kept with its score, date,
@@ -437,9 +437,10 @@ turn over at midnight UTC, the same moment for everyone.
 - **Cores** are the premium currency. They come slowly from play (login
   rewards, quests, the season pass) and, in the apps, from the store. They buy
   premium looks, ranked tickets, revives and the pass's premium track.
-- **Ranked tickets:** each ranked attempt uses one. You hold up to 5, and one
-  refills every 2 hours. Out of tickets, the ranked button offers one for 30
-  cores, or shows the wait. Tickets from rewards can take you over 5.
+- **Ranked tickets:** each try at the week's ranked run uses one. You get 5
+  every Monday (UTC). Out of tickets, the ranked button offers one for 30
+  cores, or shows when the next 5 arrive. Tickets from rewards and purchases
+  come on top and carry over to the next week.
 - **Revive:** outside ranked, once a run, a crash offers to carry on (with a
   6 s timer). The first each day is free, then 20 cores. The ship goes back
   onto the safe lane, obstacles near the lane just ahead are cleared, it gets
@@ -452,7 +453,7 @@ turn over at midnight UTC, the same moment for everyone.
 - **Shop:** four looks a day, the same for everyone, at least one premium.
   One is the deal of the day at a quarter off. Tap a look to try it on the
   ship. Also: a ranked ticket for cores, and core packs in the apps.
-- **Season pass:** six weeks (six weekly levels), 30 tiers of 120 XP. Runs
+- **Season pass:** six weeks (six weekly runs), 30 tiers of 120 XP. Runs
   earn XP (1 per 250 points, up to 60) and each quest 60. The free track pays
   credits, cores and tickets; the premium track (950 cores, or a purchase in
   the apps) pays more, with the frost and ember paints, the solar engine and
@@ -465,8 +466,8 @@ turn over at midnight UTC, the same moment for everyone.
 
 Missions come in two pools, three active at a time in each.
 
-- **Ranked** (the weekly level): score in a run, near misses, chain length,
-  beat your league's par, finish the weekly level, finish it without a hit,
+- **Ranked** (the week's run): score in a run, near misses, chain length,
+  beat your league's par, reach a level, pickups in a run,
   ranked runs played.
 - **Solo** (environments, set levels and endless): reach a level, score in a
   run, near misses, chain length, pickups, boost time, ship rooms passed,
@@ -553,7 +554,7 @@ cross-fades all write into it each frame.
 **A course is its seed.** Generation only uses the seeded `rand()`, never
 `Math.random`, the clock or frame timing, and nothing is placed relative to
 where the ship is: canyon mouths, scatter and props all follow the lane. So
-the weekly level is the same for everyone however they steer, and a server
+the week's ranked run is the same for everyone however they fly, and a server
 can check a run from its inputs. A test enforces both.
 
 **Heights** (`terrain.ts`). Hills, ramps, platforms and drops are one height
@@ -613,7 +614,7 @@ new build drops the old build's cached scripts and styles.
 | `src/leagues.ts` | Leagues, divisions, league points, weekly rewards, emblems |
 | `src/looks.ts` | Ship looks catalogue and ownership |
 | `src/progress.ts` | Stats, set level results, weekly, endless and environment bests |
-| `src/courses.ts` | The set levels, the solo environments and the weekly level |
+| `src/courses.ts` | The set levels, the solo environments and the week's ranked run |
 | `src/fx.ts` | Animated interior detail: liquids, steam, blinkers, holograms, sparks |
 | `src/settings.ts` | Settings table and storage |
 | `src/hints.ts`, `src/haptics.ts` | First-run hints, vibration |
@@ -627,7 +628,7 @@ new build drops the old build's cached scripts and styles.
 | `tests/economy.test.ts` | Tickets, the calendar, quests, the shop, the pass and the revive |
 | `tests/server.test.ts` | Offline fallback, and the server functions agree with the game |
 | `tests/ranks.test.ts` | Rank ladder, XP, skill and credit maths |
-| `tests/courses.test.ts` | Set levels and twelve weeks of weekly levels fly to the finish; every environment is survivable |
+| `tests/courses.test.ts` | Set levels fly to the finish; twelve weeks of ranked runs and every environment are survivable; the course depends only on its seed |
 | `tests/input.test.ts` | Double-tap and hold to boost |
 | `tests/leagues.test.ts` | League brackets, LP, divisions, promotion, weekly rewards, prices |
 | `public/` | Icons, manifest, service worker |
@@ -691,10 +692,10 @@ chasms, looking well ahead as a player would; it also checks that splits and
 chasms really happen. Every ship room is flown on its own, back to back, for
 four seeds.
 
-`tests/courses.test.ts` flies every set level and twelve weeks of weekly
-levels from start to finish at each section's speed, checks each runs
-100-260 seconds and that the weeks start in a different environment each
-time, and flies every solo environment for 40 seconds on three seeds.
+`tests/courses.test.ts` flies every set level from start to finish at each
+section's speed and checks each runs 100-260 seconds, flies twelve weeks of
+ranked runs for 90 seconds each, and every solo environment for 40 seconds on
+three seeds.
 
 `tests/input.test.ts` checks double-tap and hold: a quick double-tap boosts,
 a slow one, a long press, a drag or taps on opposite sides don't, and the
@@ -705,8 +706,9 @@ skill, the XP and skill rules, the length of the grind and credit rates.
 
 The pilots steer the way the ship really does: through its easing, sliding on
 ice, and dying in lava or pits as a player would. Courses also have to be the
-same however they're flown: one test flies a weekly level twice, once on the
-lane and once weaving, and checks the lane matches row for row.
+same however they're flown: one test flies a week's ranked run twice, once on
+the lane, once weaving and boosting with a different upgrade, and checks the
+lane matches row for row.
 
 `tests/pieces.test.ts` checks every ship section on paper and flies each of
 its routes slow and fast; `tests/pieces-pairs.test.ts` flies every pair of

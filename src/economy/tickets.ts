@@ -1,66 +1,55 @@
 import { CONFIG } from '../config';
+import { weekKey } from '../leagues';
 import { storage } from '../storage';
 
-// Ranked tickets: one per ranked attempt. They refill one at a time up to the
-// cap; tickets from rewards or bought with cores can go over it (refilling
-// waits until you're back under). A server version (stage C) keeps the same
-// methods with the count held there.
+// Ranked tickets: one per attempt at the week's ranked run. Everyone gets a
+// fresh set each week (Monday, UTC); tickets from rewards or bought with
+// cores come on top and carry over. A server version (stage C) keeps the
+// same methods with the count held there.
 
 const KEY = 'endless.tickets';
+const WEEK = 7 * 86_400_000;
 
 export class Tickets {
-  count: number = CONFIG.economy.tickets.max;
-  /** When the refill clock last ticked (ms); only counts while under the cap. */
-  private since = 0;
-
-  private get period(): number {
-    return CONFIG.economy.tickets.refillMinutes * 60_000;
-  }
+  count: number = CONFIG.economy.tickets.perWeek;
+  private week = '';
 
   async load(now: number): Promise<void> {
     const raw = await storage.get(KEY);
-    this.since = now;
     if (raw) {
       try {
-        const s = JSON.parse(raw) as { count?: number; since?: number };
+        const s = JSON.parse(raw) as { count?: number; week?: string };
         this.count = Math.max(0, s.count ?? this.count);
-        this.since = Math.min(now, s.since ?? now);
+        this.week = s.week ?? '';
       } catch {
-        // Corrupt value: a full set.
+        // Corrupt value: a fresh set.
       }
     }
     this.refill(now);
   }
 
   private save(): void {
-    void storage.set(KEY, JSON.stringify({ count: this.count, since: this.since }));
+    void storage.set(KEY, JSON.stringify({ count: this.count, week: this.week }));
   }
 
-  /** Add the tickets that have refilled since last time. */
+  /** A new week tops the count back up to the weekly allowance. */
   refill(now: number): void {
-    const max = CONFIG.economy.tickets.max;
-    if (this.count >= max) {
-      this.since = now;
-      return;
-    }
-    const n = Math.floor((now - this.since) / this.period);
-    if (n <= 0) return;
-    this.count = Math.min(max, this.count + n);
-    this.since = this.count >= max ? now : this.since + n * this.period;
+    const week = weekKey(now);
+    if (week === this.week) return;
+    this.week = week;
+    this.count = Math.max(this.count, CONFIG.economy.tickets.perWeek);
     this.save();
   }
 
-  /** Milliseconds until the next ticket refills (0 when full). */
+  /** Milliseconds until the next week's tickets. */
   nextIn(now: number): number {
-    if (this.count >= CONFIG.economy.tickets.max) return 0;
-    return Math.max(0, this.since + this.period - now);
+    return Date.parse(`${weekKey(now)}T00:00:00Z`) + WEEK - now;
   }
 
   /** Use one for a ranked attempt; false if there are none. */
   use(now: number): boolean {
     this.refill(now);
     if (this.count <= 0) return false;
-    if (this.count >= CONFIG.economy.tickets.max) this.since = now; // the clock starts now
     this.count--;
     this.save();
     return true;

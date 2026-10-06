@@ -14,28 +14,25 @@ const HOUR = 3_600_000;
 const T0 = Date.UTC(2026, 9, 5, 9); // a Monday morning
 
 describe('ranked tickets', () => {
-  it('start full, refill one per period up to the cap', async () => {
+  const week = CONFIG.economy.tickets.perWeek;
+
+  it('give a set each week, all the same week, and a fresh set on Monday', async () => {
     const t = new Tickets();
     await t.load(T0);
-    const max = CONFIG.economy.tickets.max;
-    const period = CONFIG.economy.tickets.refillMinutes * 60_000;
-    expect(t.count).toBe(max);
-    for (let i = 0; i < max; i++) expect(t.use(T0)).toBe(true);
-    expect(t.use(T0)).toBe(false);
-    expect(t.nextIn(T0)).toBe(period);
-    t.refill(T0 + period * 2 + 1000);
-    expect(t.count).toBe(2);
-    t.refill(T0 + period * 100);
-    expect(t.count).toBe(max);
+    expect(t.count).toBe(week);
+    for (let i = 0; i < week; i++) expect(t.use(T0 + i * HOUR)).toBe(true);
+    expect(t.use(T0 + 3 * 24 * HOUR)).toBe(false); // still the same week: none come back
+    expect(t.nextIn(T0)).toBe(7 * 24 * HOUR - 9 * HOUR);
+    t.refill(T0 + 7 * 24 * HOUR);
+    expect(t.count).toBe(week);
   });
 
-  it('keep bought tickets over the cap, and stop refilling there', async () => {
+  it('keep extra tickets into the next week', async () => {
     const t = new Tickets();
     await t.load(T0);
     t.add(3);
-    t.refill(T0 + 10 * HOUR);
-    expect(t.count).toBe(CONFIG.economy.tickets.max + 3);
-    expect(t.nextIn(T0)).toBe(0);
+    t.refill(T0 + 7 * 24 * HOUR);
+    expect(t.count).toBe(week + 3);
   });
 });
 

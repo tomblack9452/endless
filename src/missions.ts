@@ -2,8 +2,8 @@ import { storage } from './storage';
 import { formatScore } from './ui';
 
 // Missions: three active goals at a time in each of two pools.
-//   ranked - played on the weekly level: scores, beating your league par,
-//            finishing, clean finishes, ranked runs played
+//   ranked - played on the week's ranked run: scores, beating your league par,
+//            levels reached, pickups, ranked runs played
 //   solo   - solo environments, endless and the set levels: reaching levels,
 //            pickups, boost time, rooms, scoring without boosting, and so on
 // "Best" missions take your best single run; "count" missions add up across
@@ -18,8 +18,8 @@ export type MissionType =
   | 'rankedNearMisses'
   | 'rankedChain'
   | 'beatPar'
-  | 'finishWeekly'
-  | 'cleanFinish'
+  | 'rankedLevel'
+  | 'rankedPickups'
   | 'rankedRuns'
   // solo
   | 'level'
@@ -38,9 +38,9 @@ const TIERS: Record<MissionType, number[]> = {
   rankedNearMisses: [8, 14, 20, 28, 36, 45, 55],
   rankedChain: [4, 5, 6, 7, 8, 9, 10],
   beatPar: [1, 3, 5, 10, 15, 25, 40],
-  finishWeekly: [1, 3, 5, 10, 20, 30, 50],
-  cleanFinish: [1, 2, 4, 7, 10, 15, 20],
-  rankedRuns: [5, 10, 20, 35, 50, 75, 100],
+  rankedLevel: [3, 4, 5, 6, 7, 8, 9],
+  rankedPickups: [5, 8, 12, 16, 20, 25, 30],
+  rankedRuns: [3, 5, 10, 15, 20, 30, 40],
   level: [3, 5, 7, 10, 13, 16, 19],
   score: [2000, 4000, 7000, 10000, 15000, 20000, 30000],
   nearMisses: [5, 10, 18, 28, 40, 55, 70],
@@ -53,12 +53,12 @@ const TIERS: Record<MissionType, number[]> = {
 };
 
 const POOLS: Record<Pool, MissionType[]> = {
-  ranked: ['rankedScore', 'rankedNearMisses', 'rankedChain', 'beatPar', 'finishWeekly', 'cleanFinish', 'rankedRuns'],
+  ranked: ['rankedScore', 'rankedNearMisses', 'rankedChain', 'beatPar', 'rankedLevel', 'rankedPickups', 'rankedRuns'],
   solo: ['level', 'score', 'nearMisses', 'chain', 'pickups', 'boostTime', 'rooms', 'noBoostScore', 'levelStars'],
 };
 
 /** Missions that add up across runs (the rest take the best single run). */
-const COUNTS = new Set<MissionType>(['beatPar', 'finishWeekly', 'cleanFinish', 'rankedRuns']);
+const COUNTS = new Set<MissionType>(['beatPar', 'rankedRuns']);
 
 /** What a run achieved, as missions see it. */
 export interface RunMetrics {
@@ -100,10 +100,10 @@ export function missionText(m: Mission): string {
       return `a x${t} chain in ranked`;
     case 'beatPar':
       return `beat your league par ${s(t, 'time')}`;
-    case 'finishWeekly':
-      return `finish the weekly level ${s(t, 'time')}`;
-    case 'cleanFinish':
-      return `finish the weekly level without a hit ${s(t, 'time')}`;
+    case 'rankedLevel':
+      return `reach level ${t} in ranked`;
+    case 'rankedPickups':
+      return `collect ${t} pickups in one ranked run`;
     case 'rankedRuns':
       return `play ${s(t, 'ranked run')}`;
     case 'level':
@@ -136,6 +136,10 @@ function valueFor(type: MissionType, r: RunMetrics): number {
       return r.ranked ? r.nearMisses : 0;
     case 'rankedChain':
       return r.ranked ? r.bestChain : 0;
+    case 'rankedLevel':
+      return r.ranked ? r.level : 0;
+    case 'rankedPickups':
+      return r.ranked ? r.pickups : 0;
     case 'level':
       return r.ranked ? 0 : r.level;
     case 'score':
@@ -165,10 +169,6 @@ function countFor(type: MissionType, r: RunMetrics): number {
   switch (type) {
     case 'beatPar':
       return r.beatPar ? 1 : 0;
-    case 'finishWeekly':
-      return r.finished ? 1 : 0;
-    case 'cleanFinish':
-      return r.finished && r.clean ? 1 : 0;
     case 'rankedRuns':
       return 1;
     default:

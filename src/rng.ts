@@ -1,6 +1,6 @@
 // Seeded random numbers for world generation (mulberry32). Seeding before a
-// run makes its layout reproducible: same seed, same course (the canyon mouth
-// still follows where the ship is, so that part depends on how you fly).
+// run makes its layout reproducible: same seed, same course, however the ship
+// is flown (see tests/courses.test.ts and tests/determinism.test.ts).
 
 let state = (Math.random() * 2 ** 32) >>> 0;
 
