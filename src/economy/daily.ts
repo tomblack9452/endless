@@ -6,9 +6,11 @@ import { dayBefore, hash, picker } from './time';
 
 // The daily habit: a 7-day login calendar, three daily quests and a free
 // revive each day. Days turn over in UTC; quests are picked from the date, so
-// everyone gets the same three.
+// everyone gets the same three. A finished quest is claimed with a tap (the
+// goals screen), which pays its credits and pass XP; claiming all three pays
+// cores. The weekly goals (weekly.ts) work the same way over a week.
 
-type QuestType = 'runs' | 'score' | 'level' | 'nearMisses' | 'pickups' | 'boost' | 'ranked' | 'rooms';
+export type QuestType = 'runs' | 'score' | 'level' | 'nearMisses' | 'pickups' | 'boost' | 'ranked' | 'rooms' | 'beatPar';
 
 /** Targets to pick from, and whether a quest adds up across runs or takes the best one. */
 const QUESTS: Record<QuestType, { targets: number[]; adds: boolean }> = {
@@ -18,9 +20,15 @@ const QUESTS: Record<QuestType, { targets: number[]; adds: boolean }> = {
   nearMisses: { targets: [15, 25, 40], adds: true },
   pickups: { targets: [10, 20, 30], adds: true },
   boost: { targets: [20, 40, 60], adds: true },
-  ranked: { targets: [1], adds: true }, // five tries a week: one is plenty
+  ranked: { targets: [1, 2], adds: true },
   rooms: { targets: [4, 6, 10], adds: true },
+  beatPar: { targets: [1], adds: true },
 };
+
+/** Whether a quest adds up across runs (or takes the best single run). */
+export function adds(type: QuestType): boolean {
+  return QUESTS[type].adds;
+}
 
 export interface Quest {
   type: QuestType;
@@ -28,6 +36,8 @@ export interface Quest {
   progress: number;
   credits: number;
   done: boolean;
+  /** Its reward has been taken (older saves paid on finishing, so done means claimed there). */
+  claimed?: boolean;
 }
 
 /** One run, as quests see it. */
@@ -39,6 +49,8 @@ export interface QuestRun {
   pickups: number;
   boostSeconds: number;
   rooms: number;
+  /** Ranked, and scored at least the league's par. */
+  beatPar?: boolean;
 }
 
 export function questText(q: Quest): string {
@@ -60,10 +72,12 @@ export function questText(q: Quest): string {
       return t === 1 ? 'play a ranked run' : `play ${t} ranked runs`;
     case 'rooms':
       return `fly through ${t} ship rooms`;
+    case 'beatPar':
+      return t === 1 ? "beat your league's par in ranked" : `beat your league's par in ranked ${t} times`;
   }
 }
 
-function amount(q: QuestType, r: QuestRun): number {
+export function amount(q: QuestType, r: QuestRun): number {
   switch (q) {
     case 'runs':
       return 1;
@@ -81,13 +95,31 @@ function amount(q: QuestType, r: QuestRun): number {
       return r.ranked ? 1 : 0;
     case 'rooms':
       return r.rooms;
+    case 'beatPar':
+      return r.ranked && r.beatPar ? 1 : 0;
   }
+}
+
+/** Fold a run into a list of quests; returns the ones it finished. */
+export function progressQuests(quests: Quest[], run: QuestRun): Quest[] {
+  const done: Quest[] = [];
+  for (const q of quests) {
+    if (q.done) continue;
+    const v = amount(q.type, run);
+    q.progress = adds(q.type) ? q.progress + v : Math.max(q.progress, v);
+    if (q.progress >= q.target) {
+      q.progress = q.target;
+      q.done = true;
+      done.push(q);
+    }
+  }
+  return done;
 }
 
 /** The day's quests: the same for everyone on a UTC date. */
 export function questsFor(day: string): Quest[] {
   const next = picker(hash(`quests-${day}`));
-  const types = Object.keys(QUESTS) as QuestType[];
+  const types = (Object.keys(QUESTS) as QuestType[]).filter((t) => t !== 'beatPar'); // par needs a league: weekly only
   const out: Quest[] = [];
   const Q = CONFIG.economy.quests;
   while (out.length < Q.count) {
@@ -97,7 +129,7 @@ export function questsFor(day: string): Quest[] {
     const tier = Math.floor(next() * targets.length);
     const hard = tier / Math.max(1, targets.length - 1);
     const credits = Math.round((Q.credits[0] + (Q.credits[1] - Q.credits[0]) * hard) / 50) * 50;
-    out.push({ type, target: targets[tier], progress: 0, credits, done: false });
+    out.push({ type, target: targets[tier], progress: 0, credits, done: false, claimed: false });
   }
   return out;
 }
@@ -107,7 +139,7 @@ interface Saved {
   loginStep: number; // next calendar day to claim, 0..6
   questDay: string;
   quests: Quest[];
-  allDonePaid: boolean;
+  allDonePaid: boolean; // the all-three bonus has been claimed
   reviveDay: string; // the day free revives were last used
   reviveUsed?: number; // how many that day (older saves: 1)
 }
@@ -122,6 +154,8 @@ export class Daily {
     if (raw) {
       try {
         this.s = { ...this.s, ...(JSON.parse(raw) as Partial<Saved>) };
+        // Older saves paid a quest as it finished: a finished one there is already claimed.
+        for (const q of this.s.quests) if (q.claimed === undefined) q.claimed = q.done;
       } catch {
         // Corrupt value: start the calendar again.
       }
@@ -180,26 +214,42 @@ export class Daily {
    * Fold a run into today's quests. Returns the quests it completed, and the
    * all-three bonus (cores) if this run finished the set.
    */
-  recordRun(day: string, run: QuestRun): { done: Quest[]; allDone: number } {
+  recordRun(day: string, run: QuestRun): Quest[] {
     this.turn(day);
-    const done: Quest[] = [];
-    for (const q of this.s.quests) {
-      if (q.done) continue;
-      const v = amount(q.type, run);
-      q.progress = QUESTS[q.type].adds ? q.progress + v : Math.max(q.progress, v);
-      if (q.progress >= q.target) {
-        q.progress = q.target;
-        q.done = true;
-        done.push(q);
-      }
-    }
-    let allDone = 0;
-    if (!this.s.allDonePaid && this.s.quests.every((q) => q.done)) {
-      this.s.allDonePaid = true;
-      allDone = CONFIG.economy.quests.allDoneCores;
-    }
+    const done = progressQuests(this.s.quests, run);
+    if (done.length > 0) this.save();
+    return done;
+  }
+
+  /** Claim quest `i` if it's finished: returns its credits, or null. */
+  claim(i: number): Quest | null {
+    const q = this.s.quests[i];
+    if (!q || !q.done || q.claimed) return null;
+    q.claimed = true;
     this.save();
-    return { done, allDone };
+    return q;
+  }
+
+  /** The all-three bonus can be claimed: every quest claimed, bonus not yet taken. */
+  get bonusReady(): boolean {
+    return !this.s.allDonePaid && this.s.quests.length > 0 && this.s.quests.every((q) => q.claimed);
+  }
+
+  /** Claim the all-three bonus; returns its cores (0 if it isn't ready). */
+  claimBonus(): number {
+    if (!this.bonusReady) return 0;
+    this.s.allDonePaid = true;
+    this.save();
+    return CONFIG.economy.quests.allDoneCores;
+  }
+
+  get bonusClaimed(): boolean {
+    return this.s.allDonePaid;
+  }
+
+  /** How many rewards are waiting to be claimed (quests and the bonus). */
+  get claimable(): number {
+    return this.s.quests.filter((q) => q.done && !q.claimed).length + (this.bonusReady ? 1 : 0);
   }
 
   // --- revive ---

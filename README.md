@@ -474,11 +474,15 @@ how far along you are. Each slot is a chip with its count.
 **goal**, the login calendar or the season pass, or the
 vault. Each look says which on its card.
 
-**Goals** (the goals button on the title screen): 53 of them in four groups
+**Goals** (the bar's goals button) has three tabs. **Daily**: the login
+calendar and today's three goals. **Weekly**: five harder goals, the same for
+everyone, new every Monday (UTC), that span many runs (60 runs, 800 near
+misses, beat your league's par in ranked twice...); each pays 150 credits and
+400 pass XP, and all five 15 cores. **Achievements**: 53 long-term goals in four groups
 (flying, skill, places, collection), each with a progress bar. They count what
 the game already keeps, so a save that existed before has its progress already.
-Finishing one pays credits and unlocks a look to wear; there's a card for each
-when you finish a run. Examples: fly 50 runs, 10,000 near misses, a chain of
+Finishing one unlocks a look to wear and is announced after the run; claiming
+it pays credits and 30 rank XP. Examples: fly 50 runs, 10,000 near misses, a chain of
 15, reach level 19 (the volcanic plain), score 4,000 in each area on its own,
 finish all nine set levels, own 25 looks.
 
@@ -514,10 +518,12 @@ turn over at midnight UTC, the same moment for everyone.
   a shield and a moment of grace, and a 3-2-1 starts it again.
 - **Daily:** a 7-day login calendar (credits, cores, and the aurora
   paint on day 7), collected with a card when you open the game. A missed day
-  just waits. Three **daily quests**, the same for everyone that day (play
+  just waits. Three **daily goals**, the same for everyone that day (play
   runs, score, reach a level, near misses, pickups, boost time, ranked runs,
   ship rooms), each paying 60 to 120 credits and 30 pass XP; all three pay 4
-  cores.
+  cores. Every finished goal (daily, weekly or achievement) waits on the goals
+  screen to be **claimed** with a tap; the bar's goals button has a dot while
+  anything is waiting.
 - **Shop:** a showroom, with the camera circling your ship above a sheet of
   cards. Tap a card to put the look on the ship, then buy it with the button
   under the cards (tap an owned one to wear it). Three tabs, all the same for
@@ -537,8 +543,8 @@ turn over at midnight UTC, the same moment for everyone.
   the apps) pays more, with the frost and ember paints, the solar engine and
   the raptor hull. Rewards are paid as you reach each tier, and unlocking
   premium pays every premium tier already reached.
-- After a run, the end screen lists any quests finished and the pass XP
-  earned, and the counters in the top bar bump as things land.
+- After a run, the end screen lists any goals finished (to claim) and the pass
+  XP earned, and the counters in the top bar bump as things land.
 
 **Stats** (the service record's second tab) show runs, time played, distance, your best this
 week, your endless best and your best in each solo environment, furthest
@@ -663,7 +669,7 @@ new build drops the old build's cached scripts and styles.
 | `src/input.ts` | Drag, side taps, tilt, keyboard, boost control |
 | `src/ranks.ts` | Rank ladder, XP, run credits, insignia, ranked history |
 | `src/wallet.ts` | Credits and cores |
-| `src/economy/` | Daily rewards and quests, the shop (today, the weekly set, the vault), the season pass, and their screens |
+| `src/economy/` | Daily rewards and goals, weekly goals, the shop (today, the weekly set, the vault), the season pass, and their screens |
 | `src/server/` | The server behind one interface: Supabase, or the device alone; cloud save, the run outbox and the leaderboard boards |
 | `src/unlocks.ts` | What opens solo environments and how far off it is |
 | `src/store/` | In-app purchases (RevenueCat in the apps, nothing on the web) and what's owned for good |
@@ -676,7 +682,9 @@ new build drops the old build's cached scripts and styles.
 | `src/season.ts`, `src/seasonLooks.ts` | Season timing, and each season's generated looks |
 | `src/looks.ts` | What you own and what's on; how an unlock reads |
 | `src/achievements.ts`, `src/goals.ts` | The 53 goals (counted from existing stats) and which have paid |
-| `src/hangar.ts`, `src/hangarView.ts` | The hangar's model and its screen (looks and the upgrades chip), and the goals list |
+| `src/hangar.ts`, `src/hangarView.ts` | The hangar's model and its screen (looks and the upgrades chip) |
+| `src/goalsView.ts` | The goals screen: daily, weekly and achievements, with claiming |
+| `src/reveal.ts` | What new players see, in stages |
 | `src/legacy.ts` | Carries older saves' mission unlocks over to the looks (missions were removed) |
 | `src/decals.ts` | Wing decal pictures |
 | `src/progress.ts` | Stats, set level results, weekly, endless and environment bests |

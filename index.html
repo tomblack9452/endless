@@ -177,14 +177,26 @@
           <div class="panel-title">goals</div>
         </div>
         <div class="tabs">
-          <span id="goals-count" class="label dim tabs-credits"></span>
+          <button class="tab on" type="button" data-goaltab="daily">daily<i class="news"></i></button>
+          <button class="tab" type="button" data-goaltab="weekly">weekly<i class="news"></i></button>
+          <button class="tab" type="button" data-goaltab="achievements">achievements<i class="news"></i></button>
         </div>
-        <div class="settings tabbed">
+        <div class="settings tabbed" data-goalpane="daily">
+          <div class="settings-group">login rewards</div>
+          <div id="daily-calendar" class="calendar"></div>
+          <button id="daily-claim" class="pill primary daily-claim" type="button"></button>
+          <div class="settings-group">today <span id="daily-reset" class="group-note"></span></div>
+          <div id="daily-quests" class="task-list"></div>
+        </div>
+        <div class="settings tabbed" data-goalpane="weekly" hidden>
+          <div class="settings-group">this week <span id="weekly-reset" class="group-note"></span></div>
+          <div id="weekly-goals" class="task-list"></div>
+        </div>
+        <div class="settings tabbed" data-goalpane="achievements" hidden>
           <div id="goals-note" class="label dim setting-note"></div>
-          <div id="goals-list"></div>
+          <div id="goals-list" class="task-list"></div>
         </div>
       </div>
-
       <div id="screen-sectors" class="layer screen panel">
         <div class="panel-head">
           <button class="label link back" type="button" data-action="back">back</button>
@@ -212,7 +224,7 @@
       <div id="screen-boards" class="layer screen panel">
         <div class="panel-head">
           <button class="label link back" type="button" data-action="back">back</button>
-          <div class="panel-title">leaderboard</div>
+          <div class="panel-title">leaderboards</div>
         </div>
         <div class="settings">
           <div id="board-tabs" class="board-tabs"></div>
@@ -357,21 +369,6 @@
           <div class="pass-head label dim"><span>tier</span><span>free</span><span>premium</span></div>
           <div id="pass-tiers" class="pass-tiers"></div>
           <div class="label dim setting-note">every run earns xp (more for higher scores), and so does each daily quest. rewards are paid as you reach each tier.</div>
-        </div>
-      </div>
-
-      <div id="screen-daily" class="layer screen panel">
-        <div class="panel-head">
-          <button class="label link back" type="button" data-action="back">back</button>
-          <div class="panel-title">daily</div>
-        </div>
-        <div class="settings">
-          <div class="settings-group">login rewards</div>
-          <div id="daily-calendar" class="calendar"></div>
-          <button id="daily-claim" class="pill primary daily-claim" type="button"></button>
-          <div class="settings-group">today's quests <span id="daily-reset" class="group-note"></span></div>
-          <div id="daily-quests"></div>
-          <div id="daily-bonus" class="label dim setting-note"></div>
         </div>
       </div>
 

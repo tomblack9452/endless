@@ -25,7 +25,9 @@ import { entitlementFor, Entitlements } from './store/entitlements';
 import { Progress } from './progress';
 import { creditsFor, insignia, promotionBonus, Ranked, rankName, RANKS, type RunMode, xpToRank } from './ranks';
 import { Wallet } from './wallet';
-import { Daily, questText } from './economy/daily';
+import { Daily, type Quest, questText } from './economy/daily';
+import { Weekly } from './economy/weekly';
+import { type GoalsTab, GoalsScreen, type TaskRow } from './goalsView';
 import { Pass, premiumReward, freeReward, runXp, seasonAt } from './economy/pass';
 import { type Reward, rewardLook, rewardParts, rewardText } from './economy/reward';
 import { DailyShop, setOffer, vaultAt } from './economy/shop';
@@ -65,7 +67,7 @@ const PATH_STEP = 4;
 const FIRST_PLAYED_KEY = 'endless.firstPlayed';
 const REVEAL_KEY = 'endless.reveal';
 
-type InfoScreen = 'goals' | 'hangar' | 'record' | 'solo' | 'league' | 'shop' | 'pass' | 'daily' | 'boards';
+type InfoScreen = 'goals' | 'hangar' | 'record' | 'solo' | 'league' | 'shop' | 'pass' | 'boards';
 
 /** "5 oct": the Monday this week's ranked course started. */
 /** "1:23.4" */
@@ -169,6 +171,11 @@ export class Game {
   private shopPick = -1;
   private readonly dailyShop = new DailyShop();
   private readonly goalLog = new GoalLog();
+  private readonly weeklyGoals = new Weekly();
+  private readonly goalsUi = new GoalsScreen();
+  private goalsTab: GoalsTab = 'daily';
+  /** This ranked run scored at least the league's par (a weekly goal counts these). */
+  private beatPar = false;
   private readonly hangarUi = new HangarScreen();
   private hangar: HangarState = { slot: 'hull', pick: null };
   private hangarUpgrades = false; // the upgrades chip is open, not a slot of looks
@@ -310,6 +317,7 @@ export class Game {
       this.leagues.load(),
       this.upgrades.load(),
       this.daily.load(dayKey(now)),
+      this.weeklyGoals.load(weekKey(now)),
       this.pass.load(now),
       this.dailyShop.load(),
       this.goalLog.load(),
@@ -335,7 +343,14 @@ export class Game {
       open: () => this.openHangar({ from: 'shop' }),
     });
     this.econ.bindPass(this.onPassPremium, () => void this.buyProduct('season_pass'));
-    this.econ.bindDaily(() => this.claimLogin());
+    this.goalsUi.bind({
+      tab: (tab) => {
+        this.goalsTab = tab;
+        this.goalsUi.setTab(tab);
+      },
+      claimLogin: () => this.claimLogin(),
+      claim: (id) => this.onClaim(id),
+    });
     this.ui.titleLeague.addEventListener('pointerdown', (e) => e.stopPropagation());
     this.ui.titleLeague.addEventListener('click', () => this.openLeague());
     this.ui.bindSolo((i) => this.startCourse(i), (i) => this.startSolo(i));
@@ -556,12 +571,12 @@ export class Game {
     return lines.join(' · ');
   }
 
-  /** Daily quests and season pass XP for the run just recorded; lines for the end screen. */
+  /** Daily and weekly goal progress and season pass XP for the run just recorded; lines for the end screen. */
   private runRewards(): string[] {
     const now = Date.now();
     const score = this.assisted ? 0 : this.score;
     const out: string[] = [];
-    const q = this.daily.recordRun(dayKey(now), {
+    const run = {
       ranked: this.mode === 'ranked',
       score,
       level: this.level,
@@ -569,17 +584,11 @@ export class Game {
       pickups: this.pickupCount,
       boostSeconds: this.boostSeconds,
       rooms: this.roomsEntered,
-    });
-    let xp = runXp(score);
-    for (const done of q.done) {
-      this.wallet.add(done.credits);
-      xp += CONFIG.economy.quests.passXp;
-      out.push(`quest done: ${questText(done)} · +${formatScore(done.credits)} credits`);
-    }
-    if (q.allDone > 0) {
-      this.wallet.addCores(q.allDone);
-      out.push(`all daily quests done · +${q.allDone} cores`);
-    }
+      beatPar: this.beatPar,
+    };
+    const done = [...this.daily.recordRun(dayKey(now), run), ...this.weeklyGoals.recordRun(weekKey(now), run)];
+    for (const q of done) out.push(`goal done: ${questText(q)} · claim it in goals`);
+    const xp = runXp(score);
     const before = this.pass.tier;
     const paid = this.pass.addXp(now, xp);
     for (const r of paid) this.grant(r);
@@ -588,6 +597,16 @@ export class Game {
     else if (xp > 0) out.push(`season pass +${xp} xp · tier ${tier}`);
     if (paid.length > 0) out.push(paid.map(rewardText).join(' · '));
     return out;
+  }
+
+  /** Add pass XP from anywhere (a claimed goal); pays any tiers reached. Returns lines. */
+  private passXp(xp: number): string[] {
+    const before = this.pass.tier;
+    const paid = this.pass.addXp(Date.now(), xp);
+    const lines = [`+${formatScore(xp)} pass xp`];
+    for (const r of paid) lines.push(...this.grant(r));
+    if (this.pass.tier > before) lines.push(`season pass tier ${this.pass.tier}`);
+    return lines;
   }
 
   /** Pay a reward into the wallet or looks; returns it in words. */
@@ -619,37 +638,7 @@ export class Game {
     this.sound.power();
     this.haptics.pickup();
     this.refreshTitle();
-    if (this.infoOpen === 'daily') this.openDaily();
-  }
-
-  private openDaily(): void {
-    const now = Date.now();
-    const day = dayKey(now);
-    this.daily.turn(day);
-    const due = this.daily.loginDue(day);
-    const step = this.daily.loginStep;
-    const login = CONFIG.economy.login as readonly Reward[];
-    const claimedUpTo = due >= 0 ? step : step === 0 ? login.length : step;
-    const qs = this.daily.quests;
-    const allDone = qs.every((q) => q.done);
-    this.econ.renderDaily({
-      calendar: login.map((r, i) => ({
-        day: i + 1,
-        reward: rewardParts(r).map((p) => p.replace(/^\+/, '')).join(', '),
-        state: i < claimedUpTo ? 'claimed' : i === step && due >= 0 ? 'today' : 'next',
-      })),
-      claim: due >= 0 ? { text: `claim day ${step + 1}`, enabled: true } : { text: `next reward in ${formatWait(untilTomorrow(now))}`, enabled: false },
-      reset: `new in ${formatWait(untilTomorrow(now))}`,
-      quests: qs.map((q) => ({
-        text: questText(q),
-        reward: `+${formatScore(q.credits)} credits · +${CONFIG.economy.quests.passXp} pass xp`,
-        progress: `${formatScore(q.progress)} / ${formatScore(q.target)}`,
-        fraction: q.progress / q.target,
-        done: q.done,
-      })),
-      bonus: allDone ? `all done: +${CONFIG.economy.quests.allDoneCores} cores collected` : `finish all three for +${CONFIG.economy.quests.allDoneCores} cores`,
-    });
-    this.openInfo('daily');
+    if (this.infoOpen === 'goals') this.renderGoals();
   }
 
   private shopTab: 'today' | 'set' | 'vault' = 'today';
@@ -980,6 +969,7 @@ export class Game {
     this.economyTimer = 1;
     const now = Date.now();
     this.daily.turn(dayKey(now));
+    this.weeklyGoals.turn(weekKey(now));
     this.pass.turn(now);
     this.refreshBar(now);
   }
@@ -1076,7 +1066,7 @@ export class Game {
 
   private refreshBar(now = Date.now()): void {
     this.econ.setBar(this.wallet.credits, this.wallet.cores);
-    this.econ.setNews('goals', this.daily.loginDue(dayKey(now)) >= 0);
+    this.econ.setNews('goals', this.daily.loginDue(dayKey(now)) >= 0 || this.goalsToClaim() > 0);
   }
 
   /** Fold a run into the rank (every mode) and, for ranked, the league; fills the game-over block. Returns bonus credits. */
@@ -1085,6 +1075,7 @@ export class Game {
     const ranked = this.mode === 'ranked';
     const score = this.assisted ? 0 : this.score;
     const target = this.weekly.target;
+    this.beatPar = false;
     const r = this.ranked.record(this.mode, score, this.level, this.seed, Date.now(), ranked ? this.weekly.id : undefined);
     const promoted = r.rankAfter > r.rankBefore;
     const leagueLines: string[] = [];
@@ -1093,6 +1084,7 @@ export class Game {
     if (ranked) {
       this.submitToBoard('ranked', finished);
       this.ui.showShare(true);
+      this.beatPar = score >= leaguePar(lg.league, target);
       const res = lg.record(this.score, target);
       bonus += res.credits;
       leagueLines.push(`${leagueName(lg.league, lg.division)} · ${res.lp >= 0 ? '+' : ''}${res.lp} lp (${lg.lp}/${LP_PER_DIVISION})`);
@@ -1580,17 +1572,112 @@ export class Game {
     return [`+${a.credits.toLocaleString('en-US')} credits`, ...looks.map((l) => `${l.name} ${SLOT_NAMES[l.slot]}`)].join(' · ');
   }
 
+  /** The goals screen's three tabs. */
   private renderGoals(): void {
+    const now = Date.now();
+    const day = dayKey(now);
+    this.daily.turn(day);
+    this.weeklyGoals.turn(weekKey(now));
+    // Daily: the login calendar and today's goals.
+    const due = this.daily.loginDue(day);
+    const step = this.daily.loginStep;
+    const login = CONFIG.economy.login as readonly Reward[];
+    const claimedUpTo = due >= 0 ? step : step === 0 ? login.length : step;
+    const Q = CONFIG.economy.quests;
+    const W = CONFIG.economy.weekly;
+    const taskRows = (list: readonly Quest[], prefix: string, passXp: number): TaskRow[] =>
+      list.map((q, i) => ({
+        id: `${prefix}${i}`,
+        name: questText(q),
+        progress: `${formatScore(q.progress)} / ${formatScore(q.target)}`,
+        fraction: q.progress / q.target,
+        reward: `+${formatScore(q.credits)} credits · +${formatScore(passXp)} pass xp`,
+        state: q.claimed ? 'claimed' : q.done ? 'claim' : 'open',
+      }));
+    const bonusRow = (id: string, name: string, cores: number, ready: boolean, claimed: boolean, list: readonly Quest[]): TaskRow => ({
+      id,
+      name,
+      progress: `${list.filter((q) => q.claimed).length} / ${list.length}`,
+      fraction: list.filter((q) => q.claimed).length / Math.max(1, list.length),
+      reward: `+${cores} cores`,
+      state: claimed ? 'claimed' : ready ? 'claim' : 'open',
+    });
+    const qs = this.daily.quests;
+    this.goalsUi.renderDaily({
+      calendar: login.map((r, i) => ({
+        day: i + 1,
+        reward: rewardParts(r).map((p) => p.replace(/^\+/, '')).join(', '),
+        state: i < claimedUpTo ? 'claimed' : i === step && due >= 0 ? 'today' : 'next',
+      })),
+      claim: due >= 0 ? { text: `claim day ${step + 1}`, enabled: true } : { text: `next reward in ${formatWait(untilTomorrow(now))}`, enabled: false },
+      reset: `new in ${formatWait(untilTomorrow(now))}`,
+      rows: [...taskRows(qs, 'q', Q.passXp), bonusRow('qall', 'claim all three', Q.allDoneCores, this.daily.bonusReady, this.daily.bonusClaimed, qs)],
+    });
+    // Weekly.
+    const wg = this.weeklyGoals.goals;
+    const weekEnd = Date.parse(`${weekKey(now)}T00:00:00Z`) + 7 * 86_400_000;
+    this.goalsUi.renderWeekly(`new in ${formatWait(weekEnd - now)}`, [...taskRows(wg, 'w', W.passXp), bonusRow('wall', 'claim all five', W.allDoneCores, this.weeklyGoals.bonusReady, this.weeklyGoals.bonusClaimed, wg)]);
+    // Achievements.
     const snap = this.snapshot();
     const groups = (Object.keys(GROUP_NAMES) as Group[]).map((g) => ({
       name: GROUP_NAMES[g],
-      rows: ACHIEVEMENTS.filter((a) => a.group === g).map((a) => {
+      rows: ACHIEVEMENTS.filter((a) => a.group === g).map((a): TaskRow => {
         const p = progressOn(a, snap);
-        return { name: a.name, text: a.text, have: p.have, target: p.target, done: p.done, reward: this.goalRewardText(a) };
+        const claimed = this.goalLog.has(a.id);
+        return { id: `a:${a.id}`, name: a.name, text: a.text, progress: `${formatScore(p.have)} / ${formatScore(p.target)}`, fraction: p.have / p.target, reward: `${this.goalRewardText(a)} · +${CONFIG.rank.goalXp} xp`, state: claimed ? 'claimed' : p.done ? 'claim' : 'open' };
       }),
     }));
-    const done = ACHIEVEMENTS.filter((a) => progressOn(a, snap).done).length;
-    this.hangarUi.renderGoals(`${done} of ${ACHIEVEMENTS.length}`, 'finish a goal for credits and a look to wear. they count everything you do, from the start', groups);
+    const doneCount = ACHIEVEMENTS.filter((a) => progressOn(a, snap).done).length;
+    this.goalsUi.renderAchievements(`${doneCount} of ${ACHIEVEMENTS.length} done. each pays credits and rank xp, and unlocks a look to wear. they count everything you've done, from the start.`, groups);
+    this.goalsUi.setTabNews({ daily: due >= 0 || this.daily.claimable > 0, weekly: this.weeklyGoals.claimable > 0, achievements: this.achievementsToClaim() > 0 });
+  }
+
+  /** Finished achievements not yet claimed. */
+  private achievementsToClaim(): number {
+    const snap = this.snapshot();
+    return ACHIEVEMENTS.filter((a) => !this.goalLog.has(a.id) && progressOn(a, snap).done).length;
+  }
+
+  /** Everything waiting to be claimed on the goals screen (the bar's dot). */
+  private goalsToClaim(): number {
+    return this.daily.claimable + this.weeklyGoals.claimable + this.achievementsToClaim();
+  }
+
+  /** Claim a finished goal ("q1", "qall", "w3", "wall", "a:<id>"): pay it, with a small moment. */
+  private onClaim(id: string): void {
+    let lines: string[] = [];
+    let name = '';
+    if (/^q\d$/.test(id)) {
+      const q = this.daily.claim(Number(id.slice(1)));
+      if (!q) return;
+      name = questText(q);
+      lines = [...this.grant({ credits: q.credits }), ...this.passXp(CONFIG.economy.quests.passXp)];
+    } else if (/^w\d$/.test(id)) {
+      const q = this.weeklyGoals.claim(Number(id.slice(1)));
+      if (!q) return;
+      name = questText(q);
+      lines = [...this.grant({ credits: q.credits }), ...this.passXp(CONFIG.economy.weekly.passXp)];
+    } else if (id === 'qall' || id === 'wall') {
+      const cores = id === 'qall' ? this.daily.claimBonus() : this.weeklyGoals.claimBonus();
+      if (cores <= 0) return;
+      this.ui.celebrate([{ kicker: id === 'qall' ? "today's goals" : "this week's goals", icon: GOAL_ICON, name: 'all done', lines: this.grant({ cores }) }]);
+    } else if (id.startsWith('a:')) {
+      const a = achievement(id.slice(2));
+      if (!a || this.goalLog.has(a.id) || !progressOn(a, this.snapshot()).done) return;
+      this.goalLog.add(a.id);
+      this.goalLog.save();
+      name = a.name;
+      const promo = this.ranked.addXp(CONFIG.rank.goalXp);
+      lines = [...this.grant({ credits: a.credits + promo.credits }), `+${CONFIG.rank.goalXp} xp`];
+      if (promo.rankAfter > promo.rankBefore) {
+        this.ui.celebrate([{ kicker: 'promoted', icon: insignia(promo.rankAfter), name: rankName(promo.rankAfter), lines: mergeCredits(Array.from({ length: promo.rankAfter - promo.rankBefore }, (_, k) => this.rankGives(promo.rankBefore + 1 + k)).flat()), color: '#d4a63a' }]);
+      }
+    } else return;
+    if (name) this.ui.showNotice(`${name}: ${mergeCredits(lines).join(' · ')}`);
+    this.sound.pickup();
+    this.haptics.pickup();
+    this.renderGoals();
+    this.refreshTitle();
   }
 
   /**
@@ -1601,23 +1688,15 @@ export class Game {
     const party: Celebration[] = [];
     for (let pass = 0; pass < 4; pass++) {
       const snap = this.snapshot();
-      const fresh = ACHIEVEMENTS.filter((a) => progressOn(a, snap).done && !this.goalLog.has(a.id));
+      const fresh = ACHIEVEMENTS.filter((a) => progressOn(a, snap).done && !this.goalLog.seenDone(a.id));
       const sets = this.looks.completedSets(SETS, this.owner());
       if (fresh.length === 0 && sets.length === 0) break;
-      let credits = 0;
-      for (const a of fresh) {
-        this.goalLog.add(a.id);
-        credits += a.credits;
-      }
+      for (const a of fresh) this.goalLog.markSeen(a.id);
       if (fresh.length > 0) this.goalLog.save();
-      const promo = this.ranked.addXp(fresh.length * CONFIG.rank.goalXp);
-      credits += promo.credits;
-      if (promo.rankAfter > promo.rankBefore) party.push({ kicker: 'promoted', icon: insignia(promo.rankAfter), name: rankName(promo.rankAfter), lines: mergeCredits(Array.from({ length: promo.rankAfter - promo.rankBefore }, (_, k) => this.rankGives(promo.rankBefore + 1 + k)).flat()), color: '#d4a63a' });
-      if (credits > 0) this.grant({ credits });
       if (fresh.length > 3) {
-        party.push({ kicker: `${fresh.length} goals complete`, icon: GOAL_ICON, name: `${fresh.length} goals`, lines: [...fresh.slice(0, 5).map((a) => a.name), `+${credits.toLocaleString('en-US')} credits`] });
+        party.push({ kicker: `${fresh.length} goals complete`, icon: GOAL_ICON, name: `${fresh.length} goals`, lines: [...fresh.slice(0, 5).map((a) => a.name), 'claim them in goals'] });
       } else {
-        for (const a of fresh) party.push({ kicker: 'goal complete', icon: GOAL_ICON, name: a.name, lines: [a.text, ...this.goalRewardText(a).split(' · ')] });
+        for (const a of fresh) party.push({ kicker: 'goal complete', icon: GOAL_ICON, name: a.name, lines: [a.text, ...this.goalRewardText(a).split(' · '), 'claim it in goals'] });
       }
       for (const id of sets) {
         const set = SETS.find((x) => x.id === id);
@@ -1670,7 +1749,9 @@ export class Game {
     );
   }
 
-  private openGoals(): void {
+  private openGoals(tab: GoalsTab = this.goalsTab): void {
+    this.goalsTab = tab;
+    this.goalsUi.setTab(tab);
     this.renderGoals();
     this.openInfo('goals');
   }
@@ -1768,7 +1849,7 @@ export class Game {
     else if (name === 'shop-cores') this.onTitleLink('shop');
     else if (name === 'pass') this.openPass();
     else if (name === 'boards') this.openBoards();
-    else if (name === 'daily') this.openDaily();
+    else if (name === 'daily') this.openGoals('daily');
     else if (name === 'claim') this.claimLogin();
   };
 
@@ -1810,7 +1891,8 @@ export class Game {
     if (due >= 0) cards.push({ id: 'claim', kicker: 'daily reward', title: `day ${due + 1} ready to claim`, hot: true });
     const quests = this.daily.quests;
     const done = quests.filter((q) => q.done).length;
-    cards.push({ id: 'daily', kicker: "today's goals", title: done >= quests.length ? 'all done' : `${done} of ${quests.length} done`, fraction: quests.length ? done / quests.length : 0 });
+    const toClaim = this.goalsToClaim();
+    cards.push({ id: 'daily', kicker: "today's goals", title: toClaim > 0 ? `${toClaim} to claim` : done >= quests.length ? 'all done' : `${done} of ${quests.length} done`, fraction: quests.length ? done / quests.length : 0, hot: toClaim > 0 });
     const P = CONFIG.economy.pass;
     const tier = this.pass.tier;
     cards.push({

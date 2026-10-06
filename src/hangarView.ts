@@ -1,8 +1,8 @@
 import type { Slot } from './looks';
 import type { HangarView } from './hangar';
 
-// The hangar screen (looks, and the upgrades chip) and the goals list. The
-// model is hangar.ts and achievements.ts; Game wires the taps. This only draws.
+// The hangar screen: looks, and the upgrades chip. The model is hangar.ts;
+// Game wires the taps. This only draws.
 
 function $(id: string): HTMLElement {
   const el = document.getElementById(id);
@@ -15,21 +15,6 @@ function el(tag: string, className: string, text?: string): HTMLElement {
   e.className = className;
   if (text !== undefined) e.textContent = text;
   return e;
-}
-
-interface GoalRow {
-  name: string;
-  text: string;
-  have: number;
-  target: number;
-  done: boolean;
-  /** What it unlocks, in words. */
-  reward: string;
-}
-
-export interface GoalGroup {
-  name: string;
-  rows: GoalRow[];
 }
 
 const fmt = (n: number): string => Math.floor(n).toLocaleString('en-US');
@@ -52,7 +37,7 @@ export interface HangarFrame {
 export class HangarScreen {
   constructor() {
     // Taps on these screens never start a run.
-    for (const id of ['screen-hangar', 'screen-goals']) $(id).addEventListener('pointerdown', (e) => e.stopPropagation());
+    for (const id of ['screen-hangar']) $(id).addEventListener('pointerdown', (e) => e.stopPropagation());
   }
 
   // --- looks and upgrades ---
@@ -117,32 +102,5 @@ export class HangarScreen {
     a.textContent = d.action.text;
     a.disabled = !d.action.enabled;
     a.dataset.kind = d.action.kind;
-  }
-
-  // --- goals ---
-
-  renderGoals(count: string, note: string, groups: GoalGroup[]): void {
-    $('goals-count').textContent = count;
-    $('goals-note').textContent = note;
-    const out: HTMLElement[] = [];
-    for (const g of groups) {
-      out.push(el('div', 'settings-group goal-group', g.name));
-      for (const r of g.rows) {
-        const row = el('div', `goal-row${r.done ? ' done' : ''}`);
-        const top = el('div', 'goal-top');
-        top.append(el('span', 'label goal-name', r.name), el('span', 'label goal-count', r.done ? 'done' : `${fmt(r.have)} / ${fmt(r.target)}`));
-        row.append(top, el('div', 'label goal-text', r.text));
-        if (!r.done) {
-          const track = el('div', 'xp-track');
-          const f = el('div', 'xp-fill');
-          track.append(f);
-          row.append(track);
-          fill(f, r.have / r.target);
-        }
-        if (r.reward) row.append(el('div', 'label goal-reward', r.reward));
-        out.push(row);
-      }
-    }
-    $('goals-list').replaceChildren(...out);
   }
 }

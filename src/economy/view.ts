@@ -1,7 +1,7 @@
 import { formatScore } from '../ui';
 
 // The economy's screens: the wallet bar on the title, the shop, the season
-// pass, the daily screen, the offer dialog (revive) and
+// pass, the offer dialog (revive) and
 // the 3-2-1 countdown. Game wires the taps; this only draws.
 
 function $(id: string): HTMLElement {
@@ -69,13 +69,6 @@ export interface PassView {
   premiumOwned: boolean;
 }
 
-export interface DailyView {
-  calendar: { day: number; reward: string; state: 'claimed' | 'today' | 'next' }[];
-  claim: { text: string; enabled: boolean };
-  reset: string;
-  quests: { text: string; reward: string; progress: string; fraction: number; done: boolean }[];
-  bonus: string;
-}
 
 export interface OfferView {
   kicker: string;
@@ -107,7 +100,7 @@ export class EconomyView {
     stopTaps(this.offerEl);
     $('offer-yes').addEventListener('click', () => this.closeOffer(true));
     $('offer-no').addEventListener('click', () => this.closeOffer(false));
-    for (const id of ['screen-shop', 'screen-pass', 'screen-daily', 'countdown']) stopTaps($(id));
+    for (const id of ['screen-shop', 'screen-pass', 'countdown']) stopTaps($(id));
   }
 
   // --- title ---
@@ -232,40 +225,6 @@ export class EconomyView {
       const scroller = list.closest<HTMLElement>('.settings');
       if (row && scroller) scroller.scrollTop = Math.max(0, row.offsetTop - scroller.clientHeight / 2);
     });
-  }
-
-  // --- daily ---
-
-  bindDaily(onClaim: () => void): void {
-    $('daily-claim').addEventListener('click', onClaim);
-  }
-
-  renderDaily(v: DailyView): void {
-    $('daily-calendar').replaceChildren(
-      ...v.calendar.map((d) => {
-        const cell = el('div', `cal-day ${d.state}`);
-        cell.append(el('span', 'label dim cal-num', `day ${d.day}`), el('span', 'label cal-reward', d.reward));
-        return cell;
-      }),
-    );
-    const claim = $('daily-claim') as HTMLButtonElement;
-    claim.textContent = v.claim.text;
-    claim.disabled = !v.claim.enabled;
-    $('daily-reset').textContent = v.reset;
-    $('daily-quests').replaceChildren(
-      ...v.quests.map((q) => {
-        const row = el('div', `quest${q.done ? ' done' : ''}`);
-        const top = el('div', 'quest-top');
-        top.append(el('span', 'label', q.text), el('span', 'label dim', q.done ? 'done' : q.progress));
-        const track = el('div', 'xp-track');
-        const fill = el('div', 'xp-fill');
-        fill.style.transform = `scaleX(${Math.max(0, Math.min(1, q.fraction))})`;
-        track.append(fill);
-        row.append(top, track, el('div', 'label dim quest-reward', q.reward));
-        return row;
-      }),
-    );
-    $('daily-bonus').textContent = v.bonus;
   }
 
   // --- end of run ---
