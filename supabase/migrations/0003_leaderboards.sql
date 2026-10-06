@@ -10,16 +10,16 @@
 -- Everything is plain SQL: there is no function to deploy.
 
 -- Pilot names: shown on the boards. hidden takes a player off them.
-alter table public.players add column hidden boolean not null default false;
-alter table public.players add column name_changed_at timestamptz;
+alter table public.players add column if not exists hidden boolean not null default false;
+alter table public.players add column if not exists name_changed_at timestamptz;
 
 -- Every submitted run, kept for checking and clean-up. Written only by submit_run.
-alter table public.runs add column board text not null default 'ranked';
-create index runs_by_user on public.runs (user_id, at desc);
+alter table public.runs add column if not exists board text not null default 'ranked';
+create index if not exists runs_by_user on public.runs (user_id, at desc);
 
 -- The best run per player on each board (period is the week's Monday for
 -- ranked, 'all' for the rest; league is 0 outside ranked).
-create table public.bests (
+create table if not exists public.bests (
   board text not null,
   period text not null,
   league smallint not null default 0,
@@ -29,7 +29,7 @@ create table public.bests (
   achieved_at timestamptz not null default now(),
   primary key (board, period, league, user_id)
 );
-create index bests_top on public.bests (board, period, league, score desc, achieved_at);
+create index if not exists bests_top on public.bests (board, period, league, score desc, achieved_at);
 
 alter table public.bests enable row level security; -- no policies: read through leaderboard()
 
@@ -44,7 +44,7 @@ drop view if exists public.board;
 
 -- The checks on a run: is it possible? (not that it's honest: a full re-fly on the
 -- server is the next step, see docs/leaderboards.md). Raises a reason if not.
-create function public.check_run(
+create or replace function public.check_run(
   p_board text,
   p_league smallint,
   p_score integer,
@@ -94,7 +94,7 @@ begin
 end $$;
 
 -- Submit a finished run: checks it, keeps it if it is a best, and says where it ranks.
-create function public.submit_run(
+create or replace function public.submit_run(
   p_board text,
   p_league smallint,
   p_score integer,
@@ -162,7 +162,7 @@ end $$;
 
 -- A board, best first: the top p_limit pilots and, if you are further down,
 -- your own row at the end with your rank.
-create function public.leaderboard(
+create or replace function public.leaderboard(
   p_board text,
   p_period text default 'all',
   p_league smallint default 0,
@@ -205,7 +205,7 @@ end $$;
 
 -- Change your pilot name: 3 to 16 letters, numbers, spaces, - or _; not taken;
 -- once an hour at most.
-create function public.set_pilot_name(p_name text) returns text
+create or replace function public.set_pilot_name(p_name text) returns text
 language plpgsql security definer set search_path = public as $$
 declare
   me uuid := auth.uid();

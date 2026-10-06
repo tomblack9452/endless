@@ -120,6 +120,19 @@ describe('supabase/setup.sql', () => {
     const t = await fresh.query<{ table_name: string }>("select table_name from information_schema.tables where table_schema = 'public' order by 1");
     expect(t.rows.map((r) => r.table_name)).toEqual(['bests', 'core_log', 'players', 'runs', 'saves', 'store_events', 'wallets']);
   });
+
+  it('can run again over a database it already set up, as the Supabase GitHub integration does', async () => {
+    const twice = new PGlite();
+    await twice.exec(SUPABASE_STANDIN);
+    await twice.exec(SETUP);
+    await twice.exec("insert into auth.users (id) values ('00000000-0000-0000-0000-000000000001')");
+    await twice.exec(SETUP);
+    for (const [, sql] of migrations) await twice.exec(sql);
+    const players = await twice.query<{ n: number }>('select count(*)::int as n from public.players');
+    expect(players.rows[0].n).toBe(1); // data kept
+    const views = await twice.query<{ n: number }>("select count(*)::int as n from information_schema.views where table_schema = 'public'");
+    expect(views.rows[0].n).toBe(0); // the old board view stays gone
+  });
 });
 
 describe('supabase/parts (for pasting a little at a time)', () => {

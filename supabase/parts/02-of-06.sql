@@ -1,8 +1,20 @@
--- Endless Space database: part 2 of 5. Run the parts in order, 01 first.
+-- Endless Space database: part 2 of 6. Run the parts in order, 01 first.
+
+-- New accounts get a player row and an empty wallet.
+create or replace function public.on_new_user() returns trigger
+language plpgsql security definer set search_path = public as $$
+begin
+  insert into public.players (user_id) values (new.id) on conflict do nothing;
+  insert into public.wallets (user_id) values (new.id) on conflict do nothing;
+  return new;
+end $$;
+
+create or replace trigger on_auth_user_created after insert on auth.users
+  for each row execute function public.on_new_user();
 
 -- Cores earned in play (login calendar, quests, the pass): capped per day, so
 -- an edited client can't print them.
-create function public.earn_cores(amount integer, reason text) returns integer
+create or replace function public.earn_cores(amount integer, reason text) returns integer
 language plpgsql security definer set search_path = public as $$
 declare
   cap constant integer := 120;
@@ -24,7 +36,7 @@ begin
   return give;
 end $$;
 
-create function public.spend_cores(amount integer, reason text) returns boolean
+create or replace function public.spend_cores(amount integer, reason text) returns boolean
 language plpgsql security definer set search_path = public as $$
 begin
   if amount <= 0 then return false; end if;
@@ -35,7 +47,7 @@ begin
 end $$;
 
 -- Purchases (the store webhook calls this with the service key).
-create function public.grant_cores(player uuid, amount integer, reason text) returns void
+create or replace function public.grant_cores(player uuid, amount integer, reason text) returns void
 language plpgsql security definer set search_path = public as $$
 begin
   insert into public.wallets (user_id, cores) values (player, amount)
@@ -50,7 +62,7 @@ grant execute on function public.earn_cores, public.spend_cores to authenticated
 -- Store purchases from RevenueCat's webhook. Each event is kept once (by its
 -- id), so a retried webhook never pays twice.
 
-create table public.store_events (
+create table if not exists public.store_events (
   id text primary key,
   user_id uuid references auth.users on delete set null,
   product text not null,
@@ -60,25 +72,6 @@ create table public.store_events (
 
 alter table public.store_events enable row level security;
 
+drop policy if exists "own purchases" on public.store_events;
+
 create policy "own purchases" on public.store_events for select using (auth.uid() = user_id);
-
--- Leaderboards: one table of each player's best per board, filled by submit_run
--- (which checks a run is possible) and read through leaderboard().
---
--- Boards:
---   ranked          the week's run, one board per week and league
---   endless         every area in turn, all time
---   solo:<env>      one environment endlessly, all time (open-ground, canyon,
---                   ship, ice, asteroids, volcanic)
---
--- Everything is plain SQL: there is no function to deploy.
-
--- Pilot names: shown on the boards. hidden takes a player off them.
-alter table public.players add column hidden boolean not null default false;
-
-alter table public.players add column name_changed_at timestamptz;
-
--- Every submitted run, kept for checking and clean-up. Written only by submit_run.
-alter table public.runs add column board text not null default 'ranked';
-
-create index runs_by_user on public.runs (user_id, at desc);

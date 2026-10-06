@@ -11,14 +11,14 @@
 -- anonymous sign-ins under Authentication > Providers.
 
 -- A short public name for the leaderboard ("pilot-3fa2" until there are names).
-create table public.players (
+create table if not exists public.players (
   user_id uuid primary key references auth.users on delete cascade,
   name text not null default ('pilot-' || substr(md5(random()::text), 1, 4)),
   created_at timestamptz not null default now()
 );
 
 -- Cloud save: every saved key as JSON, and when the device wrote it (ms).
-create table public.saves (
+create table if not exists public.saves (
   user_id uuid primary key references auth.users on delete cascade,
   data jsonb not null,
   saved_at bigint not null
@@ -26,14 +26,14 @@ create table public.saves (
 
 -- Cores live here. Players can read their balance; only the functions below
 -- (and the store webhook, with the service key) change it.
-create table public.wallets (
+create table if not exists public.wallets (
   user_id uuid primary key references auth.users on delete cascade,
   cores integer not null default 0 check (cores >= 0),
   earned_today integer not null default 0,
   earned_day date not null default current_date
 );
 
-create table public.core_log (
+create table if not exists public.core_log (
   id bigserial primary key,
   user_id uuid not null references auth.users on delete cascade,
   delta integer not null,
@@ -42,7 +42,7 @@ create table public.core_log (
 );
 
 -- Ranked runs, written by the submit-run function after its checks.
-create table public.runs (
+create table if not exists public.runs (
   id bigserial primary key,
   user_id uuid not null references auth.users on delete cascade,
   week date not null,
@@ -54,10 +54,10 @@ create table public.runs (
   path real[] not null,
   at timestamptz not null default now()
 );
-create index runs_board on public.runs (week, league, score desc);
+create index if not exists runs_board on public.runs (week, league, score desc);
 
 -- Each player's best run per week and league.
-create view public.board with (security_invoker = false) as
+create or replace view public.board with (security_invoker = false) as
   select distinct on (r.week, r.league, r.user_id)
     r.week, r.league, r.user_id, coalesce(p.name, 'pilot') as name, r.score
   from public.runs r
@@ -70,15 +70,20 @@ alter table public.wallets enable row level security;
 alter table public.core_log enable row level security;
 alter table public.runs enable row level security;
 
+drop policy if exists "own player" on public.players;
 create policy "own player" on public.players for select using (auth.uid() = user_id);
+drop policy if exists "own save read" on public.saves;
 create policy "own save read" on public.saves for select using (auth.uid() = user_id);
+drop policy if exists "own save write" on public.saves;
 create policy "own save write" on public.saves for insert with check (auth.uid() = user_id);
+drop policy if exists "own save update" on public.saves;
 create policy "own save update" on public.saves for update using (auth.uid() = user_id);
+drop policy if exists "own wallet" on public.wallets;
 create policy "own wallet" on public.wallets for select using (auth.uid() = user_id);
 grant select on public.board to anon, authenticated;
 
 -- New accounts get a player row and an empty wallet.
-create function public.on_new_user() returns trigger
+create or replace function public.on_new_user() returns trigger
 language plpgsql security definer set search_path = public as $$
 begin
   insert into public.players (user_id) values (new.id) on conflict do nothing;
@@ -86,12 +91,12 @@ begin
   return new;
 end $$;
 
-create trigger on_auth_user_created after insert on auth.users
+create or replace trigger on_auth_user_created after insert on auth.users
   for each row execute function public.on_new_user();
 
 -- Cores earned in play (login calendar, quests, the pass): capped per day, so
 -- an edited client can't print them.
-create function public.earn_cores(amount integer, reason text) returns integer
+create or replace function public.earn_cores(amount integer, reason text) returns integer
 language plpgsql security definer set search_path = public as $$
 declare
   cap constant integer := 120;
@@ -113,7 +118,7 @@ begin
   return give;
 end $$;
 
-create function public.spend_cores(amount integer, reason text) returns boolean
+create or replace function public.spend_cores(amount integer, reason text) returns boolean
 language plpgsql security definer set search_path = public as $$
 begin
   if amount <= 0 then return false; end if;
@@ -124,7 +129,7 @@ begin
 end $$;
 
 -- Purchases (the store webhook calls this with the service key).
-create function public.grant_cores(player uuid, amount integer, reason text) returns void
+create or replace function public.grant_cores(player uuid, amount integer, reason text) returns void
 language plpgsql security definer set search_path = public as $$
 begin
   insert into public.wallets (user_id, cores) values (player, amount)
@@ -140,7 +145,7 @@ grant execute on function public.earn_cores, public.spend_cores to authenticated
 -- Store purchases from RevenueCat's webhook. Each event is kept once (by its
 -- id), so a retried webhook never pays twice.
 
-create table public.store_events (
+create table if not exists public.store_events (
   id text primary key,
   user_id uuid references auth.users on delete set null,
   product text not null,
@@ -149,6 +154,7 @@ create table public.store_events (
 );
 
 alter table public.store_events enable row level security;
+drop policy if exists "own purchases" on public.store_events;
 create policy "own purchases" on public.store_events for select using (auth.uid() = user_id);
 
 -- ===== 0003_leaderboards.sql =====
@@ -165,16 +171,16 @@ create policy "own purchases" on public.store_events for select using (auth.uid(
 -- Everything is plain SQL: there is no function to deploy.
 
 -- Pilot names: shown on the boards. hidden takes a player off them.
-alter table public.players add column hidden boolean not null default false;
-alter table public.players add column name_changed_at timestamptz;
+alter table public.players add column if not exists hidden boolean not null default false;
+alter table public.players add column if not exists name_changed_at timestamptz;
 
 -- Every submitted run, kept for checking and clean-up. Written only by submit_run.
-alter table public.runs add column board text not null default 'ranked';
-create index runs_by_user on public.runs (user_id, at desc);
+alter table public.runs add column if not exists board text not null default 'ranked';
+create index if not exists runs_by_user on public.runs (user_id, at desc);
 
 -- The best run per player on each board (period is the week's Monday for
 -- ranked, 'all' for the rest; league is 0 outside ranked).
-create table public.bests (
+create table if not exists public.bests (
   board text not null,
   period text not null,
   league smallint not null default 0,
@@ -184,7 +190,7 @@ create table public.bests (
   achieved_at timestamptz not null default now(),
   primary key (board, period, league, user_id)
 );
-create index bests_top on public.bests (board, period, league, score desc, achieved_at);
+create index if not exists bests_top on public.bests (board, period, league, score desc, achieved_at);
 
 alter table public.bests enable row level security; -- no policies: read through leaderboard()
 
@@ -199,7 +205,7 @@ drop view if exists public.board;
 
 -- The checks on a run: is it possible? (not that it's honest: a full re-fly on the
 -- server is the next step, see docs/leaderboards.md). Raises a reason if not.
-create function public.check_run(
+create or replace function public.check_run(
   p_board text,
   p_league smallint,
   p_score integer,
@@ -249,7 +255,7 @@ begin
 end $$;
 
 -- Submit a finished run: checks it, keeps it if it is a best, and says where it ranks.
-create function public.submit_run(
+create or replace function public.submit_run(
   p_board text,
   p_league smallint,
   p_score integer,
@@ -317,7 +323,7 @@ end $$;
 
 -- A board, best first: the top p_limit pilots and, if you are further down,
 -- your own row at the end with your rank.
-create function public.leaderboard(
+create or replace function public.leaderboard(
   p_board text,
   p_period text default 'all',
   p_league smallint default 0,
@@ -360,7 +366,7 @@ end $$;
 
 -- Change your pilot name: 3 to 16 letters, numbers, spaces, - or _; not taken;
 -- once an hour at most.
-create function public.set_pilot_name(p_name text) returns text
+create or replace function public.set_pilot_name(p_name text) returns text
 language plpgsql security definer set search_path = public as $$
 declare
   me uuid := auth.uid();

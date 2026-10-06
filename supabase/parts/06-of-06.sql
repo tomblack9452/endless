@@ -1,8 +1,8 @@
--- Endless Space database: part 5 of 5. Run the parts in order, 01 first.
+-- Endless Space database: part 6 of 6. Run the parts in order, 01 first.
 
 -- A board, best first: the top p_limit pilots and, if you are further down,
 -- your own row at the end with your rank.
-create function public.leaderboard(
+create or replace function public.leaderboard(
   p_board text,
   p_period text default 'all',
   p_league smallint default 0,
@@ -45,7 +45,7 @@ end $$;
 
 -- Change your pilot name: 3 to 16 letters, numbers, spaces, - or _; not taken;
 -- once an hour at most.
-create function public.set_pilot_name(p_name text) returns text
+create or replace function public.set_pilot_name(p_name text) returns text
 language plpgsql security definer set search_path = public as $$
 declare
   me uuid := auth.uid();

@@ -1,36 +1,8 @@
--- Endless Space database: part 3 of 5. Run the parts in order, 01 first.
-
--- The best run per player on each board (period is the week's Monday for
--- ranked, 'all' for the rest; league is 0 outside ranked).
-create table public.bests (
-  board text not null,
-  period text not null,
-  league smallint not null default 0,
-  user_id uuid not null references auth.users on delete cascade,
-  score integer not null,
-  seconds real not null,
-  achieved_at timestamptz not null default now(),
-  primary key (board, period, league, user_id)
-);
-
-create index bests_top on public.bests (board, period, league, score desc, achieved_at);
-
-alter table public.bests enable row level security;
-
--- no policies: read through leaderboard()
-
--- Carry over what the old board view showed.
-insert into public.bests (board, period, league, user_id, score, seconds, achieved_at)
-select distinct on (week, league, user_id) 'ranked', week::text, league, user_id, score, seconds, at
-from public.runs
-order by week, league, user_id, score desc, at
-on conflict do nothing;
-
-drop view if exists public.board;
+-- Endless Space database: part 4 of 6. Run the parts in order, 01 first.
 
 -- The checks on a run: is it possible? (not that it's honest: a full re-fly on the
 -- server is the next step, see docs/leaderboards.md). Raises a reason if not.
-create function public.check_run(
+create or replace function public.check_run(
   p_board text,
   p_league smallint,
   p_score integer,

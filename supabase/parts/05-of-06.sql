@@ -1,7 +1,7 @@
--- Endless Space database: part 4 of 5. Run the parts in order, 01 first.
+-- Endless Space database: part 5 of 6. Run the parts in order, 01 first.
 
 -- Submit a finished run: checks it, keeps it if it is a best, and says where it ranks.
-create function public.submit_run(
+create or replace function public.submit_run(
   p_board text,
   p_league smallint,
   p_score integer,
