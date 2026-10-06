@@ -3,20 +3,19 @@ import { progressOn } from '../src/achievements';
 import { achievement } from '../src/achievements';
 import { LOOKS, VAULT_ORDER } from '../src/catalogue';
 import { type Slot, Looks, type Owner, SLOTS, keyOf, itemsIn } from '../src/looks';
-import { buildWardrobe, hullIcon, monthsUntilVault, shortUnlock, type WardrobeDeps } from '../src/wardrobe';
+import { buildHangar, hullIcon, monthsUntilVault, shortUnlock, type HangarDeps } from '../src/hangar';
 
-// The wardrobe's cards and what its detail panel offers for each way to get a look.
+// The hangar's cards and what its detail panel offers for each way to get a look.
 
 const owner = (over: Partial<Owner> = {}, snap: Record<string, number> = {}): Owner => ({
   rank: 0,
   stars: 0,
   league: 0,
-  mission: new Set(),
   goal: (id) => {
     const a = achievement(id);
     return a
       ? progressOn(a, {
-          runs: 0, distance: 0, seconds: 0, nearMisses: 0, bestChain: 0, pickups: 0, crashes: 0, furthest: 1, endlessBest: 0, envBest: {}, coursesDone: 0, stars: 0, missions: 0, upgradePoints: 0, looksOwned: 0,
+          runs: 0, distance: 0, seconds: 0, nearMisses: 0, bestChain: 0, pickups: 0, crashes: 0, furthest: 1, endlessBest: 0, envBest: {}, coursesDone: 0, stars: 0, upgradePoints: 0, looksOwned: 0,
           ...snap,
         })
       : { have: 0, target: 1, done: false };
@@ -24,13 +23,13 @@ const owner = (over: Partial<Owner> = {}, snap: Record<string, number> = {}): Ow
   ...over,
 });
 
-function deps(over: Partial<WardrobeDeps> = {}): WardrobeDeps {
+function deps(over: Partial<HangarDeps> = {}): HangarDeps {
   return { looks: new Looks(), owner: owner(), credits: 0, cores: 0, vault: { key: VAULT_ORDER[0], monthsUntil: () => 3 }, ...over };
 }
 
-const view = (slot: Slot, pick: string | null, d = deps()) => buildWardrobe({ slot, pick }, d);
+const view = (slot: Slot, pick: string | null, d = deps()) => buildHangar({ slot, pick }, d);
 
-describe('the wardrobe', () => {
+describe('the hangar', () => {
   it('has every slot, and the counts add up to the whole catalogue', () => {
     const v = view('paint', null);
     expect(v.slots.map((s) => s.slot)).toEqual(SLOTS);

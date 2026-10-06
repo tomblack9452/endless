@@ -20,7 +20,6 @@ export interface Snapshot {
   envBest: Record<string, number>;
   coursesDone: number; // set levels finished
   stars: number;
-  missions: number; // missions completed
   upgradePoints: number;
   looksOwned: number;
 }
@@ -52,6 +51,7 @@ const env = (id: string) => (s: Snapshot) => s.envBest[id] ?? 0;
 
 export const ACHIEVEMENTS: readonly Achievement[] = [
   // --- flying: how much you've done -------------------------------------------------
+  a('runs-5', 'flying', 'first flights', 'fly 5 runs', 5, (s) => s.runs, 50),
   a('runs-10', 'flying', 'getting started', 'fly 10 runs', 10, (s) => s.runs, 100),
   a('runs-50', 'flying', 'regular', 'fly 50 runs', 50, (s) => s.runs, 250),
   a('runs-250', 'flying', 'veteran', 'fly 250 runs', 250, (s) => s.runs, 600),
@@ -60,23 +60,28 @@ export const ACHIEVEMENTS: readonly Achievement[] = [
   a('dist-25k', 'flying', 'long haul', 'fly 25,000 units in total', 25000, (s) => s.distance, 300),
   a('dist-100k', 'flying', 'deep space', 'fly 100,000 units in total', 100000, (s) => s.distance, 800),
   a('dist-500k', 'flying', 'past the edge', 'fly 500,000 units in total', 500000, (s) => s.distance, 2500),
+  a('time-15m', 'flying', 'warming up', 'play for 15 minutes', 900, (s) => s.seconds, 100),
   a('time-1h', 'flying', 'settled in', 'play for an hour', 3600, (s) => s.seconds, 150),
   a('time-5h', 'flying', 'at home', 'play for five hours', 18000, (s) => s.seconds, 500),
   a('time-20h', 'flying', 'never landed', 'play for twenty hours', 72000, (s) => s.seconds, 1500),
 
   // --- skill: how well ----------------------------------------------------------------
+  a('near-25', 'skill', 'near thing', '25 near misses in total', 25, (s) => s.nearMisses, 75),
   a('near-100', 'skill', 'close calls', '100 near misses in total', 100, (s) => s.nearMisses, 100),
   a('near-1k', 'skill', 'hair trigger', '1,000 near misses in total', 1000, (s) => s.nearMisses, 400),
   a('near-10k', 'skill', 'needle threader', '10,000 near misses in total', 10000, (s) => s.nearMisses, 1500),
+  a('chain-3', 'skill', 'two in a row', 'a near-miss chain of 3', 3, (s) => s.bestChain, 75),
   a('chain-6', 'skill', 'chain starter', 'a near-miss chain of 6', 6, (s) => s.bestChain, 150),
   a('chain-10', 'skill', 'chain master', 'a near-miss chain of 10', 10, (s) => s.bestChain, 500),
   a('chain-15', 'skill', 'untouchable', 'a near-miss chain of 15', 15, (s) => s.bestChain, 1500),
+  a('pickups-50', 'skill', 'magpie', 'collect 50 pickups', 50, (s) => s.pickups, 50),
   a('pickups-200', 'skill', 'gold digger', 'collect 200 pickups', 200, (s) => s.pickups, 150),
   a('pickups-2k', 'skill', 'hoarder', 'collect 2,000 pickups', 2000, (s) => s.pickups, 700),
   a('crashes-100', 'skill', 'learning the hard way', 'crash 100 times', 100, (s) => s.crashes, 100),
   a('crashes-500', 'skill', 'wreckage', 'crash 500 times', 500, (s) => s.crashes, 300),
 
   // --- places: how far, and where -------------------------------------------------------
+  a('level-4', 'places', 'canyon bound', 'reach level 4 in ranked or endless', 4, (s) => s.furthest, 100),
   a('level-6', 'places', 'lift off', 'reach level 6 in ranked or endless', 6, (s) => s.furthest, 100),
   a('level-10', 'places', 'frost line', 'reach level 10 (the ice field)', 10, (s) => s.furthest, 250),
   a('level-13', 'places', 'belt runner', 'reach level 13 (the asteroid belt)', 13, (s) => s.furthest, 400),
@@ -92,15 +97,15 @@ export const ACHIEVEMENTS: readonly Achievement[] = [
   a('endless-15k', 'places', 'going far', 'score 15,000 in endless', 15000, (s) => s.endlessBest, 600),
   a('endless-30k', 'places', 'legend', 'score 30,000 in endless', 30000, (s) => s.endlessBest, 1500),
   a('endless-60k', 'places', 'mythic', 'score 60,000 in endless', 60000, (s) => s.endlessBest, 4000),
+  a('courses-1', 'places', 'first finish', 'finish a set level', 1, (s) => s.coursesDone, 150),
   a('courses-3', 'places', 'on rails', 'finish 3 set levels', 3, (s) => s.coursesDone, 200),
   a('courses-6', 'places', 'half way round', 'finish 6 set levels', 6, (s) => s.coursesDone, 500),
   a('courses-9', 'places', 'the whole route', 'finish all 9 set levels', 9, (s) => s.coursesDone, 1200),
   a('stars-5', 'places', 'star spotter', 'earn 5 stars', 5, (s) => s.stars, 100),
+  a('stars-10', 'places', 'bright spark', 'earn 10 stars', 10, (s) => s.stars, 200),
   a('stars-30', 'places', 'constellation', 'earn 30 stars', 30, (s) => s.stars, 600),
 
   // --- collection: what you've built ---------------------------------------------------------
-  a('missions-5', 'collection', 'mission control', 'complete 5 missions', 5, (s) => s.missions, 200),
-  a('missions-11', 'collection', 'all missions', 'complete every mission unlock (11)', 11, (s) => s.missions, 800),
   a('upgrades-10', 'collection', 'upgraded', 'own 10 upgrade points', 10, (s) => s.upgradePoints, 300),
   a('upgrades-30', 'collection', 'maxed out', 'own all 30 upgrade points', 30, (s) => s.upgradePoints, 3000),
   a('looks-25', 'collection', 'collector', 'own 25 looks', 25, (s) => s.looksOwned, 400),

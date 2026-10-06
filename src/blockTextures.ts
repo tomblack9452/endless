@@ -10,9 +10,9 @@ import { CONFIG } from './config';
 // tall blocks repeat panels instead of stretching them. Everything drawn in a
 // cell either stays inside it or is drawn wrapped, so vertical tiling is seamless.
 
-export const SIDE_VARIANTS = 8;
+const SIDE_VARIANTS = 8;
 /** Floor/top plates: TOP_VARIANTS cells side by side (picked per instance by its style). */
-export const TOP_VARIANTS = 4;
+const TOP_VARIANTS = 4;
 
 type Ctx = CanvasRenderingContext2D;
 type Pt = [number, number];

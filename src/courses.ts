@@ -13,7 +13,7 @@ import type { ThemeId } from './world';
 // hard it is (`difficulty`: the score whose speed and density it uses), and
 // optionally a set piece laid over it, a run of rooms, or an event.
 
-export type Overlay = 'slalom' | 'gates' | 'pickups' | 'arches';
+type Overlay = 'slalom' | 'gates' | 'pickups' | 'arches';
 
 export interface Section {
   name: string; // shown as you reach it
@@ -183,10 +183,6 @@ export const COURSES: readonly Course[] = [
 /** Total length of a course in world units. */
 export function courseLength(c: Course): number {
   return c.sections.reduce((n, s) => n + s.length, 0);
-}
-
-export function findCourse(id: string): Course | undefined {
-  return COURSES.find((c) => c.id === id);
 }
 
 // --- the weekly ranked level ---------------------------------------------------------

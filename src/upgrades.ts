@@ -58,7 +58,7 @@ export const STANDARD: ShipStats = {
   powerRate: 1,
 };
 
-export function statsFor(tiers: Partial<Record<SystemId, number>>): ShipStats {
+function statsFor(tiers: Partial<Record<SystemId, number>>): ShipStats {
   const t = (id: SystemId) => tiers[id] ?? 0;
   return {
     boostDrain: 1 + 0.08 * t('thrusters'),

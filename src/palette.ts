@@ -2,7 +2,7 @@ import { Color } from 'three';
 import { CONFIG, type Palette } from './config';
 
 // Live palette as THREE.Color objects. Materials hold references to these
-// colours via copy() each frame they change, so cross-fades are just a lerp.
+// colours via copy() each frame they change.
 
 export class LivePalette {
   readonly ground = new Color();
@@ -34,19 +34,6 @@ export class LivePalette {
     this.ship.set(p.ship);
     this.shipShade.set(p.shipShade);
     this.text.set(p.text);
-  }
-
-  /** The per-level colours part way from `a` to `b` (palette cross-fades). */
-  mix(a: LivePalette, b: LivePalette, t: number): void {
-    this.ground.lerpColors(a.ground, b.ground, t);
-    this.sky.lerpColors(a.sky, b.sky, t);
-    this.fog.lerpColors(a.fog, b.fog, t);
-    this.cubeLight.lerpColors(a.cubeLight, b.cubeLight, t);
-    this.cubeMid.lerpColors(a.cubeMid, b.cubeMid, t);
-    this.cubeDark.lerpColors(a.cubeDark, b.cubeDark, t);
-    this.ship.lerpColors(a.ship, b.ship, t);
-    this.shipShade.lerpColors(a.shipShade, b.shipShade, t);
-    this.text.lerpColors(a.text, b.text, t);
   }
 
   copy(o: LivePalette): void {

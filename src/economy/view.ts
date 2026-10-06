@@ -22,7 +22,7 @@ function stopTaps(e: HTMLElement): void {
   e.addEventListener('pointerdown', (ev) => ev.stopPropagation());
 }
 
-export interface ShopOfferView {
+interface ShopOfferView {
   name: string;
   slot: string; // 'hull', 'paint', ...
   slotName: string; // shown under the name
@@ -50,7 +50,7 @@ export interface ShopView {
   cores: { label: string; button: string; enabled: boolean }[];
 }
 
-export interface PassTierView {
+interface PassTierView {
   tier: number;
   free: string;
   premium: string;

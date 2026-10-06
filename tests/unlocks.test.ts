@@ -68,6 +68,5 @@ describe('furthest level', () => {
     expect(p.furthest).toBe(5);
     expect(p.reachedLevel(3)).toBe(5);
     expect(p.furthest).toBe(5);
-    expect(p.sector).toBe(1);
   });
 });

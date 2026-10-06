@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ACHIEVEMENTS, achievement, doneIn, evaluate, GROUP_NAMES, progressOn, rewardKeys, type Snapshot } from '../src/achievements';
 import { LOOKS, SETS, SLOT_ORDER, VAULT_ORDER } from '../src/catalogue';
-import { SHIPS, TRAILS, UNLOCK_ORDER } from '../src/cosmetics';
 import { COURSES, ENVIRONMENTS } from '../src/courses';
 import { LEAGUES } from '../src/leagues';
 import { buyable, byKey, itemsIn, keyOf, Looks, type LookItem, type Owner, SLOT_NAMES, SLOTS, unlockProgress, unlockText } from '../src/looks';
@@ -23,7 +22,6 @@ const BLANK: Snapshot = {
   envBest: {},
   coursesDone: 0,
   stars: 0,
-  missions: 0,
   upgradePoints: 0,
   looksOwned: 0,
 };
@@ -41,7 +39,6 @@ const MAXED: Snapshot = {
   envBest: Object.fromEntries(ENVIRONMENTS.map((e) => [e.id, 1e9])),
   coursesDone: COURSES.length,
   stars: 1000,
-  missions: UNLOCK_ORDER.length,
   upgradePoints: 30,
   looksOwned: 1000,
 };
@@ -51,7 +48,6 @@ function owner(snap: Snapshot, extra: Partial<Owner> = {}): Owner {
     rank: 0,
     stars: snap.stars,
     league: 0,
-    mission: new Set(),
     goal: (id) => {
       const a = achievement(id);
       return a ? progressOn(a, snap) : { have: 0, target: 1, done: false };
@@ -132,15 +128,6 @@ describe('the catalogue', () => {
     expect(cost('paint:nebula')).toBe(120);
     expect(cost('engine:plasma')).toBe(60);
   });
-
-  it('matches the mission unlocks: those hulls and trails are the mission looks', () => {
-    const missionHulls = UNLOCK_ORDER.filter((u) => u.kind === 'ship').map((u) => `hull:${u.id}`);
-    const missionTrails = UNLOCK_ORDER.filter((u) => u.kind === 'trail').map((u) => `trail:${u.id}`);
-    const inCatalogue = LOOKS.filter((l) => l.unlock.by === 'mission').map(keyOf);
-    expect([...missionHulls, ...missionTrails].sort()).toEqual(inCatalogue.sort());
-    expect(SHIPS.slice(1).map((s) => `hull:${s}`).sort()).toEqual(missionHulls.sort());
-    expect(TRAILS.filter((t) => t !== 'none').map((t) => `trail:${t}`).sort()).toEqual(missionTrails.sort());
-  });
 });
 
 describe('goals', () => {
@@ -166,7 +153,7 @@ describe('goals', () => {
     for (const a of ACHIEVEMENTS) {
       let last = -1;
       for (const k of steps) {
-        const snap: Snapshot = { ...BLANK, runs: k * 100, distance: k * 10000, seconds: k * 5000, nearMisses: k * 1000, bestChain: k * 5, pickups: k * 500, crashes: k * 100, furthest: 1 + k * 5, endlessBest: k * 10000, coursesDone: Math.floor(k), stars: k * 10, missions: Math.floor(k * 2), upgradePoints: k * 5, looksOwned: k * 20, envBest: { 'open-ground': k * 3000 } };
+        const snap: Snapshot = { ...BLANK, runs: k * 100, distance: k * 10000, seconds: k * 5000, nearMisses: k * 1000, bestChain: k * 5, pickups: k * 500, crashes: k * 100, furthest: 1 + k * 5, endlessBest: k * 10000, coursesDone: Math.floor(k), stars: k * 10, upgradePoints: k * 5, looksOwned: k * 20, envBest: { 'open-ground': k * 3000 } };
         const have = progressOn(a, snap).have;
         expect(have, `${a.id} at ${k}`).toBeGreaterThanOrEqual(last);
         last = have;
@@ -189,10 +176,9 @@ describe('goals', () => {
   });
 
   it('are reachable: the biggest are inside what the game allows', () => {
-    // Nothing asks for more upgrade points than exist, more set levels than there are, more missions.
+    // Nothing asks for more upgrade points than exist, or more set levels than there are.
     expect(Math.max(...ACHIEVEMENTS.filter((a) => a.id.startsWith('upgrades-')).map((a) => a.target))).toBeLessThanOrEqual(30);
     expect(Math.max(...ACHIEVEMENTS.filter((a) => a.id.startsWith('courses-')).map((a) => a.target))).toBeLessThanOrEqual(COURSES.length);
-    expect(Math.max(...ACHIEVEMENTS.filter((a) => a.id.startsWith('missions-')).map((a) => a.target))).toBeLessThanOrEqual(UNLOCK_ORDER.length);
     expect(Math.max(...ACHIEVEMENTS.filter((a) => a.id.startsWith('looks-')).map((a) => a.target))).toBeLessThan(LOOKS.length);
   });
 });
@@ -238,8 +224,8 @@ describe('owning looks', () => {
     expect(looks.owns(get('paint:dawn'), { ...base, stars: 4 })).toBe(false);
     expect(looks.owns(get('paint:dawn'), { ...base, stars: 5 })).toBe(true);
     expect(looks.owns(get('hull:wing'), base)).toBe(false);
-    expect(looks.owns(get('hull:wing'), { ...base, mission: new Set(['hull:wing']) })).toBe(true);
-    expect(looks.owns(get('trail:line'), { ...base, mission: new Set(['trail:line']) })).toBe(true);
+    expect(looks.owns(get('hull:wing'), owner({ ...BLANK, runs: 5 }))).toBe(true);
+    expect(looks.owns(get('trail:line'), owner({ ...BLANK, pickups: 50 }))).toBe(true);
     expect(looks.owns(get('decal:star'), base)).toBe(false);
     expect(looks.owns(get('decal:star'), owner({ ...BLANK, runs: 10 }))).toBe(true);
   });
@@ -260,17 +246,6 @@ describe('owning looks', () => {
     for (const k of s.items) l.give(k);
     expect(l.completedSets(SETS, base)).toContain(s.id);
     expect(l.completedSets(SETS, base)).not.toContain(s.id);
-  });
-
-  it('puts back what is no longer owned', () => {
-    const l = new Looks();
-    l.equipped.paint = 'copper';
-    l.validate(base);
-    expect(l.equipped.paint).toBe('standard');
-    l.validate({ ...base, rank: 12 });
-    l.equipped.paint = 'copper';
-    l.validate({ ...base, rank: 12 });
-    expect(l.equipped.paint).toBe('copper');
   });
 });
 

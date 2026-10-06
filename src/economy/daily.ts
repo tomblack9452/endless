@@ -8,7 +8,7 @@ import { dayBefore, hash, picker } from './time';
 // revive each day. Days turn over in UTC; quests are picked from the date, so
 // everyone gets the same three.
 
-export type QuestType = 'runs' | 'score' | 'level' | 'nearMisses' | 'pickups' | 'boost' | 'ranked' | 'rooms';
+type QuestType = 'runs' | 'score' | 'level' | 'nearMisses' | 'pickups' | 'boost' | 'ranked' | 'rooms';
 
 /** Targets to pick from, and whether a quest adds up across runs or takes the best one. */
 const QUESTS: Record<QuestType, { targets: number[]; adds: boolean }> = {

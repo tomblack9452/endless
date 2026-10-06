@@ -5,7 +5,7 @@ import type { Backend, RunSubmission, SubmitResult } from './backend';
 // is written down first and sent after: it stays here until the server takes it
 // or turns it down for good. Kept on the device only (never in the cloud save).
 
-export const OUTBOX_KEY = 'endless.outbox';
+const OUTBOX_KEY = 'endless.outbox';
 const MAX_WAITING = 30; // a long offline spell keeps the best of what's left, not everything
 const MAX_TRIES = 8; // then it's not going to work: let it go
 

@@ -777,14 +777,6 @@ body {
   line-height: 1.6;
 }
 
-.over-missions {
-  margin: 18px auto 0;
-  padding-top: 14px;
-  max-width: 320px;
-  line-height: 1.8;
-  border-top: 1px solid color-mix(in srgb, currentColor 22%, transparent);
-}
-
 .setting-row.locked {
   opacity: 0.5;
 }
@@ -1115,7 +1107,7 @@ body {
   margin-top: 4px;
 }
 
-/* Hangar tabs. */
+/* Tabs under a screen's title (goals, solo). */
 .tabs {
   position: absolute;
   left: calc(var(--safe-left) + 24px);
@@ -1160,31 +1152,10 @@ body {
   display: none;
 }
 
-/* Ship tab: compact rows so the ship stays in view below them. */
-#look-rows .setting-row {
-  min-height: calc(44px * var(--ui-scale));
-}
 
 .setting-row .value.locked {
   border-style: dashed;
   opacity: 0.75;
-}
-
-.look-buy {
-  width: 100%;
-  margin-top: 12px;
-}
-
-.look-buy[hidden] {
-  display: none;
-}
-
-.screen.panel.top {
-  background: linear-gradient(
-    to bottom,
-    color-mix(in srgb, var(--sky, #f1ede4) 92%, transparent) 64%,
-    transparent 76%
-  );
 }
 
 /* Upgrade rows: name and effect on the left, tier pips and a buy button on the right. */
@@ -1316,71 +1287,7 @@ body {
   margin-top: auto;
 }
 
-/* Sector map: a row of three sectors per loop. */
-.sector-loop {
-  margin: 22px 0 8px;
-}
-
-.sector-row {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 8px;
-}
-
-.sector {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 6px;
-  min-height: 92px;
-  padding: 12px;
-  font: inherit;
-  color: inherit;
-  text-align: left;
-  background: color-mix(in srgb, currentColor 5%, transparent);
-  border: 1px solid color-mix(in srgb, currentColor 28%, transparent);
-  border-radius: 14px;
-  cursor: pointer;
-  -webkit-appearance: none;
-  appearance: none;
-}
-
-.sector:active {
-  background: color-mix(in srgb, currentColor 14%, transparent);
-}
-
-.sector.locked {
-  opacity: 0.35;
-  cursor: default;
-}
-
-.sector-name {
-  font-size: calc(12px * var(--ui-scale));
-  letter-spacing: 0.08em;
-  line-height: 1.3;
-}
-
-.sector-levels {
-  font-size: calc(10px * var(--ui-scale));
-  letter-spacing: 0.14em;
-  opacity: 0.65;
-}
-
-.sector-stars {
-  margin-top: auto;
-  font-size: calc(15px * var(--ui-scale));
-  letter-spacing: 0.2em;
-}
-
 /* Service record. */
-.record-top {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  text-align: center;
-  padding: 10px 0 4px;
-}
-
 .record-rank {
   font-size: calc(20px * var(--ui-scale));
   letter-spacing: 0.14em;
@@ -1503,22 +1410,6 @@ body {
   backdrop-filter: blur(12px);
 }
 
-/* The hangar leaves the lower half clear so you can see the ship. */
-.screen.panel.top {
-  background: linear-gradient(
-    to bottom,
-    color-mix(in srgb, var(--sky, #f1ede4) 92%, transparent) 50%,
-    transparent 72%
-  );
-  -webkit-backdrop-filter: none;
-  backdrop-filter: none;
-}
-
-.settings.short {
-  bottom: auto;
-  overflow: visible;
-}
-
 /* No HUD behind a menu. */
 .menu-open #hud,
 .menu-open .combo,
@@ -1589,22 +1480,6 @@ body {
 
 .settings::-webkit-scrollbar {
   display: none;
-}
-
-/* Game over: one mission per row, progress on the right. */
-.over-mission {
-  display: flex;
-  justify-content: space-between;
-  gap: 16px;
-  text-align: left;
-  font-size: calc(12px * var(--ui-scale));
-  line-height: 1.5;
-  padding: 4px 0;
-}
-
-.over-mission-progress {
-  flex-shrink: 0;
-  opacity: 0.8;
 }
 
 /* --- Service record and league screens ----------------------------------- */
@@ -2063,10 +1938,6 @@ body {
   flex-direction: column;
   gap: 2px;
   min-width: 0;
-}
-
-.shop-slot {
-  font-size: calc(11px * var(--ui-scale));
 }
 
 .pill.shop-buy {
@@ -2537,8 +2408,8 @@ body {
   border-color: currentColor;
 }
 
-/* Wardrobe: slot chips, a scrolling grid of looks, and a panel for the one picked. */
-.settings.sheet.ward-sheet {
+/* Hangar: slot chips, a scrolling grid of looks, and a panel for the one picked. */
+.settings.sheet.hangar-sheet {
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -2546,7 +2417,7 @@ body {
   padding-top: 12px;
 }
 
-.ward-sheet .chip-row {
+.hangar-sheet .chip-row {
   flex: none;
   margin-top: 0;
   margin-bottom: 8px;
@@ -2562,7 +2433,28 @@ body {
   opacity: 0.8;
 }
 
-.ward-grid {
+.hangar-pane {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.hangar-pane[hidden] {
+  display: none;
+}
+
+.hangar-scroll {
+  overflow-y: auto;
+  scrollbar-width: none;
+  touch-action: pan-y;
+}
+
+.hangar-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.hangar-grid {
   flex: 1;
   min-height: 0;
   display: grid;
@@ -2575,11 +2467,11 @@ body {
   scrollbar-width: none;
 }
 
-.ward-grid::-webkit-scrollbar {
+.hangar-grid::-webkit-scrollbar {
   display: none;
 }
 
-.ward-card {
+.hangar-card {
   position: relative;
   display: flex;
   flex-direction: column;
@@ -2596,32 +2488,32 @@ body {
   min-width: 0;
 }
 
-.ward-card.picked {
+.hangar-card.picked {
   border: 2px solid currentColor;
   padding: 8px 2px 7px;
   background: color-mix(in srgb, currentColor 10%, transparent);
 }
 
-.ward-card.locked .card-swatch {
+.hangar-card.locked .card-swatch {
   opacity: 0.55;
 }
 
-.ward-card .card-swatch {
+.hangar-card .card-swatch {
   width: 38px;
   height: 38px;
   margin-bottom: 3px;
 }
 
-.ward-card .card-swatch svg {
+.hangar-card .card-swatch svg {
   width: 24px;
   height: 24px;
 }
 
-.ward-card .card-swatch svg[viewBox] path[fill="currentColor"] {
+.hangar-card .card-swatch svg[viewBox] path[fill="currentColor"] {
   stroke: none;
 }
 
-.ward-card .card-name {
+.hangar-card .card-name {
   font-size: calc(10.5px * var(--ui-scale));
   line-height: 1.2;
   max-width: 100%;
@@ -2630,7 +2522,7 @@ body {
   white-space: nowrap;
 }
 
-.ward-card .card-sub {
+.hangar-card .card-sub {
   font-size: calc(9px * var(--ui-scale));
   line-height: 1.2;
   opacity: 0.6;
@@ -2640,42 +2532,42 @@ body {
   white-space: nowrap;
 }
 
-.ward-card .card-tick {
+.hangar-card .card-tick {
   position: absolute;
   top: 4px;
   right: 6px;
   font-size: calc(11px * var(--ui-scale));
 }
 
-.ward-detail {
+.hangar-detail {
   flex: none;
   padding-top: 10px;
   border-top: 1px solid color-mix(in srgb, currentColor 18%, transparent);
 }
 
-.ward-head {
+.hangar-head {
   display: flex;
   justify-content: space-between;
   align-items: baseline;
   gap: 10px;
 }
 
-.ward-name {
+.hangar-name {
   font-size: calc(15px * var(--ui-scale));
   font-weight: 500;
 }
 
-.ward-status {
+.hangar-status {
   margin: 3px 0 8px;
   min-height: 2.4em;
   line-height: 1.35;
 }
 
-.ward-goal {
+.hangar-goal {
   margin: 0 0 10px;
 }
 
-.ward-detail .pill {
+.hangar-detail .pill {
   width: 100%;
 }
 

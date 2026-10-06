@@ -46,7 +46,3 @@ export async function loadNumber(key: string, fallback: number): Promise<number>
   const n = raw === null ? NaN : Number(raw);
   return Number.isFinite(n) ? n : fallback;
 }
-
-export function saveNumber(key: string, value: number): Promise<void> {
-  return storage.set(key, String(value));
-}

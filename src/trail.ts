@@ -1,5 +1,5 @@
 import { BufferAttribute, BufferGeometry, Color, DoubleSide, Mesh, MeshBasicMaterial, type Object3D } from 'three';
-import type { TrailId } from './cosmetics';
+import type { TrailId } from './looks';
 import type { LivePalette } from './palette';
 
 // Engine flames, fixed to the back of the ship so they always point straight

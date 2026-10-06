@@ -13,82 +13,19 @@ export interface Palette {
   text: string;
 }
 
-// Hand-picked. Level n uses PALETTES[(n - 1) % PALETTES.length].
-// Only the first is in use for now; the rest are candidates for later levels.
-export const PALETTES: Palette[] = [
-  {
-    name: 'bone',
-    ground: '#e6e1d6',
-    sky: '#f1ede4',
-    fog: '#d8d2c4',
-    cubeLight: '#d9a27a',
-    cubeMid: '#c07a4f',
-    cubeDark: '#8a5236',
-    ship: '#2b2824',
-    shipShade: '#57514a',
-    text: '#2b2824',
-  },
-  {
-    name: 'tidewater',
-    ground: '#dadfdb',
-    sky: '#ecefeb',
-    fog: '#c9d1cd',
-    cubeLight: '#8fb0ac',
-    cubeMid: '#5f8784',
-    cubeDark: '#3d5d5b',
-    ship: '#1f2a2a',
-    shipShade: '#4a5857',
-    text: '#1f2a2a',
-  },
-  {
-    name: 'clay',
-    ground: '#d9cfc2',
-    sky: '#ebe4d9',
-    fog: '#c8bcad',
-    cubeLight: '#a39483',
-    cubeMid: '#73665a',
-    cubeDark: '#4a4038',
-    ship: '#2e2620',
-    shipShade: '#5c5148',
-    text: '#2e2620',
-  },
-  {
-    name: 'lichen',
-    ground: '#e1dfd0',
-    sky: '#efede2',
-    fog: '#d1cebb',
-    cubeLight: '#aaa982',
-    cubeMid: '#7f805a',
-    cubeDark: '#56583c',
-    ship: '#2a2b1e',
-    shipShade: '#55573f',
-    text: '#2a2b1e',
-  },
-  {
-    name: 'ink',
-    ground: '#1c1b19',
-    sky: '#2a2825',
-    fog: '#33302c',
-    cubeLight: '#ece5d5',
-    cubeMid: '#c6bdaa',
-    cubeDark: '#8c8476',
-    ship: '#ece5d5',
-    shipShade: '#9a9284',
-    text: '#e6dfd0',
-  },
-  {
-    name: 'ember',
-    ground: '#1f2325',
-    sky: '#2c3133',
-    fog: '#363d3f',
-    cubeLight: '#e3a679',
-    cubeMid: '#c28056',
-    cubeDark: '#87573b',
-    ship: '#e9e0d1',
-    shipShade: '#9b9286',
-    text: '#e9e0d1',
-  },
-];
+// The world's base colours; the time of day and each area's biome tint them (atmosphere.ts).
+export const BASE_PALETTE: Palette = {
+  name: 'bone',
+  ground: '#e6e1d6',
+  sky: '#f1ede4',
+  fog: '#d8d2c4',
+  cubeLight: '#d9a27a',
+  cubeMid: '#c07a4f',
+  cubeDark: '#8a5236',
+  ship: '#2b2824',
+  shipShade: '#57514a',
+  text: '#2b2824',
+};
 
 export const CONFIG = {
   render: {
@@ -122,7 +59,7 @@ export const CONFIG = {
     height: 2.0,
     distanceBehind: 2.5,
     // Hangar and shop: the camera circles close to the ship so looks can be seen.
-    showroom: { distance: 1.75, height: 1.0, angle: 2.2, spin: 0.22, ease: 4, shopY: 0.29, hangarY: 0.79 },
+    showroom: { distance: 1.75, height: 1.0, angle: 2.2, spin: 0.22, ease: 4, y: 0.29 },
     maxRollDeg: 10,
     rollEase: 6, // higher = snappier
     near: 0.1,
@@ -907,7 +844,6 @@ export const CONFIG = {
   },
 
   ui: {
-    paletteFadeSeconds: 1.2, // palette cross-fade at each loop of the themes
     fadeMs: 200,
   },
 

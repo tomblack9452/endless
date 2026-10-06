@@ -2,7 +2,7 @@ import { applyAtmosphere } from './atmosphere';
 import { type AudioState, Sound } from './audio/sound';
 import type { MusicId } from './audio/music';
 import { createBlockTextures } from './blockTextures';
-import { CONFIG, PALETTES } from './config';
+import { BASE_PALETTE, CONFIG } from './config';
 import { lateralSpeedAt, speedAt } from './difficulty';
 import { Input } from './input';
 import { LivePalette } from './palette';
@@ -16,10 +16,9 @@ import { EVENT_NOTICE, Events } from './events';
 import { Weather } from './weather';
 import { Ghost } from './ghost';
 import { DECAL_SVG } from './decals';
-import { Cosmetics, describe } from './cosmetics';
 import { Haptics } from './haptics';
 import { Hints } from './hints';
-import { Missions, type RunMetrics } from './missions';
+import { migrateMissionLooks } from './legacy';
 import { Progress } from './progress';
 import { creditsFor, insignia, par, promotionBonus, Ranked, rankName, RANKS, type RunMode, xpToRank } from './ranks';
 import { Wallet } from './wallet';
@@ -44,15 +43,14 @@ import { DIVISIONS, divisionReward, emblem, LEAGUES, leagueName, leaguePar, Leag
 import { ACHIEVEMENTS, type Achievement, GROUP_NAMES, type Group, type Snapshot, achievement, progressOn, rewardKeys } from './achievements';
 import { SETS, VAULT_ORDER } from './catalogue';
 import { GoalLog } from './goals';
-import { buildWardrobe, lookIcon, lookSwatch, monthsUntilVault, type WardrobeState } from './wardrobe';
-import { WardrobeScreen } from './wardrobeView';
-import { byKey, find, itemsIn, keyOf, LOOKS, Looks, type LookItem, type Owner, type Slot, SLOT_NAMES, SLOTS, unlockText } from './looks';
+import { buildHangar, type HangarState, lookIcon, lookSwatch, monthsUntilVault } from './hangar';
+import { type HangarTab, HangarScreen } from './hangarView';
+import { byKey, find, keyOf, LOOKS, Looks, type LookItem, type Owner, type ShipId, type Slot, type TrailId, SLOT_NAMES } from './looks';
 import type { Fin, Marking } from './looks';
-import type { ShipId, TrailId } from './cosmetics';
 import { MAX_TIER, type ShipStats, STANDARD, SYSTEMS, type SystemId, TIER_COST, TIER_LEAGUE, Upgrades } from './upgrades';
 import { newSeed } from './rng';
 import { loadNumber } from './storage';
-import { type Celebration, formatScore, type LookRow, type ProgressView, type RankResultView, UI } from './ui';
+import { type Celebration, formatScore, type ProgressView, type RankResultView, UI } from './ui';
 import type { RoomId } from './interior';
 import { biomeForLevel, type PowerKind, themeForLevel, themeName, World } from './world';
 import { tintBiome } from './biomes';
@@ -64,7 +62,7 @@ const DEG = Math.PI / 180;
 const PATH_STEP = 4;
 const OWNED_KEY = 'endless.purchases';
 
-type InfoScreen = 'stats' | 'missions' | 'hangar' | 'record' | 'solo' | 'league' | 'shop' | 'pass' | 'daily' | 'boards' | 'wardrobe';
+type InfoScreen = 'stats' | 'goals' | 'hangar' | 'record' | 'solo' | 'league' | 'shop' | 'pass' | 'daily' | 'boards';
 
 /** "5 oct": the Monday this week's ranked course started. */
 /** "1:23.4" */
@@ -101,11 +99,6 @@ const PASS_ICON =
 export class Game {
   private readonly basePalette = new LivePalette(); // the level's palette
   private readonly palette = new LivePalette(); // after time of day, read by materials
-  // Palette cross-fade between theme loops.
-  private readonly fadeFrom = new LivePalette();
-  private readonly fadeTo = new LivePalette();
-  private fadeT = 1; // 1 = done
-  private paletteLoop = 0;
   private shownTextHex = -1;
   private shownPageHex = -1;
   private readonly stage: Stage;
@@ -168,10 +161,10 @@ export class Game {
   private shopPick = -1;
   private readonly dailyShop = new DailyShop();
   private readonly goalLog = new GoalLog();
-  private readonly wardrobeUi = new WardrobeScreen();
-  private ward: WardrobeState = { slot: 'hull', pick: null };
-  private wardrobeFrom: 'shop' | 'hangar' | null = null;
-  private missionsTab: 'missions' | 'goals' = 'missions';
+  private readonly hangarUi = new HangarScreen();
+  private hangar: HangarState = { slot: 'hull', pick: null };
+  private hangarUpgrades = false; // the upgrades chip is open, not a slot of looks
+  private hangarFrom: 'shop' | null = null; // where Back goes
   // Ranked: the ship's sideways position every PATH_STEP units (the leaderboard check, and later the ghost).
   private path: number[] = [];
   private pathTimes: number[] = [];
@@ -187,30 +180,21 @@ export class Game {
   private course: Course | null = null;
   private sectionIdx = -1;
   private hitThisRun = false; // anything hit, even a shield save (course stars)
-  private beatPar = false; // ranked: scored at least the league par (missions)
-  private finishedRun = false; // crossed a finish line (missions)
   private finishMs = 0;
   private readonly upgrades = new Upgrades();
   private readonly leagues = new Leagues();
   /** This run's ship systems (your switched-on upgrades). */
   private ship: ShipStats = STANDARD;
-  private hangarTab: 'ship' | 'upgrades' = 'ship';
   private readonly looks = new Looks();
   /** A locked look being tried on in the hangar (not yet owned). */
   private preview: { slot: Slot; id: string } | null = null;
   private pickupCount = 0;
   private recorded = false; // this run's stats are saved
   private assisted = false; // assist mode was on at some point this run
-  private readonly cosmetics = new Cosmetics();
-  private readonly rankedMissions = new Missions('ranked', 'endless.missions.ranked');
-  private readonly soloMissions = new Missions('solo', 'endless.missions');
-  /** Which info screen is open from the title (stats, missions, hangar), if any. */
+  /** Which info screen is open from the title (stats, goals, hangar), if any. */
   private infoOpen: InfoScreen | null = null;
-  // Run metrics for missions.
   private boostSeconds = 0;
-  private boosted = false;
   private roomsEntered = 0;
-  private missionTimer = 0;
   private shownSky = -1;
   private runTime = 0; // seconds into the current run
 
@@ -253,8 +237,8 @@ export class Game {
   private titleTime = 0;
 
   constructor(canvas: HTMLCanvasElement) {
-    this.basePalette.set(PALETTES[0]);
-    this.palette.set(PALETTES[0]);
+    this.basePalette.set(BASE_PALETTE);
+    this.palette.set(BASE_PALETTE);
     this.stage = new Stage(canvas, this.palette);
     const textures = CONFIG.blocks.textured
       ? createBlockTextures(this.stage.renderer.capabilities.getMaxAnisotropy())
@@ -301,7 +285,7 @@ export class Game {
     window.addEventListener('online', () => void this.outbox.flush());
     const now = Date.now();
     // Looks load once; a login reward can give one, so it waits for them.
-    const looksReady = Promise.all([this.cosmetics.load(), this.looks.load()]);
+    const looksReady = this.looks.load().then(() => migrateMissionLooks(this.looks));
     void Promise.all([
       this.progress.load(),
       this.ranked.load(),
@@ -328,41 +312,23 @@ export class Game {
       void this.connect();
     });
     this.econ.bindShop(this.onShopOffer, this.onShopBuy, this.onShopTicket, this.onShopCores, this.onShopTab);
-    this.wardrobeUi.bindWardrobe({
-      slot: (slot) => this.onWardrobeSlot(slot),
-      pick: (id) => this.onWardrobePick(id),
-      action: () => this.onWardrobeAction(),
-      open: () => this.openWardrobe(undefined, this.infoOpen === 'shop' ? 'shop' : 'hangar'),
-    });
-    this.wardrobeUi.bindGoals((tab) => {
-      this.missionsTab = tab;
-      this.wardrobeUi.setMissionsTab(tab);
-      if (tab === 'goals') this.renderGoals();
+    this.hangarUi.bindHangar({
+      tab: (tab) => this.onHangarTab(tab),
+      pick: (id) => this.onHangarPick(id),
+      action: () => this.onHangarAction(),
+      open: () => this.openHangar({ from: 'shop' }),
     });
     this.econ.bindPass(this.onPassPremium, () => void this.buyProduct('season_pass'));
     this.econ.bindDaily(() => this.claimLogin());
     this.ui.titleLeague.addEventListener('pointerdown', (e) => e.stopPropagation());
     this.ui.titleLeague.addEventListener('click', () => this.openLeague());
-    this.ui.bindLooks(this.onLookRow, this.onLookBuy);
     this.ui.bindSolo((i) => this.startCourse(i), (i) => this.startSolo(i));
-    this.ui.bindHangarTabs((tab) => {
-      this.hangarTab = tab;
-      this.openHangar();
-    });
     this.ui.bindUpgrades(this.onBuyUpgrade, (id) => {
       this.upgrades.toggle(id as SystemId);
       this.haptics.pickup();
-      this.openHangar();
+      this.renderHangar(true);
     });
-    void this.rankedMissions.load();
-    void this.soloMissions.load();
-    void looksReady.then(() => {
-      // Saves from before the hangar had looks: carry the mission hull across.
-      if (this.looks.equipped.hull === 'dart' && this.cosmetics.ship !== 'dart') this.looks.equip('hull', this.cosmetics.ship);
-      // Flames used to be picked on their own; they're a look now.
-      if (this.looks.equipped.trail === 'none' && this.cosmetics.trail !== 'none') this.looks.equip('trail', this.cosmetics.trail);
-      this.applyCosmetics();
-    });
+    void looksReady.then(() => this.applyLooks());
     void loadSettings().then((s) => {
       this.settings = s;
       this.applySettings();
@@ -406,8 +372,6 @@ export class Game {
     this.world.setEnvironment(env);
     this.sectionIdx = -1;
     this.hitThisRun = false;
-    this.beatPar = false;
-    this.finishedRun = false;
     this.scoreBase = 0;
     this.world.assist = this.assistOn();
     // Your switched-on upgrades (ranked checks them against the league's cap before starting).
@@ -418,12 +382,9 @@ export class Game {
     this.pickupCount = 0;
     this.recorded = false;
     this.assisted = this.assistOn();
-    this.boostSeconds = this.roomsEntered = this.missionTimer = 0;
-    this.boosted = false;
+    this.boostSeconds = this.roomsEntered = 0;
     this.infoOpen = null;
-    this.paletteLoop = 0;
-    this.fadeT = 1;
-    this.applyCosmetics();
+    this.applyLooks();
     this.world.reset(CONFIG.field.startClearance, true, startScore, seed);
     const level = Math.floor(startScore / CONFIG.score.levelLength) + 1;
     this.sound.ignite();
@@ -516,7 +477,6 @@ export class Game {
       const pct = Math.floor((100 * (this.world.distance - this.world.finishAt + length)) / length);
       this.ui.setGameOverExtra(`${Math.max(0, Math.min(99, pct))}% of ${this.course.name}${extra ? ' · ' + extra : ''}`);
     } else this.ui.setGameOverExtra(extra);
-    this.ui.setGameOverMissions(this.poolMissions().lines());
   }
 
   /**
@@ -548,20 +508,16 @@ export class Game {
   private finishRun(crashedIn: string | null): string {
     if (this.recorded) return '';
     this.recorded = true;
-    this.progress.recordRun(
-      {
-        score: this.assisted ? 0 : this.score,
-        level: this.level,
-        distance: this.world.distance,
-        seconds: this.runTime,
-        nearMisses: this.nearMissCount,
-        bestChain: this.bestChain,
-        pickups: this.pickupCount,
-        crashedIn,
-      },
-      false,
-    );
-    for (const done of this.poolMissions().endRun(this.metrics())) this.missionDone(done);
+    this.progress.recordRun({
+      score: this.assisted ? 0 : this.score,
+      level: this.level,
+      distance: this.world.distance,
+      seconds: this.runTime,
+      nearMisses: this.nearMissCount,
+      bestChain: this.bestChain,
+      pickups: this.pickupCount,
+      crashedIn,
+    });
     const lines: string[] = [];
     // Ranked pays full rate; solo, set levels and endless half.
     let credits = creditsFor(this.assisted ? 0 : this.score, this.mode === 'ranked');
@@ -1145,8 +1101,6 @@ export class Game {
     this.submitToBoard('ranked', finished);
     this.ui.showShare(true);
     const target = this.weekly.target;
-    this.beatPar = this.score >= leaguePar(lg.league, target);
-    this.finishedRun = finished;
     const r = this.ranked.record(this.mode, this.score, this.level, this.seed, Date.now(), target, this.weekly.id);
     const promoted = r.rankAfter > r.rankBefore;
     const leagueLines: string[] = [];
@@ -1477,11 +1431,6 @@ export class Game {
     return this.settings.assist && this.mode !== 'ranked';
   }
 
-  /** The mission pool this run counts towards. */
-  private poolMissions(): Missions {
-    return this.mode === 'ranked' ? this.rankedMissions : this.soloMissions;
-  }
-
   /** What the HUD and game-over screen call this run. */
   private modeLabel(): string {
     if (this.mode === 'ranked') return `ranked · ${this.weekly.name}`;
@@ -1501,54 +1450,6 @@ export class Game {
 
   private areaMusic(level: number): MusicId {
     return this.environment ? musicForArea(this.environment.theme, this.environment.biome) : musicFor(level);
-  }
-
-  private metrics(): RunMetrics {
-    let levelStars = 0;
-    for (const c of COURSES) levelStars += [1, 2, 4].filter((b) => this.progress.course(c.id).stars & b).length;
-    return {
-      ranked: this.mode === 'ranked',
-      // Set levels have no level numbers to reach.
-      level: this.course ? 0 : this.level,
-      score: this.assisted ? 0 : this.score,
-      nearMisses: this.nearMissCount,
-      bestChain: this.bestChain,
-      pickups: this.pickupCount,
-      boostSeconds: this.boostSeconds,
-      rooms: this.roomsEntered,
-      boosted: this.boosted,
-      finished: this.finishedRun,
-      clean: !this.hitThisRun,
-      beatPar: this.beatPar,
-      levelStars,
-    };
-  }
-
-  /** A mission is complete: say so and unlock the next cosmetic. */
-  private missionDone(text: string): void {
-    const u = this.cosmetics.unlockNext();
-    this.ui.showNotice(u ? `done: ${text}. unlocked ${describe(u)}` : `done: ${text}`);
-    this.sound.pickup();
-    this.haptics.level(false);
-    this.checkGoals();
-  }
-
-  /** Ship shape, trail and the chosen palette (outside a run's later loops). */
-  private applyCosmetics(): void {
-    const c = this.cosmetics;
-    this.applyLooks();
-    this.basePalette.set(PALETTES.find((p) => p.name === c.palette) ?? PALETTES[0]);
-    this.applyLook(this.distanceScore / CONFIG.score.levelLength);
-  }
-
-  /** Each loop of the themes fades the world to the next unlocked palette. */
-  private startPaletteFade(loop: number): void {
-    const list = this.cosmetics.palettes();
-    if (list.length < 2) return;
-    const name = list[(list.indexOf(this.cosmetics.palette) + loop) % list.length];
-    this.fadeFrom.copy(this.basePalette);
-    this.fadeTo.set(PALETTES.find((p) => p.name === name) ?? PALETTES[0]);
-    this.fadeT = 0;
   }
 
   /** The player as the goals see them (everything here is already saved: nothing extra is tracked). */
@@ -1574,21 +1475,18 @@ export class Game {
       envBest: this.progress.envBest,
       coursesDone: COURSES.filter((c) => this.progress.course(c.id).stars & 1).length,
       stars: this.progress.totalStars(),
-      missions: this.cosmetics.unlocked,
       upgradePoints: this.upgrades.points(),
       looksOwned: 0,
     };
   }
 
   private ownerFor(snap: Snapshot): Owner {
-    // Dev "unlock all" opens every look: every mission unlock, plenty of stars, every goal done.
+    // Dev "unlock all" opens every look: plenty of stars, every goal done.
     const all = this.dev.unlockedAll;
-    const mission = new Set<string>(all ? LOOKS.filter((l) => l.unlock.by === 'mission').map(keyOf) : [...this.cosmetics.ships().map((id) => `hull:${id}`), ...this.cosmetics.trails().map((id) => `trail:${id}`)]);
     return {
       rank: this.ranked.rank,
       stars: all ? 999 : this.progress.totalStars(),
       league: this.leagues.league,
-      mission,
       goal: (id) => {
         const a = achievement(id);
         if (all) return { have: a?.target ?? 1, target: a?.target ?? 1, done: true };
@@ -1615,98 +1513,70 @@ export class Game {
     this.trail.setStyle(eq.trail as TrailId);
   }
 
-  /** Ship tab rows: tap a slot to open the wardrobe on it; world colours cycle (they come from missions). */
-  private onLookRow = (key: string): void => {
-    if (key === 'palette') {
-      this.preview = null;
-      this.cosmetics.cycle(key);
-      this.applyCosmetics();
-      this.openHangar();
-      return;
-    }
-    this.openWardrobe(key as Slot, 'hangar');
-  };
+  // --- the hangar: looks by slot, and the ship's upgrades ---------------------------------------
 
-  private onLookBuy = (): void => {};
-
-  private renderLooks(): void {
-    const o = this.owner();
-    const rows = SLOTS.map((slot): LookRow => {
-      const id = this.preview?.slot === slot ? this.preview.id : this.looks.equipped[slot];
-      const item = find(slot, id);
-      const owned = this.looks.owns(item, o);
-      const count = itemsIn(slot).filter((i) => this.looks.owns(i, o)).length;
-      return {
-        key: slot,
-        label: SLOT_NAMES[slot],
-        value: owned ? `${item.name} (${count}/${itemsIn(slot).length})` : item.name,
-        locked: !owned,
-        note: unlockText(item.unlock),
-      };
-    });
-    const c = this.cosmetics;
-    rows.push({ key: 'palette', label: 'world colours', value: `${c.palette} (${c.palettes().length})`, locked: false, note: '' });
-    const owned = LOOKS.filter((l) => this.looks.owns(l, o)).length;
-    this.ui.renderLooks(rows, null, `${owned} of ${LOOKS.length} looks · tap one to open the wardrobe`);
-  }
-
-  // --- the wardrobe ----------------------------------------------------------------------------
-
-  private openWardrobe(slot: Slot | undefined, from: 'shop' | 'hangar'): void {
-    if (slot) this.ward = { slot, pick: null };
-    else this.ward = { ...this.ward, pick: null };
-    this.wardrobeFrom = from;
+  /** Open the hangar on a slot of looks (or on the upgrades). `from: 'shop'` makes Back return to the shop. */
+  private openHangar(opts: { slot?: Slot; upgrades?: boolean; from?: 'shop' } = {}): void {
+    this.hangar = { slot: opts.slot ?? this.hangar.slot, pick: null };
+    this.hangarUpgrades = opts.upgrades ?? false;
+    this.hangarFrom = opts.from ?? null;
     this.preview = null;
     this.applyLooks();
-    this.renderWardrobe(false);
+    this.renderHangar(false);
+    // Show the ship (and its engine) over the title scene while choosing.
     this.player.reset();
     this.player.setVisible(true);
     this.trail.setVisible(true);
-    this.openInfo('wardrobe');
+    this.openInfo('hangar');
   }
 
-  private renderWardrobe(keepScroll: boolean): void {
+  private renderHangar(keepScroll: boolean): void {
     const now = new Date();
     const v = vaultAt(now.getTime());
     const month = now.getUTCFullYear() * 12 + now.getUTCMonth();
-    this.wardrobeUi.renderWardrobe(
-      buildWardrobe(this.ward, {
-        looks: this.looks,
-        owner: this.owner(),
-        credits: this.wallet.credits,
-        cores: this.wallet.cores,
-        vault: { key: keyOf(v.item), monthsUntil: (key) => monthsUntilVault(key, VAULT_ORDER, month) },
-      }),
-      keepScroll,
-    );
+    const view = buildHangar(this.hangar, {
+      looks: this.looks,
+      owner: this.owner(),
+      credits: this.wallet.credits,
+      cores: this.wallet.cores,
+      vault: { key: keyOf(v.item), monthsUntil: (key) => monthsUntilVault(key, VAULT_ORDER, month) },
+    });
+    this.renderUpgrades();
+    const credits = `${formatScore(this.wallet.credits)} credits`;
+    this.hangarUi.renderHangar(view, keepScroll, {
+      upgrades: this.hangarUpgrades,
+      upgradeTag: `${this.upgrades.points()}/${SYSTEMS.length * MAX_TIER}`,
+      summary: this.hangarUpgrades ? credits : `${view.summary} · ${credits} · ${formatScore(this.wallet.cores)} cores`,
+    });
   }
 
-  private onWardrobeSlot(slot: Slot): void {
-    this.ward = { slot, pick: null };
+  private onHangarTab(tab: HangarTab): void {
+    this.hangarUpgrades = tab === 'upgrades';
+    this.hangar = { slot: tab === 'upgrades' ? this.hangar.slot : tab, pick: null };
     this.preview = null;
     this.applyLooks();
-    this.renderWardrobe(false);
+    this.renderHangar(false);
   }
 
   /** Tap a look: it goes on the ship to see (owned or not); the button underneath puts it on for good, or buys it. */
-  private onWardrobePick(id: string): void {
-    this.ward.pick = id;
-    this.preview = { slot: this.ward.slot, id };
+  private onHangarPick(id: string): void {
+    this.hangar.pick = id;
+    this.preview = { slot: this.hangar.slot, id };
     this.haptics.pickup();
     this.applyLooks();
-    this.renderWardrobe(true);
+    this.renderHangar(true);
   }
 
-  private onWardrobeAction(): void {
-    const id = this.ward.pick;
+  private onHangarAction(): void {
+    const id = this.hangar.pick;
     if (!id) return;
-    const item = find(this.ward.slot, id);
+    const item = find(this.hangar.slot, id);
     if (this.looks.owns(item, this.owner())) {
       this.looks.equip(item.slot, item.id);
       this.preview = null;
       this.sound.pickup();
       this.applyLooks();
-      this.renderWardrobe(true);
+      this.renderHangar(true);
       return;
     }
     const u = item.unlock;
@@ -1719,7 +1589,7 @@ export class Game {
     } else return;
     this.looks.buy(item);
     this.afterBuy([item], `${item.name} bought and on your ship`);
-    this.renderWardrobe(true);
+    this.renderHangar(true);
   }
 
   // --- goals ---------------------------------------------------------------------------------------
@@ -1740,7 +1610,7 @@ export class Game {
       }),
     }));
     const done = ACHIEVEMENTS.filter((a) => progressOn(a, snap).done).length;
-    this.wardrobeUi.renderGoals(`${done} of ${ACHIEVEMENTS.length}`, 'finish a goal for credits and a look to wear. they count everything you do, from the start', groups);
+    this.hangarUi.renderGoals(`${done} of ${ACHIEVEMENTS.length}`, 'finish a goal for credits and a look to wear. they count everything you do, from the start', groups);
   }
 
   /**
@@ -1789,10 +1659,15 @@ export class Game {
     this.sound.pickup();
     this.haptics.pickup();
     this.refreshTitle();
-    this.openHangar();
+    this.renderHangar(true);
   };
 
   private renderUpgrades(): void {
+    const lg = this.leagues.current;
+    const active = this.upgrades.activePoints();
+    this.ui.setUpgradeNote(
+      `${active} of ${this.upgrades.points()} points on · ${lg.name} league cap ${lg.max}${active > lg.max ? ' (over: switch some off for ranked)' : ''}. solo, levels and endless have no cap.`,
+    );
     this.ui.renderUpgrades(
       SYSTEMS.map((s) => {
         const tier = this.upgrades.tier(s.id);
@@ -1812,29 +1687,9 @@ export class Game {
     );
   }
 
-  private openHangar(): void {
-    this.renderUpgrades();
-    const lg = this.leagues.current;
-    const active = this.upgrades.activePoints();
-    this.ui.setUpgradeNote(
-      `${active} of ${this.upgrades.points()} points on · ${lg.name} league cap ${lg.max}${active > lg.max ? ' (over: switch some off for ranked)' : ''}. solo, levels and endless have no cap.`,
-    );
-    this.ui.setHangarTab(this.hangarTab, `${formatScore(this.wallet.credits)} credits`);
-    this.renderLooks();
-    // Show the ship (and its engine) over the title scene while choosing.
-    this.player.reset();
-    this.player.setVisible(true);
-    this.trail.setVisible(true);
-    this.openInfo('hangar');
-  }
-
-  private openMissions(): void {
-    const next = this.cosmetics.next();
-    const rows: [string, string][] = [['RANKED', ''], ...this.rankedMissions.lines(), ['SOLO, LEVELS AND ENDLESS', ''], ...this.soloMissions.lines()];
-    this.ui.renderMissions(rows, next ? `next unlock: ${describe(next)}` : 'everything unlocked');
+  private openGoals(): void {
     this.renderGoals();
-    this.wardrobeUi.setMissionsTab(this.missionsTab);
-    this.openInfo('missions');
+    this.openInfo('goals');
   }
 
   private openInfo(which: InfoScreen): void {
@@ -1887,9 +1742,8 @@ export class Game {
     if (active > cap) {
       // Over the cap: choose which systems to switch off first.
       this.ui.showNotice(`${active} upgrade points on, ${this.leagues.current.name} allows ${cap}. switch some off`);
-      this.hangarTab = 'upgrades';
       if (this.state === 'crashed') this.toMainMenu();
-      this.openHangar();
+      this.openHangar({ upgrades: true });
       return;
     }
     // One ticket per attempt.
@@ -1927,7 +1781,7 @@ export class Game {
     else if (name === 'solo') this.openSolo();
     else if (name === 'record') this.openRecord();
     else if (name === 'stats') this.openStats();
-    else if (name === 'missions') this.openMissions();
+    else if (name === 'goals') this.openGoals();
     else if (name === 'hangar') this.openHangar();
     else if (name === 'shop') {
       this.shopPick = -1;
@@ -2041,17 +1895,15 @@ export class Game {
   };
 
   private closeInfo(): void {
-    if (this.infoOpen === 'wardrobe' && this.wardrobeFrom) {
-      // Back to where the wardrobe was opened from, not all the way out.
-      const from = this.wardrobeFrom;
-      this.wardrobeFrom = null;
+    if (this.infoOpen === 'hangar' && this.hangarFrom === 'shop') {
+      // Back to the shop it was opened from, not all the way out.
+      this.hangarFrom = null;
       this.preview = null;
       this.applyLooks();
-      if (from === 'shop') this.openShop();
-      else this.openHangar();
+      this.openShop();
       return;
     }
-    if (this.infoOpen === 'hangar' || this.infoOpen === 'shop' || this.infoOpen === 'wardrobe') {
+    if (this.infoOpen === 'hangar' || this.infoOpen === 'shop') {
       // Leaving the hangar takes off anything only being tried on.
       this.preview = null;
       this.applyLooks();
@@ -2123,9 +1975,7 @@ export class Game {
     this.trail.setVisible(false);
     this.events.clear();
     this.sound.setWind(0);
-    this.fadeT = 1;
-    this.paletteLoop = 0;
-    this.applyCosmetics();
+    this.applyLooks();
     this.world.reset(0, false);
     this.level = 1;
     this.applyLook(0);
@@ -2163,9 +2013,6 @@ export class Game {
     this.ranked.xp = Math.max(this.ranked.xp, RANKS[RANKS.length - 1].xp);
     this.ranked.skill = this.ranked.highestSkill = 50;
     this.ranked.save();
-    while (this.cosmetics.unlockNext()) {
-      // every mission unlock
-    }
     this.looks.buyAll();
     this.leagues.devTop();
     this.dev.unlockedAll = true;
@@ -2254,10 +2101,6 @@ export class Game {
   /** Apply time of day for `levelProgress` (score / levelLength) to every material and the UI. */
   private applyLook(levelProgress: number): void {
     const w = this.world;
-    if (this.fadeT < 1) {
-      this.fadeT = Math.min(1, this.fadeT + 1 / 60 / CONFIG.ui.paletteFadeSeconds);
-      this.basePalette.mix(this.fadeFrom, this.fadeTo, this.fadeT * this.fadeT * (3 - 2 * this.fadeT));
-    }
     const space = Math.max(w.deckMix, w.asteroidMix);
     applyAtmosphere(this.basePalette, this.palette, levelProgress, w.canyonMix, w.interiorMix, space, this.settings.contrast);
     if (!this.settings.contrast) {
@@ -2300,12 +2143,12 @@ export class Game {
 
   private updateTitle(dt: number): void {
     this.titleTime += dt;
-    const showroom = this.infoOpen === 'hangar' || this.infoOpen === 'shop' || this.infoOpen === 'wardrobe';
+    const showroom = this.infoOpen === 'hangar' || this.infoOpen === 'shop';
     const S = CONFIG.camera.showroom;
     if (showroom) {
       this.trail.update(dt, 0, this.player.engineHalfSpan);
       this.showroomTime += dt;
-      this.stage.showroomY = this.infoOpen === 'hangar' ? S.hangarY : S.shopY;
+      this.stage.showroomY = S.y;
     }
     this.stage.showroom += ((showroom ? 1 : 0) - this.stage.showroom) * (1 - Math.exp(-S.ease * dt));
     this.stage.showroomAngle = S.angle + this.showroomTime * S.spin;
@@ -2344,7 +2187,6 @@ export class Game {
     this.trail.update(dt, this.boostLevel, this.player.engineHalfSpan);
     if (this.boosting) {
       this.boostSeconds += dt;
-      this.boosted = true;
     }
 
     const prev = this.world.distance;
@@ -2390,11 +2232,6 @@ export class Game {
       this.sound.level(themeChange, this.areaMusic(level));
       this.haptics.level(themeChange);
       this.maybeStartEvent(level);
-      const loop = Math.floor((level - 1) / (CONFIG.themes.levelsPerTheme * 3));
-      if (loop !== this.paletteLoop) {
-        this.paletteLoop = loop;
-        this.startPaletteFade(loop);
-      }
     }
     if (!this.course) {
       this.ui.setProgress(progress - (level - 1));
@@ -2444,11 +2281,6 @@ export class Game {
     }
     this.score = this.distanceScore - this.scoreBase + this.bonus;
     this.ui.setScore(this.score);
-    this.missionTimer += dt;
-    if (this.missionTimer > 0.5) {
-      this.missionTimer = 0;
-      for (const done of this.poolMissions().check(this.metrics())) this.missionDone(done);
-    }
 
     this.updateCamera(dt);
     this.sky.update(dt);
@@ -2592,7 +2424,6 @@ export class Game {
     const best = this.progress.course(c.id);
     this.ui.setOverHeading('level complete');
     this.ui.setGameOver(this.score, best.score, this.score >= best.score, this.nearMissCount, this.bestChain, this.seed);
-    this.finishedRun = true;
     const extra = this.finishRun(null);
     this.wallet.add(starCredits);
     const starText = [1, 2, 4].map((b) => (stars & b ? '★' : '☆')).join('');
@@ -2602,7 +2433,6 @@ export class Game {
     if (!(stars & 4)) lines.push(`score ${formatScore(c.target)} for the third star`);
     lines.push(extra);
     this.ui.setGameOverExtra(lines.join(' · '));
-    this.ui.setGameOverMissions(this.poolMissions().lines());
     this.refreshTitle();
   }
 

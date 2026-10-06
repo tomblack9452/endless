@@ -64,7 +64,7 @@ export const RANKS: readonly Rank[] = [
   r('general', 4, 50000, 50, 12),
 ];
 
-export const MAX_SKILL = 50;
+const MAX_SKILL = 50;
 const DAILY_BONUS_RUNS = 3; // first runs each day earn double XP
 const MIN_SCORE_FOR_XP = 500; // a run that crashes straight away earns nothing
 
@@ -81,7 +81,7 @@ export function rankFor(xp: number, highestSkill: number): number {
 }
 
 /** A typical weekly level's score target (for when there isn't one to hand). */
-export const DEFAULT_TARGET = 10000;
+const DEFAULT_TARGET = 10000;
 
 /** Par score at a skill level for a course with score target `target`: beat it to climb. */
 export function par(skill: number, target = DEFAULT_TARGET): number {

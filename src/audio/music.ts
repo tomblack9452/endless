@@ -29,7 +29,7 @@ interface ThemeMusic {
 /** A theme, or one of the biomes that has its own music. */
 export type MusicId = ThemeId | 'ice' | 'volcanic' | 'asteroids';
 
-export const THEME_MUSIC: Record<MusicId, ThemeMusic> = {
+const THEME_MUSIC: Record<MusicId, ThemeMusic> = {
   // D major pentatonic: open and airy.
   land: {
     scale: [0, 2, 4, 7, 9],

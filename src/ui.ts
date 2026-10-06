@@ -1,7 +1,7 @@
 import { CONFIG } from './config';
 import { label, type SettingKey, type Settings } from './settings';
 
-export type ScreenName = 'title' | 'paused' | 'over' | 'settings' | 'stats' | 'missions' | 'hangar' | 'record' | 'solo' | 'league' | 'shop' | 'pass' | 'daily' | 'boards' | 'wardrobe';
+export type ScreenName = 'title' | 'paused' | 'over' | 'settings' | 'stats' | 'goals' | 'hangar' | 'record' | 'solo' | 'league' | 'shop' | 'pass' | 'daily' | 'boards';
 
 /** Everything the league screen shows. */
 /** The service record and league screens share one layout. */
@@ -32,16 +32,7 @@ export interface Celebration {
   color?: string; // league colour for the glow
 }
 
-/** One row on the hangar's ship tab. */
-export interface LookRow {
-  key: string;
-  label: string;
-  value: string;
-  locked: boolean;
-  note: string; // how to unlock, when locked
-}
-
-/** One row on the upgrades tab. */
+/** One row on the hangar's upgrades tab. */
 export interface UpgradeRow {
   id: string;
   name: string;
@@ -71,15 +62,6 @@ export interface EnvTile {
   need: string;
   toGo: string;
   fraction: number; // 0..1 towards the unlock
-}
-
-/** One tile on the sector map. */
-export interface SectorTile {
-  index: number;
-  name: string;
-  levels: string;
-  stars: number; // star bits
-  locked: boolean;
 }
 
 /** Everything the service record screen shows. */
@@ -136,7 +118,7 @@ export class UI {
     over: $('screen-over'),
     settings: $('screen-settings'),
     stats: $('screen-stats'),
-    missions: $('screen-missions'),
+    goals: $('screen-goals'),
     hangar: $('screen-hangar'),
     record: $('screen-record'),
     solo: $('screen-sectors'),
@@ -145,17 +127,12 @@ export class UI {
     pass: $('screen-pass'),
     daily: $('screen-daily'),
     boards: $('screen-boards'),
-    wardrobe: $('screen-wardrobe'),
   };
   readonly titleLeague = $('title-league');
   private readonly hudMode = $('hud-mode');
   private readonly overMode = $('over-mode');
   private readonly overRank = $('over-rank');
   readonly titleRank = $('title-rank');
-  private readonly missionsRows = $('missions-rows');
-  private readonly missionsNext = $('missions-next');
-  private readonly hangarCount = $('hangar-count');
-  private readonly overMissions = $('over-missions');
   private readonly hudPower = $('hud-power');
   private shownPower = '';
   private readonly statsRows = $('stats-rows');
@@ -306,12 +283,6 @@ export class UI {
     this.rankedSub.textContent = text;
   }
 
-  setTitleLink(name: string, text: string): void {
-    const el = document.querySelector<HTMLElement>(`[data-title="${name}"]`);
-    if (el) el.textContent = text;
-  }
-
-
   // --- leaderboard screen ---------------------------------------------------------
 
   /** Wire the tabs and the name box. Taps and keys here never start a run. */
@@ -400,31 +371,10 @@ export class UI {
     this.fillRows(this.statsRows, rows);
   }
 
-  /** Missions screen: each mission with its progress, and what the next one unlocks. */
-  renderMissions(rows: [string, string][], next: string): void {
-    this.fillRows(this.missionsRows, rows);
-    this.missionsNext.textContent = next;
-  }
-
   /** Run mode under the level number and above the game-over score. */
   setMode(text: string): void {
     this.hudMode.textContent = text;
     this.overMode.textContent = text;
-  }
-
-  bindHangarTabs(onTab: (tab: 'ship' | 'upgrades') => void): void {
-    for (const el of document.querySelectorAll<HTMLElement>('[data-tab]')) {
-      el.addEventListener('pointerdown', (e) => e.stopPropagation());
-      el.addEventListener('click', () => onTab(el.dataset.tab as 'ship' | 'upgrades'));
-    }
-  }
-
-  /** Show a hangar tab. The ship tab leaves the lower screen clear to see the ship. */
-  setHangarTab(tab: 'ship' | 'upgrades', credits: string): void {
-    for (const el of document.querySelectorAll<HTMLElement>('[data-tab]')) el.classList.toggle('on', el.dataset.tab === tab);
-    for (const el of document.querySelectorAll<HTMLElement>('[data-pane]')) el.hidden = el.dataset.pane !== tab;
-    this.screens.hangar.classList.toggle('top', tab === 'ship');
-    $('hangar-credits').textContent = credits;
   }
 
   bindUpgrades(onBuy: (id: string) => void, onToggle: (id: string) => void): void {
@@ -573,47 +523,6 @@ export class UI {
 
   setOverHeading(text: string): void {
     $('over-heading').textContent = text;
-  }
-
-  /** Taps on unlocked sector tiles call `onPick` with the sector index. */
-  bindSectors(onPick: (sector: number) => void): void {
-    const grid = $('sectors-grid');
-    grid.addEventListener('pointerdown', (e) => e.stopPropagation());
-    grid.addEventListener('click', (e) => {
-      const tile = (e.target as HTMLElement).closest<HTMLElement>('.sector');
-      if (tile && !tile.classList.contains('locked')) onPick(Number(tile.dataset.sector));
-    });
-  }
-
-  renderSectors(tiles: SectorTile[], summary: string): void {
-    $('sectors-summary').textContent = summary;
-    const rows: HTMLElement[] = [];
-    for (let i = 0; i < tiles.length; i += 3) {
-      const head = document.createElement('div');
-      head.className = 'settings-group sector-loop';
-      head.textContent = `loop ${i / 3 + 1}`;
-      const row = document.createElement('div');
-      row.className = 'sector-row';
-      for (const t of tiles.slice(i, i + 3)) {
-        const b = document.createElement('button');
-        b.type = 'button';
-        b.className = `sector${t.locked ? ' locked' : ''}`;
-        b.dataset.sector = String(t.index);
-        const name = document.createElement('span');
-        name.className = 'sector-name';
-        name.textContent = t.locked ? 'locked' : t.name;
-        const levels = document.createElement('span');
-        levels.className = 'sector-levels';
-        levels.textContent = t.levels;
-        const stars = document.createElement('span');
-        stars.className = 'sector-stars';
-        stars.textContent = [1, 2, 4].map((bit) => (t.stars & bit ? '★' : '☆')).join('');
-        b.append(name, levels, stars);
-        row.append(b);
-      }
-      rows.push(head, row);
-    }
-    $('sectors-grid').replaceChildren(...rows);
   }
 
   /** League badge on the title screen. */
@@ -788,62 +697,6 @@ export class UI {
     if (text === this.shownPower) return;
     this.shownPower = text;
     this.hudPower.textContent = text;
-  }
-
-  /** Mission progress under the game-over score. */
-  setGameOverMissions(rows: [string, string][]): void {
-    this.overMissions.replaceChildren(
-      ...rows.map(([text, prog]) => {
-        const line = document.createElement('div');
-        line.className = 'over-mission';
-        const a = document.createElement('span');
-        a.textContent = text;
-        const b = document.createElement('span');
-        b.className = 'over-mission-progress';
-        b.textContent = prog;
-        line.append(a, b);
-        return line;
-      }),
-    );
-  }
-
-  /** Ship tab: a row tap cycles that slot; the buy button buys what's being previewed. */
-  bindLooks(onRow: (key: string) => void, onBuy: () => void): void {
-    const rows = $('look-rows');
-    rows.addEventListener('pointerdown', (e) => e.stopPropagation());
-    rows.addEventListener('click', (e) => {
-      const row = (e.target as HTMLElement).closest<HTMLElement>('[data-look]');
-      if (row) onRow(row.dataset.look ?? '');
-    });
-    const buy = $('look-buy');
-    buy.addEventListener('pointerdown', (e) => e.stopPropagation());
-    buy.addEventListener('click', () => onBuy());
-  }
-
-  renderLooks(rows: LookRow[], buy: { text: string; enabled: boolean } | null, note: string): void {
-    $('look-rows').replaceChildren(
-      ...rows.map((r) => {
-        const b = document.createElement('button');
-        b.type = 'button';
-        b.className = 'setting-row';
-        b.dataset.look = r.key;
-        const name = document.createElement('span');
-        name.className = 'label';
-        name.textContent = r.label;
-        const value = document.createElement('span');
-        value.className = `value${r.locked ? ' locked' : ''}`;
-        value.textContent = r.locked ? `${r.value} · ${r.note}` : r.value;
-        b.append(name, value);
-        return b;
-      }),
-    );
-    const btn = $('look-buy') as HTMLButtonElement;
-    btn.hidden = !buy;
-    if (buy) {
-      btn.textContent = buy.text;
-      btn.disabled = !buy.enabled;
-    }
-    this.hangarCount.textContent = note;
   }
 
   fillRows(into: HTMLElement, rows: [string, string][]): void {

@@ -86,7 +86,7 @@ export const ROCK_HIT = 0.88;
 /** Mesas are round: a box this fraction of the radius fits them closely. */
 export const MESA_HIT = 0.92;
 /** A tumbleweed is a ring of wire loops about half a unit in radius; its box is a little inside that. */
-export const TUMBLEWEED_HIT = 0.45;
+const TUMBLEWEED_HIT = 0.45;
 /** Room families in the order of CONFIG.themes.interior.familyLooks. */
 const FAMILY_LOOK_IDS = Object.keys(CONFIG.themes.interior.familyLooks); // a bridge edge moving more than this in a row has jumped, not bent // pit sides: a thin steel lip, then black
 

@@ -13,9 +13,8 @@ import {
   Scene,
   Vector3,
 } from 'three';
-import type { Fin, Marking } from './looks';
+import type { Fin, Marking, ShipId } from './looks';
 import { CONFIG } from './config';
-import type { ShipId } from './cosmetics';
 import type { LivePalette } from './palette';
 
 const DEG = Math.PI / 180;
