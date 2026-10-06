@@ -69,7 +69,8 @@ Accept the certificate warning once on the phone.
 | `npm run preview` | Serve the built `dist/` |
 | `npm run typecheck` | TypeScript only |
 | `npm test` | Fairness, collision, database and server tests (see [Testing](#testing)) |
-| `npm run db:setup` | Rebuild `supabase/setup.sql` from the migrations |
+| `npm run db:setup` | Rebuild `supabase/setup.sql` and `supabase/parts/` from the migrations |
+| `npm run db:apply` | Set up or update the Supabase database from your terminal (needs `SUPABASE_DB_URL`) |
 | `npm run check-server` | Check the Supabase keys and database, and say what's missing |
 
 ## Controls
@@ -700,7 +701,7 @@ new build drops the old build's cached scripts and styles.
 | `tests/input.test.ts` | Double-tap and hold to boost |
 | `tests/leagues.test.ts` | League brackets, LP, divisions, promotion, weekly rewards, prices |
 | `public/` | Icons, manifest, service worker |
-| `supabase/` | Database migrations, `setup.sql` (all of them in one paste) and the store webhook |
+| `supabase/` | Database migrations, `setup.sql` (all of them in one file), `parts/` (the same in small pieces to paste) and the store webhook |
 | `docs/leaderboards.md` | Turning the leaderboards on, what's checked, and the cheating roadmap |
 | `docs/store.md` | Server, store and app setup, and the store listing |
 
@@ -807,7 +808,7 @@ Without keys, everything lives on the device. With them:
   for each solo environment, with pilot names (see the `top` link on the title
   screen). Runs are checked in the database (the score has to fit the distance
   and time, and the path the distance), kept and retried if there's no signal.
-  Setup is one SQL paste and two keys: [docs/leaderboards.md](docs/leaderboards.md).
+  Setup is two keys and `npm run db:apply` (or pasting the small SQL parts): [docs/leaderboards.md](docs/leaderboards.md).
 - **RevenueCat** (`src/store/`) in the iOS and Android apps: core packs
   (100, 550, 1,200, 2,500), a one-time starter pack (500 cores, 3 tickets and
   the nova hull) and the season pass. Purchases are paid into the server

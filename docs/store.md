@@ -10,8 +10,9 @@ The short version is in [leaderboards.md](leaderboards.md). In full:
 
 1. Create a project at supabase.com.
 2. Authentication > Sign In / Providers: turn on **anonymous sign-ins**.
-3. SQL editor: paste all of `supabase/setup.sql` and run it. (Or with the CLI:
-   `supabase link`, then `supabase db push`.)
+3. The database: `npm run db:apply` with `SUPABASE_DB_URL` in `.env` (see
+   leaderboards.md), or paste the files in `supabase/parts/` into the SQL editor one at a
+   time, in order. (Or with the CLI: `supabase link`, then `supabase db push`.)
 4. Copy `.env.example` to `.env` and fill in `VITE_SUPABASE_URL` and
    `VITE_SUPABASE_ANON_KEY` (Project settings > API). `.env` is never committed.
 5. For the live site, add the same two values as repository secrets

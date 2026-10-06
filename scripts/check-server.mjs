@@ -59,12 +59,12 @@ if (token) {
   const headers = { apikey: key, Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
   const board = await call('/rest/v1/rpc/leaderboard', { method: 'POST', headers, body: JSON.stringify({ p_board: 'endless', p_period: 'all', p_league: 0, p_limit: 1 }) });
   if (board.status === 200) ok('the database is set up (leaderboard answers)');
-  else if (board.status === 404) bad('the database has no leaderboard function yet', 'SQL editor > paste supabase/setup.sql > Run');
-  else bad(`leaderboard failed (${board.status}): ${JSON.stringify(board.body)}`, 'run supabase/setup.sql in the SQL editor');
+  else if (board.status === 404) bad('the database has no leaderboard function yet', 'run `npm run db:apply` (needs SUPABASE_DB_URL in .env), or paste the files in supabase/parts/ into the SQL editor, in order');
+  else bad(`leaderboard failed (${board.status}): ${JSON.stringify(board.body)}`, 'run `npm run db:apply`, or the files in supabase/parts/');
 
   const name = await call(`/rest/v1/players?select=name&user_id=eq.${signup.body.user.id}`, { headers });
   if (name.status === 200 && name.body?.[0]?.name) ok(`new accounts get a pilot name (${name.body[0].name})`);
-  else if (board.status === 200) bad('the new account has no pilot name', 'run all of supabase/setup.sql, in order (the new-account trigger is in 0001)');
+  else if (board.status === 200) bad('the new account has no pilot name', 'run all the database parts, in order (the new-account trigger is in the first)');
 
   const rejected = await call('/rest/v1/rpc/submit_run', {
     method: 'POST',
@@ -72,7 +72,7 @@ if (token) {
     body: JSON.stringify({ p_board: 'nonsense', p_league: 0, p_score: 1, p_seconds: 10, p_distance: 100, p_finished: false, p_path: [] }),
   });
   if (rejected.status === 400 && /unknown board/.test(JSON.stringify(rejected.body))) ok('submit_run checks runs');
-  else if (board.status === 200) bad(`submit_run isn't answering as expected (${rejected.status})`, 'run supabase/setup.sql again');
+  else if (board.status === 200) bad(`submit_run isn't answering as expected (${rejected.status})`, 'run `npm run db:apply` again');
 }
 
 console.log(failed ? '\nNot ready yet: fix the lines marked FAIL and run this again.' : '\nAll good. Run the game and the leaderboards are live.');
