@@ -15,6 +15,7 @@ import { cycle, DEFAULT_SETTINGS, LEVEL_GAIN, loadSettings, saveSettings, type S
 import { EVENT_NOTICE, Events } from './events';
 import { Weather } from './weather';
 import { Ghost } from './ghost';
+import { DECAL_SVG } from './decals';
 import { Cosmetics, describe } from './cosmetics';
 import { Haptics } from './haptics';
 import { Hints } from './hints';
@@ -40,9 +41,10 @@ import { fxDistance, fxTime } from './fx';
 import { type Course, COURSES, courseLength, type Environment, ENVIRONMENTS, type WeeklyRun, weeklyRun } from './courses';
 import { envStatus, nextEnvironment, newlyOpened } from './unlocks';
 import { DIVISIONS, divisionReward, emblem, LEAGUES, leagueName, leaguePar, Leagues, LP_PER_DIVISION, weekKey } from './leagues';
+import { type Snapshot, achievement, progressOn } from './achievements';
 import { find, itemsIn, LOOKS, Looks, type Owner, type Slot, SLOT_NAMES, SLOTS, unlockText } from './looks';
 import type { Fin, Marking } from './looks';
-import type { ShipId } from './cosmetics';
+import type { ShipId, TrailId } from './cosmetics';
 import { MAX_TIER, type ShipStats, STANDARD, SYSTEMS, type SystemId, TIER_COST, TIER_LEAGUE, Upgrades } from './upgrades';
 import { newSeed } from './rng';
 import { loadNumber } from './storage';
@@ -329,6 +331,8 @@ export class Game {
     void looksReady.then(() => {
       // Saves from before the hangar had looks: carry the mission hull across.
       if (this.looks.equipped.hull === 'dart' && this.cosmetics.ship !== 'dart') this.looks.equip('hull', this.cosmetics.ship);
+      // Flames used to be picked on their own; they're a look now.
+      if (this.looks.equipped.trail === 'none' && this.cosmetics.trail !== 'none') this.looks.equip('trail', this.cosmetics.trail);
       this.applyCosmetics();
     });
     void loadSettings().then((s) => {
@@ -1409,7 +1413,6 @@ export class Game {
   private applyCosmetics(): void {
     const c = this.cosmetics;
     this.applyLooks();
-    this.trail.setStyle(c.trail);
     this.basePalette.set(PALETTES.find((p) => p.name === c.palette) ?? PALETTES[0]);
     this.applyLook(this.distanceScore / CONFIG.score.levelLength);
   }
@@ -1424,9 +1427,52 @@ export class Game {
     this.fadeT = 0;
   }
 
+  /** The player as the goals see them (everything here is already saved: nothing extra is tracked). */
+  private snapshot(): Snapshot {
+    const base = this.baseSnapshot();
+    // "Own N looks" counts the looks goals unlock too, so count once without it and then again with.
+    base.looksOwned = this.looks.count(this.ownerFor(base));
+    return base;
+  }
+
+  private baseSnapshot(): Snapshot {
+    const st = this.progress.stats;
+    return {
+      runs: st.runs,
+      distance: st.distance,
+      seconds: st.seconds,
+      nearMisses: st.nearMisses,
+      bestChain: st.bestChain,
+      pickups: st.pickups,
+      crashes: Object.values(st.crashes).reduce((n, v) => n + v, 0),
+      furthest: this.progress.furthest,
+      endlessBest: this.progress.endlessBest,
+      envBest: this.progress.envBest,
+      coursesDone: COURSES.filter((c) => this.progress.course(c.id).stars & 1).length,
+      stars: this.progress.totalStars(),
+      missions: this.cosmetics.unlocked,
+      upgradePoints: this.upgrades.points(),
+      looksOwned: 0,
+    };
+  }
+
+  private ownerFor(snap: Snapshot): Owner {
+    const mission = new Set<string>([...this.cosmetics.ships().map((id) => `hull:${id}`), ...this.cosmetics.trails().map((id) => `trail:${id}`)]);
+    return {
+      rank: this.ranked.rank,
+      stars: this.progress.totalStars(),
+      league: this.leagues.league,
+      mission,
+      goal: (id) => {
+        const a = achievement(id);
+        return a ? progressOn(a, snap) : { have: 0, target: 1, done: false };
+      },
+    };
+  }
+
   /** What the player has, for unlocking looks. */
   private owner(): Owner {
-    return { rank: this.ranked.rank, stars: this.progress.totalStars(), league: this.leagues.league, missionHulls: this.cosmetics.ships() };
+    return this.ownerFor(this.snapshot());
   }
 
   /** Put the equipped looks (plus any preview) on the ship. */
@@ -1435,14 +1481,16 @@ export class Game {
     if (this.preview) eq[this.preview.slot] = this.preview.id;
     this.player.setShape(eq.hull as ShipId);
     this.player.setPaint(find('paint', eq.paint).colors ?? null);
-    const decal = eq.decal === 'rank' ? insignia(this.ranked.rank) : eq.decal === 'league' ? emblem(this.leagues.league, this.leagues.division) : null;
+    const decal = eq.decal === 'rank' ? insignia(this.ranked.rank) : eq.decal === 'league' ? emblem(this.leagues.league, this.leagues.division) : (DECAL_SVG[eq.decal] ?? null);
     this.player.setDressing(eq.markings as Marking, eq.fins as Fin, decal);
-    this.trail.setTint(find('engine', eq.engine).colors?.[0] ?? null);
+    const flame = find('engine', eq.engine).colors;
+    this.trail.setTint(flame?.[0] ?? null, flame?.[1] ?? null);
+    this.trail.setStyle(eq.trail as TrailId);
   }
 
   /** Ship tab rows: the looks slots, then trail style and world colours (from missions). */
   private onLookRow = (key: string): void => {
-    if (key === 'trail' || key === 'palette') {
+    if (key === 'palette') {
       this.preview = null;
       this.cosmetics.cycle(key);
       this.applyCosmetics();
@@ -1494,10 +1542,7 @@ export class Game {
       };
     });
     const c = this.cosmetics;
-    rows.push(
-      { key: 'trail', label: 'trail', value: `${c.trail} (${c.trails().length})`, locked: false, note: '' },
-      { key: 'palette', label: 'world colours', value: `${c.palette} (${c.palettes().length})`, locked: false, note: '' },
-    );
+    rows.push({ key: 'palette', label: 'world colours', value: `${c.palette} (${c.palettes().length})`, locked: false, note: '' });
     let buy: { text: string; enabled: boolean } | null = null;
     if (this.preview) {
       const item = find(this.preview.slot, this.preview.id);
