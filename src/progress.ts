@@ -36,6 +36,7 @@ interface Saved {
   stats: Stats;
   reached?: number; // older saves: highest theme start level reached (1, 4, 7)
   sector: number; // furthest sector reached
+  furthest?: number; // furthest level reached in ranked or endless (opens solo environments)
   stars: number[]; // per sector: bit 0 cleared, bit 1 no hits, bit 2 chain
   daily: { date: string; best: number };
   courses?: Record<string, CourseResult>;
@@ -107,8 +108,10 @@ function countBits(n: number): number {
 
 export class Progress {
   stats: Stats = blankStats();
-  /** Furthest sector reached in any mode. */
+  /** Furthest sector reached in ranked or endless. */
   sector = 0;
+  /** Furthest level reached in ranked or endless: what opens solo environments (see unlocks.ts). */
+  furthest = 1;
   /** Star bits per sector (see STAR_*). */
   stars: number[] = [];
   /** Set course results by course id. */
@@ -127,6 +130,8 @@ export class Progress {
       const s = JSON.parse(raw) as Partial<Saved>;
       this.stats = { ...blankStats(), ...s.stats };
       this.sector = s.sector ?? sectorOf(s.reached ?? 1);
+      // Older saves only kept the sector: start from its first level.
+      this.furthest = Math.max(1, s.furthest ?? sectorStart(this.sector));
       this.stars = s.stars ?? [];
       this.courses = s.courses ?? {};
       if (s.weekly) this.weekly = s.weekly;
@@ -142,6 +147,7 @@ export class Progress {
     const s: Saved = {
       stats: this.stats,
       sector: this.sector,
+      furthest: this.furthest,
       stars: this.stars,
       daily: this.daily,
       courses: this.courses,
@@ -156,13 +162,18 @@ export class Progress {
     return this.daily.date === today() ? this.daily.best : 0;
   }
 
-  /** Note that a run reached `level` (unlocks its sector as a solo start straight away). */
-  reachedLevel(level: number): void {
-    const s = sectorOf(level);
-    if (s > this.sector) {
-      this.sector = s;
+  /**
+   * Note that a ranked or endless run reached `level`. Returns the previous furthest level,
+   * so the caller can tell what just opened. Solo, set levels and dev starts don't call this.
+   */
+  reachedLevel(level: number): number {
+    const before = this.furthest;
+    if (level > this.furthest) {
+      this.furthest = level;
+      this.sector = Math.max(this.sector, sectorOf(level));
       this.save();
     }
+    return before;
   }
 
   starsIn(sector: number): number {

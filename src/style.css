@@ -1268,6 +1268,37 @@ body {
   cursor: default;
 }
 
+#env-grid .course-tile.locked {
+  opacity: 0.62;
+}
+
+.course-need {
+  font-size: calc(10px * var(--ui-scale));
+  line-height: 1.35;
+  opacity: 0.75;
+}
+
+.unlock-bar {
+  display: block;
+  width: 100%;
+  height: 4px;
+  margin-top: auto;
+  background: color-mix(in srgb, currentColor 18%, transparent);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.unlock-bar > span {
+  display: block;
+  height: 100%;
+  background: currentColor;
+  opacity: 0.85;
+}
+
+.course-tile.locked .course-time {
+  margin-top: 0;
+}
+
 .course-num {
   font-size: calc(18px * var(--ui-scale));
   line-height: 1;
