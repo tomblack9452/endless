@@ -835,8 +835,9 @@ Without keys, everything lives on the device. With them:
   setting and stat (the newer save wins; a fresh install takes the cloud's),
   cores held on the server (earned cores capped per day, spending checked),
   and **leaderboards**: this week's ranked run per league, endless, and one
-  for each solo environment, with pilot names (see the `top` link on the title
-  screen). Runs are checked in the database (the score has to fit the distance
+  for each solo environment, with pilot names and each pilot's ship drawn next
+  to their name from the looks they have on (tap a row to see it bigger, with
+  what's on it). Runs are checked in the database (the score has to fit the distance
   and time, and the path the distance), kept and retried if there's no signal.
   Setup is two keys and `npm run db:apply` (or pasting the small SQL parts): [docs/leaderboards.md](docs/leaderboards.md).
 - **RevenueCat** (`src/store/`) in the iOS and Android apps: core packs

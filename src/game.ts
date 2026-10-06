@@ -7,6 +7,7 @@ import { lateralSpeedAt, speedAt } from './difficulty';
 import { Input } from './input';
 import { LivePalette } from './palette';
 import { Player, shipGeometry } from './player';
+import { describeShip, Portraits, type ShipLook } from './portrait';
 import { Stage } from './renderer';
 import { Sky } from './sky';
 import { SpeedLines } from './speedLines';
@@ -163,6 +164,8 @@ export class Game {
   private storeProducts: StoreProduct[] = [];
   /** Shop rows for real-money products, in the order shown ('dev' adds cores in the dev build). */
   private deleteArmed = false;
+  private portraits = new Portraits(this.palette);
+  private shipSent = ''; // the looks last sent to the boards (JSON)
   private shopPacks: (ProductId | 'dev' | 'restore' | 'pass-cores' | 'pass-open' | 'dev-premium' | `swap-${number}`)[] = [];
   /** One-time products already bought. */
   private readonly entitlements = new Entitlements();
@@ -1421,6 +1424,34 @@ export class Game {
     return this.progress.envBest[id] ?? 0;
   }
 
+  /** The looks you have on, as the boards keep them (with the rank and league your badge decals show). */
+  private shipLook(): ShipLook {
+    return { ...this.looks.equipped, rank: this.ranked.rank, league: this.leagues.league, division: this.leagues.division };
+  }
+
+  /** Send your looks to the boards if they've changed since last time. */
+  private async syncShip(): Promise<void> {
+    if (!this.backend.online) return;
+    const ship = this.shipLook();
+    const key = JSON.stringify(ship);
+    if (key === this.shipSent) return;
+    if (await this.backend.setShip(ship)) this.shipSent = key;
+  }
+
+  /** A board row for the UI, with a picture of the pilot's ship (yours as you have it on now). */
+  private boardRow(r: { rank: number; name: string; score: number; you: boolean; premium?: boolean; ship?: ShipLook | null }) {
+    const ship = r.you ? this.shipLook() : (r.ship ?? null);
+    return {
+      rank: r.rank,
+      name: r.name,
+      score: formatScore(r.score),
+      you: r.you,
+      premium: r.premium,
+      picture: ship ? () => this.portraits.get(ship) : null,
+      looks: ship ? describeShip(ship) : '',
+    };
+  }
+
   private openBoards(): void {
     this.openInfo('boards');
     void this.showBoard(this.boardTab);
@@ -1438,18 +1469,18 @@ export class Game {
     const seq = ++this.boardSeq;
     const caption = boardCaption(tab, this.leagues.league);
     const mine = this.localBest(tab.id);
-    const own = mine > 0 ? [{ rank: 0, name: 'you', score: formatScore(mine), you: true }] : [];
+    const own = mine > 0 ? [this.boardRow({ rank: 0, name: 'you', score: mine, you: true })] : [];
     if (!this.backend.online) {
       this.ui.renderLeaderboard(caption, own, 'global boards need the server. this is your best on this device.');
       return;
     }
     this.ui.renderLeaderboard(caption, [], 'loading');
-    await this.outbox.flush(); // so a run you just finished is on the board you're about to read
+    await Promise.all([this.outbox.flush(), this.syncShip()]); // so a run you just finished, and your ship, are on the board
     const rows = await this.backend.board(boardQuery(tab, this.leagues.league));
     if (seq !== this.boardSeq || this.infoOpen !== 'boards') return; // moved on while it loaded
     if (rows === null) this.ui.renderLeaderboard(caption, own, "couldn't load the board. check your connection");
     else if (rows.length === 0) this.ui.renderLeaderboard(caption, [], 'nobody yet. fly a run to be first');
-    else this.ui.renderLeaderboard(caption, rows.map((r) => ({ rank: r.rank, name: r.name, score: formatScore(r.score), you: r.you, premium: r.premium })), '');
+    else this.ui.renderLeaderboard(caption, rows.map((r) => this.boardRow(r)), '');
   }
 
   private async savePilotName(name: string, box = 'board'): Promise<boolean> {

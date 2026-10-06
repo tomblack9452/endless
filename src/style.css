@@ -2433,11 +2433,44 @@ body {
 
 .board-row {
   display: grid;
-  grid-template-columns: 2.4em 1fr auto;
-  align-items: baseline;
+  grid-template-columns: 2.4em 52px 1fr auto;
+  align-items: center;
   gap: 10px;
-  padding: 11px 0;
+  width: 100%;
+  padding: 6px 0;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  background: none;
+  border: 0;
   border-bottom: 1px solid color-mix(in srgb, currentColor 18%, transparent);
+  cursor: pointer;
+}
+
+/* Each pilot's ship, drawn from their looks (portrait.ts). */
+.board-ship {
+  width: 52px;
+  height: 31px;
+  object-fit: contain;
+}
+
+.board-ship.none {
+  visibility: hidden;
+}
+
+.board-more {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 0 14px;
+  text-align: center;
+  border-bottom: 1px solid color-mix(in srgb, currentColor 18%, transparent);
+}
+
+.board-more img {
+  width: min(300px, 100%);
+  aspect-ratio: 168 / 100;
 }
 
 .board-row .rank {

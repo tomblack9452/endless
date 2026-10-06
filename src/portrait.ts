@@ -30,7 +30,8 @@ export function describeShip(ship: ShipLook): string {
   for (const slot of SLOTS) {
     const id = look(ship, slot);
     if (slot !== 'hull' && (id === 'none' || id === 'standard')) continue;
-    out.push(`${find(slot, id).name} ${SLOT_NAMES[slot]}`);
+    const name = find(slot, id).name;
+    out.push(name.endsWith(SLOT_NAMES[slot]) ? name : `${name} ${SLOT_NAMES[slot]}`);
   }
   return out.join(' · ');
 }

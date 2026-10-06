@@ -97,6 +97,7 @@ function $(id: string): HTMLElement {
 }
 
 export class UI {
+  private boardPictures = 0; // which board the ship pictures being drawn belong to
   private readonly hud = $('hud');
   private readonly hudScore = $('hud-score');
   private readonly hudLevel = $('hud-level');
@@ -434,10 +435,15 @@ export class UI {
   }
 
   /** The board's rows: rank, name, score. A pilot below the top comes after a gap. */
-  renderLeaderboard(caption: string, rows: { rank: number; name: string; score: string; you: boolean; premium?: boolean }[], status: string): void {
+  renderLeaderboard(
+    caption: string,
+    rows: { rank: number; name: string; score: string; you: boolean; premium?: boolean; picture?: (() => string | null) | null; looks?: string }[],
+    status: string,
+  ): void {
     $('board-caption').textContent = caption;
     $('board-status').textContent = status;
     const out: HTMLElement[] = [];
+    const pictures: [HTMLImageElement, () => string | null][] = [];
     let last = 0;
     for (const r of rows) {
       if (last > 0 && r.rank > last + 1) {
@@ -447,14 +453,20 @@ export class UI {
         out.push(gap);
       }
       last = r.rank;
-      const row = document.createElement('div');
+      const row = document.createElement('button');
+      row.type = 'button';
       row.className = `board-row label${r.you ? ' you' : ''}`;
       const rank = document.createElement('span');
       rank.className = 'rank';
       rank.textContent = r.rank > 0 ? String(r.rank) : '–';
+      const ship = document.createElement('img');
+      ship.className = 'board-ship';
+      ship.alt = '';
+      if (r.picture) pictures.push([ship, r.picture]);
+      else ship.classList.add('none');
       const who = document.createElement('span');
       who.className = 'who';
-      who.textContent = r.you ? `${r.name} (you)` : r.name;
+      who.textContent = r.you && r.name !== 'you' ? `${r.name} (you)` : r.name;
       if (r.premium) {
         const badge = document.createElement('span');
         badge.className = 'premium-badge';
@@ -465,10 +477,38 @@ export class UI {
       const score = document.createElement('span');
       score.className = 'pts';
       score.textContent = r.score;
-      row.append(rank, who, score);
-      out.push(row);
+      row.append(rank, ship, who, score);
+      // Tap a pilot to see their ship bigger, and what's on it.
+      if (r.picture) {
+        const more = document.createElement('div');
+        more.className = 'board-more';
+        more.hidden = true;
+        const big = document.createElement('img');
+        big.alt = '';
+        const looks = document.createElement('div');
+        looks.className = 'label dim';
+        looks.textContent = r.looks ?? '';
+        more.append(big, looks);
+        row.addEventListener('click', () => {
+          more.hidden = !more.hidden;
+          big.src = ship.src;
+        });
+        out.push(row, more);
+      } else out.push(row);
     }
     $('board-rows').replaceChildren(...out);
+    // Draw the ships a few a frame, so a long board opens at once.
+    const seq = ++this.boardPictures;
+    const step = () => {
+      if (seq !== this.boardPictures) return;
+      for (const [img, draw] of pictures.splice(0, 4)) {
+        const url = draw();
+        if (url) img.src = url;
+        else img.classList.add('none');
+      }
+      if (pictures.length > 0) requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
   }
 
   /** A pilot name box ("board", "settings", "welcome"): its current value and a line under it. */
