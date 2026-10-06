@@ -451,8 +451,12 @@ turn over at midnight UTC, the same moment for everyone.
   runs, score, reach a level, near misses, pickups, boost time, ranked runs,
   ship rooms), each paying credits and pass XP; all three pay 10 cores.
 - **Shop:** four looks a day, the same for everyone, at least one premium.
-  One is the deal of the day at a quarter off. Tap a look to try it on the
-  ship. Also: a ranked ticket for cores, and core packs in the apps.
+  One is the deal of the day at a quarter off. The shop is a showroom: the
+  camera swings in and circles your ship in the top half, and the looks are
+  cards on a sheet below. Tap a card to put it on the ship, then buy it with
+  the button under the cards (tap an owned one to wear it). Also: a ranked
+  ticket for cores, and core packs in the apps. The hangar uses the same
+  close-up camera.
 - **Season pass:** six weeks (six weekly runs), 30 tiers of 120 XP. Runs
   earn XP (1 per 250 points, up to 60) and each quest 60. The free track pays
   credits, cores and tickets; the premium track (950 cores, or a purchase in

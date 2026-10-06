@@ -299,16 +299,16 @@
         </div>
       </div>
 
-      <div id="screen-shop" class="layer screen panel">
+      <div id="screen-shop" class="layer screen panel showroom">
         <div class="panel-head">
           <button class="label link back" type="button" data-action="back">back</button>
           <div class="panel-title">shop</div>
         </div>
-        <div class="settings">
-          <div class="shop-wallet label dim" id="shop-wallet"></div>
+        <div id="shop-wallet" class="label dim showroom-note"></div>
+        <div class="sheet settings">
           <div class="settings-group">today's looks <span id="shop-reset" class="group-note"></span></div>
-          <div id="shop-offers"></div>
-          <div class="label dim setting-note">tap a look to try it on. new looks every day.</div>
+          <div id="shop-offers" class="offer-cards"></div>
+          <button id="shop-buy" class="pill primary sheet-buy" type="button"></button>
           <div class="settings-group">ranked tickets</div>
           <div id="shop-tickets"></div>
           <div class="settings-group">cores</div>
