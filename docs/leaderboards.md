@@ -15,7 +15,7 @@ to a board.
      is safe. This is a secret; it's not a `VITE_` variable, so it never goes into
      the game's build.
    - **Or paste it:** SQL editor > New query > paste the files in `supabase/parts/`
-     one at a time, in order (`01-of-05.sql` first), running each. They are small
+     one at a time, in order (`01-of-07.sql` first), running each. They are small
      on purpose: pasting one big file can get cut off part way (about 4 KB), which
      shows up as `unterminated dollar-quoted string`. If you'd rather paste one
      file, `supabase/setup.sql` is all of it.
@@ -91,7 +91,7 @@ the run. If that starts to matter, the next steps in order of effort:
 
 ## Changing the database
 
-Add a new file in `supabase/migrations/` (`0004_...sql`), run `npm run db:setup`
+Add a new file in `supabase/migrations/` (`0006_...sql`), run `npm run db:setup`
 to rebuild `supabase/setup.sql` and `supabase/parts/`, then `npm run db:apply` on a
 live project (it applies only what's new). `npm test` runs every migration on a real Postgres (PGlite), the
 client against it, and checks `setup.sql` is up to date.

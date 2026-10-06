@@ -1,7 +1,7 @@
 // `npm run check-server`: checks the Supabase setup end to end and says what's
 // missing. Reads VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY from the
 // environment or from .env. Signs in anonymously once (that makes one throwaway
-// account); changes nothing else.
+// account, deleted again at the end); changes nothing else.
 import { existsSync, readFileSync } from 'node:fs';
 
 const env = { ...process.env };
@@ -73,6 +73,12 @@ if (token) {
   });
   if (rejected.status === 400 && /unknown board/.test(JSON.stringify(rejected.body))) ok('submit_run checks runs');
   else if (board.status === 200) bad(`submit_run isn't answering as expected (${rejected.status})`, 'run `npm run db:apply` again');
+
+  // Last: deleting an account (settings > delete my account), on the throwaway one.
+  const gone = await call('/rest/v1/rpc/delete_my_account', { method: 'POST', headers, body: '{}' });
+  if (gone.status >= 200 && gone.status < 300) ok('players can delete their account (the check account is gone again)');
+  else if (gone.status === 404) bad('the database has no delete_my_account function yet', 'run `npm run db:apply` (it adds 0005_delete_account.sql)');
+  else bad(`delete_my_account failed (${gone.status}): ${JSON.stringify(gone.body)}`, 'run `npm run db:apply` again');
 }
 
 console.log(failed ? '\nNot ready yet: fix the lines marked FAIL and run this again.' : '\nAll good. Run the game and the leaderboards are live.');

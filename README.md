@@ -855,6 +855,38 @@ is in [docs/leaderboards.md](docs/leaderboards.md) for the server and
 the screenshot list. Keys go in `.env` (copy `.env.example`), which is never
 committed; `npm run check-server` says what's missing.
 
+### Supabase settings
+
+Everything the game needs from the Supabase dashboard, in one place. The
+step-by-step first setup is in [docs/leaderboards.md](docs/leaderboards.md).
+
+| Where in the dashboard | Setting | Why |
+| --- | --- | --- |
+| New project | Free plan; the region nearest most players | Free is plenty to launch. A free project pauses after a week with no use, so open the game (or the dashboard) now and then before launch |
+| Authentication > Sign In / Providers | **Allow anonymous sign-ins: on** | Every player gets an account with no sign-up screen. Without it nothing reaches the server |
+| Authentication > Sign In / Providers | Email: leave as it is | Not used by the game |
+| Authentication > Attack Protection | CAPTCHA: **off** | The game signs in silently and can't show a CAPTCHA |
+| Authentication > Rate Limits | Anonymous sign-ins: 30 an hour per IP (the default) is fine | Raise it if many players share one network (a school, an event) |
+| Authentication > URL Configuration | Site URL: `https://tomblack9452.github.io/endless/` | Not used by anonymous sign-in, but keeps the defaults pointing at the game |
+| Project Settings > Data API | Exposed schemas: `public` (the default) | The game calls the database functions through it |
+| Project Settings > API Keys | The project URL and the **publishable** key (`sb_publishable_...`, or the legacy `anon` key) | Go in `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`. **Never** the secret or `service_role` key: anything `VITE_` is in the public build |
+| Connect > Session pooler | The connection string, with your database password | Goes in `SUPABASE_DB_URL` in `.env` for `npm run db:apply`. A secret: never a `VITE_` variable, never in GitHub |
+| Edge Functions > Secrets | `REVENUECAT_WEBHOOK_SECRET` (a long random string) | Only for store purchases. `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are there already. Deploy with `supabase functions deploy revenuecat-webhook --no-verify-jwt` ([docs/store.md](docs/store.md)) |
+| Authentication > Users | Nothing to set | Anonymous players show here. Deleting one deletes their save, cores, runs and scores |
+
+Where the keys go:
+
+- **On your computer:** `.env` (copy `.env.example`): `VITE_SUPABASE_URL`,
+  `VITE_SUPABASE_ANON_KEY` and `SUPABASE_DB_URL`.
+- **The live site:** GitHub repo > Settings > Secrets and variables > Actions:
+  `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` as repository secrets
+  (`deploy.yml` passes them to the build). Not `SUPABASE_DB_URL`.
+
+After every update that adds a file to `supabase/migrations/`, run
+`npm run db:apply` (it only applies what's new), then `npm run check-server`
+to see it's all there. The latest, `0005_delete_account.sql`, is what
+"delete my account and data" in settings needs.
+
 Still to do on the server: a full re-fly of submitted runs with the game's
 own code (it needs the run simulation pulled out of `game.ts` first), and
 linking accounts to Apple or Google sign-in.
