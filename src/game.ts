@@ -1081,6 +1081,7 @@ export class Game {
   /** Hold everything still for a 3-2-1, then play. */
   private startCountdown(): void {
     this.state = 'countdown';
+    this.speedLines.update(0, 0, 0);
     this.countdownT = CONFIG.economy.revive.countdown;
     this.input.enabled = false;
     this.input.releaseAll();
@@ -2303,6 +2304,7 @@ export class Game {
     if (this.state !== 'playing' && this.state !== 'countdown') return;
     this.econ.setCountdown(0);
     this.state = 'paused';
+    this.speedLines.update(0, 0, 0); // not frozen on screen while paused
     this.input.releaseAll();
     this.sound.suspend();
     this.ui.show('paused');
@@ -2695,7 +2697,8 @@ export class Game {
     const pitch = this.boostLevel * CONFIG.boost.shipPitchDeg * DEG - Math.atan(slope) * CONFIG.terrain.shipPitch;
     this.player.update(dt, this.dev.autopilot ? this.autopilot() : this.input.steering(), lateralSpeedAt(speed) * this.ship.steer, pitch, this.onIce ? CONFIG.hazards.ice.grip : 1);
     this.weather.update(dt, speed);
-    this.speedLines.update(dt, speed, this.settings.reduceMotion ? 0 : this.boostLevel);
+    // No streaks inside the ship: they'd run through its walls and ceiling like loose wires.
+    this.speedLines.update(dt, speed, this.settings.reduceMotion ? 0 : this.boostLevel * (1 - this.world.insideMix));
     this.trail.update(dt, this.boostLevel, this.player.engineHalfSpan);
     if (this.boosting) {
       this.boostSeconds += dt;

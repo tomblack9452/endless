@@ -275,6 +275,12 @@ export class World {
   private readonly decorMat: MeshBasicMaterial;
   // Custom floor of the row being built (world x pairs) and the history of past rows.
   private floorN = -1;
+  /**
+   * Railings along pit edges, one run per edge. A run is only drawn once its
+   * edge lasts two rows (a one-row jog would leave a stub hanging over the
+   * drop), with a post at each end and every few rows between.
+   */
+  private rails: { x: number; x0: number; d0: number; d: number; rows: number; seen: boolean }[] = [];
   private readonly floorSegs = new Float32Array(12);
   private readonly floorD = new Float64Array(FLOOR_ROWS).fill(-Infinity);
   private readonly floorCount = new Int8Array(FLOOR_ROWS).fill(-1);
@@ -552,6 +558,7 @@ export class World {
     this.devPieceNext = 0;
     this.roomShift = 0;
     this.prevWallL = this.prevWallR = NaN;
+    this.rails.length = 0;
     this.floorD.fill(-Infinity);
     this.wallD.fill(-Infinity);
     this.laneRingD.fill(-Infinity);
@@ -2650,14 +2657,14 @@ export class World {
           this.hullBox(edge + s * 0.08, -PIT_LIP, d, 0.16, PIT_LIP - 0.14, depth, false);
           this.voids.spawn(edge + s * 0.08 - this.shipX, -P, d, 0.16, P - PIT_LIP, depth, 0, false, false, 0, 0, false);
           if (pr ? pr.catwalk : def.railings) {
-            api.run(edge - s * 0.06, it.railHeight, d, 0.035, Decor.Steel);
-            if (api.row % 3 === 0) api.greeble(edge - s * 0.06, 0, d, 0.07, it.railHeight, 0.07, Decor.Steel);
+            this.railAt(edge - s * 0.06, d);
           } else {
             this.light(edge - s * 0.05, 0.01, d, 0.1, 0.03, depth, Light.White, false); // pale rim on the drop
           }
         }
       }
     }
+    this.endRails(d);
     const split = this.plan !== null && open > 0.97;
     if (split) {
       // Dividers between branches, a light down each branch.
@@ -2700,6 +2707,52 @@ export class World {
     if (!def.build || !inBody) return;
     if (this.plan && !split) return;
     def.build(api);
+  }
+
+  /** A railing at `x` on this row: carries on the run along that edge, or starts one. */
+  private railAt(x: number, d: number): void {
+    let r = this.rails.find((q) => !q.seen && Math.abs(q.x - x) < 0.2 && d - q.d < STEP * 1.5);
+    if (!r) {
+      r = { x, x0: x, d0: d, d, rows: 0, seen: false };
+      this.rails.push(r);
+    }
+    r.seen = true;
+    r.x = x;
+    r.d = d;
+    r.rows++;
+    if (r.rows === 2) {
+      // It lasts: draw its first row too, with a post where it starts.
+      this.railPiece(r.x0, r.d0);
+      this.railPost(r.x0, r.d0 - STEP / 2);
+    }
+    if (r.rows >= 2) {
+      this.railPiece(x, d);
+      if (r.rows % 3 === 0) this.railPost(x, d);
+    }
+  }
+
+  /** End of a row: runs that didn't carry on end here, with a post (one-row stubs are dropped). */
+  private endRails(d: number): void {
+    for (let i = this.rails.length - 1; i >= 0; i--) {
+      const r = this.rails[i];
+      if (r.seen && r.d === d) {
+        r.seen = false;
+        continue;
+      }
+      if (r.rows >= 2) this.railPost(r.x, r.d + STEP / 2);
+      this.rails.splice(i, 1);
+    }
+  }
+
+  private railPiece(x: number, d: number): void {
+    this.pipes.nextColor = Decor.Steel;
+    this.pipes.nextTilt = true;
+    this.pipes.spawn(x - this.shipX, TH.interior.railHeight, d, 0.035, 0.035, STEP + 0.1, 0, false, false, 0, 0, false);
+  }
+
+  private railPost(x: number, d: number): void {
+    this.greebles.nextColor = Decor.Steel;
+    this.greebles.spawn(x - this.shipX, 0, d, 0.07, TH.interior.railHeight, 0.07, 0, false, false, 0, 0, false);
   }
 
   /**
