@@ -354,16 +354,19 @@ The pilot name is asked when it's first needed: the first run that would go on
 a board, or opening the leaderboard. "Skip" gives a generated name. The rest is
 as in the plan: it resumes, it can be replayed, and existing players skip it.
 
-## 8. Decisions for you
+## 8. Decisions
 
-| # | Question | Recommended |
+Agreed on 6 October 2026: every recommendation below, as written. The new looks
+each season are generated (section 9) rather than drawn by hand.
+
+| # | Question | Agreed |
 |---|---|---|
 | 1 | Tickets: remove (ranked unlimited), keep but refill 1 a day, or keep as now? | Remove; spare tickets become cores |
 | 2 | Rank: turn into a pilot level from all play (skill removed), merge into leagues, or keep? | Pilot level |
 | 3 | Rebalance credits: runs pay more, quests and league weekly less, more credit looks as a sink? | Yes |
 | 4 | Credit packs? | Not sold |
 | 5 | Free cores (~100 to 130 a week): keep, or cut to about half? | Cut to about half (the weekly goals add some back) |
-| 6 | The pass: slow it to fit 6 weeks, a theme and new looks each season, price £4.99 or 550 cores? | Yes. How many new looks can you make a season? |
+| 6 | The pass: slow it to fit 6 weeks, a theme and new looks each season, price £4.99 or 550 cores? | Yes; the season's looks are generated (section 9) |
 | 7 | Premium: no ads, ad rewards free, 3 exclusive looks, +1 free revive a day, a board badge, £4.99? | Yes |
 | 8 | Revived runs on the boards: count up to the first crash? | Yes |
 | 9 | Ads: AdMob, rewarded only at launch, interstitials later or never? | Rewarded only; decide interstitials after launch data |
@@ -372,3 +375,42 @@ as in the plan: it resumes, it can be replayed, and existing players skip it.
 | 12 | Limited offers from the server: design now, build after launch? | Yes |
 | 13 | Pickups pay credits directly (the run visibly earns)? | Yes, if 3 is agreed |
 | 14 | Audience: 13+ with personalised ads, or family-friendly with non-personalised ads only? | 13+ |
+
+
+## 9. Generated season looks
+
+Each season's new looks are made by code from the season number, so a new
+season needs no drawing and no app update, and everyone gets the same looks.
+
+**What a season makes (`src/seasonLooks.ts`):**
+- A theme: a name from word lists (e.g. "solar drift") and a base hue, which
+  steps round the colour wheel by the golden angle each season so neighbouring
+  seasons never look alike.
+- A palette from that hue by colour harmony rules (analogous, split
+  complementary or triadic, picked by the seed), with lightness and saturation
+  kept in ranges that read on the ship.
+- **Premium track (4 looks):** a paint, a two-tone paint, an engine colour and a
+  wing decal.
+- **Free track (1 look):** a paint at tier 25.
+- **Shop (4 looks):** credit paints and engine colours priced 2,000 to 20,000,
+  which rotate into the daily shop during the season (the credit sink in
+  recommendation 4).
+- **Decals** are emblems built from parts: an outer shape (shield, circle,
+  diamond, hexagon), a centre mark (star, chevron, bolt, ring, wings) and a
+  symmetry. They're drawn as 24 x 24 SVG like the hand-made decals.
+
+**Rules it keeps:**
+- Deterministic: the same season always makes the same looks, on every device
+  and the server.
+- Distinct: each colour is far enough from every existing paint and engine
+  colour (a colour-difference check), or it's nudged until it is.
+- Readable: paint tops are lighter than their shades, and decals stay inside
+  their box with enough filled area to read at wing size.
+- Kept forever: a look's id names its season (e.g. `paint:s4-1`), so owned
+  season looks stay in the catalogue after the season ends, and the vault can
+  bring them back.
+- Curatable: `CONFIG.seasons.overrides` can rename, recolour or veto any
+  generated look for a season without touching the generator.
+
+Hulls stay hand-made: each is new geometry, and a bad hull would be seen on
+every board.
