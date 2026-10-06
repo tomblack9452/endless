@@ -1,5 +1,5 @@
 import { achievement } from './achievements';
-import { DECAL_SVG } from './decals';
+import { decalArt } from './decals';
 import { find, itemsIn, keyOf, type Looks, type LookItem, type Owner, type ShipId, type Slot, SLOT_NAMES, SLOTS, unlockProgress, unlockText } from './looks';
 import { shipShape } from './player';
 
@@ -109,7 +109,7 @@ export function lookSwatch(item: LookItem): string | null {
 export function lookIcon(item: LookItem): string | null {
   if (item.slot === 'hull') return hullIcon(item.id);
   if (item.slot === 'decal') {
-    const art = DECAL_SVG[item.id];
+    const art = decalArt(item.id);
     if (art) return art;
     return '<svg viewBox="0 0 24 24"><path d="M12 3l7 7-7 11-7-11z"/></svg>';
   }

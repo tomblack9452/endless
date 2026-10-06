@@ -473,6 +473,18 @@ when you finish a run. Examples: fly 50 runs, 10,000 near misses, a chain of
 15, reach level 19 (the volcanic plain), score 4,000 in each area on its own,
 finish all nine set levels, own 25 looks.
 
+**Season looks** are made by code (`src/seasonLooks.ts`), so every six-week
+season brings new ones with no drawing and no app update. Each season has a
+theme (a name like "hollow relay" and a base hue that steps round the colour
+wheel) and makes nine looks: a paint, an engine colour, a wing decal and a
+two-tone paint on the pass's premium track, a paint on the free track at tier
+25, and two paints and two engine colours for 2,000 to 20,000 credits, one of
+which the daily shop features each day of the season. Season 1's pass keeps its
+hand-made looks, so it only adds the shop four. Colours keep clear of the
+hand-made paints, decals are built from an outline, a mark and pips, and a look
+stays in the catalogue for good once its season has come.
+`CONFIG.seasons.overrides` renames, recolours or vetoes any of them.
+
 **Sets** are themed groups of four or five looks you can buy (ember forge, deep sea, neon
 night, royal guard, toxic waste, sunset strip). Own every look in one for a
 bonus of cores.
@@ -650,7 +662,8 @@ new build drops the old build's cached scripts and styles.
 | `src/share.ts` | The share card |
 | `src/upgrades.ts` | Ship upgrade systems, points and the standard ship |
 | `src/leagues.ts` | Leagues, divisions, league points, weekly rewards, emblems |
-| `src/catalogue.ts` | Every look, how to get each, the sets and the vault |
+| `src/catalogue.ts` | Every hand-made look, how to get each, the sets and the vault (plus the season looks) |
+| `src/season.ts`, `src/seasonLooks.ts` | Season timing, and each season's generated looks |
 | `src/looks.ts` | What you own and what's on; how an unlock reads |
 | `src/achievements.ts`, `src/goals.ts` | The 53 goals (counted from existing stats) and which have paid |
 | `src/hangar.ts`, `src/hangarView.ts` | The hangar's model and its screen (looks and the upgrades chip), and the goals list |
@@ -767,6 +780,9 @@ the shop, the pass, and that a revive leaves a clear lane.
 `tests/looks.test.ts` checks the catalogue: every way to get a look is real,
 every goal unlocks something, sets are buyable, old ids and prices are kept;
 `tests/legacy.test.ts` that a save with mission unlocks keeps them.
+`tests/seasons.test.ts` checks the season looks are the same every time, nine a
+season, unique, clear of the hand-made colours, priced right, overridable, and
+the pass's rewards from season 2.
 `tests/shop.test.ts` covers the day's picks (no reshuffle on a purchase), the
 weekly set's cycle and bundle price, and the vault's calendar.
 `tests/hangar.test.ts` covers the cards and the buy or equip button for each kind

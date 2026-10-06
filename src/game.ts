@@ -15,7 +15,7 @@ import { cycle, DEFAULT_SETTINGS, LEVEL_GAIN, loadSettings, saveSettings, type S
 import { EVENT_NOTICE, Events } from './events';
 import { Weather } from './weather';
 import { Ghost } from './ghost';
-import { DECAL_SVG } from './decals';
+import { decalArt } from './decals';
 import { Haptics } from './haptics';
 import { Hints } from './hints';
 import { migrateMissionLooks, migrateTickets } from './legacy';
@@ -857,8 +857,8 @@ export class Game {
       premiumOwned: this.pass.premium,
       tiers: Array.from({ length: P.tiers }, (_, i) => ({
         tier: i + 1,
-        free: rewardText(freeReward(i + 1)),
-        premium: rewardText(premiumReward(i + 1)),
+        free: rewardText(freeReward(i + 1, s.season)),
+        premium: rewardText(premiumReward(i + 1, s.season)),
         reached: i < tier,
         current: i === tier || (maxed && i === P.tiers - 1),
       })),
@@ -1451,7 +1451,7 @@ export class Game {
     if (this.preview) eq[this.preview.slot] = this.preview.id;
     this.player.setShape(eq.hull as ShipId);
     this.player.setPaint(find('paint', eq.paint).colors ?? null);
-    const decal = eq.decal === 'rank' ? insignia(this.ranked.rank) : eq.decal === 'league' ? emblem(this.leagues.league, this.leagues.division) : (DECAL_SVG[eq.decal] ?? null);
+    const decal = eq.decal === 'rank' ? insignia(this.ranked.rank) : eq.decal === 'league' ? emblem(this.leagues.league, this.leagues.division) : decalArt(eq.decal);
     this.player.setDressing(eq.markings as Marking, eq.fins as Fin, decal);
     const flame = find('engine', eq.engine).colors;
     this.trail.setTint(flame?.[0] ?? null, flame?.[1] ?? null);

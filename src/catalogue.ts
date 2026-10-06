@@ -1,4 +1,6 @@
 import type { LookItem, Slot, Unlock } from './looks';
+import { seasonAt } from './season';
+import { seasonLooksThrough } from './seasonLooks';
 
 // Every look in the game, and how to get each. Purely cosmetic (every hull
 // shares one hitbox), so all of it is allowed in ranked.
@@ -13,6 +15,8 @@ import type { LookItem, Slot, Unlock } from './looks';
 //   achievement finishing a goal (src/achievements.ts)
 //   reward      the login calendar or the season pass
 //   vault       sold for a month at a time in the shop, then away for a while
+//
+// On top of these hand-made looks, every season adds generated ones (seasonLooks.ts).
 
 const free: Unlock = { by: 'free' };
 const credits = (cost: number): Unlock => ({ by: 'credits', cost });
@@ -33,7 +37,7 @@ const engine = (id: string, name: string, unlock: Unlock, a: string, b = a): Loo
 const decal = (id: string, name: string, unlock: Unlock): LookItem => ({ slot: 'decal', id, name, unlock });
 const trail = (id: string, name: string, unlock: Unlock): LookItem => ({ slot: 'trail', id, name, unlock });
 
-export const LOOKS: readonly LookItem[] = [
+const HAND_MADE: readonly LookItem[] = [
   // --- hulls ----------------------------------------------------------------------------------
   hull('dart', 'dart', free),
   hull('wing', 'wing', goal('runs-5')),
@@ -213,6 +217,9 @@ export const LOOKS: readonly LookItem[] = [
   trail('pulse', 'pulse', goal('endless-60k')),
   trail('ribbon', 'ribbon', vault(500)),
 ];
+
+/** Every look: the hand-made ones, then each season's generated ones up to the current season. */
+export const LOOKS: readonly LookItem[] = [...HAND_MADE, ...seasonLooksThrough(seasonAt(Date.now()).season, HAND_MADE)];
 
 /** Looks by slot, in the order the hangar shows them. */
 export const SLOT_ORDER: Slot[] = ['hull', 'paint', 'markings', 'fins', 'engine', 'decal', 'trail'];

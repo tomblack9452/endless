@@ -611,6 +611,12 @@ export const CONFIG = {
     markerEvery: 3, // rows between safe-line markers
   },
 
+  // Season looks (seasonLooks.ts): generated from the season number. Rename,
+  // recolour or veto any of them here by key, e.g.
+  //   'paint:s4-p1': { name: 'harbour light', colors: ['#7fb8e6', '#4f84b5'] },
+  //   'decal:s5-d1': { veto: true },
+  seasons: { overrides: {} as Record<string, { name?: string; colors?: [string, string]; veto?: boolean }> },
+
   // Rank (ranks.ts): XP from every run, ranked paying the most, and from goals.
   rank: { pointsPerXp: 4000, rankedPointsPerXp: 800, goalXp: 30 },
 

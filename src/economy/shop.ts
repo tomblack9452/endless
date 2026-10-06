@@ -1,11 +1,14 @@
 import { SETS, VAULT_ORDER, type LookSet } from '../catalogue';
 import { CONFIG } from '../config';
 import { byKey, keyOf, LOOKS, type LookItem } from '../looks';
+import { seasonAt } from '../season';
+import { isSeasonShopLook } from '../seasonLooks';
 import { storage } from '../storage';
 import { hash, picker } from './time';
 
 // The shop turns over on the clock, the same for everyone (UTC):
-//   today    four looks a day; one a deal at a quarter off, at least one premium.
+//   today    four looks a day; one a deal at a quarter off, at least one premium,
+//            and during a season one of that season's generated looks.
 //            Looks you don't own come first, and the day's picks are written down
 //            the first time you open the shop, so buying one doesn't reshuffle the rest.
 //   the set  one themed set a week as a bundle at a discount. Every set comes round
@@ -64,6 +67,10 @@ export function shopFor(day: string, owned: (key: string) => boolean = () => fal
   // At least one premium look a day, so the shop always has something new.
   const premium = ranked.find((l) => l.unlock.by === 'cores');
   if (premium) picked.push(premium);
+  // One of this season's generated looks, while there's one you don't own.
+  const season = seasonAt(Date.parse(`${day}T12:00:00Z`)).season;
+  const seasonal = fresh.find((l) => isSeasonShopLook(l, season));
+  if (seasonal && picked.length < n) picked.push(seasonal);
   for (const l of ranked) {
     if (picked.length >= n) break;
     if (!picked.includes(l)) picked.push(l);

@@ -2,6 +2,8 @@
 // currentColor (the ship draws them in white and tints them, see player.ts).
 // Each is a 24 x 24 SVG, bold enough to read at about 0.17 units across.
 
+import { seasonDecal } from './seasonLooks';
+
 const svg = (body: string): string => `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">${body}</svg>`;
 const fill = (d: string, rule = 'nonzero'): string => `<path fill="currentColor" fill-rule="${rule}" d="${d}"/>`;
 const line = (d: string, w = 2.2): string => `<path fill="none" stroke="currentColor" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round" d="${d}"/>`;
@@ -21,3 +23,8 @@ export const DECAL_SVG: Record<string, string> = {
   planet: svg(fill('M12 6.4a5.6 5.6 0 1 0 0 11.2 5.6 5.6 0 0 0 0-11.2z') + line('M2.2 15.6c-.7-1.9 3.6-5 9.8-6.9 6.2-1.9 11.2-1.4 11.9.5', 1.7)),
   phoenix: svg(fill('M12 2.4c1.1 2.6 3.2 3.4 3.2 6 0 1.3-.5 2.2-1.2 2.9l5.4-3.6c0 4.2-2.2 7.4-6.1 9.2l1.5 4.7L12 19.2l-2.8 2.4 1.5-4.7C6.8 15.1 4.6 11.9 4.6 7.7l5.4 3.6c-.7-.7-1.2-1.6-1.2-2.9 0-2.6 2.1-3.4 3.2-6z')),
 };
+
+/** A wing decal's art by id: a hand-made picture or a season's generated one (null for rank, league or none). */
+export function decalArt(id: string): string | null {
+  return DECAL_SVG[id] ?? seasonDecal(id);
+}
