@@ -33,7 +33,7 @@ const RIDGE = new Vector3(0, S.height, S.length * 0.28);
  * triangles, light faces first then shaded ones, plus an outline for the
  * shadow. Units are the ship's half-width (w), length (l) and ridge height (h).
  */
-function shipShape(id: ShipId): { light: Vector3[]; shade: Vector3[]; outline: Vector3[]; tail?: number } {
+export function shipShape(id: ShipId): { light: Vector3[]; shade: Vector3[]; outline: Vector3[]; tail?: number } {
   const w = S.halfWidth;
   const l = S.length;
   const h = S.height;

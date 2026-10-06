@@ -446,17 +446,37 @@ tier 5 Diamond. Any bought system can be switched off in the hangar.
 | Stabilisers | Steering 3% quicker | +15% |
 | Scanner | Power-ups 8% more often | +40% |
 
-**Looks** (any mode). Tap a row in the hangar's ship tab to cycle it; locked
-items are tried on the ship with a buy button or what unlocks them.
+**Looks** (any mode) are the ship's wardrobe: **157 of them** across seven slots,
+every one allowed in ranked because every hull shares one hitbox. Open the
+**wardrobe** from the hangar (tap any slot) or the shop. Tap a look to see it on
+the ship; the button under the grid puts it on, buys it, or says how to get it,
+with how far along you are. Each slot is a tab with its count.
 
-| Slot | Options |
+| Slot | What's in it |
 |---|---|
-| Hull | dart, wing, needle, manta (missions), arrow (1,500), talon (4,000), nova (400 cores, or the starter pack), raptor (season pass) |
-| Paint | standard, slate, crimson, cobalt, olive, sand, white, carbon, mint, rose gold (credits), gunmetal (Colonel), chrome (General), silver, gold, platinum, diamond, champion, supernova (leagues), nebula, solar, void, midnight, glacier (cores), aurora (day 7 login reward), frost, ember (season pass) |
-| Markings | stripe, twin stripes, split (credits), chevron (10 stars), two-tone (25 stars) |
-| Fins | tail fin, winglets (credits), twin fins (15 stars) |
-| Engine colour | amber, cyan, violet, green, white, ice (credits), red (Sergeant), plasma, gold (cores), solar (season pass); colours the engine flames |
-| Wing decal | your rank insignia, or your league emblem |
+| Hull (12) | dart; wing, needle, manta (missions); arrow, talon, viper (credits); nova, phantom (cores); raptor (season pass); kite, comet (goals) |
+| Paint (72) | plain colours for credits, rank paints (copper to pearl), a paint for each league, star paints, premium paints for cores, and paints for finishing goals (one for each area you reach, and each place you master) |
+| Markings (13) | stripe, twin stripes, split, hazard (credits); dots, bands (cores); chevron, two-tone (stars); spine, wing tips, checker, nose cap (goals) |
+| Fins (7) | tail fin, winglets, crest (credits); twin fins (stars); blade, swept fins (goals) |
+| Engine colour (27) | single colours and two-colour flames (root to tip) for credits, cores, rank, goals and the pass |
+| Wing decal (16) | your rank insignia, your league emblem, and pictures: flame, wings, rocket (credits); star, moon, target, crown, skull, bolt, laurel, atom, planet (goals) |
+| Flame (10) | glow only, line, dashes, ion (missions); triple (credits); wide (cores); long, twin, pulse (goals); ribbon (the vault) |
+
+**Ways to get a look:** credits, cores, a rank, a league, set level stars, a
+**goal**, the mission unlocks, the login calendar or the season pass, or the
+vault. Each look says which on its card.
+
+**Goals** (the second tab of the missions screen): 47 of them in four groups
+(flying, skill, places, collection), each with a progress bar. They count what
+the game already keeps, so a save that existed before has its progress already.
+Finishing one pays credits and unlocks a look to wear; there's a card for each
+when you finish a run. Examples: fly 50 runs, 10,000 near misses, a chain of
+15, reach level 19 (the volcanic plain), score 4,000 in each area on its own,
+finish all nine set levels, own 25 looks.
+
+**Sets** are themed groups of four or five looks you can buy (ember forge, deep sea, neon
+night, royal guard, toxic waste, sunset strip). Own every look in one for a
+bonus of cores.
 
 Missions still unlock trail styles and world colour palettes.
 
@@ -481,13 +501,18 @@ turn over at midnight UTC, the same moment for everyone.
   just waits. Three **daily quests**, the same for everyone that day (play
   runs, score, reach a level, near misses, pickups, boost time, ranked runs,
   ship rooms), each paying credits and pass XP; all three pay 10 cores.
-- **Shop:** four looks a day, the same for everyone, at least one premium.
-  One is the deal of the day at a quarter off. The shop is a showroom: the
-  camera swings in and circles your ship in the top half, and the looks are
-  cards on a sheet below. Tap a card to put it on the ship, then buy it with
-  the button under the cards (tap an owned one to wear it). Also: a ranked
-  ticket for cores, and core packs in the apps. The hangar uses the same
-  close-up camera.
+- **Shop:** a showroom, with the camera circling your ship above a sheet of
+  cards. Tap a card to put the look on the ship, then buy it with the button
+  under the cards (tap an owned one to wear it). Three tabs, all the same for
+  everyone and all turning over on the UTC clock:
+  - **today:** four looks a day, at least one premium, one a deal at a quarter
+    off. Looks you don't own come first, and the day's picks are kept for the
+    day, so buying one doesn't reshuffle the rest.
+  - **weekly set:** one themed set a week, as a bundle for what you're missing
+    at a fifth off (in cores). Every set comes round once before any repeats.
+  - **vault:** one rare look a month, for cores. When it goes it's away for the
+    rest of the cycle.
+  Also: a ranked ticket for cores, and core packs in the apps.
 - **Season pass:** six weeks (six weekly runs), 30 tiers of 120 XP. Runs
   earn XP (1 per 250 points, up to 60) and each quest 60. The free track pays
   credits, cores and tickets; the premium track (950 cores, or a purchase in
@@ -512,7 +537,7 @@ Each one gets harder every time you complete it. Every completed mission
 unlocks the next item, in a fixed order:
 
 - **Hulls:** wing, needle, manta.
-- **Trails:** line, dashes, ion. Short engine flames behind the ship.
+- **Flames:** line, dashes, ion. Short engine flames behind the ship.
 - **World colours:** tidewater, clay, lichen, ink, ember. At each loop of the
   themes the world fades to your next unlocked palette.
 
@@ -640,7 +665,7 @@ new build drops the old build's cached scripts and styles.
 | `src/missions.ts`, `src/cosmetics.ts` | Missions and mission unlocks |
 | `src/ranks.ts` | Rank ladder, XP, skill, par, insignia, run history |
 | `src/wallet.ts` | Credits and cores |
-| `src/economy/` | Tickets, daily rewards and quests, the shop, the season pass, and their screens |
+| `src/economy/` | Tickets, daily rewards and quests, the shop (today, the weekly set, the vault), the season pass, and their screens |
 | `src/server/` | The server behind one interface: Supabase, or the device alone; cloud save, the run outbox and the leaderboard boards |
 | `src/unlocks.ts` | What opens solo environments and how far off it is |
 | `src/store/` | In-app purchases (RevenueCat in the apps, nothing on the web) |
@@ -648,7 +673,11 @@ new build drops the old build's cached scripts and styles.
 | `src/share.ts` | The share card |
 | `src/upgrades.ts` | Ship upgrade systems, points and the standard ship |
 | `src/leagues.ts` | Leagues, divisions, league points, weekly rewards, emblems |
-| `src/looks.ts` | Ship looks catalogue and ownership |
+| `src/catalogue.ts` | Every look, how to get each, the sets and the vault |
+| `src/looks.ts` | What you own and what's on; how an unlock reads |
+| `src/achievements.ts`, `src/goals.ts` | The 47 goals (counted from existing stats) and which have paid |
+| `src/wardrobe.ts`, `src/wardrobeView.ts` | The wardrobe's model and its screen, and the goals list |
+| `src/decals.ts` | Wing decal pictures |
 | `src/progress.ts` | Stats, set level results, weekly, endless and environment bests |
 | `src/courses.ts` | The set levels, the solo environments and the week's ranked run |
 | `src/fx.ts` | Animated interior detail: liquids, steam, blinkers, holograms, sparks |
@@ -756,6 +785,13 @@ sections back to back. `tests/determinism.test.ts` bans `Math.random`,
 `Date.now` and `performance.now` from the generator files.
 `tests/economy.test.ts` covers ticket refills, the login calendar, quests,
 the shop, the pass, and that a revive leaves a clear lane.
+`tests/looks.test.ts` checks the catalogue: every way to get a look is real,
+every goal unlocks something, sets are buyable, old ids and prices are kept.
+`tests/shop.test.ts` covers the day's picks (no reshuffle on a purchase), the
+weekly set's cycle and bundle price, and the vault's calendar.
+`tests/wardrobe.test.ts` covers the cards and the buy or equip button for each kind
+of unlock. `tests/ships.test.ts` checks every hull, marking, decal and flame can be
+drawn and that no hull is wider than the ship's footprint allows.
 `tests/server.test.ts` checks the game runs without a server and that the
 server functions' numbers match the game's.
 

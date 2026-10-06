@@ -134,24 +134,30 @@ is checked by eye.
 
 ## 4. Shop revamp (E)
 
-Today: a daily shop of four looks, a showroom camera, core packs, tickets and a pass.
-The catalogue is ~60 items across six slots.
+Was: ~60 looks across six slots, a daily shop of four, a hangar that cycled one slot
+at a time through the list on each tap.
 
-Design goals:
+Now:
 
-1. **A bigger catalogue** in more slots: hulls, paints, markings, fins, engine colours,
-   wing decals, plus trails, nameplate titles and badges (for the leaderboard rows) and
-   world palettes.
-2. **Every item has a path**: bought with credits, bought with cores, or earned by a
-   named goal (a rank, a league, stars, a mission, a level reached, a leaderboard
-   place, a login streak, the pass). Items show how to get them when locked.
-3. **A collection screen**: per slot, owned/total, and the nearest goal for each
-   locked item.
-4. **A rotating shop**: daily picks plus a weekly featured set and a rare "vault"
-   item, all seeded by date so everyone sees the same.
-5. **No pay-to-win**: looks only; one hitbox for every hull.
+1. **157 looks in seven slots** (a new flame slot), up from ~60: 12 hulls, 72 paints,
+   13 markings, 7 fins, 27 engine colours, 16 wing decals, 10 flames. Four new hulls,
+   seven markings, three fins, twelve decals and six flame styles are drawn in code.
+2. **Every look has a path:** credits, cores, rank, league, stars, a goal, the mission
+   unlocks, the login calendar or pass, or the vault. 47 goals unlock one look each
+   (and pay credits); they are counted from stats the game already keeps, so existing
+   saves have their progress.
+3. **A wardrobe:** slot tabs with counts, a grid of looks, try-on on the ship, and a
+   panel that says how to get the one you picked, with a progress bar for goals.
+4. **A rotating shop:** today's four (favouring what you don't own, kept for the day),
+   a weekly set bundle at a discount, and a monthly vault look. Finishing a set pays a
+   bonus.
+5. **No pay-to-win:** looks only; one hitbox for every hull.
 
-**Status: not started** (queued after the asteroid and volcano work).
+Not built, on purpose: leaderboard titles and badges (they would need the server to
+trust a client's claim to own them), and selling hulls in the vault (each is new
+geometry to draw).
+
+**Status: done.**
 
 ## 5. What's next, in order
 

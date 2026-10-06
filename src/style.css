@@ -2446,7 +2446,8 @@ body {
 }
 
 /* Leaderboard screen. */
-.board-tabs {
+.board-tabs,
+.chip-row {
   display: flex;
   gap: 8px;
   margin: 6px -24px 12px 0;
@@ -2456,11 +2457,13 @@ body {
   -webkit-overflow-scrolling: touch;
 }
 
-.board-tabs::-webkit-scrollbar {
+.board-tabs::-webkit-scrollbar,
+.chip-row::-webkit-scrollbar {
   display: none;
 }
 
-.board-tabs .tab {
+.board-tabs .tab,
+.chip-row .tab {
   flex: none;
   white-space: nowrap;
 }
@@ -2532,4 +2535,201 @@ body {
 .name-edit input:focus {
   outline: none;
   border-color: currentColor;
+}
+
+/* Wardrobe: slot chips, a scrolling grid of looks, and a panel for the one picked. */
+.settings.sheet.ward-sheet {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  height: 56%;
+  padding-top: 12px;
+}
+
+.ward-sheet .chip-row {
+  flex: none;
+  margin-top: 0;
+  margin-bottom: 8px;
+}
+
+.chip-row .tab small {
+  margin-left: 6px;
+  opacity: 0.6;
+  font-size: 0.85em;
+}
+
+.chip-row .tab.on small {
+  opacity: 0.8;
+}
+
+.ward-grid {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  grid-auto-rows: min-content;
+  gap: 8px;
+  overflow-y: auto;
+  padding: 2px 2px 10px;
+  touch-action: pan-y;
+  scrollbar-width: none;
+}
+
+.ward-grid::-webkit-scrollbar {
+  display: none;
+}
+
+.ward-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 9px 3px 8px;
+  font: inherit;
+  color: inherit;
+  text-align: center;
+  background: color-mix(in srgb, currentColor 4%, transparent);
+  border: 1px solid color-mix(in srgb, currentColor 20%, transparent);
+  border-radius: 14px;
+  cursor: pointer;
+  min-width: 0;
+}
+
+.ward-card.picked {
+  border: 2px solid currentColor;
+  padding: 8px 2px 7px;
+  background: color-mix(in srgb, currentColor 10%, transparent);
+}
+
+.ward-card.locked .card-swatch {
+  opacity: 0.55;
+}
+
+.ward-card .card-swatch {
+  width: 38px;
+  height: 38px;
+  margin-bottom: 3px;
+}
+
+.ward-card .card-swatch svg {
+  width: 24px;
+  height: 24px;
+}
+
+.ward-card .card-swatch svg[viewBox] path[fill="currentColor"] {
+  stroke: none;
+}
+
+.ward-card .card-name {
+  font-size: calc(10.5px * var(--ui-scale));
+  line-height: 1.2;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ward-card .card-sub {
+  font-size: calc(9px * var(--ui-scale));
+  line-height: 1.2;
+  opacity: 0.6;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ward-card .card-tick {
+  position: absolute;
+  top: 4px;
+  right: 6px;
+  font-size: calc(11px * var(--ui-scale));
+}
+
+.ward-detail {
+  flex: none;
+  padding-top: 10px;
+  border-top: 1px solid color-mix(in srgb, currentColor 18%, transparent);
+}
+
+.ward-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.ward-name {
+  font-size: calc(15px * var(--ui-scale));
+  font-weight: 500;
+}
+
+.ward-status {
+  margin: 3px 0 8px;
+  min-height: 2.4em;
+  line-height: 1.35;
+}
+
+.ward-goal {
+  margin: 0 0 10px;
+}
+
+.ward-detail .pill {
+  width: 100%;
+}
+
+/* Goals. */
+.goal-group {
+  margin: 22px 0 4px;
+}
+
+.goal-row {
+  padding: 11px 0;
+  border-bottom: 1px solid color-mix(in srgb, currentColor 16%, transparent);
+}
+
+.goal-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.goal-name {
+  font-size: calc(13px * var(--ui-scale));
+}
+
+.goal-count {
+  font-size: calc(11px * var(--ui-scale));
+  opacity: 0.7;
+  font-variant-numeric: tabular-nums;
+}
+
+.goal-text {
+  margin: 2px 0 6px;
+  font-size: calc(11px * var(--ui-scale));
+  opacity: 0.65;
+}
+
+.goal-reward {
+  margin-top: 6px;
+  font-size: calc(10.5px * var(--ui-scale));
+  opacity: 0.7;
+}
+
+.goal-row.done .goal-name::before {
+  content: '✓ ';
+}
+
+.goal-row.done {
+  opacity: 0.6;
+}
+
+.goal-row .xp-track {
+  height: 4px;
+}
+
+#screen-shop .chip-row {
+  margin-top: 10px;
 }

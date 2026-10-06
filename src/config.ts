@@ -699,7 +699,8 @@ export const CONFIG = {
     // Three a day (UTC), the same for everyone. Each pays credits and pass XP;
     // finishing all three pays cores.
     quests: { count: 3, credits: [150, 400], allDoneCores: 10, passXp: 60 },
-    shop: { slots: 4 },
+    // The shop: looks a day, the weekly set's bundle discount, and how many credits a core is worth when a bundle mixes them.
+    shop: { slots: 4, setDiscount: 0.8, creditsPerCore: 25 },
     pass: { weeks: 6, tiers: 30, xpPerTier: 120, premiumCores: 950, runXpPer: 250, runXpMax: 60 },
     // Real-money products (src/store): create these ids in App Store Connect,
     // Google Play and RevenueCat. Prices are set in the stores. Bonus sizes:

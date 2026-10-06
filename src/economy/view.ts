@@ -27,6 +27,7 @@ export interface ShopOfferView {
   slot: string; // 'hull', 'paint', ...
   slotName: string; // shown under the name
   swatch: string | null; // css colours for paints and engines
+  icon: string | null; // a picture, for the rest
   price: string;
   premium: boolean; // priced in cores
   deal: boolean;
@@ -37,6 +38,11 @@ export interface ShopOfferView {
 export interface ShopView {
   wallet: string;
   reset: string;
+  /** The tabs (today, the weekly set, the vault) and which is open. */
+  tabs: { id: string; label: string; on: boolean }[];
+  heading: string;
+  /** A line under the cards: what the set or the vault is. */
+  info: string;
   offers: ShopOfferView[];
   /** The one buy button, for the picked look. */
   buy: { text: string; enabled: boolean };
@@ -129,7 +135,11 @@ export class EconomyView {
 
   // --- shop ---
 
-  bindShop(onOffer: (i: number) => void, onBuy: () => void, onTicket: () => void, onCores: (i: number) => void): void {
+  bindShop(onOffer: (i: number) => void, onBuy: () => void, onTicket: () => void, onCores: (i: number) => void, onTab: (id: string) => void): void {
+    $('shop-tabs').addEventListener('click', (e) => {
+      const tab = (e.target as HTMLElement).closest<HTMLElement>('[data-shoptab]');
+      if (tab) onTab(tab.dataset.shoptab ?? '');
+    });
     $('shop-offers').addEventListener('click', (e) => {
       const card = (e.target as HTMLElement).closest<HTMLElement>('[data-offer]');
       if (card) onOffer(Number(card.dataset.offer));
@@ -147,6 +157,16 @@ export class EconomyView {
   renderShop(v: ShopView): void {
     $('shop-wallet').textContent = v.wallet;
     $('shop-reset').textContent = v.reset;
+    $('shop-heading').textContent = v.heading;
+    $('shop-info').textContent = v.info;
+    $('shop-tabs').replaceChildren(
+      ...v.tabs.map((t) => {
+        const b = el('button', `tab${t.on ? ' on' : ''}`, t.label) as HTMLButtonElement;
+        b.type = 'button';
+        b.dataset.shoptab = t.id;
+        return b;
+      }),
+    );
     $('shop-offers').replaceChildren(
       ...v.offers.map((o, i) => {
         const card = el('button', `offer-card${o.picked ? ' picked' : ''}${o.owned ? ' owned' : ''}`) as HTMLButtonElement;
@@ -154,7 +174,7 @@ export class EconomyView {
         card.dataset.offer = String(i);
         const sw = el('span', 'card-swatch');
         if (o.swatch) sw.style.background = o.swatch;
-        else sw.innerHTML = SLOT_ICONS[o.slot] ?? '';
+        else sw.innerHTML = o.icon ?? SLOT_ICONS[o.slot] ?? '';
         const price = el('span', `card-price${o.premium ? ' premium' : ''}`, o.owned ? 'owned' : o.price);
         card.append(sw, el('span', 'label card-name', o.name), el('span', 'label dim card-slot', o.slotName), price);
         if (o.deal && !o.owned) card.append(el('span', 'card-deal', '-25%'));
