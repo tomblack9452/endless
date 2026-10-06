@@ -62,6 +62,17 @@ export interface CourseTile {
   locked: boolean;
 }
 
+/** One solo environment tile: open (with its best) or locked (with what opens it). */
+export interface EnvTile {
+  index: number;
+  name: string;
+  best: number;
+  locked: boolean;
+  need: string;
+  toGo: string;
+  fraction: number; // 0..1 towards the unlock
+}
+
 /** One tile on the sector map. */
 export interface SectorTile {
   index: number;
@@ -400,7 +411,7 @@ export class UI {
     envs.addEventListener('pointerdown', (e) => e.stopPropagation());
     envs.addEventListener('click', (e) => {
       const tile = (e.target as HTMLElement).closest<HTMLElement>('.course-tile');
-      if (tile) onEnv(Number(tile.dataset.env));
+      if (tile && !tile.classList.contains('locked')) onEnv(Number(tile.dataset.env));
     });
     for (const el of document.querySelectorAll<HTMLElement>('[data-solotab]')) {
       el.addEventListener('pointerdown', (e) => e.stopPropagation());
@@ -414,22 +425,39 @@ export class UI {
     });
   }
 
-  /** Solo environments: a tile each with its high score. */
-  renderEnvironments(tiles: { index: number; name: string; best: number }[]): void {
+  /** Solo environments: a tile each with its high score, or what opens it and how far off that is. */
+  renderEnvironments(tiles: EnvTile[], note: string): void {
+    $('env-note').textContent = note;
     const grid = document.createElement('div');
     grid.className = 'course-grid';
     for (const t of tiles) {
       const b = document.createElement('button');
       b.type = 'button';
-      b.className = 'course-tile';
+      b.className = `course-tile${t.locked ? ' locked' : ''}`;
       b.dataset.env = String(t.index);
       const name = document.createElement('span');
       name.className = 'course-name';
       name.textContent = t.name;
-      const best = document.createElement('span');
-      best.className = 'course-time';
-      best.textContent = t.best > 0 ? `best ${formatScore(t.best)}` : 'no runs yet';
-      b.append(name, best);
+      b.append(name);
+      if (t.locked) {
+        const need = document.createElement('span');
+        need.className = 'course-need';
+        need.textContent = t.need;
+        const bar = document.createElement('span');
+        bar.className = 'unlock-bar';
+        const fill = document.createElement('span');
+        fill.style.width = `${Math.round(t.fraction * 100)}%`;
+        bar.append(fill);
+        const togo = document.createElement('span');
+        togo.className = 'course-time';
+        togo.textContent = t.toGo;
+        b.append(need, bar, togo);
+      } else {
+        const best = document.createElement('span');
+        best.className = 'course-time';
+        best.textContent = t.best > 0 ? `best ${formatScore(t.best)}` : 'no runs yet';
+        b.append(best);
+      }
       grid.append(b);
     }
     $('env-grid').replaceChildren(grid);

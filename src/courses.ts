@@ -200,15 +200,20 @@ export interface Environment {
   name: string;
   theme: ThemeId;
   biome: Biome;
+  /**
+   * The sector (a theme's three levels, in the endless order) that opens it in
+   * solo. Reaching that sector in ranked or endless unlocks the environment; see unlocks.ts.
+   */
+  sector: number;
 }
 
 export const ENVIRONMENTS: readonly Environment[] = [
-  { id: 'open-ground', name: 'open ground', theme: 'land', biome: 'alien' },
-  { id: 'canyon', name: 'canyon', theme: 'canyon', biome: 'canyon' },
-  { id: 'ship', name: 'ship interior', theme: 'interior', biome: 'interior' },
-  { id: 'ice', name: 'ice field', theme: 'land', biome: 'ice' },
-  { id: 'asteroids', name: 'asteroid belt', theme: 'canyon', biome: 'asteroids' },
-  { id: 'volcanic', name: 'volcanic plain', theme: 'land', biome: 'volcanic' },
+  { id: 'open-ground', name: 'open ground', theme: 'land', biome: 'alien', sector: 0 },
+  { id: 'canyon', name: 'canyon', theme: 'canyon', biome: 'canyon', sector: 1 },
+  { id: 'ship', name: 'ship interior', theme: 'interior', biome: 'interior', sector: 2 },
+  { id: 'ice', name: 'ice field', theme: 'land', biome: 'ice', sector: 3 },
+  { id: 'asteroids', name: 'asteroid belt', theme: 'canyon', biome: 'asteroids', sector: 4 },
+  { id: 'volcanic', name: 'volcanic plain', theme: 'land', biome: 'volcanic', sector: 6 },
 ];
 
 
