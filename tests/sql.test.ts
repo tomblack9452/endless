@@ -2,6 +2,7 @@ import { PGlite } from '@electric-sql/pglite';
 import { beforeAll, describe, expect, it } from 'vitest';
 import SETUP from '../supabase/setup.sql?raw';
 import { CONFIG } from '../src/config';
+import { ALLOWED, REFUSED } from './nameCases';
 import { applyMigrations } from '../scripts/apply-db-lib.mjs';
 import { parts as splitParts, statements } from '../scripts/sql-split.mjs';
 
@@ -118,7 +119,7 @@ describe('supabase/setup.sql', () => {
     await fresh.exec(SUPABASE_STANDIN);
     await fresh.exec(SETUP);
     const t = await fresh.query<{ table_name: string }>("select table_name from information_schema.tables where table_schema = 'public' order by 1");
-    expect(t.rows.map((r) => r.table_name)).toEqual(['bests', 'core_log', 'players', 'runs', 'saves', 'store_events', 'wallets']);
+    expect(t.rows.map((r) => r.table_name)).toEqual(['bests', 'core_log', 'name_words', 'players', 'runs', 'saves', 'store_events', 'wallets']);
   });
 
   it('can run again over a database it already set up, as the Supabase GitHub integration does', async () => {
@@ -192,7 +193,7 @@ describe('db:apply (the migrations from a terminal)', () => {
     const second = await applyMigrations(asClient(d), migrations);
     expect(second).toEqual({ applied: [], recorded: [] });
     const t = await d.query<{ n: string }>("select table_name n from information_schema.tables where table_schema = 'public' order by 1");
-    expect(t.rows.map((r) => r.n)).toEqual(['bests', 'core_log', 'endless_migrations', 'players', 'runs', 'saves', 'store_events', 'wallets']);
+    expect(t.rows.map((r) => r.n)).toEqual(['bests', 'core_log', 'endless_migrations', 'name_words', 'players', 'runs', 'saves', 'store_events', 'wallets']);
     // Every table has row-level security on (Supabase's advisor flags any that don't).
     const open = await d.query<{ n: string }>("select relname n from pg_class c join pg_namespace s on s.oid = c.relnamespace where s.nspname = 'public' and c.relkind = 'r' and not c.relrowsecurity");
     expect(open.rows).toEqual([]);
@@ -452,6 +453,22 @@ describe('ships on the boards', () => {
     await rejects(db.query('select public.set_ship($1::jsonb)', ['[1]']), /not a ship/);
     await as(null);
     await rejects(db.query('select public.set_ship($1::jsonb)', ['{}']), /permission denied|not signed in/);
+  });
+});
+
+describe('pilot name filter', () => {
+  it('gives the same answers as the game', async () => {
+    await admin();
+    for (const n of [...REFUSED, ...ALLOWED]) {
+      const r = await db.query<{ name_blocked: boolean }>('select public.name_blocked($1)', [n]);
+      expect(r.rows[0].name_blocked, n).toBe(REFUSED.includes(n));
+    }
+  });
+
+  it('stops a blocked name being picked', async () => {
+    const a = await newUser();
+    await as(a);
+    await rejects(db.query("select public.set_pilot_name('Sh1tLord')"), /isn't allowed/);
   });
 });
 

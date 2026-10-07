@@ -918,7 +918,17 @@ afterwards are flown with a maxed ship.
 After every update that adds a file to `supabase/migrations/`, run
 `npm run db:apply` (it only applies what's new), then `npm run check-server`
 to see it's all there. Recent ones: `0005` (deleting an account from
-settings), `0006` (ships on the leaderboards), `0007` (credits in `wallets`), `0008` (maxing out a player).
+settings), `0006` (ships on the leaderboards), `0007` (credits in `wallets`), `0008` (maxing out a player), `0009` (the pilot
+name profanity filter).
+
+**Bad names.** Names are checked against a profanity list
+([zautumnz/profane-words](https://github.com/zautumnz/profane-words), WTFPL)
+in the game and again in the database (`src/nameFilter.ts`,
+`name_blocked()`). To find names picked before the filter, in the SQL editor:
+`select name from players where name_blocked(name);`. To allow a word the
+list catches wrongly, add it to `ALLOW` in `scripts/name-filter/build.mjs`, run
+`npm run names:build`, and put the change in a new migration (delete the word
+from `name_words`).
 
 Still to do on the server: a full re-fly of submitted runs with the game's
 own code (it needs the run simulation pulled out of `game.ts` first), and

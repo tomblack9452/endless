@@ -1,4 +1,4 @@
--- Endless Space database: part 1 of 10. Run the parts in order, 01 first.
+-- Endless Space database: part 1 of 23. Run the parts in order, 01 first.
 
 -- Endless Space: players, cloud saves, cores, ranked runs and the weekly board.
 -- Run with `supabase db push` (or paste into the SQL editor). Turn on

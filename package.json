@@ -12,7 +12,8 @@
     "test": "vitest run",
     "db:setup": "node scripts/build-setup-sql.mjs",
     "check-server": "node scripts/check-server.mjs",
-    "db:apply": "node scripts/apply-db.mjs"
+    "db:apply": "node scripts/apply-db.mjs",
+    "names:build": "node scripts/name-filter/build.mjs"
   },
   "dependencies": {
     "@capacitor-community/admob": "^8.2.0",

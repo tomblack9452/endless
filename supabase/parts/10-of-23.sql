@@ -1,4 +1,4 @@
--- Endless Space database: part 10 of 10. Run the parts in order, 01 first.
+-- Endless Space database: part 10 of 23. Run the parts in order, 01 first.
 
 -- p_credits: the device's balance now. p_last: what the server said last time
 -- (null if this device has never synced). Returns the balance to keep.
@@ -58,3 +58,23 @@ $$;
 revoke execute on function public.take_max_out from public, anon;
 
 grant execute on function public.take_max_out to authenticated;
+
+-- No profanity in pilot names. The words are from
+-- https://github.com/zautumnz/profane-words (WTFPL), made by
+-- `npm run names:build` (scripts/name-filter/). The rules match
+-- src/nameFilter.ts, which checks the same in the game first:
+--   a name is split into words (at spaces, - and _, and between a small and a
+--   capital letter), each read with leetspeak undone and with digits dropped;
+--   it's refused if a word, or the whole name run together, is on the list, or
+--   if it contains a strong root anywhere.
+-- To find names picked before this:  select name from players where name_blocked(name);
+
+create table if not exists public.name_words (
+  word text primary key,
+  strong boolean not null default false -- refused anywhere in a name, not just as a word
+);
+
+alter table public.name_words enable row level security;
+
+-- only the functions below read it
+revoke all on public.name_words from anon, authenticated;

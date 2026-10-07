@@ -173,6 +173,7 @@ export class Game {
   private shipSent = ''; // the looks last sent to the boards (JSON)
   private shipTimer = 0;
   private nameOk = false; // the player has a pilot name of their own
+  private nameWords: Promise<Set<string>> | null = null; // the profanity list, once loaded
   private shopPacks: (ProductId | 'dev' | 'restore' | 'pass-cores' | 'pass-open' | 'dev-premium' | `swap-${number}`)[] = [];
   /** One-time products already bought. */
   private readonly entitlements = new Entitlements();
@@ -1509,6 +1510,11 @@ export class Game {
       this.ui.setPilotName('', 'names come with the server', box);
       return false;
     }
+    const problem = await this.nameProblem(name);
+    if (problem) {
+      this.ui.setPilotName('', problem, box);
+      return false;
+    }
     const res = await this.backend.setPilotName(name);
     this.ui.setPilotName(res.ok ? res.message : '', res.ok ? 'saved' : res.message, box);
     if (res.ok) this.nameOk = true;
@@ -2222,9 +2228,19 @@ export class Game {
     this.openInfo('name');
   }
 
+  /** Why this name can't be had (shape or profanity: nameFilter.ts), or null if it's fine to send. */
+  private async nameProblem(name: string): Promise<string | null> {
+    if (!PILOT_NAME.test(name.trim())) return '3 to 16 letters, numbers, spaces, - or _';
+    // The word list loads the first time it's needed (it's its own file).
+    this.nameWords ??= import('./nameWords.json').then((m) => new Set(m.default as string[]));
+    const [{ nameBlocked }, words] = await Promise.all([import('./nameFilter'), this.nameWords]);
+    return nameBlocked(name.trim(), words) ? "that name isn't allowed. try another" : null;
+  }
+
   private async saveNameScreen(name: string): Promise<void> {
-    if (!PILOT_NAME.test(name.trim())) {
-      this.ui.setPilotName('', '3 to 16 letters, numbers, spaces, - or _', 'name');
+    const problem = await this.nameProblem(name);
+    if (problem) {
+      this.ui.setPilotName('', problem, 'name');
       return;
     }
     const res = await this.backend.setPilotName(name.trim());
