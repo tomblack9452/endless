@@ -48,7 +48,7 @@ bigger picture and the names of the looks.
 
 Set levels have no board (they're the same every time, so they have times and
 stars instead). Assisted runs, and anything flown with the dev tools, are never
-sent. Everyone has a pilot name (a new account gets `pilot-3fa2`, and the game asks for a real one before going on: the name screen comes up on the title and stays until a name is saved; 3-16
+sent. Everyone has a pilot name (a new account gets `pilot-3fa2`, and once ranked and the leaderboards open (after 5 runs of 1,000+) the game asks for a real one: the name screen comes up on the title and stays until a name is saved; 3-16
 letters/numbers/spaces/`-`/`_`, unique, once an hour) and a row on a board is
 their best score. The screen shows the top 50 and, if you're lower, your own row
 and rank under a gap.

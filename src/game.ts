@@ -2231,12 +2231,13 @@ export class Game {
   }
 
   /**
-   * Everyone picks a pilot name: a player still on a made-up one ("pilot-3fa2")
-   * gets the name screen on the title, and it stays until a name is saved.
-   * Only with the server (names live there).
+   * Everyone picks a pilot name once ranked and the leaderboards open (before
+   * that nobody sees it, so new players can just fly): a player still on a
+   * made-up one ("pilot-3fa2") then gets the name screen on the title, and it
+   * stays until a name is saved. Only with the server (names live there).
    */
   private async askName(): Promise<void> {
-    if (this.nameOk || !this.backend.online || !this.onboarding.done) return;
+    if (this.nameOk || !this.backend.online || !this.onboarding.done || !this.open('leaderboard')) return;
     const name = await this.backend.pilotName();
     if (name === null) return; // no answer (no signal): ask another time
     if (!GENERATED_NAME.test(name)) {

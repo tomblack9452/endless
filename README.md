@@ -290,13 +290,14 @@ steer, a near miss, a pickup, boost. Then **dress your ship** from a starter
 set (three hulls, three paints, three engine colours) and you're on the front
 page, with the first daily reward. It resumes after a restart, can be skipped,
 and can be replayed from settings; anyone who had already played skips it. The
-pilot name is asked for on the leaderboard, while it's still the generated
-one.
+pilot name is asked for when ranked and the leaderboards open, while it's
+still the generated one (the name screen stays until one is saved).
 
 New players see the game in stages (`src/reveal.ts`), so the first screen isn't
 a wall of buttons: at first the big button flies endless and the bar has the
-hangar and goals; solo, the shop and the service record open after 3 runs;
-ranked, leagues and the leaderboard after 5 (and the tutorial). Each stage is
+hangar and goals; solo, the shop, the service record, ranked, leagues and the
+leaderboard open after 5 valid runs (a run scoring 1,000 or more) and the
+tutorial. Each stage is
 announced once, and a line under the menu says what opens next.
 
 | | Ranked | Solo | Endless |
