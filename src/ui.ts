@@ -1,7 +1,7 @@
 import { CONFIG } from './config';
 import { label, type SettingKey, type Settings } from './settings';
 
-export type ScreenName = 'title' | 'paused' | 'over' | 'settings' | 'goals' | 'hangar' | 'record' | 'solo' | 'league' | 'shop' | 'pass' | 'boards' | 'welcome';
+export type ScreenName = 'title' | 'paused' | 'over' | 'settings' | 'goals' | 'hangar' | 'record' | 'solo' | 'league' | 'shop' | 'pass' | 'boards' | 'welcome' | 'name';
 
 /** Everything the league screen shows. */
 /** The service record and league screens share one layout. */
@@ -131,6 +131,7 @@ export class UI {
     goals: $('screen-goals'),
     hangar: $('screen-hangar'),
     welcome: $('screen-welcome'),
+    name: $('screen-name'),
     record: $('screen-record'),
     solo: $('screen-sectors'),
     league: $('screen-league'),
@@ -338,6 +339,7 @@ export class UI {
   bindWelcome(on: { control: (id: string) => void; practice: () => void; skip: () => void; pick: (key: string) => void; done: () => void }): void {
     const stop = (e: Event) => e.stopPropagation();
     $('screen-welcome').addEventListener('pointerdown', stop);
+    $('screen-name').addEventListener('pointerdown', stop);
     $('tutorial').addEventListener('pointerdown', stop);
     $('welcome-controls').addEventListener('click', (e) => {
       const b = (e.target as HTMLElement).closest<HTMLElement>('[data-control]');
@@ -352,7 +354,6 @@ export class UI {
     $('welcome-skip').addEventListener('click', on.skip);
     $('tutorial-skip').addEventListener('click', on.skip);
     $('welcome-done').addEventListener('click', on.done);
-    $('welcome-name').addEventListener('pointerdown', stop);
   }
 
   /** The welcome screen: choosing controls, or dressing the ship (chips: [key, label, on]). */
@@ -511,17 +512,12 @@ export class UI {
     requestAnimationFrame(step);
   }
 
-  /** A pilot name box ("board", "settings", "welcome"): its current value and a line under it. */
+  /** A pilot name box ("board", "settings", "name"): its current value and a line under it. */
   setPilotName(name: string, note: string, box = 'board'): void {
     const input = $(`${box}-name`) as HTMLInputElement;
     if (name && document.activeElement !== input) input.value = name;
     const n = document.getElementById(`${box}-name-note`);
     if (n) n.textContent = note;
-  }
-
-  /** What's typed in a name box. */
-  nameTyped(box: string): string {
-    return ($(`${box}-name`) as HTMLInputElement).value.trim();
   }
 
   /** The league screen's weekly leaderboard. */

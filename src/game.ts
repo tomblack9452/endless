@@ -72,7 +72,12 @@ const REVEAL_KEY = 'endless.reveal';
 /** The shop's tabs: looks as cards (today, the set, the vault), then lists (the pass, cores, premium). */
 type ShopTab = 'today' | 'set' | 'vault' | 'pass' | 'cores' | 'premium';
 
-type InfoScreen = 'welcome' | 'goals' | 'hangar' | 'record' | 'solo' | 'league' | 'shop' | 'pass' | 'boards';
+/** A name the server made up for a new account ("pilot-3fa2"): the player hasn't picked one. */
+const GENERATED_NAME = /^pilot-[0-9a-f]{4}$/;
+/** A name the server takes (see set_pilot_name). */
+const PILOT_NAME = /^[A-Za-z0-9 _-]{3,16}$/;
+
+type InfoScreen = 'welcome' | 'name' | 'goals' | 'hangar' | 'record' | 'solo' | 'league' | 'shop' | 'pass' | 'boards';
 
 /** "5 oct": the Monday this week's ranked course started. */
 /** "1:23.4" */
@@ -167,6 +172,7 @@ export class Game {
   private portraits = new Portraits(this.palette);
   private shipSent = ''; // the looks last sent to the boards (JSON)
   private shipTimer = 0;
+  private nameOk = false; // the player has a pilot name of their own
   private shopPacks: (ProductId | 'dev' | 'restore' | 'pass-cores' | 'pass-open' | 'dev-premium' | `swap-${number}`)[] = [];
   /** One-time products already bought. */
   private readonly entitlements = new Entitlements();
@@ -324,6 +330,7 @@ export class Game {
     this.ui.bindTitleLinks(this.onTitleLink);
     this.ui.bindBoards(BOARD_TABS, (id) => void this.showBoard(id), (name) => void this.savePilotName(name));
     this.ui.bindNameBox('settings', (name) => void this.savePilotName(name, 'settings'));
+    this.ui.bindNameBox('name', (name) => void this.saveNameScreen(name));
     window.addEventListener('online', () => void this.outbox.flush());
     const now = Date.now();
     // Looks load once; a login reward can give one, so it waits for them.
@@ -1124,6 +1131,7 @@ export class Game {
       await this.checkMaxOut();
       this.refreshTitle();
       this.queueShip();
+      void this.askName();
       void this.outbox.flush(); // runs that couldn't be sent last time
     }
     const refund = await migrateTickets((n) => this.wallet.addCores(n, 'tickets'));
@@ -1470,7 +1478,7 @@ export class Game {
     void this.showBoard(this.boardTab);
     void this.backend.pilotName().then((name) => {
       // The name is asked for here, when it's first needed: a generated one ("pilot-3fa2") invites a real one.
-      const generated = !name || /^pilot-[0-9a-f]{4}$/.test(name);
+      const generated = !name || GENERATED_NAME.test(name);
       if (this.infoOpen === 'boards') this.ui.setPilotName(name ?? '', this.backend.online ? (generated ? 'pick your pilot name: 3 to 16 letters, numbers, spaces, - or _' : '3 to 16 letters, numbers, spaces, - or _. once an hour') : 'names come with the server');
     });
   }
@@ -1503,6 +1511,7 @@ export class Game {
     }
     const res = await this.backend.setPilotName(name);
     this.ui.setPilotName(res.ok ? res.message : '', res.ok ? 'saved' : res.message, box);
+    if (res.ok) this.nameOk = true;
     if (res.ok && box === 'board') void this.showBoard(this.boardTab);
     return res.ok;
   }
@@ -2184,9 +2193,6 @@ export class Game {
     }
     const hull = `hull:${this.looks.equipped.hull}`;
     if (STARTER.hull.includes(hull) && !this.looks.owns(byKey(hull)!, this.owner())) this.looks.give(hull);
-    const name = this.ui.nameTyped('welcome');
-    if (name && this.backend.online)
-      void this.backend.setPilotName(name).then((res) => this.ui.showNotice(res.ok ? `welcome, ${res.message}` : `name not saved: ${res.message}. change it in settings`));
     this.onboarding.set('done');
     this.infoOpen = null;
     this.player.setVisible(false);
@@ -2194,6 +2200,42 @@ export class Game {
     this.ui.show('title');
     this.refreshTitle();
     this.claimLogin();
+    void this.askName();
+  }
+
+  /**
+   * Everyone picks a pilot name: a player still on a made-up one ("pilot-3fa2")
+   * gets the name screen on the title, and it stays until a name is saved.
+   * Only with the server (names live there).
+   */
+  private async askName(): Promise<void> {
+    if (this.nameOk || !this.backend.online || !this.onboarding.done) return;
+    const name = await this.backend.pilotName();
+    if (name === null) return; // no answer (no signal): ask another time
+    if (!GENERATED_NAME.test(name)) {
+      this.nameOk = true;
+      return;
+    }
+    if (this.state !== 'title' || this.infoOpen === 'welcome' || this.infoOpen === 'name') return;
+    this.settingsOpen = false;
+    this.ui.setPilotName('', '', 'name');
+    this.openInfo('name');
+  }
+
+  private async saveNameScreen(name: string): Promise<void> {
+    if (!PILOT_NAME.test(name.trim())) {
+      this.ui.setPilotName('', '3 to 16 letters, numbers, spaces, - or _', 'name');
+      return;
+    }
+    const res = await this.backend.setPilotName(name.trim());
+    if (!res.ok) {
+      this.ui.setPilotName('', res.message, 'name');
+      return;
+    }
+    this.nameOk = true;
+    this.infoOpen = null;
+    this.ui.show('title');
+    this.ui.showNotice(`welcome, ${res.message}`);
   }
 
   /** How much of the game is open to this player (new players see it in stages: reveal.ts). */
@@ -2393,7 +2435,7 @@ export class Game {
       this.preview = null;
       this.applyLooks();
     }
-    if (this.infoOpen === 'welcome') return; // onboarding ends by its own buttons
+    if (this.infoOpen === 'welcome' || this.infoOpen === 'name') return; // these end by their own buttons
     if (this.state === 'title') {
       // The ship only shows on the screens that show it off (hangar, shop, welcome).
       this.player.setVisible(false);
@@ -2478,6 +2520,7 @@ export class Game {
     this.ui.show('title');
     this.refreshTitle();
     this.lastTime = performance.now();
+    void this.askName();
   }
 
   /** Dev: renderer stats for the FPS readout. */

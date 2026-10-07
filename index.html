@@ -148,10 +148,22 @@
             <div id="welcome-paint" class="chip-row"></div>
             <div class="settings-group">engine colour</div>
             <div id="welcome-engine" class="chip-row"></div>
-            <div class="settings-group">pilot name</div>
-            <input id="welcome-name" class="name-input" type="text" maxlength="16" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="for the leaderboards (optional)" aria-label="pilot name" />
             <button id="welcome-done" class="pill primary sheet-buy" type="button">ready</button>
           </div>
+        </div>
+      </div>
+
+      <div id="screen-name" class="layer screen panel">
+        <div class="panel-head">
+          <div class="panel-title">your pilot name</div>
+        </div>
+        <div class="settings">
+          <div class="label setting-note">this is how you show on the leaderboards. 3 to 16 letters, numbers, spaces, - or _. you can change it later in settings.</div>
+          <div class="name-edit">
+            <input id="name-name" type="text" maxlength="16" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="pilot name" aria-label="pilot name" />
+            <button id="name-name-save" class="tab" type="button">save</button>
+          </div>
+          <div id="name-name-note" class="label dim setting-note"></div>
         </div>
       </div>
 
