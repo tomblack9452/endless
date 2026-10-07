@@ -20,6 +20,8 @@ export interface Store {
   readonly available: boolean;
   /** Connect, as `userId` (the server account) when there is one. */
   start(userId: string | null): Promise<void>;
+  /** Buy as this server account from now on (it signed in after start). False if the store couldn't switch. */
+  identify(userId: string): Promise<boolean>;
   products(): Promise<StoreProduct[]>;
   buy(id: ProductId): Promise<BuyResult>;
   /** One-time products this account owns (restoring on a new device). */
@@ -31,6 +33,9 @@ class WebStore implements Store {
   async start(): Promise<void> {}
   async products(): Promise<StoreProduct[]> {
     return [];
+  }
+  async identify(): Promise<boolean> {
+    return true;
   }
   async buy(): Promise<BuyResult> {
     return 'failed';
@@ -49,12 +54,27 @@ class AppStore implements Store {
 
   constructor(private readonly key: string) {}
 
+  private user: string | null = null;
+
   async start(userId: string | null): Promise<void> {
     try {
       this.rc = await import('@revenuecat/purchases-capacitor');
       await this.rc.Purchases.configure({ apiKey: this.key, appUserID: userId ?? undefined });
+      this.user = userId;
     } catch {
       this.rc = null;
+    }
+  }
+
+  async identify(userId: string): Promise<boolean> {
+    if (!this.rc) return false;
+    if (this.user === userId) return true;
+    try {
+      await this.rc.Purchases.logIn({ appUserID: userId });
+      this.user = userId;
+      return true;
+    } catch {
+      return false;
     }
   }
 

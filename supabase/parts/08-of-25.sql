@@ -1,4 +1,4 @@
--- Endless Space database: part 8 of 23. Run the parts in order, 01 first.
+-- Endless Space database: part 8 of 25. Run the parts in order, 01 first.
 
 -- Set your own. Only the shape is checked (known slots, short ids, small
 -- numbers): which looks a player owns lives on their device.

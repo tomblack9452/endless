@@ -20,12 +20,15 @@ export interface AdNetwork {
   start(): Promise<void>;
   rewarded(placement: RewardedPlacement): Promise<AdResult>;
   interstitial(): Promise<void>;
-  /** Show the consent form again (settings > privacy choices). */
+  /** Show the consent form again (settings > ad privacy choices). */
   privacyChoices(): Promise<void>;
+  /** Google's consent rules ask for a way back to the form where the player is (the EU and UK). */
+  readonly privacyRequired: boolean;
 }
 
 class NoAds implements AdNetwork {
   readonly available = false;
+  readonly privacyRequired = false;
   async start(): Promise<void> {}
   async rewarded(): Promise<AdResult> {
     return 'unavailable';
@@ -40,6 +43,7 @@ class AdMobAds implements AdNetwork {
   readonly available = true;
   private m: AdMobModule | null = null;
   private npa = true; // non-personalised until consent says otherwise
+  privacyRequired = false;
 
   constructor(private readonly ids: { rewarded: string; interstitial: string }) {}
 
@@ -56,6 +60,7 @@ class AdMobAds implements AdNetwork {
       let consent = await AdMob.requestConsentInfo();
       if (consent.isConsentFormAvailable && consent.status === AdmobConsentStatus.REQUIRED) consent = await AdMob.showConsentForm();
       this.npa = !(allowed && (consent.status === AdmobConsentStatus.OBTAINED || consent.status === AdmobConsentStatus.NOT_REQUIRED));
+      this.privacyRequired = String(consent.privacyOptionsRequirementStatus) === 'REQUIRED';
     } catch {
       this.m = null;
     }
@@ -155,5 +160,10 @@ export class Ads {
 
   get hasNetwork(): boolean {
     return this.network.available;
+  }
+
+  /** Settings shows "ad privacy choices" when this is true. */
+  get privacyRequired(): boolean {
+    return this.network.privacyRequired;
   }
 }

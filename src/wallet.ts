@@ -70,7 +70,8 @@ export class Wallet {
     this.cores += n;
     this.coresEarned += n;
     this.save();
-    void this.remote?.earnCores(n, reason);
+    // The server decides what a reward is worth (earn_cores): take its balance after.
+    if (this.remote) void this.remote.earnCores(n, reason).then(() => this.syncCores());
   }
 
   spendCores(n: number, reason = 'spend'): boolean {

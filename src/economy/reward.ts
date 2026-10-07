@@ -7,6 +7,8 @@ export interface Reward {
   credits?: number;
   cores?: number;
   look?: string;
+  /** What the server records cores under ("pass:3:p10"): each reward is paid there once (earn_cores). */
+  source?: string;
 }
 
 function n(v: number): string {

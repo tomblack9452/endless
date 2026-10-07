@@ -2,10 +2,12 @@ import { storage } from '../storage';
 
 // What the player has bought for good: the one-off premium unlock and the
 // starter pack. The whole game asks this, never the store directly. It's filled
-// from three places, and anything any of them says is owned stays owned:
+// from three places, and anything any of them says is owned stays owned,
+// unless the server says it was refunded:
 //   - this device (purchases made here, kept in storage)
 //   - the store (RevenueCat restores, on a new install)
-//   - the server (the purchase webhook writes them to the account)
+//   - the server (the purchase webhook writes them to the account; a refunded
+//     one comes back as "refunded:<product>")
 // The season pass's premium track is per season, so the pass keeps that itself.
 
 export type Entitlement = 'premium' | 'starter';
@@ -47,6 +49,12 @@ export class Entitlements {
     this.owned.add(e);
     void storage.set(KEY, JSON.stringify([...this.owned]));
     return true;
+  }
+
+  /** No longer owned (refunded, as the server's records say). */
+  revoke(e: Entitlement): void {
+    if (!this.owned.delete(e)) return;
+    void storage.set(KEY, JSON.stringify([...this.owned]));
   }
 
   /** Dev: forget them all. */

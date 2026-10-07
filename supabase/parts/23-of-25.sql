@@ -1,4 +1,4 @@
--- Endless Space database: part 23 of 23. Run the parts in order, 01 first.
+-- Endless Space database: part 23 of 25. Run the parts in order, 01 first.
 
 -- END WORDS
 
@@ -53,3 +53,21 @@ end $$;
 revoke execute on function public.set_pilot_name from public, anon;
 
 grant execute on function public.set_pilot_name to authenticated;
+
+-- Cores can only come from real rewards (assessment items 1 and 2).
+--
+-- 1. grant_cores pays any account any amount, for the purchase webhook (which
+--    uses the service key). 0001 revoked it from anon and authenticated, but
+--    Postgres gives every function to PUBLIC too, so players could still call
+--    it. Revoke that as well.
+-- 2. earn_cores trusted the client up to 120 a day. Now every reward names
+--    itself ("login:2026-10-07", "pass:3:p10", "set:forge"...), is paid at most
+--    once, at most its real size, and only for the current day, week or season.
+
+revoke execute on function public.grant_cores from public, anon, authenticated;
+
+revoke execute on function public.earn_cores, public.spend_cores from public, anon;
+
+grant execute on function public.earn_cores, public.spend_cores to authenticated;
+
+create index if not exists core_log_reason on public.core_log (user_id, reason);

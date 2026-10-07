@@ -732,3 +732,131 @@ end $$;
 
 revoke execute on function public.set_pilot_name from public, anon;
 grant execute on function public.set_pilot_name to authenticated;
+
+-- ===== 0010_secure_cores.sql =====
+
+-- Cores can only come from real rewards (assessment items 1 and 2).
+--
+-- 1. grant_cores pays any account any amount, for the purchase webhook (which
+--    uses the service key). 0001 revoked it from anon and authenticated, but
+--    Postgres gives every function to PUBLIC too, so players could still call
+--    it. Revoke that as well.
+-- 2. earn_cores trusted the client up to 120 a day. Now every reward names
+--    itself ("login:2026-10-07", "pass:3:p10", "set:forge"...), is paid at most
+--    once, at most its real size, and only for the current day, week or season.
+
+revoke execute on function public.grant_cores from public, anon, authenticated;
+revoke execute on function public.earn_cores, public.spend_cores from public, anon;
+grant execute on function public.earn_cores, public.spend_cores to authenticated;
+
+create index if not exists core_log_reason on public.core_log (user_id, reason);
+
+create or replace function public.earn_cores(amount integer, reason text) returns integer
+language plpgsql security definer set search_path = public as $$
+declare
+  me uuid := auth.uid();
+  kind text := split_part(coalesce(reason, ''), ':', 1);
+  rest text := substr(coalesce(reason, ''), length(split_part(coalesce(reason, ''), ':', 1)) + 2);
+  today date := (now() at time zone 'utc')::date;
+  season integer := floor((today - date '2026-09-14') / 42) + 1; -- six-week seasons (src/season.ts)
+  most integer;
+  give integer;
+  so_far integer;
+begin
+  if me is null or amount is null or amount <= 0 then return 0; end if;
+  -- Each reward is paid once.
+  if exists (select 1 from public.core_log l where l.user_id = me and l.reason = earn_cores.reason) then return 0; end if;
+
+  if kind in ('login', 'gift', 'goals', 'weekly') then
+    -- A UTC date: today's (a day either side for clocks and midnight), or this week's Monday.
+    if rest !~ '^\d{4}-\d{2}-\d{2}$' then return 0; end if;
+    if kind = 'weekly' then
+      if rest::date not between today - 8 and today + 1 then return 0; end if;
+    elsif rest::date not between today - 1 and today + 1 then
+      return 0;
+    end if;
+    most := case kind when 'login' then 15 when 'gift' then 2 when 'goals' then 4 else 15 end;
+  elsif kind = 'pass' then
+    -- "pass:<season>:<f|p><tier>", this season, and no more than the whole pass pays.
+    if rest !~ ('^' || season || ':[fp]([1-9]|[12][0-9]|30)$') then return 0; end if;
+    select coalesce(sum(l.delta), 0) into so_far from public.core_log l
+      where l.user_id = me and l.reason like 'pass:' || season || ':%';
+    most := least(50, 300 - so_far);
+  elsif kind = 'set' then
+    -- A completed looks set's bonus (SETS in src/catalogue.ts).
+    if rest not in ('forge', 'deep', 'neon', 'royal', 'toxic', 'sunset') then return 0; end if;
+    most := 40;
+  elsif kind = 'tickets' and rest = '' then
+    most := 300; -- the one-off refund for spare ranked tickets (src/legacy.ts)
+  else
+    return 0;
+  end if;
+
+  give := greatest(0, least(amount, most));
+  if give = 0 then return 0; end if;
+  update public.wallets set cores = cores + give where user_id = me;
+  if not found then return 0; end if;
+  insert into public.core_log (user_id, delta, reason) values (me, give, earn_cores.reason);
+  return give;
+end $$;
+
+revoke execute on function public.earn_cores from public, anon;
+grant execute on function public.earn_cores to authenticated;
+
+-- ===== 0011_store_purchases.sql =====
+
+-- Purchases, safely (assessment items 4 and 5).
+--
+-- store_purchase: the webhook's one call per paid event. Keeping the event and
+-- paying its cores happen in one transaction, so a failure leaves nothing
+-- behind and RevenueCat's retry pays it properly; a repeat of an event that
+-- went through answers 'duplicate'.
+--
+-- store_refund: a refunded purchase. Its row is renamed 'refunded:<product>',
+-- so premium and the starter pack stop counting everywhere that looks for the
+-- product (the boards' badge, the game's purchases()), and refunded cores are
+-- taken back (the balance can't go below zero).
+-- Both are for the webhook's service key only.
+
+alter table public.store_events add column if not exists transaction_id text;
+
+create or replace function public.store_purchase(p_id text, p_user uuid, p_product text, p_type text, p_transaction text, p_cores integer)
+returns text language plpgsql security definer set search_path = public as $$
+begin
+  insert into public.store_events (id, user_id, product, type, transaction_id)
+  values (p_id, p_user, p_product, p_type, p_transaction)
+  on conflict (id) do nothing;
+  if not found then return 'duplicate'; end if;
+  if p_user is not null and coalesce(p_cores, 0) > 0 then
+    insert into public.wallets (user_id, cores) values (p_user, p_cores)
+      on conflict (user_id) do update set cores = public.wallets.cores + p_cores;
+    insert into public.core_log (user_id, delta, reason) values (p_user, p_cores, 'purchase:' || p_product);
+  end if;
+  return 'paid';
+end $$;
+
+create or replace function public.store_refund(p_id text, p_user uuid, p_product text, p_transaction text, p_cores integer)
+returns text language plpgsql security definer set search_path = public as $$
+declare
+  bought text;
+begin
+  insert into public.store_events (id, user_id, product, type, transaction_id)
+  values (p_id, p_user, 'refund:' || p_product, 'CANCELLATION', p_transaction)
+  on conflict (id) do nothing;
+  if not found then return 'duplicate'; end if;
+  select e.id into bought from public.store_events e
+    where e.product = p_product and e.user_id is not distinct from p_user
+      and (p_transaction is null or e.transaction_id is null or e.transaction_id = p_transaction)
+    order by (e.transaction_id = p_transaction) desc nulls last, e.at desc
+    limit 1;
+  if bought is null then return 'not found'; end if;
+  update public.store_events set product = 'refunded:' || product where id = bought;
+  if p_user is not null and coalesce(p_cores, 0) > 0 then
+    update public.wallets set cores = greatest(0, cores - p_cores) where user_id = p_user;
+    insert into public.core_log (user_id, delta, reason) values (p_user, -p_cores, 'refund:' || p_product);
+  end if;
+  return 'refunded';
+end $$;
+
+revoke execute on function public.store_purchase, public.store_refund from public, anon, authenticated;
+grant execute on function public.store_purchase, public.store_refund, public.grant_cores to service_role;

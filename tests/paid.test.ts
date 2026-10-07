@@ -29,6 +29,18 @@ describe('entitlements', () => {
     expect(entitlementFor('season_pass')).toBeNull();
   });
 
+  it('can be taken back (a refund), and stay gone after a reload', async () => {
+    const e = new Entitlements();
+    await e.load();
+    e.grant('premium');
+    e.revoke('premium');
+    expect(e.has('premium')).toBe(false);
+    expect(entitlementFor('refunded:premium')).toBeNull();
+    const again = new Entitlements();
+    await again.load();
+    expect(again.has('premium')).toBe(false);
+  });
+
   it('are kept, and older saves\' bought products carry over', async () => {
     data.set('endless.purchases', JSON.stringify(['starter_pack']));
     const e = new Entitlements();
@@ -56,6 +68,7 @@ describe('entitlements', () => {
 });
 
 class FakeNetwork implements AdNetwork {
+  privacyRequired = false;
   shown = 0;
   interstitials = 0;
   constructor(

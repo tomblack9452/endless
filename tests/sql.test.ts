@@ -23,6 +23,7 @@ const migrations: [string, string][] = Object.entries(files)
 const SUPABASE_STANDIN = `
   create role anon nologin;
   create role authenticated nologin;
+  create role service_role nologin;
   create schema auth;
   create table auth.users (id uuid primary key default gen_random_uuid());
   create function auth.uid() returns uuid language sql stable
@@ -420,6 +421,79 @@ describe('credits on the server', () => {
     await rejects(db.query('select public.sync_credits(-5, null)'), /not a balance/);
     await as(null);
     await rejects(db.query('select public.sync_credits(5, null)'), /permission denied|not signed in/);
+  });
+});
+
+describe('cores', () => {
+  const earn = async (amount: number, reason: string) => (await db.query<{ earn_cores: number }>('select public.earn_cores($1, $2)', [amount, reason])).rows[0].earn_cores;
+  const today = () => new Date().toISOString().slice(0, 10);
+  const season = () => Math.floor((Date.parse(today()) - Date.UTC(2026, 8, 14)) / (42 * 86_400_000)) + 1;
+
+  it("can't be granted by a player (only the purchase webhook's service key)", async () => {
+    const a = await newUser();
+    await as(a);
+    await rejects(db.query(`select public.grant_cores('${a}', 99999, 'x')`), /permission denied/);
+  });
+
+  it('pay each real reward once, at most its size, for today only', async () => {
+    const a = await newUser();
+    await as(a);
+    expect(await earn(15, `login:${today()}`)).toBe(15);
+    expect(await earn(15, `login:${today()}`)).toBe(0); // once
+    expect(await earn(999, `gift:${today()}`)).toBe(2); // its size
+    expect(await earn(15, 'login:2020-01-01')).toBe(0); // not today
+    expect(await earn(120, 'reward')).toBe(0); // not a reward
+    expect(await earn(40, 'set:forge')).toBe(40);
+    expect(await earn(40, 'set:made-up')).toBe(0);
+    expect(await earn(50, `pass:${season()}:p30`)).toBe(50);
+    expect(await earn(50, `pass:${season() + 1}:p30`)).toBe(0); // not this season
+    await admin();
+    expect((await db.query<{ cores: number }>('select cores from public.wallets where user_id = $1', [a])).rows[0].cores).toBe(15 + 2 + 40 + 50);
+  });
+
+  it('pay no more pass cores in a season than the whole pass holds', async () => {
+    const a = await newUser();
+    await as(a);
+    let total = 0;
+    for (let t = 1; t <= 30; t++) for (const track of ['f', 'p']) total += await earn(50, `pass:${season()}:${track}${t}`);
+    expect(total).toBe(300);
+  });
+});
+
+describe('store purchases (the webhook, with the service key)', () => {
+  const buy = async (id: string, user: string, product: string, cores: number, tx = id) =>
+    (await db.query<{ store_purchase: string }>('select public.store_purchase($1, $2, $3, $4, $5, $6)', [id, user, product, 'INITIAL_PURCHASE', tx, cores])).rows[0].store_purchase;
+  const refund = async (id: string, user: string, product: string, cores: number, tx: string) =>
+    (await db.query<{ store_refund: string }>('select public.store_refund($1, $2, $3, $4, $5)', [id, user, product, tx, cores])).rows[0].store_refund;
+  const coresOf = async (u: string) => (await db.query<{ cores: number }>('select cores from public.wallets where user_id = $1', [u])).rows[0].cores;
+  const products = async (u: string) => (await db.query<{ product: string }>('select product from public.store_events where user_id = $1 order by at, id', [u])).rows.map((r) => r.product);
+
+  it('keep the event and pay its cores together, once', async () => {
+    const a = await newUser();
+    await admin();
+    expect(await buy('ev1', a, 'cores_550', 550)).toBe('paid');
+    expect(await buy('ev1', a, 'cores_550', 550)).toBe('duplicate');
+    expect(await coresOf(a)).toBe(550);
+  });
+
+  it('take refunds back: premium stops counting and cores come off the balance', async () => {
+    const a = await newUser();
+    await admin();
+    await buy('ev2', a, 'premium', 0, 'tx2');
+    await buy('ev3', a, 'cores_100', 100, 'tx3');
+    expect(await refund('rf2', a, 'premium', 0, 'tx2')).toBe('refunded');
+    expect(await refund('rf2', a, 'premium', 0, 'tx2')).toBe('duplicate');
+    expect(await refund('rf3', a, 'cores_100', 100, 'tx3')).toBe('refunded');
+    expect(await products(a)).toEqual(expect.arrayContaining(['refunded:premium', 'refunded:cores_100']));
+    expect(await products(a)).not.toContain('premium');
+    expect(await coresOf(a)).toBe(0);
+  });
+
+  it("can't be called by a player", async () => {
+    const a = await newUser();
+    await as(a);
+    await rejects(db.query(`select public.store_purchase('x', '${a}', 'premium', 'INITIAL_PURCHASE', 'x', 0)`), /permission denied/);
+    await rejects(db.query(`select public.store_refund('x', '${a}', 'premium', 'x', 0)`), /permission denied/);
   });
 });
 

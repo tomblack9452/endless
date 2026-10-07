@@ -22,21 +22,34 @@ const CORES: Record<string, number> = {
 };
 
 const PAID = new Set(['INITIAL_PURCHASE', 'NON_RENEWING_PURCHASE']);
+// A refund of a one-off purchase arrives as a cancellation.
+const REFUNDED = new Set(['CANCELLATION']);
+
+interface RcEvent {
+  id: string;
+  type: string;
+  app_user_id: string;
+  product_id: string;
+  transaction_id?: string;
+  original_transaction_id?: string;
+}
 
 Deno.serve(async (req) => {
   const secret = Deno.env.get('REVENUECAT_WEBHOOK_SECRET');
   if (!secret || req.headers.get('Authorization') !== `Bearer ${secret}`) return new Response('no', { status: 401 });
-  const { event } = (await req.json()) as { event: { id: string; type: string; app_user_id: string; product_id: string } };
-  if (!PAID.has(event.type)) return new Response('ignored');
+  const { event } = (await req.json()) as { event: RcEvent };
+  if (!PAID.has(event.type) && !REFUNDED.has(event.type)) return new Response('ignored');
   const admin = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
   // Anonymous RevenueCat ids ($RCAnonymousID:...) aren't accounts: nothing to pay on the server.
   const user = /^[0-9a-f-]{36}$/.test(event.app_user_id) ? event.app_user_id : null;
-  const { error: seen } = await admin.from('store_events').insert({ id: event.id, user_id: user, product: event.product_id, type: event.type });
-  if (seen) return new Response('already handled'); // duplicate id: paid before
   const cores = CORES[event.product_id] ?? 0;
-  if (user && cores > 0) {
-    const { error } = await admin.rpc('grant_cores', { player: user, amount: cores, reason: `purchase:${event.product_id}` });
-    if (error) return new Response(error.message, { status: 500 });
-  }
-  return new Response('ok');
+  const transaction = event.transaction_id ?? event.original_transaction_id ?? null;
+  // One database call each: keeping the event and paying (or taking back) its
+  // cores happen together, so an error leaves nothing half done and the retry
+  // RevenueCat makes after a 500 does the whole thing (0011_store_purchases.sql).
+  const { data, error } = PAID.has(event.type)
+    ? await admin.rpc('store_purchase', { p_id: event.id, p_user: user, p_product: event.product_id, p_type: event.type, p_transaction: transaction, p_cores: cores })
+    : await admin.rpc('store_refund', { p_id: event.id, p_user: user, p_product: event.product_id, p_transaction: transaction, p_cores: cores });
+  if (error) return new Response(error.message, { status: 500 });
+  return new Response(String(data));
 });

@@ -652,14 +652,14 @@ export class Game {
     return lines;
   }
 
-  /** Pay a reward into the wallet or looks; returns it in words. */
-  private grant(r: Reward): string[] {
+  /** Pay a reward into the wallet or looks; returns it in words. `source` names cores for the server (earn_cores). */
+  private grant(r: Reward, source?: string): string[] {
     if (r.credits) {
       this.wallet.add(r.credits);
       this.econ.bump('credits');
     }
     if (r.cores) {
-      this.wallet.addCores(r.cores);
+      this.wallet.addCores(r.cores, r.source ?? source ?? 'reward');
       this.econ.bump('cores');
     }
     const look = rewardLook(r);
@@ -676,7 +676,7 @@ export class Game {
     if (step < 0) return;
     const r = this.daily.claimLogin(day);
     if (!r) return;
-    const lines = this.grant(r);
+    const lines = this.grant(r, `login:${day}`);
     this.ui.celebrate([{ kicker: `day ${step + 1} of ${CONFIG.economy.login.length}`, icon: GIFT_ICON, name: 'daily reward', lines }]);
     this.sound.power();
     this.haptics.pickup();
@@ -1042,7 +1042,7 @@ export class Game {
     const day = dayKey(Date.now());
     if (!this.daily.giftReady(day) || !(await this.ads.reward('dailyGift'))) return;
     this.daily.takeGift(day);
-    const lines = this.grant(CONFIG.ads.dailyGift);
+    const lines = this.grant(CONFIG.ads.dailyGift, `gift:${day}`);
     this.ui.celebrate([{ kicker: 'free gift', icon: GIFT_ICON, name: 'daily gift', lines }]);
     this.refreshTitle();
   }
@@ -1141,15 +1141,34 @@ export class Game {
       this.refreshTitle();
     }
     // What the account has bought, as the server's purchase records have it.
-    for (const id of (await this.backend.purchases()) ?? []) this.grantProduct(id);
+    const bought = (await this.backend.purchases()) ?? [];
+    for (const id of bought) this.grantProduct(id);
+    // Refunded (and not bought again): no longer owned on this device either.
+    for (const id of bought) {
+      const e = id.startsWith('refunded:') ? entitlementFor(id.slice(9)) : null;
+      if (e && !bought.some((b) => entitlementFor(b) === e)) this.entitlements.revoke(e);
+    }
+    this.applyLooks();
     await this.store.start(this.backend.userId);
-    void this.ads.start();
+    void this.ads.start().then(() => {
+      const row = document.getElementById('privacy-choices');
+      if (row) row.hidden = !this.ads.privacyRequired; // Google asks for a way back to the consent form here
+    });
     this.storeProducts = await this.store.products();
     if (this.infoOpen === 'shop') this.openShop();
   }
 
   /** Buy a real-money product through the app store, then deliver it. */
   private async buyProduct(id: ProductId): Promise<void> {
+    // With the server, a purchase is paid to the account (the webhook): no account known, no sale.
+    if (this.backend.online) {
+      if (!this.backend.userId) await this.backend.signIn();
+      const user = this.backend.userId;
+      if (!user || !(await this.store.identify(user))) {
+        this.ui.showNotice("can't reach the server right now. nothing was charged. try again in a moment");
+        return;
+      }
+    }
     const result = await this.store.buy(id);
     if (result === 'cancelled') return;
     if (result === 'failed') {
@@ -1886,7 +1905,7 @@ export class Game {
     } else if (id === 'qall' || id === 'wall') {
       const cores = id === 'qall' ? this.daily.claimBonus() : this.weeklyGoals.claimBonus();
       if (cores <= 0) return;
-      this.ui.celebrate([{ kicker: id === 'qall' ? "today's goals" : "this week's goals", icon: GOAL_ICON, name: 'all done', lines: this.grant({ cores }) }]);
+      this.ui.celebrate([{ kicker: id === 'qall' ? "today's goals" : "this week's goals", icon: GOAL_ICON, name: 'all done', lines: this.grant({ cores }, id === 'qall' ? `goals:${dayKey(Date.now())}` : `weekly:${weekKey(Date.now())}`) }]);
     } else if (id.startsWith('a:')) {
       const a = achievement(id.slice(2));
       if (!a || this.goalLog.has(a.id) || !progressOn(a, this.snapshot()).done) return;
@@ -1927,7 +1946,7 @@ export class Game {
       for (const id of sets) {
         const set = SETS.find((x) => x.id === id);
         if (!set) continue;
-        this.grant({ cores: set.bonusCores });
+        this.grant({ cores: set.bonusCores }, `set:${set.id}`);
         party.push({ kicker: 'set complete', icon: GOAL_ICON, name: set.name, lines: [`you own every look in it`, `+${set.bonusCores} cores`] });
       }
     }
@@ -2420,6 +2439,7 @@ export class Game {
     if (action === 'resume') this.resume();
     else if (action === 'settings') this.openSettings();
     else if (action === 'delete') void this.deleteAccount();
+    else if (action === 'privacy-choices') void this.ads.privacyChoices();
     else if (action === 'tutorial') {
       if (this.state !== 'title') this.toMainMenu();
       this.onboarding.set('controls');

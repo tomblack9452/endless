@@ -123,8 +123,15 @@ export class Pass {
   private pay(): Reward[] {
     const out: Reward[] = [];
     const t = this.tier;
-    while (this.s.paidFree < t) out.push(freeReward(++this.s.paidFree, this.s.season));
-    if (this.s.premium) while (this.s.paidPremium < t) out.push(premiumReward(++this.s.paidPremium, this.s.season));
+    while (this.s.paidFree < t) {
+      const tier = ++this.s.paidFree;
+      out.push({ ...freeReward(tier, this.s.season), source: `pass:${this.s.season}:f${tier}` });
+    }
+    if (this.s.premium)
+      while (this.s.paidPremium < t) {
+        const tier = ++this.s.paidPremium;
+        out.push({ ...premiumReward(tier, this.s.season), source: `pass:${this.s.season}:p${tier}` });
+      }
     this.save();
     return out;
   }
