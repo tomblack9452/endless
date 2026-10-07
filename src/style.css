@@ -625,18 +625,43 @@ body {
 }
 
 /* Short notices (e.g. tilt unavailable): low on screen, fade in and out. */
+/* Notices sit above every screen and panel (the shop's sheet used to hide
+   them), in a small pill so they read over the game or a menu alike. */
 .notice {
   position: absolute;
-  left: 0;
-  right: 0;
+  left: 16px;
+  right: 16px;
   bottom: calc(var(--safe-bottom) + 120px);
+  z-index: 100;
+  width: fit-content;
+  max-width: min(440px, calc(100% - 32px));
+  margin: 0 auto;
+  padding: 8px 14px;
+  border-radius: 14px;
+  background: var(--ui-bg);
+  color: var(--ui-fg);
+  border: 1px solid color-mix(in srgb, var(--ui-fg) 18%, transparent);
   text-align: center;
+  text-shadow: none;
   opacity: 0;
   pointer-events: none;
 }
 
 .notice.show {
-  animation: room-label 4000ms ease-out both;
+  animation: notice 4500ms ease-out both;
+}
+
+@keyframes notice {
+  0% {
+    opacity: 0;
+  }
+  8%,
+  80% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
 }
 
 /* First-run hints: between the horizon and the ship, above the combo. */
