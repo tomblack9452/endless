@@ -369,8 +369,8 @@ your rank, with what every rank needs and gives.
 `src/ranks.ts`): chalk for recruits, then slate, pine, cobalt, violet,
 crimson and bronze, and gold for generals, whose main button has a slow sheen.
 It's on the main buttons, open tabs, progress bars, the bottom bar's icons and
-the rank badge. A promotion into a new band says so. High contrast keeps the
-plain ink.
+the rank badge. A promotion into a new band says so. High contrast uses plain
+white.
 
 **The look.** Instrument-panel minimal (`src/style.css`, tokens at the top):
 dark plates with hairlines over the live scene, square controls, underlined
