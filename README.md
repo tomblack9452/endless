@@ -13,7 +13,8 @@ as text grids.
 There's a light free-to-play layer on top: daily rewards and quests, a daily shop of ship looks, a season pass and a premium currency
 (cores). It all works on the device; a Supabase server and RevenueCat store
 plug in behind it when their keys are set (see [Server and store](#server-and-store)).
-Nothing you can buy makes a ship faster in ranked.
+Ranked groups pilots into leagues by ship power (upgrade points), so a ship
+only races ships like it. Premium itself never makes a ship faster.
 
 Play it at https://tomblack9452.github.io/endless/.
 

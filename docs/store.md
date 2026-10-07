@@ -104,8 +104,9 @@ Then open `ios/` in Xcode and `android/` in Android Studio to sign and upload.
   > solo: pick a place and see how far you get, or work through the set levels
   > for stars.
   >
-  > Daily rewards, daily quests, a season pass and a shop of ship looks. Nothing
-  > you can buy makes you faster in ranked.
+  > Daily rewards, daily quests, a season pass and a shop of ship looks. Ranked
+  > groups pilots into leagues by ship power, so you always race ships like
+  > yours.
 - **Keywords (iOS):** runner,space,arcade,endless,ship,ranked,weekly,flying
 - **Category:** Games > Arcade (Racing as the second)
 - **Age rating:** 4+ / Everyone (no violence beyond crashing, no chat), with
