@@ -5,6 +5,13 @@ passing. Every finding below was checked against the code; the server ones
 were run against a real Postgres (PGlite) with the migrations applied, acting
 as an ordinary signed-in player.
 
+**Status (8 October 2026):** every critical and high item is fixed except the
+Android project (item 7, left until the app is otherwise ready): items 1-2 in
+`supabase/migrations/0010_secure_cores.sql`, 3 in `src/game.ts` buyProduct and
+`src/store/store.ts`, 4-5 in `0011_store_purchases.sql` and the webhook, 6 as
+"ad privacy choices" in settings, 8 in `docs/store.md` and the README. Run
+`npm run db:apply` and redeploy the webhook to put the server side live.
+
 ## 1. Where it stands
 
 The game itself is in good shape. Runs are deterministic and tested for
