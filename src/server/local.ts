@@ -55,6 +55,8 @@ export class LocalBackend implements Backend {
     return false;
   }
 
+  readonly authError = '';
+
   async googleAccount(): Promise<string | null> {
     return null;
   }

@@ -539,6 +539,18 @@ export class UI {
     if (text) b.textContent = text;
   }
 
+  /** After doubling: the end screen says the doubled amount, and the button says it's done. */
+  markDoubled(before: string, after: string): void {
+    for (const id of ['over-stats', 'over-extra', 'over-best']) {
+      const el = $(id);
+      if (el.children.length === 0 && el.textContent?.includes(`+${before} credits`)) el.textContent = el.textContent.replace(`+${before} credits`, `+${after} credits (doubled)`);
+    }
+    const b = $('over-double') as HTMLButtonElement;
+    b.hidden = false;
+    b.disabled = true;
+    b.textContent = `doubled · +${after} credits`;
+  }
+
   bindRecordTabs(onTab: (tab: 'rank' | 'stats') => void): void {
     for (const t of document.querySelectorAll<HTMLElement>('[data-recordtab]')) {
       t.addEventListener('pointerdown', (e) => e.stopPropagation());

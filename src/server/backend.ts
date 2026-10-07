@@ -89,6 +89,8 @@ export interface Backend {
   takeMaxOut(): Promise<boolean>;
   /** The Google account this account is kept with (its email), '' if none, or null if unknown. */
   googleAccount(): Promise<string | null>;
+  /** Why the last Google link or sign-in was turned down (the server's error code), for the notice; '' if none. */
+  readonly authError: string;
   /** Keep this account with a Google login (see account.ts): 'taken' when that login is already another account's. */
   linkGoogle(idToken: string, nonce: string): Promise<LinkResult>;
   /** Switch to the account a Google login keeps (this session is replaced); false if that didn't work. */

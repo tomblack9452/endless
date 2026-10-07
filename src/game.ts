@@ -1036,9 +1036,17 @@ export class Game {
     if (n <= 0) return;
     this.lastRunCredits = 0;
     this.ui.showDouble(null);
-    if (!(await this.ads.reward('doubleCredits'))) return;
+    if (!(await this.ads.reward('doubleCredits'))) {
+      // No reward (the ad didn't load or was closed early): the offer stays.
+      this.lastRunCredits = n;
+      this.ui.showDouble(`double +${formatScore(n)} credits · ${this.ads.label()}`);
+      this.ui.showNotice("no ad, no double. try again in a moment");
+      return;
+    }
     this.grant({ credits: n });
-    this.ui.showNotice(`+${formatScore(n)} credits, doubled`);
+    this.ui.markDoubled(formatScore(n), formatScore(n * 2));
+    this.ui.showNotice(`doubled: +${formatScore(n * 2)} credits this run · ${formatScore(this.wallet.credits)} credits now`);
+    this.sound.power();
     this.refreshTitle();
   }
 
@@ -1235,11 +1243,19 @@ export class Game {
 
   /** Restore one-time purchases on a new install (cores come back with the cloud save). */
   private async restorePurchases(): Promise<void> {
-    const ids = await this.store.restore();
+    this.ui.showNotice('checking your purchases…');
+    // Google Play's records for the Google account on this phone, and the server's for this game account.
+    const [fromStore, fromServer] = await Promise.all([this.store.restore(), this.backend.purchases()]);
+    const ids = [...new Set([...fromStore, ...(fromServer ?? [])])].filter((id) => !id.startsWith('refunded:'));
     let n = 0;
     for (const id of ids) if (this.grantProduct(id)) n++;
-    this.ui.showNotice(n > 0 ? `restored ${n} purchase${n === 1 ? '' : 's'}` : 'nothing to restore');
-    this.openShop();
+    const owned = ids.filter((id) => entitlementFor(id) !== null && this.ownsProduct(id)).length;
+    if (n > 0) this.ui.showNotice(`restored ${n} purchase${n === 1 ? '' : 's'}`);
+    else if (owned > 0) this.ui.showNotice('your purchases are already on this account');
+    else if (googleAvailable() && !this.googleEmail)
+      this.ui.showNotice("nothing to restore here. bought on another phone? sign in there with google first (settings), then sign in with the same account here");
+    else this.ui.showNotice('nothing to restore on this account. cores are kept with your account, not restored');
+    if (this.infoOpen === 'shop') this.openShop();
   }
 
   /** A picture of this run for the share sheet. */
@@ -1628,8 +1644,8 @@ export class Game {
     this.googleBusy = true;
     try {
       const token = await googleSignIn();
-      if (!token) {
-        this.ui.showNotice("google sign-in didn't finish");
+      if ('error' in token) {
+        if (token.error !== 'cancelled') this.ui.showNotice(`google sign-in didn't work: ${token.error}`);
         return;
       }
       const res = await this.backend.linkGoogle(token.idToken, token.nonce);
@@ -1641,7 +1657,7 @@ export class Game {
         return;
       }
       if (res === 'failed') {
-        this.ui.showNotice("couldn't sign in. check your connection and try again");
+        this.ui.showNotice(`couldn't sign in: ${this.backend.authError || 'unknown error'}`);
         return;
       }
       // That Google login keeps another account: switch to it.
@@ -1660,7 +1676,7 @@ export class Game {
       this.googleArmed = false;
       const before = this.backend.userId;
       if (!(await this.backend.signInGoogle(token.idToken, token.nonce))) {
-        this.ui.showNotice("couldn't switch accounts. try again");
+        this.ui.showNotice(`couldn't switch accounts: ${this.backend.authError || 'unknown error'}`);
         return;
       }
       if (this.backend.userId === before) {

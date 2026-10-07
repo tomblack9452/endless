@@ -23,6 +23,7 @@ interface Session {
 export class SupabaseBackend implements Backend {
   readonly online = true;
   private session: Session | null = null;
+  authError = '';
 
   get userId(): string | null {
     return this.session?.user ?? null;
@@ -60,8 +61,11 @@ export class SupabaseBackend implements Backend {
     if (!res.ok) {
       const e = (await res.json().catch(() => ({}))) as { error_code?: string; code?: string | number; msg?: string; message?: string };
       const code = typeof e.error_code === 'string' ? e.error_code : typeof e.code === 'string' ? e.code : '';
-      return { session: null, code: code || (/already/i.test(e.msg ?? e.message ?? '') ? 'identity_already_exists' : `http_${res.status}`) };
+      const why = code || (/already/i.test(e.msg ?? e.message ?? '') ? 'identity_already_exists' : `http_${res.status}`);
+      this.authError = e.msg ?? e.message ? `${why}: ${e.msg ?? e.message}` : why;
+      return { session: null, code: why };
     }
+    this.authError = '';
     const j = (await res.json()) as { access_token: string; refresh_token: string; expires_in: number; user: { id: string } };
     this.session = { access: j.access_token, refresh: j.refresh_token, expires: Date.now() + j.expires_in * 1000, user: j.user.id };
     await storage.set(SESSION_KEY, JSON.stringify(this.session));
@@ -76,14 +80,21 @@ export class SupabaseBackend implements Backend {
   }
 
   async linkGoogle(idToken: string, nonce: string): Promise<LinkResult> {
-    if (!this.session && !(await this.signIn())) return 'failed';
-    if (this.session!.expires - Date.now() < 60_000 && !(await this.signIn())) return 'failed';
+    if (!this.session && !(await this.signIn())) {
+      this.authError = 'no connection to the server';
+      return 'failed';
+    }
+    if (this.session!.expires - Date.now() < 60_000 && !(await this.signIn())) {
+      this.authError = 'no connection to the server';
+      return 'failed';
+    }
     try {
       const body = { provider: 'google', id_token: idToken, nonce, link_identity: true };
       const r = await this.authRequest('token?grant_type=id_token', body, this.session!.access);
       if (r.session) return 'linked';
       return r.code === 'identity_already_exists' ? 'taken' : 'failed';
     } catch {
+      this.authError = 'no connection to the server';
       return 'failed';
     }
   }
@@ -92,6 +103,7 @@ export class SupabaseBackend implements Backend {
     try {
       return (await this.authRequest('token?grant_type=id_token', { provider: 'google', id_token: idToken, nonce })).session !== null;
     } catch {
+      this.authError = 'no connection to the server';
       return false;
     }
   }

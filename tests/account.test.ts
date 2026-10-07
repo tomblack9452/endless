@@ -88,5 +88,6 @@ describe('keeping an account with google', () => {
     await b.signIn();
     expect(await b.signInGoogle('bad', 'n')).toBe(false);
     expect(b.userId).toBe('anon');
+    expect(b.authError).toContain('validation_failed'); // the reason, for the notice
   });
 });

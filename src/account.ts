@@ -40,16 +40,28 @@ export async function makeNonce(): Promise<{ raw: string; hashed: string }> {
   return { raw, hashed: Array.from(digest, (b) => b.toString(16).padStart(2, '0')).join('') };
 }
 
-/** Ask the player to pick a Google account. Null if they backed out or it failed. */
-export async function googleSignIn(): Promise<GoogleToken | null> {
-  if (!googleAvailable()) return null;
+/** Why sign-in didn't give a token: 'cancelled' when the player backed out, else the plugin's message. */
+export interface GoogleFailure {
+  error: string;
+}
+
+/**
+ * Ask the player to pick a Google account. No `scopes` option: the plugin
+ * already asks for email, profile and openid (all the ID token needs), and on
+ * Android it refuses any login that passes scopes unless the main activity is
+ * replaced with its own.
+ */
+export async function googleSignIn(): Promise<GoogleToken | GoogleFailure> {
+  if (!googleAvailable()) return { error: 'not available in this build' };
   try {
     const SocialLogin = await plugin();
     const nonce = await makeNonce();
-    const res = await SocialLogin.login({ provider: 'google', options: { scopes: ['email', 'profile'], nonce: nonce.hashed } });
+    const res = await SocialLogin.login({ provider: 'google', options: { nonce: nonce.hashed } });
     const idToken = (res.result as { idToken?: string | null }).idToken;
-    return idToken ? { idToken, nonce: nonce.raw } : null;
-  } catch {
-    return null;
+    return idToken ? { idToken, nonce: nonce.raw } : { error: 'no ID token from Google' };
+  } catch (e) {
+    const err = e as { code?: string; message?: string };
+    if (err.code === 'USER_CANCELLED' || /cancel/i.test(err.message ?? '')) return { error: 'cancelled' };
+    return { error: err.message || String(e) };
   }
 }
