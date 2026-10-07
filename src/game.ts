@@ -1186,7 +1186,7 @@ export class Game {
       // With the server, the store's webhook pays the cores there: take its balance.
       if (this.backend.online) {
         lines.push(`+${formatScore(p.cores)} cores`);
-        window.setTimeout(() => void this.wallet.link(this.backend).then(() => this.refreshTitle()), 2500);
+        void this.awaitPaidCores(this.wallet.cores + p.cores);
       } else lines.push(...this.grant({ cores: p.cores }));
     }
     if ('look' in p) lines.push(...this.grant({ look: p.look }));
@@ -1198,6 +1198,23 @@ export class Game {
     this.refreshTitle();
     if (this.infoOpen === 'shop') this.openShop();
     if (this.infoOpen === 'pass') this.openPass();
+  }
+
+  /**
+   * The store's webhook pays a cores pack on the server a moment after the
+   * purchase goes through. Check the server's balance until it's there (or
+   * about 20 seconds pass), then show it on whichever screen is open.
+   */
+  private async awaitPaidCores(target: number): Promise<void> {
+    for (let i = 0; i < 10; i++) {
+      await new Promise((r) => window.setTimeout(r, i === 0 ? 1000 : 2000));
+      await this.wallet.link(this.backend);
+      if (this.wallet.cores >= target) break;
+    }
+    this.refreshTitle();
+    if (this.infoOpen === 'shop') this.openShop();
+    else if (this.infoOpen === 'pass') this.openPass();
+    else if (this.infoOpen === 'hangar') this.renderHangar(true);
   }
 
   /** True if a one-time product is owned (premium, the starter pack). */
