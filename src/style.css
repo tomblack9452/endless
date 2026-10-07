@@ -880,7 +880,7 @@ body {
   gap: 16px;
   min-height: calc(48px * var(--ui-scale));
   padding: 8px 0;
-  border-bottom: 1px solid color-mix(in srgb, currentColor 25%, transparent);
+  border-bottom: var(--hair);
 }
 
 /* Title screen: wordmark and badges at the top, menu at the bottom, stacked
@@ -931,7 +931,7 @@ body {
   right: 0;
   bottom: 0;
   padding: 70px calc(var(--safe-right) + 24px) calc(var(--safe-bottom) + 14px) calc(var(--safe-left) + 24px);
-  background: linear-gradient(to top, var(--sky, transparent) 55%, transparent);
+  background: none;
 }
 
 /* The menu sits on a plate along the bottom, the same by day or night. */
@@ -1516,7 +1516,7 @@ body {
   text-align: left;
   background: color-mix(in srgb, currentColor 5%, transparent);
   border: 1px solid color-mix(in srgb, currentColor 28%, transparent);
-  border-radius: 14px;
+  border-radius: var(--radius);
   cursor: pointer;
 }
 
@@ -1771,9 +1771,16 @@ body {
 }
 
 .stat-value {
-  flex-shrink: 0;
+  flex: 0 1 auto;
+  min-width: 0;
+  font-family: var(--font-mono);
+  font-size: var(--t-small);
   text-align: right;
   opacity: 0.8;
+}
+
+.stat-row > :first-child {
+  flex-shrink: 0;
 }
 
 /* Scrolls by touch; no scrollbar over the value chips. */
@@ -1813,7 +1820,7 @@ body {
   margin-top: 18px;
   padding: 18px 18px 14px;
   border: 1px solid color-mix(in srgb, currentColor 22%, transparent);
-  border-radius: 18px;
+  border-radius: var(--radius);
   background: color-mix(in srgb, currentColor 4%, transparent);
 }
 
@@ -1831,7 +1838,7 @@ body {
 
 .prog-goal .xp-track {
   height: 10px;
-  border-radius: 5px;
+  border-radius: var(--radius);
   margin: 14px 0 8px;
 }
 
@@ -1876,8 +1883,8 @@ body {
 
 .prog-card {
   padding: 12px 14px;
-  border-radius: 14px;
-  border: 1px dashed color-mix(in srgb, currentColor 32%, transparent);
+  border-radius: var(--radius);
+  border: var(--hair);
 }
 
 .prog-card-title {
@@ -1949,7 +1956,7 @@ body {
   overscroll-behavior: contain;
   touch-action: pan-y;
   scrollbar-width: none;
-  border-radius: 14px;
+  border-radius: var(--radius);
   border: 1px solid color-mix(in srgb, currentColor 16%, transparent);
   padding: 0 12px;
   margin-top: 8px;
@@ -1999,9 +2006,9 @@ body {
 
 .ladder-you {
   padding: 2px 8px;
-  border-radius: 999px;
-  color: var(--sky, #f1ede4);
-  background: var(--text);
+  border-radius: var(--radius);
+  color: var(--ink);
+  background: var(--accent);
 }
 
 .ladder-row.current {
@@ -2013,7 +2020,7 @@ body {
 /* --- Promotion moment ------------------------------------------------------ */
 
 .promo {
-  --promo: var(--text);
+  --promo: var(--accent);
   position: fixed;
   inset: 0;
   z-index: 50;
@@ -2350,7 +2357,7 @@ body {
   text-align: center;
   background: color-mix(in srgb, currentColor 4%, transparent);
   border: 1px solid color-mix(in srgb, currentColor 22%, transparent);
-  border-radius: 16px;
+  border-radius: var(--radius);
   scroll-snap-align: start;
   cursor: pointer;
 }
@@ -2363,6 +2370,14 @@ body {
 
 .offer-card:active {
   transform: scale(0.97);
+}
+
+/* The revive dialog borrows the promotion card: brackets only, no box. */
+.promo-card.offer-card {
+  background: none;
+  border: 0;
+  padding: 28px 22px 24px;
+  cursor: default;
 }
 
 .card-swatch {
@@ -2413,10 +2428,11 @@ body {
   right: 6px;
   padding: 2px 6px;
   font-size: calc(10px * var(--ui-scale));
-  font-weight: 600;
-  color: var(--sky, #f1ede4);
-  background: #e0503f;
-  border-radius: 999px;
+  font-family: var(--font-mono);
+  font-weight: 500;
+  color: var(--ink);
+  background: var(--alert);
+  border-radius: 0;
 }
 
 .pill.sheet-buy {
@@ -2499,7 +2515,7 @@ body {
   padding: 10px 6px;
   text-align: center;
   border: 1px solid color-mix(in srgb, currentColor 25%, transparent);
-  border-radius: 12px;
+  border-radius: var(--radius);
 }
 
 .cal-day:last-child {
@@ -2719,7 +2735,7 @@ body {
   margin: 0 -10px;
   padding-left: 10px;
   padding-right: 10px;
-  border-radius: 10px;
+  border-radius: var(--radius);
 }
 
 .board-row.you .rank {
@@ -2837,7 +2853,7 @@ body {
   text-align: center;
   background: color-mix(in srgb, currentColor 4%, transparent);
   border: 1px solid color-mix(in srgb, currentColor 20%, transparent);
-  border-radius: 14px;
+  border-radius: var(--radius);
   cursor: pointer;
   min-width: 0;
 }
@@ -3050,8 +3066,12 @@ body {
   gap: 4px;
   padding: 12px 16px;
   text-align: center;
-  background: color-mix(in srgb, var(--sky, #f1ede4) 88%, transparent);
-  border-radius: 16px;
+  color: var(--fg);
+  text-shadow: none;
+  background: var(--plate);
+  border: var(--hair);
+  border-left: 2px solid var(--accent);
+  border-radius: 0;
   pointer-events: auto;
 }
 

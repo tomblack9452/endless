@@ -39,7 +39,7 @@ function draw(c: ShareCard): HTMLCanvasElement {
   g.globalAlpha = 1;
   g.fillStyle = c.text;
   g.textAlign = 'center';
-  const font = (px: number, weight = 400) => `${weight} ${px}px "JetBrains Mono", ui-monospace, monospace`;
+  const font = (px: number, weight = 400) => `${weight} ${px}px "Geist Mono", ui-monospace, monospace`;
   g.font = font(64, 300);
   g.fillText('E N D L E S S', W / 2, 190);
   g.font = font(28, 500);

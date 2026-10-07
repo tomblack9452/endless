@@ -366,11 +366,18 @@ today, your bests, and the whole ladder in its own scrolling box, opened at
 your rank, with what every rank needs and gives.
 
 **Rank colours.** The menus take on a colour as you climb (`RANK_COLOURS` in
-`src/ranks.ts`): charcoal for recruits, then slate, pine, cobalt, violet,
+`src/ranks.ts`): chalk for recruits, then slate, pine, cobalt, violet,
 crimson and bronze, and gold for generals, whose main button has a slow sheen.
 It's on the main buttons, open tabs, progress bars, the bottom bar's icons and
 the rank badge. A promotion into a new band says so. High contrast keeps the
 plain ink.
+
+**The look.** Instrument-panel minimal (`src/style.css`, tokens at the top):
+dark plates with hairlines over the live scene, square controls, underlined
+tabs, numbered section labels and corner ticks, one accent (the rank colour).
+Type is Host Grotesk for words and Geist Mono for numbers and labels, both
+free (OFL), behind `--font-sans` and `--font-mono` so a licensed face like
+Matter can replace them in one place.
 
 ## Leagues
 
