@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { Ads, type AdNetwork, type AdResult } from '../src/ads/ads';
+import { Ads, adUnits, type AdNetwork, type AdResult } from '../src/ads/ads';
 import { LOOKS } from '../src/catalogue';
 import { CONFIG } from '../src/config';
 import { Looks, type Owner } from '../src/looks';
@@ -87,6 +87,15 @@ class FakeNetwork implements AdNetwork {
 }
 
 const DAY = 86_400_000;
+
+describe('ad units', () => {
+  it("are Google's test units unless the build is marked live", () => {
+    const env = { VITE_ADMOB_REWARDED_ANDROID: 'ca-app-pub-real/1' };
+    expect(adUnits('android', env).rewarded).toBe('ca-app-pub-3940256099942544/5224354917');
+    expect(adUnits('android', { ...env, VITE_ADMOB_LIVE: '1' }).rewarded).toBe('ca-app-pub-real/1');
+    expect(adUnits('ios', {}).rewarded).toMatch(/^ca-app-pub-3940256099942544\//);
+  });
+});
 
 describe('ads', () => {
   it('offer nothing without a network, unless premium (free rewards)', async () => {

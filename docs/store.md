@@ -78,16 +78,34 @@ never see an ad and get those rewards free. The web build has no ads.
 
 ## 5. Building the apps
 
+The Android project is in `android/` (Capacitor 8, package
+`com.tomblack.endlessspace`, portrait only, AdMob app id in
+`android/app/src/main/AndroidManifest.xml`, icons and splash from the game's
+icon). Each time the game changes:
+
 ```
-npm install @capacitor/cli @capacitor/ios @capacitor/android
-npx cap init "Endless Space" com.tomblack.endlessspace --web-dir dist
 npm run build
-npx cap add ios
-npx cap add android
-npx cap sync
+npx cap sync android
 ```
 
-Then open `ios/` in Xcode and `android/` in Android Studio to sign and upload.
+Then open the `android/` folder in Android Studio (it needs JDK 21, which
+Android Studio includes):
+
+- **Run on your phone:** plug it in with USB debugging on and press Run.
+- **A bundle for Play:** Build > Generate Signed App Bundle > Android App
+  Bundle. The first time, create an upload key (a `.jks` file) and keep it
+  and its passwords somewhere safe; every update must be signed with it.
+  Upload the `.aab` from `android/app/release/` to Play Console.
+- **Each upload needs a higher `versionCode`** (and usually a new
+  `versionName`) in `android/app/build.gradle`.
+
+Ads are Google's test ads in every build until `VITE_ADMOB_LIVE=1` is in `.env`
+when you build. Set it only for the build you release, never while testing:
+tapping your own live ads can get the AdMob account closed.
+
+iOS later: `npm install @capacitor/ios`, `npx cap add ios`, then the same in
+Xcode, with `GADApplicationIdentifier` and `NSUserTrackingUsageDescription`
+in `Info.plist`.
 
 ## 6. Store listing checklist
 

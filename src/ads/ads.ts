@@ -96,13 +96,30 @@ class AdMobAds implements AdNetwork {
   }
 }
 
+/**
+ * Google's own test ad units: they always fill and never pay, so tapping them
+ * is safe. Every build uses these unless VITE_ADMOB_LIVE=1 is set for the
+ * release build (tapping your own live ads can get an AdMob account closed).
+ */
+const TEST_UNITS = {
+  android: { rewarded: 'ca-app-pub-3940256099942544/5224354917', interstitial: 'ca-app-pub-3940256099942544/1033173712' },
+  ios: { rewarded: 'ca-app-pub-3940256099942544/1712485313', interstitial: 'ca-app-pub-3940256099942544/4411468910' },
+};
+
+/** The ad units to use: the real ones only in a live build. */
+export function adUnits(platform: 'ios' | 'android', env: Record<string, string | undefined>): { rewarded: string; interstitial: string } {
+  if (env.VITE_ADMOB_LIVE !== '1') return TEST_UNITS[platform];
+  const ios = platform === 'ios';
+  return {
+    rewarded: (ios ? env.VITE_ADMOB_REWARDED_IOS : env.VITE_ADMOB_REWARDED_ANDROID) ?? '',
+    interstitial: (ios ? env.VITE_ADMOB_INTERSTITIAL_IOS : env.VITE_ADMOB_INTERSTITIAL_ANDROID) ?? '',
+  };
+}
+
 export function createAdNetwork(): AdNetwork {
   if (!Capacitor.isNativePlatform()) return new NoAds();
-  const ios = Capacitor.getPlatform() === 'ios';
-  const env = import.meta.env;
-  const rewarded = (ios ? env.VITE_ADMOB_REWARDED_IOS : env.VITE_ADMOB_REWARDED_ANDROID) ?? '';
-  const interstitial = (ios ? env.VITE_ADMOB_INTERSTITIAL_IOS : env.VITE_ADMOB_INTERSTITIAL_ANDROID) ?? '';
-  return rewarded || interstitial ? new AdMobAds({ rewarded, interstitial }) : new NoAds();
+  const units = adUnits(Capacitor.getPlatform() === 'ios' ? 'ios' : 'android', import.meta.env as Record<string, string | undefined>);
+  return units.rewarded || units.interstitial ? new AdMobAds(units) : new NoAds();
 }
 
 /**
