@@ -1245,16 +1245,17 @@ export class Game {
   private async restorePurchases(): Promise<void> {
     this.ui.showNotice('checking your purchases…');
     // Google Play's records for the Google account on this phone, and the server's for this game account.
-    const [fromStore, fromServer] = await Promise.all([this.store.restore(), this.backend.purchases()]);
+    // At least two seconds, so the answer doesn't flash past the "checking" note.
+    const wait = new Promise((r) => window.setTimeout(r, 2000));
+    const [fromStore, fromServer] = await Promise.all([this.store.restore(), this.backend.purchases(), wait]);
     const ids = [...new Set([...fromStore, ...(fromServer ?? [])])].filter((id) => !id.startsWith('refunded:'));
     let n = 0;
     for (const id of ids) if (this.grantProduct(id)) n++;
-    const owned = ids.filter((id) => entitlementFor(id) !== null && this.ownsProduct(id)).length;
+    const owned = ids.some((id) => entitlementFor(id) !== null && this.ownsProduct(id));
     if (n > 0) this.ui.showNotice(`restored ${n} purchase${n === 1 ? '' : 's'}`);
-    else if (owned > 0) this.ui.showNotice('your purchases are already on this account');
-    else if (googleAvailable() && !this.googleEmail)
-      this.ui.showNotice("nothing to restore here. bought on another phone? sign in there with google first (settings), then sign in with the same account here");
-    else this.ui.showNotice('nothing to restore on this account. cores are kept with your account, not restored');
+    else if (owned) this.ui.showNotice('all your purchases are here');
+    else if (googleAvailable() && !this.googleEmail) this.ui.showNotice('nothing to restore. bought on another phone? sign in with google');
+    else this.ui.showNotice('nothing to restore');
     if (this.infoOpen === 'shop') this.openShop();
   }
 
