@@ -1645,7 +1645,8 @@ export class Game {
     try {
       const token = await googleSignIn();
       if ('error' in token) {
-        if (token.error !== 'cancelled') this.ui.showNotice(`google sign-in didn't work: ${token.error}`);
+        // A wrongly set up build can also look like a cancel, so say so either way.
+        this.ui.showNotice(token.error === 'cancelled' ? 'google sign-in was cancelled' : `google sign-in didn't work: ${token.error}`);
         return;
       }
       const res = await this.backend.linkGoogle(token.idToken, token.nonce);

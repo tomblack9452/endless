@@ -61,7 +61,9 @@ export async function googleSignIn(): Promise<GoogleToken | GoogleFailure> {
     return idToken ? { idToken, nonce: nonce.raw } : { error: 'no ID token from Google' };
   } catch (e) {
     const err = e as { code?: string; message?: string };
-    if (err.code === 'USER_CANCELLED' || /cancel/i.test(err.message ?? '')) return { error: 'cancelled' };
-    return { error: err.message || String(e) };
+    console.warn('google sign-in failed', err.code, err.message); // shows in Logcat (Capacitor/Console)
+    if (err.code === 'USER_CANCELLED' || /cancelled by user/i.test(err.message ?? '')) return { error: 'cancelled' };
+    // Google's own codes ([16], [28444]...) say what's wrong; keep the start of the message.
+    return { error: (err.message || String(e)).replace(/^Google Sign-In failed: /, '').slice(0, 160) };
   }
 }
