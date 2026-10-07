@@ -58,6 +58,30 @@ export const RANKS: readonly Rank[] = [
   r('general', 4, 50000, 12),
 ];
 
+/**
+ * The menus' colour as you climb (the accent in style.css): a new one for each
+ * band of ranks, darkest first, gold for generals. `from` is a rank tier.
+ * Each is dark enough for the page colour to read on it as text.
+ */
+export const RANK_COLOURS: readonly { from: number; name: string; accent: string }[] = [
+  { from: 0, name: 'charcoal', accent: '#2b2824' },
+  { from: 1, name: 'slate', accent: '#465a6e' },
+  { from: 3, name: 'pine', accent: '#2c6a5e' },
+  { from: 5, name: 'cobalt', accent: '#2d58a0' },
+  { from: 7, name: 'violet', accent: '#64409c' },
+  { from: 9, name: 'crimson', accent: '#9e2f45' },
+  { from: 11, name: 'bronze', accent: '#9c5a1f' },
+  { from: 12, name: 'gold', accent: '#846414' },
+];
+
+/** The colour for rank `i` (an index into RANKS). */
+export function rankColour(i: number): { from: number; name: string; accent: string } {
+  const tier = RANKS[Math.max(0, Math.min(RANKS.length - 1, i))].tier;
+  let out = RANK_COLOURS[0];
+  for (const c of RANK_COLOURS) if (tier >= c.from) out = c;
+  return out;
+}
+
 const DAILY_BONUS_RUNS = 3; // first runs each day earn double XP
 const MIN_SCORE_FOR_XP = 500; // a run that crashes straight away earns nothing
 

@@ -5,6 +5,7 @@
 
 :root {
   --text: #2b2824;
+  --accent: var(--text); /* the rank colour (RANK_COLOURS in ranks.ts), set from JS */
   --fade: 200ms;
   --ui-scale: 1; /* text size setting */
   --safe-top: env(safe-area-inset-top, 0px);
@@ -915,9 +916,26 @@ body {
 
 .pill.primary {
   color: var(--sky, #f1ede4);
-  background: var(--text);
-  border-color: var(--text);
+  background: var(--accent);
+  border-color: var(--accent);
   font-weight: 500;
+  transition: background-color 600ms, border-color 600ms;
+}
+
+/* Generals: the main button has a slow sheen across it. */
+.rank-top .pill.primary {
+  background: linear-gradient(110deg, var(--accent) 35%, color-mix(in srgb, var(--accent) 60%, #fff3c4) 50%, var(--accent) 65%) 0 0 / 300% 100%;
+  animation: rank-sheen 5s linear infinite;
+}
+
+@keyframes rank-sheen {
+  from { background-position: 100% 0; }
+  to { background-position: -50% 0; }
+}
+
+
+.rank-top.reduce-motion .pill.primary {
+  animation: none;
 }
 
 .pill:active {
@@ -1187,7 +1205,7 @@ body {
 .lp-fill {
   display: block;
   height: 100%;
-  background: currentColor;
+  background: var(--accent);
   transform-origin: left center;
   transform: scaleX(0);
 }
@@ -1258,8 +1276,8 @@ body {
 
 .tab.on {
   color: var(--sky, #f1ede4);
-  background: var(--text);
-  border-color: var(--text);
+  background: var(--accent);
+  border-color: var(--accent);
 }
 
 .settings.tabbed {
@@ -1424,7 +1442,7 @@ body {
 .xp-fill {
   position: absolute;
   inset: 0;
-  background: currentColor;
+  background: var(--accent);
   transform-origin: left center;
   transform: scaleX(0);
   transition: transform 600ms ease-out;
@@ -2859,4 +2877,16 @@ body {
 a.setting-row {
   color: inherit;
   text-decoration: none;
+}
+
+/* The rank colour on the title: the wordmark's second line, the bar's icons and the rank badge. */
+.title-word.sub,
+.bar-btn svg,
+#title-rank-icon {
+  color: var(--accent);
+  transition: color 600ms;
+}
+
+.title-rank:not(.title-league) {
+  border-color: color-mix(in srgb, var(--accent) 70%, transparent);
 }

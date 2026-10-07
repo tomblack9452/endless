@@ -365,6 +365,13 @@ any looks), a chart of the XP from your last 20 ranked runs, how XP is earned, d
 today, your bests, and the whole ladder in its own scrolling box, opened at
 your rank, with what every rank needs and gives.
 
+**Rank colours.** The menus take on a colour as you climb (`RANK_COLOURS` in
+`src/ranks.ts`): charcoal for recruits, then slate, pine, cobalt, violet,
+crimson and bronze, and gold for generals, whose main button has a slow sheen.
+It's on the main buttons, open tabs, progress bars, the bottom bar's icons and
+the rank badge. A promotion into a new band says so. High contrast keeps the
+plain ink.
+
 ## Leagues
 
 Your personal rank is your lifetime level; **leagues** are brackets by ship

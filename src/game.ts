@@ -25,7 +25,7 @@ import { hasTouch, type Lesson, LESSONS, LESSON_SECONDS, lessonText, Onboarding,
 import { Ads, createAdNetwork } from './ads/ads';
 import { entitlementFor, Entitlements } from './store/entitlements';
 import { Progress } from './progress';
-import { creditsFor, insignia, promotionBonus, Ranked, rankName, RANKS, type RunMode, xpToRank } from './ranks';
+import { creditsFor, insignia, promotionBonus, RANK_COLOURS, rankColour, Ranked, rankName, RANKS, type RunMode, xpToRank } from './ranks';
 import { Wallet } from './wallet';
 import { Daily, type Quest, questText } from './economy/daily';
 import { Weekly } from './economy/weekly';
@@ -1254,7 +1254,9 @@ export class Game {
     if (promoted) {
       const gives: string[] = [];
       for (let k = r.rankBefore + 1; k <= r.rankAfter; k++) gives.push(...this.rankGives(k));
-      party.unshift({ kicker: 'promoted', icon: insignia(r.rankAfter), name: rankName(r.rankAfter), lines: mergeCredits(gives), color: '#d4a63a' });
+      const newColour = rankColour(r.rankAfter);
+      if (newColour !== rankColour(r.rankBefore)) gives.push(`new menu colour: ${newColour.name}`);
+      party.unshift({ kicker: 'promoted', icon: insignia(r.rankAfter), name: rankName(r.rankAfter), lines: mergeCredits(gives), color: newColour.accent });
     }
     const lines = [...leagueLines, `+${r.xp} xp${r.doubled ? ' (double)' : ''}`];
     if (ranked) lines.push(`league par this week: ${formatScore(leaguePar(lg.league, target))}`);
@@ -2307,6 +2309,8 @@ export class Game {
   }
 
   private refreshTitle(): void {
+    const colour = rankColour(this.ranked.rank);
+    this.ui.setAccent(this.settings.contrast ? '#2b2824' : colour.accent, !this.settings.contrast && colour === RANK_COLOURS[RANK_COLOURS.length - 1]);
     const i = this.ranked.rank;
     this.applyLooks(); // the wing decal follows your rank and league
     const lg = this.leagues;

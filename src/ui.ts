@@ -906,6 +906,12 @@ export class UI {
     this.overExtra.textContent = text;
   }
 
+  /** The menus' accent (rank colour); `top` adds the generals' shimmer. */
+  setAccent(css: string, top: boolean): void {
+    document.documentElement.style.setProperty('--accent', css);
+    document.body.classList.toggle('rank-top', top);
+  }
+
   setSkyColor(css: string): void {
     document.documentElement.style.setProperty('--sky', css);
   }
