@@ -372,6 +372,12 @@ It's on the main buttons, open tabs, progress bars, the bottom bar's icons and
 the rank badge. A promotion into a new band says so. High contrast keeps the
 plain ink.
 
+**Dark mode** (settings > display): menus on dark panels with light text, and
+each rank colour switches to its light twin (`dark` in `RANK_COLOURS`). The
+scene and the HUD don't change. Type is Host Grotesk for text and Geist Mono
+for numbers, buttons and labels (both free, OFL), behind `--font-sans` and
+`--font-mono` in `src/style.css`.
+
 ## Leagues
 
 Your personal rank is your lifetime level; **leagues** are brackets by ship

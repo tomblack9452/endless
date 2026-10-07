@@ -21,4 +21,8 @@ describe('rank colours', () => {
   it('keep the page colour readable on a filled button', () => {
     for (const c of RANK_COLOURS) expect(contrast(c.accent, '#f1ede4'), c.name).toBeGreaterThanOrEqual(4.5);
   });
+
+  it('in dark mode, keep the dark panel colour readable on a filled button', () => {
+    for (const c of RANK_COLOURS) expect(contrast(c.dark, '#141518'), c.name).toBeGreaterThanOrEqual(7);
+  });
 });

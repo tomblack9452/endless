@@ -4,7 +4,16 @@
 }
 
 :root {
+  /* Type: Host Grotesk for text, Geist Mono for numbers, buttons and labels.
+     Swap in Matter / Matter Mono here if it's ever licensed. */
+  --font-sans: 'Host Grotesk', 'Helvetica Neue', Arial, sans-serif;
+  --font-mono: 'Geist Mono', ui-monospace, 'SFMono-Regular', monospace;
   --text: #2b2824;
+  /* Menu surfaces: the sky colour and the scene's text colour, or dark panels
+     with light text in dark mode (body.dark, from the settings). */
+  --ui-bg: var(--sky, #f1ede4);
+  --ui-fg: var(--text);
+  --on-accent: var(--sky, #f1ede4); /* text on a filled rank-colour button */
   --accent: var(--text); /* the rank colour (RANK_COLOURS in ranks.ts), set from JS */
   --fade: 200ms;
   --ui-scale: 1; /* text size setting */
@@ -38,9 +47,9 @@ body {
 body {
   position: fixed;
   inset: 0;
-  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-family: var(--font-sans);
   font-variant-numeric: tabular-nums;
-  font-feature-settings: 'tnum' 1, 'zero' 0;
+  font-feature-settings: 'tnum' 1;
   color: var(--text);
 }
 
@@ -115,9 +124,9 @@ body {
 /* Text */
 
 .label {
-  font-size: calc(13px * var(--ui-scale));
+  font-size: calc(14px * var(--ui-scale));
   font-weight: 400;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.03em;
   text-transform: lowercase;
   line-height: 1.7;
 }
@@ -827,14 +836,15 @@ body {
   right: 0;
   bottom: 0;
   padding: 70px calc(var(--safe-right) + 24px) calc(var(--safe-bottom) + 14px) calc(var(--safe-left) + 24px);
-  background: linear-gradient(to top, var(--sky, transparent) 55%, transparent);
+  background: linear-gradient(to top, var(--ui-bg) 55%, transparent);
 }
 
 #screen-title .screen-foot {
+  color: var(--ui-fg);
   position: relative;
   margin-top: auto;
   padding-top: 24px;
-  background: var(--sky, transparent);
+  background: var(--ui-bg);
 }
 
 /* The scrim fades up from the menu over the scenery. */
@@ -845,7 +855,7 @@ body {
   right: 0;
   bottom: 100%;
   height: 60px;
-  background: linear-gradient(to top, var(--sky, transparent), transparent);
+  background: linear-gradient(to top, var(--ui-bg), transparent);
   pointer-events: none;
 }
 
@@ -915,7 +925,7 @@ body {
 }
 
 .pill.primary {
-  color: var(--sky, #f1ede4);
+  color: var(--on-accent);
   background: var(--accent);
   border-color: var(--accent);
   font-weight: 500;
@@ -1176,14 +1186,14 @@ body {
 
 /* Rank badge under the wordmark: opens the service record. */
 .title-rank {
+  color: var(--ui-fg);
   display: flex;
   align-items: center;
   gap: 12px;
   padding: 6px 14px 6px 6px;
   font: inherit;
-  color: inherit;
   text-align: left;
-  background: color-mix(in srgb, var(--sky, transparent) 60%, transparent);
+  background: color-mix(in srgb, var(--ui-bg) 60%, transparent);
   border: 1px solid color-mix(in srgb, currentColor 30%, transparent);
   border-radius: 999px;
   pointer-events: auto;
@@ -1275,7 +1285,7 @@ body {
 }
 
 .tab.on {
-  color: var(--sky, #f1ede4);
+  color: var(--on-accent);
   background: var(--accent);
   border-color: var(--accent);
 }
@@ -1515,6 +1525,7 @@ body {
 
 /* Smaller outlined links (title screen). */
 .chip {
+  color: var(--ui-fg);
   display: block;
   text-align: center;
   white-space: nowrap;
@@ -1527,7 +1538,7 @@ body {
   border: 1px solid color-mix(in srgb, currentColor 35%, transparent);
   border-radius: 999px;
   text-shadow: none;
-  background: color-mix(in srgb, var(--sky, transparent) 60%, transparent);
+  background: color-mix(in srgb, var(--ui-bg) 60%, transparent);
 }
 
 .chip.link {
@@ -1541,7 +1552,8 @@ body {
 /* Menu screens sit on a frosted panel in the sky colour, so their text never
    lands on the moving scene. */
 .screen.panel {
-  background: color-mix(in srgb, var(--sky, #f1ede4) 88%, transparent);
+  color: var(--ui-fg);
+  background: color-mix(in srgb, var(--ui-bg) 88%, transparent);
   -webkit-backdrop-filter: blur(12px);
   backdrop-filter: blur(12px);
 }
@@ -1604,9 +1616,14 @@ body {
 }
 
 .stat-value {
-  flex-shrink: 0;
+  flex: 0 1 auto;
+  min-width: 0;
   text-align: right;
   opacity: 0.8;
+}
+
+.stat-row > :first-child {
+  flex-shrink: 0;
 }
 
 /* Scrolls by touch; no scrollbar over the value chips. */
@@ -1833,7 +1850,7 @@ body {
 .ladder-you {
   padding: 2px 8px;
   border-radius: 999px;
-  color: var(--sky, #f1ede4);
+  color: var(--on-accent);
   background: var(--text);
 }
 
@@ -1846,6 +1863,7 @@ body {
 /* --- Promotion moment ------------------------------------------------------ */
 
 .promo {
+  color: var(--ui-fg);
   --promo: var(--text);
   position: fixed;
   inset: 0;
@@ -1854,7 +1872,7 @@ body {
   align-items: center;
   justify-content: center;
   padding: 24px;
-  background: color-mix(in srgb, var(--sky, #f1ede4) 82%, transparent);
+  background: color-mix(in srgb, var(--ui-bg) 82%, transparent);
   -webkit-backdrop-filter: blur(10px);
   backdrop-filter: blur(10px);
   pointer-events: auto;
@@ -1978,6 +1996,7 @@ body {
 }
 
 .coin {
+  color: var(--ui-fg);
   display: inline-flex;
   align-items: center;
   gap: 5px;
@@ -1987,8 +2006,7 @@ body {
   font-size: calc(12px * var(--ui-scale));
   font-weight: 500;
   letter-spacing: 0.06em;
-  color: inherit;
-  background: color-mix(in srgb, var(--sky, #f1ede4) 70%, transparent);
+  background: color-mix(in srgb, var(--ui-bg) 70%, transparent);
   border: 1px solid color-mix(in srgb, currentColor 30%, transparent);
   border-radius: 999px;
   pointer-events: auto;
@@ -2084,7 +2102,7 @@ body {
 /* The shop is a showroom: the camera circles the ship in the clear top half,
    and the looks sit on a sheet at the bottom. */
 .screen.panel.showroom {
-  background: linear-gradient(to bottom, color-mix(in srgb, var(--sky, #f1ede4) 70%, transparent), transparent 18%);
+  background: linear-gradient(to bottom, color-mix(in srgb, var(--ui-bg) 70%, transparent), transparent 18%);
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
 }
@@ -2098,6 +2116,7 @@ body {
 }
 
 .settings.sheet {
+  color: var(--ui-fg);
   top: auto;
   left: 0;
   right: 0;
@@ -2105,7 +2124,7 @@ body {
   height: 54%;
   padding: 4px calc(var(--safe-right) + 20px) calc(var(--safe-bottom) + 20px) calc(var(--safe-left) + 20px);
   border-radius: 22px 22px 0 0;
-  background: color-mix(in srgb, var(--sky, #f1ede4) 94%, transparent);
+  background: color-mix(in srgb, var(--ui-bg) 94%, transparent);
   -webkit-backdrop-filter: blur(12px);
   backdrop-filter: blur(12px);
   box-shadow: 0 -10px 30px -18px color-mix(in srgb, var(--text) 60%, transparent);
@@ -2357,7 +2376,7 @@ body {
   position: absolute;
   inset: 5px;
   border-radius: 50%;
-  background: var(--sky, #f1ede4);
+  background: var(--ui-bg);
 }
 
 .offer-ring span {
@@ -2832,6 +2851,7 @@ body {
 }
 
 .tutorial {
+  color: var(--ui-fg);
   position: absolute;
   left: calc(var(--safe-left) + 20px);
   right: calc(var(--safe-right) + 20px);
@@ -2841,7 +2861,7 @@ body {
   gap: 4px;
   padding: 12px 16px;
   text-align: center;
-  background: color-mix(in srgb, var(--sky, #f1ede4) 88%, transparent);
+  background: color-mix(in srgb, var(--ui-bg) 88%, transparent);
   border-radius: 16px;
   pointer-events: auto;
 }
@@ -2889,4 +2909,38 @@ a.setting-row {
 
 .title-rank:not(.title-league) {
   border-color: color-mix(in srgb, var(--accent) 70%, transparent);
+}
+
+/* Dark mode: menus on dark panels with light text; the rank colours switch to
+   their light twins (ranks.ts). The live scene and the HUD are unchanged. */
+body.dark {
+  --ui-bg: #141518;
+  --ui-fg: #ebe9e3;
+  --on-accent: #141518;
+}
+
+/* The showroom's wallet line sits over the scene: the scene's own text colour reads there. */
+body.dark .showroom-note {
+  color: var(--text);
+}
+
+/* Numbers, buttons, tabs and small labels in the mono (last, so it wins over
+   the `font: inherit` the buttons use). */
+.score,
+.pill,
+.tab,
+.chip,
+.coin,
+.settings-group,
+.setting-row .value,
+.panel-title,
+.bar-btn,
+.kicker,
+.hud-mode,
+.level-num,
+.promo-kicker,
+.title-word.sub,
+.pts,
+.stat-value {
+  font-family: var(--font-mono);
 }

@@ -60,22 +60,23 @@ export const RANKS: readonly Rank[] = [
 
 /**
  * The menus' colour as you climb (the accent in style.css): a new one for each
- * band of ranks, darkest first, gold for generals. `from` is a rank tier.
- * Each is dark enough for the page colour to read on it as text.
+ * band of ranks, gold for generals. `from` is a rank tier. `accent` is dark
+ * enough for the page colour to read on it as text; `dark` is its light twin
+ * for dark mode, light enough for the dark panel colour to read on it.
  */
-export const RANK_COLOURS: readonly { from: number; name: string; accent: string }[] = [
-  { from: 0, name: 'charcoal', accent: '#2b2824' },
-  { from: 1, name: 'slate', accent: '#465a6e' },
-  { from: 3, name: 'pine', accent: '#2c6a5e' },
-  { from: 5, name: 'cobalt', accent: '#2d58a0' },
-  { from: 7, name: 'violet', accent: '#64409c' },
-  { from: 9, name: 'crimson', accent: '#9e2f45' },
-  { from: 11, name: 'bronze', accent: '#9c5a1f' },
-  { from: 12, name: 'gold', accent: '#846414' },
+export const RANK_COLOURS: readonly { from: number; name: string; accent: string; dark: string }[] = [
+  { from: 0, name: 'charcoal', accent: '#2b2824', dark: '#d8d4c8' },
+  { from: 1, name: 'slate', accent: '#465a6e', dark: '#9fb2c6' },
+  { from: 3, name: 'pine', accent: '#2c6a5e', dark: '#6cc4a9' },
+  { from: 5, name: 'cobalt', accent: '#2d58a0', dark: '#80a8f4' },
+  { from: 7, name: 'violet', accent: '#64409c', dark: '#b49cf2' },
+  { from: 9, name: 'crimson', accent: '#9e2f45', dark: '#f27f92' },
+  { from: 11, name: 'bronze', accent: '#9c5a1f', dark: '#e59c5c' },
+  { from: 12, name: 'gold', accent: '#846414', dark: '#ebc55c' },
 ];
 
 /** The colour for rank `i` (an index into RANKS). */
-export function rankColour(i: number): { from: number; name: string; accent: string } {
+export function rankColour(i: number): (typeof RANK_COLOURS)[number] {
   const tier = RANKS[Math.max(0, Math.min(RANKS.length - 1, i))].tier;
   let out = RANK_COLOURS[0];
   for (const c of RANK_COLOURS) if (tier >= c.from) out = c;

@@ -22,6 +22,7 @@ export interface Settings {
   assist: boolean; // slower, with the safe line marked; scores don't count as bests
   ghost: boolean; // ranked: fly against your week's best
   performance: boolean; // lower resolution and lighter weather, for older phones
+  dark: boolean; // menus on dark panels with light text
 }
 
 export type SettingKey = keyof Settings;
@@ -67,6 +68,7 @@ export const DEFAULT_SETTINGS: Settings = {
   assist: false,
   ghost: true,
   performance: false,
+  dark: false,
 };
 
 const KEY = 'endless.settings';

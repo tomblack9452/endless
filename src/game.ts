@@ -2310,7 +2310,8 @@ export class Game {
 
   private refreshTitle(): void {
     const colour = rankColour(this.ranked.rank);
-    this.ui.setAccent(this.settings.contrast ? '#2b2824' : colour.accent, !this.settings.contrast && colour === RANK_COLOURS[RANK_COLOURS.length - 1]);
+    const dark = this.settings.dark;
+    this.ui.setAccent(this.settings.contrast ? (dark ? '#ffffff' : '#2b2824') : dark ? colour.dark : colour.accent, !this.settings.contrast && colour === RANK_COLOURS[RANK_COLOURS.length - 1]);
     const i = this.ranked.rank;
     this.applyLooks(); // the wing decal follows your rank and league
     const lg = this.leagues;
@@ -2488,6 +2489,8 @@ export class Game {
     if (this.assistOn() && this.state !== 'title') this.assisted = true;
     this.ui.setDisplay(TEXT_SCALE[s.textSize], (['right', 'left', 'middle'] as const)[s.boostSide] ?? 'right', s.reduceMotion);
     this.applyLook(this.distanceScore / CONFIG.score.levelLength);
+    document.body.classList.toggle('dark', s.dark);
+    this.refreshTitle(); // the rank colour has a light and a dark version
     this.ui.renderSettings(s);
   }
 
