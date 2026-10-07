@@ -174,6 +174,7 @@ export class World {
 
   private generatedTo = 0;
   private lastDx = 0; // sideways movement this frame, for swept collision
+  private bringingIn = false; // the ship is outside the walls and being brought in (see bringIn)
   // Inner edges of the previous row's walls (world x), so each wall segment can
   // reach back over any step and leave no gap between rows.
   private prevWallL = NaN;
@@ -541,6 +542,7 @@ export class World {
     // piece is cleared below, so distance and sideways position can restart too.
     this.distance = 0;
     this.shipX = 0;
+    this.bringingIn = false;
     this.cx = 0;
     this.cxSlope = this.cxTargetSlope = 0;
     this.cxRetargetAt = 0;
@@ -618,6 +620,7 @@ export class World {
     const behind = this.distance - F.recycleBehind;
     for (const f of this.fields) f.advance(dx, behind);
     this.fill();
+    this.bringIn(dt);
     this.hull.animate(this.distance); // pistons
     this.vents.animate(this.distance); // steam vents
     this.tumbleweeds.animate(this.distance); // rolling across
@@ -628,8 +631,39 @@ export class World {
   }
 
   hitTest(prevDistance: number): boolean {
-    for (const f of this.solids) if (f.hitTest(prevDistance, this.distance, this.lastDx)) return true;
+    for (const f of this.solids) if (f.hitTest(prevDistance, this.distance, this.lastDx, !this.bringingIn)) return true;
     return false;
+  }
+
+  /**
+   * Open ground has no edges, so a ship can be far off the lane when a canyon
+   * or the ship starts. Their walls are built round the lane (the course
+   * depends only on its seed), so that ship would fly on outside them, over
+   * nothing, and fall at the first chasm. Instead, once it's past the outside
+   * of a wall, slide it across to the inside, through the walls (they don't
+   * hit it meanwhile; obstacles still do).
+   */
+  private bringIn(dt: number): void {
+    const slot = (((Math.round(this.distance / STEP) % FLOOR_ROWS) + FLOOR_ROWS) % FLOOR_ROWS);
+    if (Math.abs(this.wallD[slot] - this.distance) > STEP * 0.6) {
+      this.bringingIn = false;
+      return;
+    }
+    const B = TH.bringIn;
+    const lo = this.wallL[slot];
+    const hi = this.wallR[slot];
+    if (!this.bringingIn && this.shipX > lo - B.outside && this.shipX < hi + B.outside) return;
+    const target = clamp(this.shipX, lo + B.inset, hi - B.inset);
+    const gap = target - this.shipX;
+    if (Math.abs(gap) < 0.01) {
+      this.bringingIn = false;
+      return;
+    }
+    this.bringingIn = true;
+    const dx = Math.sign(gap) * Math.min(Math.abs(gap), Math.max(B.minSpeed, Math.abs(gap) * B.rate) * dt);
+    this.shipX += dx;
+    for (const f of this.fields) f.advance(dx, -Infinity);
+    this.lastDx = 0;
   }
 
   /**

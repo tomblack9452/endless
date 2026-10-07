@@ -6,6 +6,8 @@ import { storage } from './storage';
 
 export interface Stats {
   runs: number;
+  /** Runs that scored at least CONFIG.reveal.validScore: these open the game up (reveal.ts). */
+  validRuns: number;
   distance: number; // world units
   seconds: number; // time spent playing
   bestScore: number;
@@ -58,7 +60,7 @@ function legacyFurthest(s: Partial<Saved>): number {
 }
 
 function blankStats(): Stats {
-  return { runs: 0, distance: 0, seconds: 0, bestScore: 0, bestLevel: 0, nearMisses: 0, bestChain: 0, pickups: 0, crashes: {} };
+  return { runs: 0, validRuns: 0, distance: 0, seconds: 0, bestScore: 0, bestLevel: 0, nearMisses: 0, bestChain: 0, pickups: 0, crashes: {} };
 }
 
 function countBits(n: number): number {
@@ -87,6 +89,8 @@ export class Progress {
     try {
       const s = JSON.parse(raw) as Partial<Saved>;
       this.stats = { ...blankStats(), ...s.stats };
+      // Saves from before valid runs were counted: every run they played counts.
+      if (s.stats && s.stats.validRuns === undefined) this.stats.validRuns = s.stats.runs ?? 0;
       this.furthest = Math.max(1, s.furthest ?? legacyFurthest(s));
       this.oldStars = s.stars ?? [];
       this.courses = s.courses ?? {};
@@ -197,6 +201,7 @@ export class Progress {
   recordRun(r: RunResult): void {
     const s = this.stats;
     s.runs++;
+    if (r.score >= CONFIG.reveal.validScore) s.validRuns++;
     s.distance += r.distance;
     s.seconds += r.seconds;
     s.bestScore = Math.max(s.bestScore, Math.floor(r.score));

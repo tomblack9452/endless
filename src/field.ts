@@ -301,11 +301,12 @@ export class InstancedField {
    * distance and sideways by `dx`. Both axes are swept, so a long frame can't
    * carry the ship through a thin wall.
    */
-  hitTest(prevDistance: number, distance: number, dx: number): boolean {
+  /** `walls` false leaves out solids that don't score (walls), for a ship being brought inside them. */
+  hitTest(prevDistance: number, distance: number, dx: number, walls = true): boolean {
     const shipX = CONFIG.ship.hitHalfWidth;
     const shipZ = CONFIG.ship.hitHalfDepth;
     for (let i = 0; i < this.top; i++) {
-      if (!this.active[i] || !this.solid[i]) continue;
+      if (!this.active[i] || !this.solid[i] || (!walls && !this.scores[i])) continue;
       // A pulsing vent that's mostly sunk is harmless.
       if (this.moving[i] === 4 && this.y[i] < this.bx[i] - this.amp[i] * 0.5) continue;
       const rx = this.hx[i] + shipX;

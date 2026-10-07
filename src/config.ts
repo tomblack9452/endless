@@ -132,6 +132,11 @@ export const CONFIG = {
     ease: 0.6, // how fast speed follows its target (per s)
   },
 
+  // New players see the game in stages (reveal.ts); only runs scoring this much count.
+  reveal: {
+    validScore: 1000,
+  },
+
   score: {
     pointsPerUnit: 0.85,
     levelLength: 1000, // levels count distance points only; bonuses don't skip levels
@@ -278,6 +283,13 @@ export const CONFIG = {
       // last `beforeChange` units of a theme or the first `afterChange` of the next.
       beforeChange: 45,
       afterChange: 50,
+    },
+    // A ship that comes into a canyon or the ship wide of the walls is slid inside them.
+    bringIn: {
+      outside: 3, // this far past a wall's inner face it can only have come in from outside
+      inset: 2.5, // brought this far inside the inner face, clear of the wall rocks
+      minSpeed: 40, // units a second sideways, at least (faster than the ship steers)
+      rate: 3, // ...or this many times the distance still to go, a second
     },
     // Open ground is an alien landscape: mushroom trees and spire trees (only
     // their thin trunks collide; you fly under the canopies), dark rocks and

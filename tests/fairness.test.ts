@@ -6,6 +6,7 @@ import { LivePalette } from '../src/palette';
 import { ROOM_IDS, type RoomId } from '../src/interior';
 import { World } from '../src/world';
 import { PRACTICE_SEED } from '../src/onboarding';
+import { weeklyRun } from '../src/courses';
 
 // Fairness: every course must be survivable. A simple autopilot follows the
 // safe lane the generator records (steering at the normal limit, no boost)
@@ -203,5 +204,55 @@ describe('the practice run', () => {
   it('is survivable on the safe lane', () => {
     const r = drive(PRACTICE_SEED, 1);
     expect(r.crashed, `crashed at score ${r.at}`).toBe(false);
+  });
+});
+
+// Open ground has no edges, so a ship can be anywhere when a canyon starts.
+// The week of 5 Oct 2026's ranked run swings its lane ~66 units out just before
+// the canyon: a ship that stayed in the middle came in wide of the mouth, flew
+// on outside the walls over nothing and fell at the first chasm. It must be
+// brought inside, then get through on the lane like anyone else.
+describe('wide of the canyon mouth', () => {
+  it('a ship far off the lane is brought inside the walls', () => {
+    const world = new World(new Scene(), new LivePalette());
+    const hooked = world as unknown as Hooked & { theme: string };
+    const lanes: [number, number][] = [];
+    const row = hooked.row.bind(world);
+    hooked.row = (d: number) => {
+      row(d);
+      lanes.push([d, hooked.lane]);
+      if (lanes.length > 600) lanes.shift();
+    };
+    world.reset(CONFIG.field.startClearance, true, 0, weeklyRun('2026-10-05').seed);
+    const runStart = world.distance;
+    const laneAt = (d: number): number => {
+      let best = hooked.shipX;
+      let gap = Infinity;
+      for (const [rd, x] of lanes) {
+        const g = Math.abs(rd - d);
+        if (g < gap) {
+          gap = g;
+          best = x;
+        }
+      }
+      return best;
+    };
+    let eased = 0;
+    let farOff = 0;
+    for (let t = 0; t < 200; t += DT) {
+      const score = (world.distance - runStart) * CONFIG.score.pointsPerUnit;
+      if (score > 5000) break;
+      // Hands off (straight down the middle) until well into the canyon, then follow the lane.
+      const steering = score > 3150;
+      if (!steering) farOff = Math.max(farOff, Math.abs(laneAt(world.distance) - hooked.shipX));
+      const speed = speedAt(score);
+      const steer = steering ? Math.max(-1, Math.min(1, (laneAt(world.distance + 3) - hooked.shipX) * 1.5)) : 0;
+      eased += (steer - eased) * (1 - Math.exp(-CONFIG.steering.response * DT));
+      const prev = world.distance;
+      world.advance(DT, speed, eased * lateralSpeedAt(speed));
+      expect(world.overPit(), `fell at score ${Math.round(score)}`).toBe(false);
+      if (steering) expect(world.hitTest(prev), `hit something at score ${Math.round(score)}`).toBe(false);
+    }
+    expect(farOff).toBeGreaterThan(CONFIG.themes.canyon.mouthHalfWidth); // it really did come in wide
   });
 });

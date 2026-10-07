@@ -2085,7 +2085,7 @@ export class Game {
     const needs: Record<string, Feature> = { solo: 'solo', record: 'record', shop: 'shop', 'shop-cores': 'shop', pass: 'shop', boards: 'leaderboard' };
     const f = needs[name];
     if (f && !this.open(f)) {
-      this.ui.showNotice(nextStageText(this.progress.stats.runs, this.onboarding.done) || 'not open yet');
+      this.ui.showNotice(nextStageText(this.progress.stats.validRuns, this.onboarding.done) || 'not open yet');
       return;
     }
     if (name === 'endless') this.startEndless();
@@ -2277,7 +2277,7 @@ export class Game {
 
   /** How much of the game is open to this player (new players see it in stages: reveal.ts). */
   private revealStage(): number {
-    return stageFor(this.progress.stats.runs, this.onboarding.done);
+    return stageFor(this.progress.stats.validRuns, this.onboarding.done);
   }
 
   private open(f: Feature): boolean {
@@ -2339,7 +2339,7 @@ export class Game {
     this.ui.setTitleRank(insignia(i), rankName(i), next ? `${formatScore(xpToRank(this.ranked.xp, i + 1))} xp to ${rankName(i + 1)}` : 'the top rank');
     const wb = this.progress.weeklyBest(this.weekly.id);
     const now = Date.now();
-    const runs = this.progress.stats.runs;
+    const runs = this.progress.stats.validRuns;
     if (this.open('ranked')) this.ui.setPrimary('ranked', wb > 0 ? `your best this week ${formatScore(wb)}` : 'the same run for everyone, all week');
     else this.ui.setPrimary('fly', this.progress.endlessBest > 0 ? `endless · best ${formatScore(this.progress.endlessBest)}` : 'endless: every area in turn');
     this.ui.setFeatures((f) => (f === 'endless' || f === 'league' ? this.open('ranked') : f === 'boards' ? this.open('leaderboard') : f === 'solo' || f === 'shop' || f === 'record' ? this.open(f) : true));
