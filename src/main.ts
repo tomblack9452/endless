@@ -1,7 +1,11 @@
-// Latin only: the UI is all lowercase English, so the other scripts would be dead weight.
-import '@fontsource/jetbrains-mono/latin-300.css';
-import '@fontsource/jetbrains-mono/latin-400.css';
-import '@fontsource/jetbrains-mono/latin-500.css';
+// Latin only: the UI is English, so the other scripts would be dead weight.
+// Host Grotesk for text, Geist Mono for numbers and technical labels (style.css --font-sans / --font-mono).
+import '@fontsource/host-grotesk/latin-300.css';
+import '@fontsource/host-grotesk/latin-400.css';
+import '@fontsource/host-grotesk/latin-500.css';
+import '@fontsource/geist-mono/latin-300.css';
+import '@fontsource/geist-mono/latin-400.css';
+import '@fontsource/geist-mono/latin-500.css';
 import './style.css';
 import { Capacitor } from '@capacitor/core';
 import { Game } from './game';

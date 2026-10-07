@@ -18,7 +18,7 @@ describe('rank colours', () => {
     for (let i = 1; i < RANKS.length; i++) expect(RANK_COLOURS.indexOf(rankColour(i))).toBeGreaterThanOrEqual(RANK_COLOURS.indexOf(rankColour(i - 1)));
   });
 
-  it('keep the page colour readable on a filled button', () => {
-    for (const c of RANK_COLOURS) expect(contrast(c.accent, '#f1ede4'), c.name).toBeGreaterThanOrEqual(4.5);
+  it('read on the dark plates, and keep the plate colour readable on a filled button', () => {
+    for (const c of RANK_COLOURS) expect(contrast(c.accent, '#0c0d0f'), c.name).toBeGreaterThanOrEqual(7);
   });
 });

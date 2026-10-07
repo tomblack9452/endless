@@ -3,9 +3,53 @@
   display: none !important;
 }
 
+/* ---------------------------------------------------------------------------
+   Design system. Instrument-panel minimal: dark plates with hairlines over the
+   live scene, one accent (the rank colour), a neo-grotesk for words and a mono
+   for numbers and technical labels. Square corners, no shadows, no gradients.
+   --------------------------------------------------------------------------- */
 :root {
+  /* Type. Swap in Matter / Matter Mono here if it's ever licensed. */
+  --font-sans: 'Host Grotesk', 'Helvetica Neue', Arial, sans-serif;
+  --font-mono: 'Geist Mono', ui-monospace, 'SFMono-Regular', monospace;
+
+  /* Scene-driven: set from the 3D palette in game.ts (dark by day, light at night). */
   --text: #2b2824;
-  --accent: var(--text); /* the rank colour (RANK_COLOURS in ranks.ts), set from JS */
+
+  /* Plates: the surfaces UI sits on, the same day or night. */
+  --ink: #0c0d0f; /* plate colour, and text on light fills */
+  --plate: rgba(12, 13, 15, 0.9);
+  --plate-soft: rgba(12, 13, 15, 0.72);
+  --fg: #ebe9e3; /* text on plates */
+  --fg-dim: rgba(235, 233, 227, 0.58);
+  --fg-faint: rgba(235, 233, 227, 0.34);
+  --line: rgba(235, 233, 227, 0.14); /* hairlines */
+  --line-strong: rgba(235, 233, 227, 0.32);
+  --alert: #ff5a45; /* something to claim */
+
+  /* The rank colour (RANK_COLOURS in ranks.ts), set from JS. */
+  --accent: var(--fg);
+
+  /* Type scale (multiplied by the text-size setting). */
+  --t-micro: calc(10px * var(--ui-scale));
+  --t-small: calc(12px * var(--ui-scale));
+  --t-body: calc(15px * var(--ui-scale));
+  --t-lead: calc(18px * var(--ui-scale));
+  --t-title: calc(22px * var(--ui-scale));
+  --t-display: calc(40px * var(--ui-scale));
+
+  /* Spacing (4 px grid). */
+  --s1: 4px;
+  --s2: 8px;
+  --s3: 12px;
+  --s4: 16px;
+  --s5: 24px;
+  --s6: 32px;
+
+  --radius: 2px;
+  --hair: 1px solid var(--line);
+  --tap: 44px;
+  --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
   --fade: 200ms;
   --ui-scale: 1; /* text size setting */
   --safe-top: env(safe-area-inset-top, 0px);
@@ -38,10 +82,25 @@ body {
 body {
   position: fixed;
   inset: 0;
-  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-family: var(--font-sans);
   font-variant-numeric: tabular-nums;
-  font-feature-settings: 'tnum' 1, 'zero' 0;
+  font-feature-settings: 'tnum' 1;
   color: var(--text);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Technical labels: small mono capitals, tracked out. */
+.mono,
+.settings-group,
+.kicker,
+.panel-title,
+.tab,
+.bar-btn,
+.setting-row .value,
+.coin,
+.hud-mode,
+.promo-kicker {
+  font-family: var(--font-mono);
 }
 
 /* Play area: full width on phones, a centred column on wider screens.
@@ -115,15 +174,15 @@ body {
 /* Text */
 
 .label {
-  font-size: calc(13px * var(--ui-scale));
+  font-size: var(--t-body);
   font-weight: 400;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.005em;
   text-transform: lowercase;
-  line-height: 1.7;
+  line-height: 1.5;
 }
 
 .dim {
-  opacity: 0.72;
+  opacity: 0.62;
 }
 
 /* Text over the live scene (HUD, hints, combo, banners): a soft halo in the
@@ -140,9 +199,10 @@ body {
 }
 
 .score {
+  font-family: var(--font-mono);
   font-size: calc(36px * var(--ui-scale));
   font-weight: 300;
-  letter-spacing: 0.04em;
+  letter-spacing: -0.02em;
   line-height: 1;
 }
 
@@ -487,13 +547,27 @@ body {
   pointer-events: auto;
 }
 
+.settings {
+  counter-reset: group;
+}
+
+/* Section labels: an index number, then the name, in small mono capitals. */
 .settings-group {
-  margin: 26px 0 4px;
-  font-size: calc(11px * var(--ui-scale));
-  font-weight: 500;
-  letter-spacing: 0.24em;
+  margin: 28px 0 2px;
+  padding-bottom: 8px;
+  font-size: var(--t-micro);
+  font-weight: 400;
+  letter-spacing: 0.16em;
   text-transform: uppercase;
-  opacity: 0.6;
+  color: var(--fg-dim);
+  border-bottom: var(--hair);
+}
+
+.settings-group::before {
+  counter-increment: group;
+  content: counter(group, decimal-leading-zero);
+  margin-right: 12px;
+  color: var(--accent);
 }
 
 .settings-group:first-child {
@@ -507,13 +581,13 @@ body {
   align-items: center;
   gap: 16px;
   width: 100%;
-  min-height: calc(52px * var(--ui-scale));
+  min-height: max(var(--tap), calc(52px * var(--ui-scale)));
   padding: 8px 0;
   font: inherit;
   color: inherit;
   background: none;
   border: 0;
-  border-bottom: 1px solid color-mix(in srgb, currentColor 25%, transparent);
+  border-bottom: var(--hair);
   border-radius: 0;
   text-align: left;
   cursor: pointer;
@@ -521,19 +595,34 @@ body {
   appearance: none;
 }
 
-/* Current value: a small outlined chip, so it reads as something you can change. */
+/* Current value: mono capitals in brackets, so it reads as something you can change. */
 .setting-row .value {
   flex-shrink: 0;
-  font-size: calc(12px * var(--ui-scale));
+  font-size: var(--t-small);
   letter-spacing: 0.1em;
-  padding: 5px 12px;
-  border: 1px solid color-mix(in srgb, currentColor 45%, transparent);
-  border-radius: 999px;
+  text-transform: uppercase;
   line-height: 1.4;
+  color: var(--fg);
+}
+
+.setting-row .value::before {
+  content: '[';
+  margin-right: 8px;
+  color: var(--fg-faint);
+}
+
+.setting-row .value::after {
+  content: ']';
+  margin-left: 8px;
+  color: var(--fg-faint);
+}
+
+.setting-row:active {
+  background: rgba(235, 233, 227, 0.05);
 }
 
 .setting-row:active .value {
-  background: color-mix(in srgb, currentColor 12%, transparent);
+  color: var(--accent);
 }
 /* Dev panel (dev server only). */
 .dev-fps {
@@ -621,7 +710,19 @@ body {
   left: 0;
   right: 0;
   bottom: calc(var(--safe-bottom) + 120px);
+  width: fit-content;
+  max-width: calc(100% - 48px);
+  margin: 0 auto;
+  padding: 9px 14px;
+  font-family: var(--font-mono);
+  font-size: var(--t-small);
+  letter-spacing: 0.04em;
   text-align: center;
+  color: var(--fg);
+  text-shadow: none;
+  background: var(--plate);
+  border: var(--hair);
+  border-left: 2px solid var(--accent);
   opacity: 0;
   pointer-events: none;
 }
@@ -805,18 +906,21 @@ body {
 }
 
 .title-word {
-  font-size: calc(34px * var(--ui-scale));
+  font-size: var(--t-display);
   font-weight: 300;
-  letter-spacing: 0.2em;
-  line-height: 1.1;
+  letter-spacing: 0.06em;
+  line-height: 1;
 }
 
 .title-word.sub {
-  font-size: calc(13px * var(--ui-scale));
-  font-weight: 500;
-  letter-spacing: 0.62em;
-  margin-top: 10px;
-  opacity: 0.75;
+  font-family: var(--font-mono);
+  font-size: var(--t-small);
+  font-weight: 400;
+  letter-spacing: 0.72em;
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid currentColor;
+  opacity: 1;
 }
 
 /* Bottom of the title screen: a scrim in the sky colour so the menu never sits
@@ -830,23 +934,15 @@ body {
   background: linear-gradient(to top, var(--sky, transparent) 55%, transparent);
 }
 
+/* The menu sits on a plate along the bottom, the same by day or night. */
 #screen-title .screen-foot {
   position: relative;
   margin-top: auto;
-  padding-top: 24px;
-  background: var(--sky, transparent);
-}
-
-/* The scrim fades up from the menu over the scenery. */
-#screen-title .screen-foot::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 100%;
-  height: 60px;
-  background: linear-gradient(to top, var(--sky, transparent), transparent);
-  pointer-events: none;
+  padding-top: 20px;
+  color: var(--fg);
+  text-shadow: none;
+  background: var(--plate);
+  border-top: 1px solid var(--line-strong);
 }
 
 /* Short screens: tighter everything, and the wordmark loses its subtitle. */
@@ -891,22 +987,23 @@ body {
   }
 }
 
-/* Pill buttons: primary is filled, the rest outlined. */
+/* Buttons ("pill" is the old name): square, hairline; primary is filled with the rank colour. */
 .pill {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   min-width: 180px;
-  min-height: calc(48px * var(--ui-scale));
-  padding: 0 28px;
+  min-height: max(var(--tap), calc(48px * var(--ui-scale)));
+  padding: 0 24px;
   font: inherit;
-  font-size: calc(14px * var(--ui-scale));
-  letter-spacing: 0.16em;
+  font-size: var(--t-body);
+  font-weight: 400;
+  letter-spacing: 0.04em;
   text-transform: lowercase;
   color: inherit;
   background: none;
-  border: 1px solid color-mix(in srgb, currentColor 55%, transparent);
-  border-radius: 999px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
   pointer-events: auto;
   cursor: pointer;
   text-shadow: none;
@@ -915,7 +1012,7 @@ body {
 }
 
 .pill.primary {
-  color: var(--sky, #f1ede4);
+  color: var(--ink);
   background: var(--accent);
   border-color: var(--accent);
   font-weight: 500;
@@ -939,8 +1036,11 @@ body {
 }
 
 .pill:active {
-  transform: scale(0.97);
-  opacity: 0.85;
+  opacity: 0.8;
+}
+
+.pill:disabled {
+  opacity: 0.4;
 }
 
 .pill:focus {
@@ -948,7 +1048,7 @@ body {
 }
 
 .pill:focus-visible {
-  outline: 2px solid currentColor;
+  outline: 1px solid var(--accent);
   outline-offset: 3px;
 }
 
@@ -967,21 +1067,53 @@ body {
   width: 100%;
   min-width: 0;
   min-height: calc(76px * var(--ui-scale));
-  border-radius: 22px;
-  box-shadow: 0 10px 24px -14px color-mix(in srgb, var(--text) 70%, transparent);
+  border-radius: var(--radius);
+}
+
+/* Corner ticks on the main button. */
+.pill.title-ranked::before,
+.pill.title-ranked::after {
+  content: '';
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  border: 1px solid var(--ink);
+  opacity: 0.55;
+}
+
+.pill.title-ranked::before {
+  top: 6px;
+  left: 6px;
+  border-right: 0;
+  border-bottom: 0;
+}
+
+.pill.title-ranked::after {
+  bottom: 6px;
+  right: 6px;
+  border-left: 0;
+  border-top: 0;
+}
+
+.pill.title-ranked {
+  position: relative;
 }
 
 .title-ranked-name {
-  font-size: calc(20px * var(--ui-scale));
-  letter-spacing: 0.3em;
-  margin-right: -0.3em; /* letter-spacing leaves a gap after the last letter */
+  font-size: var(--t-title);
+  font-weight: 500;
+  letter-spacing: 0.32em;
+  text-transform: uppercase;
+  margin-right: -0.32em; /* letter-spacing leaves a gap after the last letter */
 }
 
 .title-ranked-sub {
-  font-size: calc(11px * var(--ui-scale));
+  font-family: var(--font-mono);
+  font-size: var(--t-micro);
   font-weight: 400;
-  letter-spacing: 0.1em;
-  opacity: 0.75;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  opacity: 0.7;
 }
 
 .title-ranked-sub:empty {
@@ -1055,30 +1187,36 @@ body {
   font: inherit;
   color: inherit;
   text-align: left;
-  background: color-mix(in srgb, currentColor 5%, transparent);
-  border: 1px solid color-mix(in srgb, currentColor 22%, transparent);
-  border-radius: 14px;
+  background: none;
+  border: var(--hair);
+  border-radius: var(--radius);
   pointer-events: auto;
   cursor: pointer;
 }
 
 .live-card.hot {
-  border-color: color-mix(in srgb, #e0503f 70%, transparent);
+  border-color: var(--alert);
+}
+
+.live-card.hot .kicker {
+  color: var(--alert);
+  opacity: 1;
 }
 
 .live-card:active {
-  transform: scale(0.98);
+  background: rgba(235, 233, 227, 0.05);
 }
 
 .live-card .kicker {
-  font-size: calc(10px * var(--ui-scale));
-  letter-spacing: 0.16em;
-  opacity: 0.65;
+  font-size: var(--t-micro);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  opacity: 0.6;
 }
 
 .live-card .title {
-  font-size: calc(13px * var(--ui-scale));
-  letter-spacing: 0.06em;
+  font-size: var(--t-body);
+  letter-spacing: 0.01em;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1105,7 +1243,9 @@ body {
   display: flex;
   justify-content: space-around;
   gap: 2px;
-  margin: 12px -14px 0;
+  margin: 14px calc(-24px - var(--safe-right)) 0 calc(-24px - var(--safe-left));
+  padding: 6px 10px 0;
+  border-top: var(--hair);
 }
 
 .bar-btn {
@@ -1121,24 +1261,25 @@ body {
   padding: 6px 2px 2px;
   font: inherit;
   min-width: 0;
-  font-size: min(calc(10px * var(--ui-scale)), 2.6vw); /* the five labels fit a narrow phone at any text size */
-  letter-spacing: 0.04em;
-  line-height: 1.2;
+  font-size: min(calc(9px * var(--ui-scale)), 2.3vw); /* the five labels fit a narrow phone at any text size */
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  line-height: 1.25;
   text-align: center;
   color: inherit;
   background: none;
   border: none;
-  border-radius: 12px;
+  border-radius: var(--radius);
   pointer-events: auto;
   cursor: pointer;
 }
 
 .bar-btn svg {
-  width: 24px;
-  height: 24px;
+  width: 22px;
+  height: 22px;
   fill: none;
   stroke: currentColor;
-  stroke-width: 1.6;
+  stroke-width: 1.25;
   stroke-linecap: round;
   stroke-linejoin: round;
 }
@@ -1148,18 +1289,18 @@ body {
 }
 
 .bar-btn:focus-visible {
-  outline: 2px solid currentColor;
+  outline: 1px solid var(--accent);
 }
 
 .bar-btn .news {
   position: absolute;
-  top: 4px;
+  top: 5px;
   left: calc(50% + 10px);
   display: none;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: #e0503f;
+  width: 6px;
+  height: 6px;
+  border-radius: 0;
+  background: var(--alert);
 }
 
 .bar-btn .news.on {
@@ -1179,13 +1320,13 @@ body {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 6px 14px 6px 6px;
+  padding: 6px 14px 6px 8px;
   font: inherit;
-  color: inherit;
+  color: var(--fg);
   text-align: left;
-  background: color-mix(in srgb, var(--sky, transparent) 60%, transparent);
-  border: 1px solid color-mix(in srgb, currentColor 30%, transparent);
-  border-radius: 999px;
+  background: var(--plate-soft);
+  border: var(--hair);
+  border-radius: var(--radius);
   pointer-events: auto;
   cursor: pointer;
   text-shadow: none;
@@ -1195,10 +1336,10 @@ body {
 .lp-track {
   display: block;
   width: 120px;
-  height: 3px;
-  margin-top: 5px;
-  border-radius: 2px;
-  background: color-mix(in srgb, currentColor 18%, transparent);
+  height: 2px;
+  margin-top: 6px;
+  border-radius: 0;
+  background: var(--line);
   overflow: hidden;
 }
 
@@ -1244,8 +1385,9 @@ body {
 }
 
 .hud-mode {
-  font-size: calc(10px * var(--ui-scale));
-  letter-spacing: 0.2em;
+  font-size: var(--t-micro);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
   margin-top: 4px;
 }
 
@@ -1257,27 +1399,36 @@ body {
   top: calc(var(--safe-top) + 86px);
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 20px;
+  border-bottom: var(--hair);
   pointer-events: auto;
 }
 
+/* Tabs and choice chips: mono capitals; the chosen one is underlined in the rank colour. */
 .tab {
-  font: inherit;
-  font-size: calc(12px * var(--ui-scale));
-  letter-spacing: 0.14em;
-  color: inherit;
-  padding: 8px 16px;
+  min-height: var(--tap);
+  font-family: var(--font-mono);
+  font-size: var(--t-small);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--fg-dim);
+  padding: 10px 0;
   background: none;
-  border: 1px solid color-mix(in srgb, currentColor 30%, transparent);
-  border-radius: 999px;
+  border: 0;
+  border-radius: 0;
+  box-shadow: inset 0 -1px 0 transparent;
   cursor: pointer;
   text-shadow: none;
+  white-space: nowrap;
 }
 
 .tab.on {
-  color: var(--sky, #f1ede4);
-  background: var(--accent);
-  border-color: var(--accent);
+  color: var(--fg);
+  box-shadow: inset 0 -2px 0 var(--accent);
+}
+
+.tab:focus-visible {
+  outline: 1px solid var(--accent);
 }
 
 .settings.tabbed {
@@ -1290,8 +1441,7 @@ body {
 
 
 .setting-row .value.locked {
-  border-style: dashed;
-  opacity: 0.75;
+  opacity: 0.55;
 }
 
 /* Upgrade rows: name and effect on the left, tier pips and a buy button on the right. */
@@ -1430,12 +1580,13 @@ body {
   margin-top: 8px;
 }
 
+/* Progress: a 2 px track ruled into tenths, filled in the rank colour. */
 .xp-track {
   position: relative;
-  height: 6px;
+  height: 2px;
   margin: 16px 0 6px;
-  border-radius: 3px;
-  background: color-mix(in srgb, currentColor 14%, transparent);
+  border-radius: 0;
+  background: repeating-linear-gradient(90deg, var(--line-strong) 0 calc(10% - 2px), transparent calc(10% - 2px) 10%);
   overflow: hidden;
 }
 
@@ -1524,10 +1675,11 @@ body {
   letter-spacing: 0.12em;
   line-height: 1.4;
   padding: 11px 6px;
-  border: 1px solid color-mix(in srgb, currentColor 35%, transparent);
-  border-radius: 999px;
+  color: var(--fg);
+  border: var(--hair);
+  border-radius: var(--radius);
   text-shadow: none;
-  background: color-mix(in srgb, var(--sky, transparent) 60%, transparent);
+  background: var(--plate-soft);
 }
 
 .chip.link {
@@ -1538,12 +1690,12 @@ body {
   background: color-mix(in srgb, currentColor 12%, transparent);
 }
 
-/* Menu screens sit on a frosted panel in the sky colour, so their text never
-   lands on the moving scene. */
+/* Menu screens sit on a dark plate, so their text never lands on the moving
+   scene and reads the same by day or night. */
 .screen.panel {
-  background: color-mix(in srgb, var(--sky, #f1ede4) 88%, transparent);
-  -webkit-backdrop-filter: blur(12px);
-  backdrop-filter: blur(12px);
+  color: var(--fg);
+  text-shadow: none;
+  background: var(--plate);
 }
 
 /* No HUD behind a menu. */
@@ -1562,25 +1714,39 @@ body {
   height: 60px;
   display: flex;
   align-items: center;
-  border-bottom: 1px solid color-mix(in srgb, currentColor 25%, transparent);
+  border-bottom: 1px solid var(--line-strong);
 }
 
+/* Screen titles: mono capitals, centred, with a small rank-coloured mark. */
 .panel-title {
   position: absolute;
   left: 0;
   right: 0;
   text-align: center;
-  font-size: calc(17px * var(--ui-scale));
-  letter-spacing: 0.18em;
+  font-size: var(--t-small);
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
   pointer-events: none;
+}
+
+.panel-title::before {
+  content: '';
+  display: inline-block;
+  width: 5px;
+  height: 5px;
+  margin: 0 12px 2px 0;
+  background: var(--accent);
 }
 
 .back {
   position: relative;
   z-index: 1;
-  font: inherit;
-  font-size: calc(13px * var(--ui-scale));
-  color: inherit;
+  min-height: var(--tap);
+  font-family: var(--font-mono);
+  font-size: var(--t-micro);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--fg-dim);
   background: none;
   border: 0;
   padding: 14px 18px 14px 16px;
@@ -1588,13 +1754,14 @@ body {
 }
 
 .back::before {
-  content: '\2039  '; /* single left angle quote */
+  content: '\2190  '; /* left arrow */
   white-space: pre;
 }
 
 .screen-heading {
-  font-size: calc(15px * var(--ui-scale));
-  letter-spacing: 0.3em;
+  font-family: var(--font-mono);
+  font-size: var(--t-small);
+  letter-spacing: 0.28em;
   text-transform: uppercase;
   opacity: 0.75;
 }
@@ -1854,9 +2021,9 @@ body {
   align-items: center;
   justify-content: center;
   padding: 24px;
-  background: color-mix(in srgb, var(--sky, #f1ede4) 82%, transparent);
-  -webkit-backdrop-filter: blur(10px);
-  backdrop-filter: blur(10px);
+  color: var(--fg);
+  text-shadow: none;
+  background: rgba(12, 13, 15, 0.94);
   pointer-events: auto;
   cursor: pointer;
 }
@@ -1884,13 +2051,42 @@ body {
   flex-direction: column;
   align-items: center;
   text-align: center;
-  max-width: 320px;
+  width: min(320px, 100%);
+  padding: 28px 22px 24px;
+}
+
+/* Corner brackets framing the card. */
+.promo-card::before,
+.promo-card::after {
+  content: '';
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  border: 1px solid var(--line-strong);
+  pointer-events: none;
+}
+
+.promo-card::before {
+  top: 0;
+  left: 0;
+  border-right: 0;
+  border-bottom: 0;
+}
+
+.promo-card::after {
+  bottom: 0;
+  right: 0;
+  border-left: 0;
+  border-top: 0;
 }
 
 .promo-kicker {
-  letter-spacing: 0.4em;
-  margin-right: -0.4em;
-  font-weight: 600;
+  font-size: var(--t-small);
+  letter-spacing: 0.32em;
+  margin-right: -0.32em;
+  text-transform: uppercase;
+  font-weight: 400;
+  color: var(--promo);
 }
 
 .promo-icon {
@@ -1901,8 +2097,9 @@ body {
 }
 
 .promo-name {
-  font-size: calc(26px * var(--ui-scale));
-  letter-spacing: 0.12em;
+  font-size: calc(28px * var(--ui-scale));
+  font-weight: 300;
+  letter-spacing: 0.02em;
 }
 
 .promo-lines {
@@ -1981,31 +2178,31 @@ body {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  height: calc(30px * var(--ui-scale));
-  padding: 0 10px 0 7px;
-  font: inherit;
-  font-size: calc(12px * var(--ui-scale));
-  font-weight: 500;
-  letter-spacing: 0.06em;
-  color: inherit;
-  background: color-mix(in srgb, var(--sky, #f1ede4) 70%, transparent);
-  border: 1px solid color-mix(in srgb, currentColor 30%, transparent);
-  border-radius: 999px;
+  min-height: calc(32px * var(--ui-scale));
+  padding: 0 10px 0 8px;
+  font-size: var(--t-small);
+  font-weight: 400;
+  letter-spacing: 0.04em;
+  color: var(--fg);
+  text-shadow: none;
+  background: var(--plate-soft);
+  border: var(--hair);
+  border-radius: var(--radius);
   pointer-events: auto;
   cursor: pointer;
 }
 
 .coin svg {
-  width: 16px;
-  height: 16px;
+  width: 15px;
+  height: 15px;
   fill: none;
   stroke: currentColor;
-  stroke-width: 1.6;
+  stroke-width: 1.25;
   stroke-linejoin: round;
 }
 
 .coin.premium svg {
-  stroke: #8a63d2;
+  stroke: #b39af0;
 }
 
 .coin.bump {
@@ -2028,8 +2225,8 @@ body {
   height: 6px;
   margin-left: 5px;
   vertical-align: 2px;
-  border-radius: 50%;
-  background: #e0503f;
+  border-radius: 0;
+  background: var(--alert);
 }
 
 .chip .news.on {
@@ -2082,11 +2279,21 @@ body {
 }
 
 /* The shop is a showroom: the camera circles the ship in the clear top half,
-   and the looks sit on a sheet at the bottom. */
+   and the looks sit on a sheet at the bottom. A plate band carries the title. */
 .screen.panel.showroom {
-  background: linear-gradient(to bottom, color-mix(in srgb, var(--sky, #f1ede4) 70%, transparent), transparent 18%);
-  -webkit-backdrop-filter: none;
-  backdrop-filter: none;
+  background: none;
+}
+
+.screen.panel.showroom::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: calc(var(--safe-top) + 108px);
+  background: var(--plate-soft);
+  border-bottom: var(--hair);
+  pointer-events: none;
 }
 
 .showroom-note {
@@ -2104,11 +2311,9 @@ body {
   bottom: 0;
   height: 54%;
   padding: 4px calc(var(--safe-right) + 20px) calc(var(--safe-bottom) + 20px) calc(var(--safe-left) + 20px);
-  border-radius: 22px 22px 0 0;
-  background: color-mix(in srgb, var(--sky, #f1ede4) 94%, transparent);
-  -webkit-backdrop-filter: blur(12px);
-  backdrop-filter: blur(12px);
-  box-shadow: 0 -10px 30px -18px color-mix(in srgb, var(--text) 60%, transparent);
+  border-radius: 0;
+  background: var(--plate);
+  border-top: 1px solid var(--line-strong);
 }
 
 .sheet .settings-group:first-child {
@@ -2348,16 +2553,18 @@ body {
   height: 84px;
   margin: 18px 0 8px;
   border-radius: 50%;
-  background: conic-gradient(var(--text) calc(var(--left) * 360deg), color-mix(in srgb, var(--text) 14%, transparent) 0);
+  background: conic-gradient(var(--accent) calc(var(--left) * 360deg), var(--line) 0);
+  font-family: var(--font-mono);
   font-size: calc(28px * var(--ui-scale));
+  font-weight: 300;
 }
 
 .offer-ring::before {
   content: '';
   position: absolute;
-  inset: 5px;
+  inset: 2px;
   border-radius: 50%;
-  background: var(--sky, #f1ede4);
+  background: var(--ink);
 }
 
 .offer-ring span {
@@ -2538,19 +2745,21 @@ body {
   flex: 1;
   min-width: 0;
   font: inherit;
-  font-size: calc(14px * var(--ui-scale));
-  letter-spacing: 0.08em;
+  font-size: max(16px, var(--t-body)); /* 16 px stops phones zooming in */
+  letter-spacing: 0.01em;
   color: inherit;
-  padding: 9px 14px;
+  min-height: var(--tap);
+  padding: 9px 2px;
   background: none;
-  border: 1px solid color-mix(in srgb, currentColor 35%, transparent);
-  border-radius: 999px;
+  border: 0;
+  border-bottom: 1px solid var(--line-strong);
+  border-radius: 0;
 }
 
 .name-edit input:focus,
 .name-input:focus {
   outline: none;
-  border-color: currentColor;
+  border-color: var(--accent);
 }
 
 /* Hangar: slot chips, a scrolling grid of looks, and a panel for the one picked. */

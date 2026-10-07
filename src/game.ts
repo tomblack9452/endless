@@ -2310,7 +2310,7 @@ export class Game {
 
   private refreshTitle(): void {
     const colour = rankColour(this.ranked.rank);
-    this.ui.setAccent(this.settings.contrast ? '#2b2824' : colour.accent, !this.settings.contrast && colour === RANK_COLOURS[RANK_COLOURS.length - 1]);
+    this.ui.setAccent(this.settings.contrast ? '#ffffff' : colour.accent, !this.settings.contrast && colour === RANK_COLOURS[RANK_COLOURS.length - 1]);
     const i = this.ranked.rank;
     this.applyLooks(); // the wing decal follows your rank and league
     const lg = this.leagues;
