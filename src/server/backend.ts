@@ -54,6 +54,8 @@ export interface BoardRow {
   ship?: ShipLook | null;
 }
 
+export type LinkResult = 'linked' | 'taken' | 'failed';
+
 export interface Backend {
   /** True when talking to a real server. */
   readonly online: boolean;
@@ -85,6 +87,12 @@ export interface Backend {
   setShip(ship: ShipLook): Promise<boolean>;
   /** True once if the account was marked to be maxed out from the SQL editor (players.max_out); clears the mark. */
   takeMaxOut(): Promise<boolean>;
+  /** The Google account this account is kept with (its email), '' if none, or null if unknown. */
+  googleAccount(): Promise<string | null>;
+  /** Keep this account with a Google login (see account.ts): 'taken' when that login is already another account's. */
+  linkGoogle(idToken: string, nonce: string): Promise<LinkResult>;
+  /** Switch to the account a Google login keeps (this session is replaced); false if that didn't work. */
+  signInGoogle(idToken: string, nonce: string): Promise<boolean>;
   /** Delete this account and everything the server holds for it; false if that couldn't be done. */
   deleteAccount(): Promise<boolean>;
 }

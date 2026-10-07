@@ -1,4 +1,4 @@
-import type { Backend, BoardQuery, BoardRow, RunSubmission, SubmitResult } from './backend';
+import type { Backend, BoardQuery, BoardRow, LinkResult, RunSubmission, SubmitResult } from './backend';
 
 // No server: the device is the only record. Boards can't be read, so the
 // leaderboard screen shows your own bests and says why.
@@ -52,6 +52,18 @@ export class LocalBackend implements Backend {
   }
 
   async setShip(): Promise<boolean> {
+    return false;
+  }
+
+  async googleAccount(): Promise<string | null> {
+    return null;
+  }
+
+  async linkGoogle(): Promise<LinkResult> {
+    return 'failed';
+  }
+
+  async signInGoogle(): Promise<boolean> {
     return false;
   }
 

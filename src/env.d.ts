@@ -7,6 +7,7 @@ interface ImportMetaEnv {
   readonly VITE_SUPABASE_ANON_KEY?: string;
   readonly VITE_REVENUECAT_APPLE_KEY?: string;
   readonly VITE_REVENUECAT_GOOGLE_KEY?: string;
+  readonly VITE_GOOGLE_WEB_CLIENT_ID?: string;
 }
 
 interface ImportMeta {

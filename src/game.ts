@@ -42,6 +42,8 @@ import { CloudSave } from './server/sync';
 import { shareCard } from './share';
 import { createStore, type ProductId, type StoreProduct } from './store/store';
 import { storage } from './storage';
+import { SESSION_KEY } from './server/supabase';
+import { googleAvailable, googleSignIn } from './account';
 import { fxDistance, fxTime } from './fx';
 import { type Course, COURSES, courseLength, type Environment, ENVIRONMENTS, type WeeklyRun, weeklyRun } from './courses';
 import { envStatus, nextEnvironment, newlyOpened } from './unlocks';
@@ -173,6 +175,9 @@ export class Game {
   private shipSent = ''; // the looks last sent to the boards (JSON)
   private shipTimer = 0;
   private nameOk = false; // the player has a pilot name of their own
+  private googleEmail: string | null = null; // the Google account this account is kept with ('' none, null unknown)
+  private googleBusy = false;
+  private googleArmed = false; // asked once to switch to the account a Google login keeps
   private nameWords: Promise<Set<string>> | null = null; // the profanity list, once loaded
   private shopPacks: (ProductId | 'dev' | 'restore' | 'pass-cores' | 'pass-open' | 'dev-premium' | `swap-${number}`)[] = [];
   /** One-time products already bought. */
@@ -1568,6 +1573,94 @@ export class Game {
     location.reload();
   }
 
+  /**
+   * Settings' account row: whether this account is kept with Google (account.ts).
+   * Only in the Android app, with the server.
+   */
+  private refreshAccount(): void {
+    const show = googleAvailable() && this.backend.online;
+    const group = document.getElementById('account-group');
+    if (group) group.hidden = !show;
+    if (!show) return;
+    const value = document.querySelector('#google-account .value');
+    const note = document.getElementById('google-note');
+    const set = (v: string, n: string): void => {
+      if (value) value.textContent = v;
+      if (note) note.textContent = n;
+    };
+    set('checking', '');
+    void this.backend.googleAccount().then((email) => {
+      this.googleEmail = email;
+      if (email === null) set('sign in', "couldn't check just now. you can still sign in");
+      else if (email) set(email, 'kept with this google account. sign in with it on another phone to carry on there');
+      else set('sign in', 'your progress is only on this phone. sign in with google to get it back if you lose or change phones');
+    });
+  }
+
+  /**
+   * Keep this account with Google, or (when that Google login already keeps
+   * another account, e.g. on a new phone) switch to that account. Switching
+   * replaces this phone's progress, so it asks twice unless there's nothing to lose.
+   */
+  private async keepWithGoogle(fromWelcome: boolean): Promise<void> {
+    if (this.googleBusy) return;
+    if (!fromWelcome && this.googleEmail) {
+      this.ui.showNotice(`kept with ${this.googleEmail}`);
+      return;
+    }
+    this.googleBusy = true;
+    try {
+      const token = await googleSignIn();
+      if (!token) {
+        this.ui.showNotice("google sign-in didn't finish");
+        return;
+      }
+      const res = await this.backend.linkGoogle(token.idToken, token.nonce);
+      if (res === 'linked') {
+        this.ui.showNotice('signed in. your account is kept with google now');
+        this.cloud.push();
+        this.refreshAccount();
+        if (fromWelcome) document.getElementById('welcome-google')?.setAttribute('hidden', '');
+        return;
+      }
+      if (res === 'failed') {
+        this.ui.showNotice("couldn't sign in. check your connection and try again");
+        return;
+      }
+      // That Google login keeps another account: switch to it.
+      const nothingToLose = fromWelcome || this.progress.stats.runs === 0;
+      if (!nothingToLose && !this.googleArmed) {
+        this.googleArmed = true;
+        const value = document.querySelector('#google-account .value');
+        if (value) value.textContent = 'tap again';
+        this.ui.showNotice("that google account already has a pilot. tap again to switch to it: it replaces this phone's progress");
+        window.setTimeout(() => {
+          this.googleArmed = false;
+          this.refreshAccount();
+        }, 8000);
+        return;
+      }
+      this.googleArmed = false;
+      const before = this.backend.userId;
+      if (!(await this.backend.signInGoogle(token.idToken, token.nonce))) {
+        this.ui.showNotice("couldn't switch accounts. try again");
+        return;
+      }
+      if (this.backend.userId === before) {
+        this.refreshAccount(); // it was this account all along
+        return;
+      }
+      // Start again as that account: forget this phone's save (keeping the new
+      // session), and the cloud save comes down on the reload.
+      const session = await storage.get(SESSION_KEY);
+      await storage.clear('endless.');
+      if (session) await storage.set(SESSION_KEY, session);
+      location.reload();
+    } finally {
+      this.googleBusy = false;
+    }
+  }
+
   /** How far through the current rank's XP band the player is (0..1). */
   private xpFraction(): number {
     const i = this.ranked.rank;
@@ -2137,6 +2230,8 @@ export class Game {
     const chips = (slot: 'hull' | 'paint' | 'engine'): [string, string, boolean][] =>
       STARTER[slot].map((key) => [key, byKey(key)?.name ?? key, `${slot}:${eq[slot]}` === key]);
     this.ui.renderWelcome(step, controls, { hull: chips('hull'), paint: chips('paint'), engine: chips('engine') });
+    const google = document.getElementById('welcome-google');
+    if (google) google.hidden = !(googleAvailable() && this.backend.online);
     this.player.reset();
     this.player.setVisible(true);
     this.trail.setVisible(true);
@@ -2440,6 +2535,8 @@ export class Game {
     if (action === 'resume') this.resume();
     else if (action === 'settings') this.openSettings();
     else if (action === 'delete') void this.deleteAccount();
+    else if (action === 'google') void this.keepWithGoogle(false);
+    else if (action === 'google-welcome') void this.keepWithGoogle(true);
     else if (action === 'privacy-choices') void this.ads.privacyChoices();
     else if (action === 'tutorial') {
       if (this.state !== 'title') this.toMainMenu();
@@ -2518,6 +2615,7 @@ export class Game {
   private openSettings(): void {
     this.settingsOpen = true;
     this.ui.show('settings');
+    this.refreshAccount();
     void this.backend.pilotName().then((name) => this.ui.setPilotName(name ?? '', this.backend.online ? '3 to 16 letters, numbers, spaces, - or _' : 'names come with the server', 'settings'));
   }
 

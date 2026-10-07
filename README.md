@@ -846,7 +846,8 @@ server functions' numbers match the game's.
 Without keys, everything lives on the device. With them:
 
 - **Supabase** (`src/server/`, `supabase/`): an anonymous account per
-  player (linkable to Apple or Google later), a cloud save of every saved
+  player (in the Android app it can be kept with a Google login and signed
+  back into on a new phone: docs/store.md, "Google sign-in"), a cloud save of every saved
   setting and stat (the newer save wins; a fresh install takes the cloud's),
   cores held on the server (earned cores capped per day, spending checked),
   credits mirrored there (so balances can be changed from the dashboard),
@@ -882,6 +883,8 @@ step-by-step first setup is in [docs/leaderboards.md](docs/leaderboards.md).
 | New project | Free plan; the region nearest most players | Free is plenty to launch. A free project pauses after a week with no use, so open the game (or the dashboard) now and then before launch |
 | Authentication > Sign In / Providers | **Allow anonymous sign-ins: on** | Every player gets an account with no sign-up screen. Without it nothing reaches the server |
 | Authentication > Sign In / Providers | Email: leave as it is | Not used by the game |
+| Authentication > Sign In / Providers | **Allow manual linking: on** | Lets a player keep their anonymous account with Google. Without it "keep it with google" fails |
+| Authentication > Sign In / Providers > Google | Enabled, with the **web** OAuth client id and secret; skip nonce checks off | Google sign-in in the Android app (docs/store.md, "Google sign-in") |
 | Authentication > Attack Protection | CAPTCHA: **off** | The game signs in silently and can't show a CAPTCHA |
 | Authentication > Rate Limits | Anonymous sign-ins: 30 an hour per IP (the default) is fine | Raise it if many players share one network (a school, an event) |
 | Authentication > URL Configuration | Site URL: `https://tomblack9452.github.io/endless/` | Not used by anonymous sign-in, but keeps the defaults pointing at the game |

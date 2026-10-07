@@ -105,7 +105,55 @@ tapping your own live ads can get the AdMob account closed.
 
 iOS later: `npm install @capacitor/ios`, `npx cap add ios`, then the same in
 Xcode, with `GADApplicationIdentifier` and `NSUserTrackingUsageDescription`
-in `Info.plist`.
+in `Info.plist`. iOS also needs Sign in with Apple next to Google (Apple's
+rule 4.8), see below.
+
+### Google sign-in (keeping an account)
+
+Every player starts on an anonymous account kept only on the phone. In the
+Android app, settings has "keep it with google", and the welcome screen
+"played before? sign in with google": the first links a Google login to the
+account (Supabase identity linking), the second, on a new phone, switches to
+the account that Google login keeps and brings its cloud save down
+(`src/account.ts`, plugin `@capgo/capacitor-social-login`). On the web the
+rows don't show.
+
+1. **Google Cloud** ([console.cloud.google.com](https://console.cloud.google.com)),
+   one project for all of this (the one Play/Firebase made is fine):
+   - **Google Auth Platform > Branding** (the OAuth consent screen): app name
+     Endless Space, support email, the privacy policy link. **Audience:**
+     External. While it's in Testing, only the test users listed there can
+     sign in; press **Publish app** when you release (email and profile
+     need no review).
+   - **Clients > Create client > Web application**, name "Supabase".
+     Authorised redirect URI: `https://<project-ref>.supabase.co/auth/v1/callback`.
+     Copy its **client id** and **client secret**.
+   - **Clients > Create client > Android**, package `com.tomblack.endlessspace`
+     and a SHA-1. Make one Android client per key that signs builds you run:
+     - debug (Run from Android Studio): `cd android && ./gradlew signingReport`
+       (or Gradle panel > app > Tasks > android > signingReport), the debug SHA1;
+     - your upload key: `keytool -list -v -keystore endless-upload.jks -alias upload`;
+     - Play's app signing key (what Play-installed builds are signed with):
+       Play Console > Test and release > App integrity > App signing key certificate.
+     The Android client ids go nowhere in the code; they only allow the app.
+2. **Supabase** (Authentication):
+   - **Sign In / Providers > Google:** enable, paste the web client id and
+     secret. Leave "Skip nonce checks" off.
+   - **Sign In / Providers > (top) "Allow manual linking": on.** Without it
+     linking is refused. "Allow anonymous sign-ins" stays on.
+3. **`.env`:** `VITE_GOOGLE_WEB_CLIENT_ID=<the web client id>`, then
+   `npm run build` and `npx cap sync android`.
+4. **Test on the phone** (it needs a Google account on it): settings > keep
+   it with google > pick the account: the row shows the email. Then delete
+   the app's data (Android settings > apps > Endless Space > storage > clear),
+   open it, tap "played before? sign in with google" on the welcome screen:
+   it reloads into your old progress.
+
+If sign-in fails with `[28444] Developer console is not set up correctly`, the
+SHA-1 of the build on the phone isn't on an Android client (or the web
+client id is wrong). Android Studio's Logcat, filtered by `GoogleProvider`,
+shows the package and SHA-1 the phone is using. Console changes can take a
+while to apply.
 
 ## 6. Store listing checklist
 
@@ -130,7 +178,9 @@ in `Info.plist`.
 - **Age rating:** 4+ / Everyone (no violence beyond crashing, no chat), with
   ads and in-app purchases declared. Not listed as made for children (ads can
   be personalised, with consent).
-- **Privacy:** an anonymous account id, gameplay data (scores, runs),
+- **Privacy:** an anonymous account id, the Google account's email and id
+  when the player chooses to sign in with Google (account management),
+  gameplay data (scores, runs),
   purchase history, and for ads the device's advertising id when the player
   allows it (AdMob). Needs a privacy policy URL.
 - **Screenshots** (6.7" iPhone 1290×2796, 5.5" 1242×2208, Android phone

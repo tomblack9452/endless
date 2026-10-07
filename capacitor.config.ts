@@ -11,6 +11,13 @@ const config: CapacitorConfig = {
     // The game draws its own background; no white flash behind the webview.
     backgroundColor: '#f1ede4',
   },
+  plugins: {
+    // Keeping an account (src/account.ts): Google on Android, Google and Apple on iOS.
+    SocialLogin: {
+      providers: { google: true, apple: true, facebook: false, twitter: false },
+      logLevel: 1,
+    },
+  },
 };
 
 export default config;

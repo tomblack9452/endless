@@ -15,8 +15,8 @@ onboarding with a practice run.
 
 ## Before the store launch
 
-1. **Sign in with Apple and Google.** Anonymous accounts are lost with the app;
-   linking keeps progress, purchases and the pilot name across devices.
+1. **Sign in with Apple and Google.** Google is in the Android app (docs/store.md,
+   "Google sign-in"); Apple (and Google) still to add for iOS.
 2. **Set up the stores and AdMob** ([store.md](store.md)): the products
    (including `premium`), RevenueCat, the AdMob ad units and app ids, and the
    consent messages.

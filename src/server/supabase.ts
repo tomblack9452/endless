@@ -1,16 +1,17 @@
 import { storage } from '../storage';
 import type { ShipLook } from '../portrait';
-import type { Backend, BoardQuery, BoardRow, RunSubmission, SubmitResult } from './backend';
+import type { Backend, BoardQuery, BoardRow, LinkResult, RunSubmission, SubmitResult } from './backend';
 
 // Supabase over plain fetch (no SDK, to keep the bundle small):
-//   auth      anonymous sign-in, refreshed as it expires
+//   auth      anonymous sign-in, refreshed as it expires; a Google login can be
+//             linked to it to keep it (account.ts), and signed in with on another phone
 //   saves     one row per player: every saved key as JSON (cloud save)
 //   wallets   cores, written only by the server (RPCs and the store webhook)
 //   runs      every submitted run, written only by the submit_run function, which checks it
 //   bests     each player's best per board; read through the leaderboard function
 // The tables, policies and functions are in supabase/ (see docs/leaderboards.md).
 
-const SESSION_KEY = 'endless.session';
+export const SESSION_KEY = 'endless.session';
 
 interface Session {
   access: string;
@@ -48,16 +49,51 @@ export class SupabaseBackend implements Backend {
   }
 
   private async auth(path: string, body: unknown): Promise<Session | null> {
-    const res = await fetch(`${this.url}/auth/v1/${path}`, {
-      method: 'POST',
-      headers: { apikey: this.key, 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    });
-    if (!res.ok) return null;
+    return (await this.authRequest(path, body)).session;
+  }
+
+  /** An auth call that answers with a session (kept, and saved on the device), or the server's error code. */
+  private async authRequest(path: string, body: unknown, bearer?: string): Promise<{ session: Session | null; code: string }> {
+    const headers: Record<string, string> = { apikey: this.key, 'Content-Type': 'application/json' };
+    if (bearer) headers.Authorization = `Bearer ${bearer}`;
+    const res = await fetch(`${this.url}/auth/v1/${path}`, { method: 'POST', headers, body: JSON.stringify(body) });
+    if (!res.ok) {
+      const e = (await res.json().catch(() => ({}))) as { error_code?: string; code?: string | number; msg?: string; message?: string };
+      const code = typeof e.error_code === 'string' ? e.error_code : typeof e.code === 'string' ? e.code : '';
+      return { session: null, code: code || (/already/i.test(e.msg ?? e.message ?? '') ? 'identity_already_exists' : `http_${res.status}`) };
+    }
     const j = (await res.json()) as { access_token: string; refresh_token: string; expires_in: number; user: { id: string } };
     this.session = { access: j.access_token, refresh: j.refresh_token, expires: Date.now() + j.expires_in * 1000, user: j.user.id };
-    void storage.set(SESSION_KEY, JSON.stringify(this.session));
-    return this.session;
+    await storage.set(SESSION_KEY, JSON.stringify(this.session));
+    return { session: this.session, code: '' };
+  }
+
+  async googleAccount(): Promise<string | null> {
+    const user = await this.call<{ email?: string; identities?: { provider: string; identity_data?: { email?: string } }[] }>('/auth/v1/user');
+    if (!user) return null;
+    const google = user.identities?.find((i) => i.provider === 'google');
+    return google ? (google.identity_data?.email ?? user.email ?? 'google') : '';
+  }
+
+  async linkGoogle(idToken: string, nonce: string): Promise<LinkResult> {
+    if (!this.session && !(await this.signIn())) return 'failed';
+    if (this.session!.expires - Date.now() < 60_000 && !(await this.signIn())) return 'failed';
+    try {
+      const body = { provider: 'google', id_token: idToken, nonce, link_identity: true };
+      const r = await this.authRequest('token?grant_type=id_token', body, this.session!.access);
+      if (r.session) return 'linked';
+      return r.code === 'identity_already_exists' ? 'taken' : 'failed';
+    } catch {
+      return 'failed';
+    }
+  }
+
+  async signInGoogle(idToken: string, nonce: string): Promise<boolean> {
+    try {
+      return (await this.authRequest('token?grant_type=id_token', { provider: 'google', id_token: idToken, nonce })).session !== null;
+    } catch {
+      return false;
+    }
   }
 
   /** A request as the signed-in player, with the status so callers can tell "no signal" from "no". */

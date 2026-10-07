@@ -139,6 +139,7 @@
             <div id="welcome-controls" class="chip-row"></div>
             <button id="welcome-practice" class="pill primary sheet-buy" type="button">practice run</button>
             <button id="welcome-skip" class="label link welcome-skip" type="button">skip the tutorial</button>
+            <button id="welcome-google" class="label link welcome-skip" type="button" data-action="google-welcome" hidden>played before? sign in with google</button>
           </div>
           <div data-welcome="dress" hidden>
             <div class="label setting-note">dress your ship. there are many more looks to earn in the hangar.</div>
@@ -196,6 +197,11 @@
             <button id="settings-name-save" class="tab" type="button">save</button>
           </div>
           <div id="settings-name-note" class="label dim setting-note"></div>
+          <div id="account-group" hidden>
+            <div class="settings-group">account</div>
+            <button id="google-account" class="setting-row" type="button" data-action="google"><span class="label">keep it with google</span><span class="value">sign in</span></button>
+            <div id="google-note" class="label dim setting-note"></div>
+          </div>
           <div class="settings-group">sound</div>
           <button class="setting-row" type="button" data-setting="sound"><span class="label">sound</span><span class="value"></span></button>
           <button class="setting-row" type="button" data-setting="music"><span class="label">music</span><span class="value"></span></button>
