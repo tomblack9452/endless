@@ -490,6 +490,7 @@ body {
   top: calc(var(--safe-top) + 84px);
   bottom: calc(var(--safe-bottom) + 16px);
   padding-bottom: 24px;
+  overflow-x: hidden; /* the chip rows' edge bleed mustn't make the panel wobble sideways */
   overflow-y: auto;
   touch-action: pan-y; /* the only scrollable thing in the game */
   overscroll-behavior: contain;
@@ -1293,7 +1294,26 @@ body {
   display: flex;
   align-items: center;
   gap: 8px;
+  overflow-x: auto; /* big text: the last tab scrolls into view, not off the edge */
+  scrollbar-width: none;
+  touch-action: pan-x;
   pointer-events: auto;
+}
+
+.tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.tabs .tab {
+  flex: none;
+  white-space: nowrap;
+}
+
+@media (max-width: 380px) {
+  .tabs .tab {
+    padding: 8px 12px;
+    letter-spacing: 0.1em;
+  }
 }
 
 .tab {
@@ -2134,9 +2154,10 @@ body {
 
 .showroom-note {
   position: absolute;
-  left: 0;
-  right: 0;
-  top: calc(var(--safe-top) + 80px);
+  left: calc(var(--safe-left) + 24px);
+  right: calc(var(--safe-right) + 24px);
+  top: calc(var(--safe-top) + 82px);
+  line-height: 1.4;
   text-align: center;
 }
 
@@ -2169,6 +2190,7 @@ body {
   padding: 4px calc(var(--safe-right) + 20px) 6px calc(var(--safe-left) + 20px);
   overflow-x: auto;
   scroll-snap-type: x mandatory;
+  scroll-padding: 0 calc(var(--safe-right) + 20px) 0 calc(var(--safe-left) + 20px); /* snap to the sheet's margin, not the screen edge */
   scrollbar-width: none;
   touch-action: pan-x pan-y;
 }
@@ -2469,11 +2491,17 @@ body {
 .chip-row {
   display: flex;
   gap: 8px;
-  margin: 6px -24px 12px 0;
-  padding: 2px 24px 4px 0;
+  margin: 6px 0 12px;
+  padding: 2px 0 4px;
   overflow-x: auto;
   scrollbar-width: none;
   -webkit-overflow-scrolling: touch;
+}
+
+/* On a full-width sheet the chips run on to the screen edge, as far as the sheet's own padding. */
+.sheet .chip-row {
+  margin-right: calc(-1 * (var(--safe-right) + 20px));
+  padding-right: calc(var(--safe-right) + 20px);
 }
 
 .board-tabs::-webkit-scrollbar,
@@ -2604,6 +2632,25 @@ body {
   overflow: hidden;
   height: 56%;
   padding-top: 12px;
+}
+
+/* Short screens: a taller sheet and a tighter detail block, so the grid keeps two rows. */
+@media (max-height: 700px) {
+  .settings.sheet.hangar-sheet {
+    height: 66%;
+  }
+
+  .hangar-detail {
+    padding-top: 6px;
+  }
+
+  .hangar-status {
+    margin: 1px 0 6px;
+  }
+
+  .hangar-detail .pill {
+    min-height: calc(40px * var(--ui-scale));
+  }
 }
 
 .hangar-sheet .chip-row {
@@ -2815,8 +2862,8 @@ body {
 
 .goal-reroll {
   display: inline-block;
-  margin: 6px 0 0; /* not .link's pull to the left: there's no padding here to take it up */
-  padding: 0;
+  margin: -4px 0 -10px; /* the padding is a bigger tap target, not more space */
+  padding: 10px 0;
   font: inherit;
   font-size: calc(11px * var(--ui-scale));
   color: inherit;
@@ -3119,7 +3166,13 @@ body.dark {
 }
 
 /* The showroom's wallet line sits over the scene: the scene's own text colour reads there. */
-body.dark .showroom-note {
+body.dark .showroom-note,
+body.dark .showroom .panel-head {
+  color: var(--text);
+}
+
+/* The title's wordmark sits over the light sky too, so the light twin would vanish there. */
+body.dark #screen-title .title-word.sub {
   color: var(--text);
 }
 
