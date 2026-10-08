@@ -1341,6 +1341,7 @@ export class Game {
     const lines = this.pass.unlockPremium().flatMap((r) => this.grant(r));
     this.refreshTitle();
     if (this.infoOpen === 'pass') this.openPass();
+    else if (this.infoOpen === 'store') this.openStore();
     return lines.length > 0 ? mergeCredits(lines) : ['premium rewards from every tier you reach'];
   }
 
