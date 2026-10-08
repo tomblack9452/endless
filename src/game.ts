@@ -34,7 +34,7 @@ import { Pass, passBought, premiumReward, freeReward, runXp, seasonAt } from './
 import { type Reward, rewardLook, rewardParts, rewardText } from './economy/reward';
 import { DailyShop, setOffer, vaultAt } from './economy/shop';
 import { dayKey, formatWait, untilTomorrow } from './economy/time';
-import { EconomyView } from './economy/view';
+import { EconomyView, type StoreButton, type StoreCard } from './economy/view';
 import { type BoardId, createBackend, type Purchase } from './server/backend';
 import { BOARD_TABS, boardCaption, boardForRun, boardName, boardQuery } from './server/boards';
 import { Outbox } from './server/outbox';
@@ -72,14 +72,14 @@ const FIRST_PLAYED_KEY = 'endless.firstPlayed';
 const REVEAL_KEY = 'endless.reveal';
 
 /** The shop's tabs: looks as cards (today, the set, the vault), then lists (the pass, cores, premium). */
-type ShopTab = 'today' | 'set' | 'vault' | 'pass' | 'cores' | 'premium';
+type ShopTab = 'today' | 'set' | 'vault';
 
 /** A name the server made up for a new account ("pilot-3fa2"): the player hasn't picked one. */
 const GENERATED_NAME = /^pilot-[0-9a-f]{4}$/;
 /** A name the server takes (see set_pilot_name). */
 const PILOT_NAME = /^[A-Za-z0-9 _-]{3,16}$/;
 
-type InfoScreen = 'welcome' | 'name' | 'goals' | 'hangar' | 'record' | 'solo' | 'league' | 'shop' | 'pass' | 'boards';
+type InfoScreen = 'welcome' | 'name' | 'goals' | 'hangar' | 'record' | 'solo' | 'league' | 'shop' | 'store' | 'pass' | 'boards';
 
 /** "5 oct": the Monday this week's ranked course started. */
 /** "1:23.4" */
@@ -179,7 +179,8 @@ export class Game {
   private googleBusy = false;
   private googleArmed = false; // asked once to switch to the account a Google login keeps
   private nameWords: Promise<Set<string>> | null = null; // the profanity list, once loaded
-  private shopPacks: (ProductId | 'dev' | 'restore' | 'pass-cores' | 'pass-open' | 'dev-premium' | `swap-${number}`)[] = [];
+  private storeFrom: 'shop' | null = null; // where Back goes from the store
+  private passFrom: 'store' | null = null; // and from the season pass
   /** One-time products already bought. */
   private readonly entitlements = new Entitlements();
   private firstPlayed = Date.now();
@@ -386,7 +387,8 @@ export class Game {
       else this.openWelcome();
       void this.connect();
     });
-    this.econ.bindShop(this.onShopOffer, this.onShopBuy, this.onShopCores, this.onShopTab);
+    this.econ.bindShop(this.onShopOffer, this.onShopBuy, this.onShopTab);
+    this.econ.bindStore(this.onStoreAct);
     this.hangarUi.bindHangar({
       tab: (tab) => this.onHangarTab(tab),
       pick: (id) => this.onHangarPick(id),
@@ -775,16 +777,11 @@ export class Game {
       const it = byKey(key);
       return !!it && this.looks.owns(it, o);
     };
-    const looksTab = this.shopTab === 'today' || this.shopTab === 'set' || this.shopTab === 'vault';
-    const v = looksTab ? this.shopTabView(now, owned) : { heading: '', reset: '', info: '', items: [] as LookItem[], cards: [] as { price: string; premium: boolean; deal: boolean }[], buy: { text: '', enabled: false } };
-    const list = looksTab ? { head: '', note: '', rows: [] } : this.shopList(this.shopTab);
+    const v = this.shopTabView(now, owned);
     this.econ.renderShop({
       wallet: `${formatScore(this.wallet.credits)} credits · ${formatScore(this.wallet.cores)} cores`,
       reset: v.reset,
-      tabs: tabs.map((t) => ({ ...t, on: t.id === this.shopTab })),
-      pane: looksTab ? 'looks' : 'list',
-      listHead: list.head,
-      listNote: list.note,
+      tabs: [...tabs.map((t) => ({ ...t, on: t.id === this.shopTab })), { id: 'store', label: 'cores & pass', on: false }],
       heading: v.heading,
       info: v.info,
       offers: v.items.map((item, i) => ({
@@ -800,7 +797,6 @@ export class Game {
         picked: i === this.shopPick,
       })),
       buy: v.buy,
-      cores: list.rows,
     });
     this.player.reset();
     this.player.setVisible(true);
@@ -808,72 +804,110 @@ export class Game {
     this.openInfo('shop');
   }
 
-  /** The shop's tabs. Cores and premium show where they can be bought (the apps, or the dev build). */
+  /** The looks shop's tabs (the store, for cores and the pass, is its own screen). */
   private shopTabs(): { id: ShopTab; label: string }[] {
-    const tabs: { id: ShopTab; label: string }[] = [
+    return [
       { id: 'today', label: 'today' },
       { id: 'set', label: 'weekly set' },
       { id: 'vault', label: 'vault' },
-      { id: 'pass', label: 'season pass' },
     ];
-    tabs.push({ id: 'cores', label: 'cores' });
-    if (this.storeProducts.some((p) => p.id === 'premium') || import.meta.env.DEV || this.entitlements.has('premium')) tabs.push({ id: 'premium', label: 'premium' });
-    return tabs;
   }
 
   private onShopTab = (id: string): void => {
+    if (id === 'store') {
+      this.openStore('shop');
+      return;
+    }
     if (!this.shopTabs().some((t) => t.id === id)) return;
     this.openShop(id as ShopTab);
   };
 
-  /** A list tab's heading, note and rows (what each row's button does is in shopPacks). */
-  private shopList(tab: ShopTab): { head: string; note: string; rows: { label: string; button: string; enabled: boolean }[] } {
-    const rows: { label: string; button: string; enabled: boolean }[] = [];
-    this.shopPacks = [];
+  /** The store: the season pass first, then cores, the starter pack and premium, swaps, and restore. */
+  private openStore(from?: 'shop' | null): void {
+    if (from !== undefined) this.storeFrom = from;
+    const now = this.now();
+    this.pass.turn(now);
+    const P = CONFIG.economy.pass;
+    const s = seasonAt(now);
+    const tier = this.pass.tier;
     const price = new Map(this.storeProducts.map((p) => [p.id, p.price]));
-    const row = (label: string, button: string, enabled: boolean, action: (typeof this.shopPacks)[number]) => {
-      rows.push({ label, button, enabled });
-      this.shopPacks.push(action);
+    const app = this.store.available;
+    // A real-money button: the store's price, or why it can't be bought here.
+    const money = (id: ProductId): StoreButton => {
+      const p = price.get(id);
+      return p ? { act: id, text: p, enabled: true, primary: true } : { act: id, text: app ? 'unavailable' : 'in the app', enabled: false };
     };
-    if (tab === 'pass') {
-      const P = CONFIG.economy.pass;
-      const s = seasonAt(this.now());
-      if (this.pass.premium) row(`season ${s.season}'s premium track is yours`, 'see tiers', true, 'pass-open');
-      else {
-        row(`premium track, season ${s.season}`, `${formatScore(P.premiumCores)} cores`, this.wallet.cores >= P.premiumCores, 'pass-cores');
-        const money = price.get('season_pass');
-        if (money) row('premium track, for money', money, true, 'season_pass');
-        row(`tier ${this.pass.tier} of ${P.tiers} · ends in ${formatWait(s.end - this.now())}`, 'see tiers', true, 'pass-open');
-      }
-      return { head: 'season pass', note: "every tier pays on the free track; premium pays more, with the season's new looks.", rows };
+    const owned = (text: string): StoreButton => ({ act: '', text, enabled: false });
+
+    const passButtons: StoreButton[] = [];
+    const perks: string[] = [];
+    if (this.pass.premium) {
+      perks.push(`season ${s.season}'s premium track is yours`, 'premium rewards are paid at every tier you reach');
+      passButtons.push({ act: 'pass-open', text: 'see the tiers', enabled: true });
+    } else {
+      const next = Math.min(tier + 1, P.tiers);
+      perks.push('more at every tier, on top of the free track', "the season's new looks", `next up: ${rewardText(premiumReward(next, s.season))} at tier ${next}`);
+      if (tier > 0) perks.push(`the ${tier} tier${tier === 1 ? '' : 's'} you've reached pay out as you unlock`);
+      passButtons.push({ act: 'pass-cores', text: `unlock · ${formatScore(P.premiumCores)} cores`, enabled: this.wallet.cores >= P.premiumCores, primary: this.wallet.cores >= P.premiumCores });
+      const m = price.get('season_pass');
+      if (m) passButtons.push({ act: 'season_pass', text: `unlock · ${m}`, enabled: true });
+      passButtons.push({ act: 'pass-open', text: 'see the tiers', enabled: true });
     }
-    if (tab === 'premium') {
-      const own = this.entitlements.has('premium');
-      const money = price.get('premium');
-      if (own) row('premium is yours. thank you', 'owned', false, 'pass-open');
-      else if (money) row('premium, once, for good', money, true, 'premium');
-      if (import.meta.env.DEV) row('dev: premium on/off', 'toggle', true, 'dev-premium');
-      if (this.store.available) row('bought on another device?', 'restore', true, 'restore');
-      return {
-        head: 'premium',
-        note: 'no ads; ad rewards (revives, double credits, the daily gift) without the ad; the halo hull, regalia paint and crown flame; an extra free revive a day; a badge on the leaderboards. nothing that makes you faster in ranked.',
-        rows,
-      };
-    }
+
+    const packs: StoreCard[] = [];
+    const extras: StoreCard[] = [];
     for (const p of CONFIG.economy.store.products) {
-      const cost = price.get(p.id);
-      if (!cost || 'pass' in p || 'premium' in p || ('once' in p && this.ownsProduct(p.id))) continue;
-      row('look' in p ? `starter pack · ${formatScore(p.cores)} cores and ${rewardText({ look: p.look })}` : `${formatScore(p.cores)} cores`, cost, true, p.id);
+      const img = `store/${p.id}.png`;
+      if ('look' in p) {
+        const mine = this.ownsProduct(p.id);
+        extras.push({ img, name: 'starter pack', sub: `${formatScore(p.cores)} cores and ${rewardText({ look: p.look })}`, tag: 'once', button: mine ? owned('owned') : money(p.id), owned: mine });
+      } else if ('premium' in p) {
+        const mine = this.entitlements.has('premium');
+        extras.push({
+          img,
+          name: 'premium',
+          sub: mine ? 'yours. thank you' : 'no ads, ad rewards without the ad, three premium looks, an extra free revive a day, a badge on the boards',
+          tag: '',
+          button: mine ? owned('owned') : money(p.id),
+          owned: mine,
+        });
+      } else if ('cores' in p) packs.push({ img, name: `${formatScore(p.cores)} cores`, sub: '', tag: '', button: money(p.id), owned: false });
     }
-    if (this.store.available) row('bought on another device?', 'restore', true, 'restore');
-    if (import.meta.env.DEV) row('dev: add cores (purchases stand-in)', '+500', true, 'dev');
-    if (rows.length === 0) {
-      rows.push({ label: 'packs of cores come with the iOS and Android apps', button: 'soon', enabled: false });
-      this.shopPacks.push('restore');
-    }
+    const packsNote = !app ? 'packs of cores, the starter pack and premium are in the android app' : this.storeProducts.length === 0 ? "the store isn't answering. check your connection and come back" : '';
+
     const S = CONFIG.economy.shop;
-    for (const n of S.swaps) row(`swap ${formatScore(n)} cores for ${formatScore(n * S.creditsPerCore)} credits`, `${formatScore(n)} cores`, this.wallet.cores >= n, `swap-${n}`);
-    return { head: 'cores', note: 'cores buy premium looks, the vault, revives and the pass, or swap for credits.', rows };
+    const foot: { label: string; button: StoreButton }[] = [];
+    if (app) foot.push({ label: 'bought on another device?', button: { act: 'restore', text: 'restore', enabled: true } });
+    if (import.meta.env.DEV) {
+      foot.push({ label: 'dev: add cores (purchases stand-in)', button: { act: 'dev', text: '+500', enabled: true } });
+      foot.push({ label: 'dev: premium on/off', button: { act: 'dev-premium', text: 'toggle', enabled: true } });
+    }
+    this.econ.renderStore({
+      wallet: `${formatScore(this.wallet.credits)} credits · ${formatScore(this.wallet.cores)} cores`,
+      pass: {
+        title: `season ${s.season}`,
+        left: `ends in ${formatWait(s.end - now)}`,
+        tier: `tier ${tier} of ${P.tiers}`,
+        fraction: Math.min(1, (tier + (tier >= P.tiers ? 0 : this.pass.tierFraction)) / P.tiers),
+        perks,
+        buttons: passButtons,
+      },
+      packs,
+      packsNote,
+      extras,
+      swapNote: `${formatScore(S.creditsPerCore)} credits for every core`,
+      swaps: S.swaps.map((n) => ({ act: `swap-${n}`, text: `${formatScore(n)} cores → ${formatScore(n * S.creditsPerCore)} credits`, enabled: this.wallet.cores >= n })),
+      foot,
+    });
+    if (this.state === 'title') {
+      // No showroom here: the ship only shows on the screens that show it off.
+      this.preview = null;
+      this.shopPick = -1;
+      this.applyLooks();
+      this.player.setVisible(false);
+      this.trail.setVisible(false);
+    }
+    this.openInfo('store');
   }
 
   /** Tap a look: it goes on the ship to try (owned ones are just put on). Tap again to take it off. */
@@ -941,22 +975,19 @@ export class Game {
     this.openShop();
   };
 
-  /** Cores packs: real purchases come with the store (stage D); the dev build adds them free. */
-  private onShopCores = (i: number): void => {
-    const pack = this.shopPacks[i];
-    if (pack === 'dev') {
+  /** A store button (its data-act): the pass, a real purchase, a swap, restore, or a dev stand-in. */
+  private onStoreAct = (act: string): void => {
+    if (act === 'dev' && import.meta.env.DEV) {
       this.devAddCores(500);
-      this.openShop();
-    } else if (pack === 'dev-premium') {
+      this.openStore();
+    } else if (act === 'dev-premium' && import.meta.env.DEV) {
       this.devTogglePremium();
-      this.openShop();
-    } else if (pack === 'pass-cores') {
-      this.onPassPremium();
-      this.openShop('pass'); // stay in the shop
-    } else if (pack === 'pass-open') this.openPass();
-    else if (pack === 'restore') void this.restorePurchases();
-    else if (pack?.startsWith('swap-')) this.swapCores(Number(pack.slice(5)));
-    else if (pack) void this.buyProduct(pack as ProductId);
+      this.openStore();
+    } else if (act === 'pass-cores') this.onPassPremium();
+    else if (act === 'pass-open') this.openPass('store');
+    else if (act === 'restore') void this.restorePurchases();
+    else if (act.startsWith('swap-')) this.swapCores(Number(act.slice(5)));
+    else if (CONFIG.economy.store.products.some((p) => p.id === act)) void this.buyProduct(act as ProductId);
   };
 
   /** Cores into credits, at the shop's rate. */
@@ -969,10 +1000,12 @@ export class Game {
     this.ui.showNotice(lines.join(' · '));
     this.sound.pickup();
     this.refreshTitle();
-    this.openShop('cores');
+    if (this.infoOpen === 'store') this.openStore();
   }
 
-  private openPass(): void {
+  /** The season pass's tiers. `from: 'store'` makes Back return to the store. */
+  private openPass(from?: 'store' | null): void {
+    if (from !== undefined) this.passFrom = from;
     const now = this.now();
     this.pass.turn(now);
     const P = CONFIG.economy.pass;
@@ -1006,7 +1039,8 @@ export class Game {
     this.ui.celebrate([{ kicker: 'season pass', icon: PASS_ICON, name: 'premium unlocked', lines: lines.length > 0 ? mergeCredits(lines) : ['premium rewards from every tier you reach'] }]);
     this.sound.power();
     this.refreshTitle();
-    this.openPass();
+    if (this.infoOpen === 'store') this.openStore();
+    else this.openPass();
   };
 
   // --- revive ----------------------------------------------------------------
@@ -1219,7 +1253,7 @@ export class Game {
       if (row) row.hidden = !this.ads.privacyRequired; // Google asks for a way back to the consent form here
     });
     this.storeProducts = await this.store.products();
-    if (this.infoOpen === 'shop') this.openShop();
+    if (this.infoOpen === 'store') this.openStore();
   }
 
   /** Buy a real-money product through the app store, then deliver it. */
@@ -1256,7 +1290,8 @@ export class Game {
     this.sound.power();
     this.refreshTitle();
     if (this.infoOpen === 'shop') this.openShop();
-    if (this.infoOpen === 'pass') this.openPass();
+    else if (this.infoOpen === 'store') this.openStore();
+    else if (this.infoOpen === 'pass') this.openPass();
   }
 
   /**
@@ -1272,6 +1307,7 @@ export class Game {
     }
     this.refreshTitle();
     if (this.infoOpen === 'shop') this.openShop();
+    else if (this.infoOpen === 'store') this.openStore();
     else if (this.infoOpen === 'pass') this.openPass();
     else if (this.infoOpen === 'hangar') this.renderHangar(true);
   }
@@ -1329,6 +1365,8 @@ export class Game {
     else if (googleAvailable() && !this.googleEmail) this.ui.showNotice('nothing to restore. bought on another phone? sign in with google');
     else this.ui.showNotice('nothing to restore');
     if (this.infoOpen === 'shop') this.openShop();
+    else if (this.infoOpen === 'store') this.openStore();
+    else if (this.infoOpen === 'pass') this.openPass();
   }
 
   /** A picture of this run for the share sheet. */
@@ -2298,11 +2336,8 @@ export class Game {
       this.preview = null;
       this.openShop();
     }
-    else if (name === 'shop-cores') {
-      this.preview = null;
-      this.openShop(this.shopTabs().some((t) => t.id === 'cores') ? 'cores' : 'today');
-    }
-    else if (name === 'pass') this.openPass();
+    else if (name === 'shop-cores') this.openStore(null);
+    else if (name === 'pass') this.openPass(null);
     else if (name === 'boards') this.openBoards();
     else if (name === 'daily') this.openGoals('daily');
     else if (name === 'claim') this.claimLogin();
@@ -2674,6 +2709,16 @@ export class Game {
       this.preview = null;
       this.applyLooks();
       this.openShop();
+      return;
+    }
+    if (this.infoOpen === 'store' && this.storeFrom === 'shop') {
+      this.storeFrom = null;
+      this.openShop();
+      return;
+    }
+    if (this.infoOpen === 'pass' && this.passFrom === 'store') {
+      this.passFrom = null;
+      this.openStore();
       return;
     }
     if (this.infoOpen === 'hangar' || this.infoOpen === 'shop') {

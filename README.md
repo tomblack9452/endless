@@ -535,7 +535,7 @@ turn over at midnight UTC, the same moment for everyone.
 - **Cores** are the premium currency. They come slowly from play (login
   rewards, quests, the season pass) and, in the apps, from the store. They buy
   premium looks, revives and the pass's premium track, and swap for credits
-  in the shop's cores tab (1 core for 25 credits). Ranked used to take a
+  in the store (1 core for 25 credits). Ranked used to take a
   ticket a try; it's unlimited now, and older saves were paid 30 cores for each
   ticket they had beyond the week's 5.
 - **Revive:** outside ranked, once a run, a crash offers to carry on (with a
@@ -556,10 +556,14 @@ turn over at midnight UTC, the same moment for everyone.
   one daily goal a day for another (free on the web, where there are no ads).
 - **Shop:** a showroom, with the camera circling your ship above a sheet of
   cards. Tap a card to put the look on the ship, then buy it with the button
-  under the cards (tap an owned one to wear it). Six tabs: three of looks, the
-  same for everyone and turning over on the UTC clock, then **season pass** (its
-  premium track for cores or money), **cores** (the packs, the starter pack and swapping cores for credits)
-  and **premium**. Tapping cores in the top bar opens the cores tab.
+  under the cards (tap an owned one to wear it). Three tabs of looks, the
+  same for everyone and turning over on the UTC clock, and a **cores & pass**
+  chip that opens the store.
+- **Store:** one scrolling page, no showroom: the season pass first (time left,
+  tier progress, what premium gives, unlock for cores or money), then the cores
+  packs, the starter pack and premium as cards, swapping cores for credits, and
+  restore at the bottom. Tapping cores in the top bar opens it; on the web the
+  real-money cards say they're in the Android app.
   - **today:** four looks a day, at least one premium, one a deal at a quarter
     off. Looks you don't own come first, and the day's picks are kept for the
     day, so buying one doesn't reshuffle the rest.

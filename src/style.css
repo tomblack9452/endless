@@ -2855,6 +2855,180 @@ body {
   margin-top: 10px;
 }
 
+/* The store: no showroom, one scrolling page. The pass first, then cores. */
+.store-wallet {
+  margin: 4px 0 14px;
+  text-align: center;
+}
+
+.store-hero {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 14px;
+  align-items: center;
+  padding: 16px;
+  border: 1px solid color-mix(in srgb, currentColor 22%, transparent);
+  border-radius: 18px;
+  background: color-mix(in srgb, currentColor 4%, transparent);
+}
+
+.store-hero-img {
+  width: 72px;
+  height: 72px;
+  object-fit: contain;
+  border-radius: 14px;
+}
+
+.store-hero-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.store-kicker {
+  font-size: calc(10px * var(--ui-scale));
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+}
+
+.store-hero-title {
+  font-size: calc(22px * var(--ui-scale));
+  font-weight: 500;
+}
+
+.store-hero-progress,
+.store-perks,
+.store-hero-buttons {
+  grid-column: 1 / -1;
+}
+
+.store-hero-progress {
+  margin-top: 8px;
+}
+
+.store-hero-progress .xp-track {
+  margin: 6px 0 0;
+}
+
+.store-tier {
+  font-size: calc(12px * var(--ui-scale));
+}
+
+.store-perks {
+  margin: 10px 0 0;
+  padding: 0 0 0 18px;
+  font-size: calc(12px * var(--ui-scale));
+  line-height: 1.6;
+}
+
+.store-hero-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.pill.store-pass-btn {
+  width: 100%;
+}
+
+.store-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.store-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  min-width: 0;
+  padding: 14px 10px 12px;
+  text-align: center;
+  border: 1px solid color-mix(in srgb, currentColor 22%, transparent);
+  border-radius: 16px;
+  background: color-mix(in srgb, currentColor 4%, transparent);
+}
+
+.store-img {
+  width: 80px;
+  height: 80px;
+  margin-bottom: 4px;
+  object-fit: contain;
+  border-radius: 14px;
+}
+
+/* The pictures sit on the page's off-white: in light mode they melt into the card. */
+body:not(.dark) .store-img,
+body:not(.dark) .store-hero-img {
+  mix-blend-mode: multiply;
+}
+
+.store-card.owned .store-img {
+  opacity: 0.55;
+}
+
+.store-name {
+  font-size: calc(14px * var(--ui-scale));
+  font-weight: 500;
+}
+
+.store-sub {
+  font-size: calc(11px * var(--ui-scale));
+  line-height: 1.45;
+}
+
+.store-tag {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  padding: 1px 7px;
+  font-size: calc(10px * var(--ui-scale));
+  letter-spacing: 0.06em;
+  border: 1px solid color-mix(in srgb, currentColor 35%, transparent);
+  border-radius: 999px;
+}
+
+.pill.store-price {
+  width: 100%;
+  min-width: 0;
+  min-height: calc(38px * var(--ui-scale));
+  margin-top: auto;
+  padding: 0 10px;
+  font-size: calc(12px * var(--ui-scale));
+  letter-spacing: 0.06em;
+}
+
+.store-text {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-bottom: 10px;
+}
+
+.store-swaps {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.pill.store-swap {
+  width: 100%;
+  min-height: calc(42px * var(--ui-scale));
+  font-size: calc(12px * var(--ui-scale));
+  letter-spacing: 0.06em;
+}
+
+.store-foot {
+  margin-top: 18px;
+  border-top: 1px solid color-mix(in srgb, currentColor 25%, transparent);
+}
+
 /* First launch: the welcome sheet, and the practice run's prompt. */
 .welcome-sheet {
   height: auto;

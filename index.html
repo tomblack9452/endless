@@ -390,11 +390,40 @@
             <button id="shop-buy" class="pill primary sheet-buy" type="button"></button>
             <button id="shop-hangar" class="pill sheet-buy" type="button">open your hangar</button>
           </div>
-          <div id="shop-list" hidden>
-            <div id="shop-list-head" class="settings-group"></div>
-            <div id="shop-list-note" class="label dim setting-note"></div>
-            <div id="shop-cores"></div>
+        </div>
+      </div>
+
+      <div id="screen-store" class="layer screen panel">
+        <div class="panel-head">
+          <button class="label link back" type="button" data-action="back">back</button>
+          <div class="panel-title">store</div>
+        </div>
+        <div class="settings store">
+          <div id="store-wallet" class="label dim store-wallet"></div>
+          <div class="store-hero">
+            <img class="store-hero-img" src="store/season_pass.png" alt="" width="72" height="72" />
+            <div class="store-hero-text">
+              <div class="label dim store-kicker">season pass</div>
+              <div id="store-pass-title" class="store-hero-title"></div>
+              <div id="store-pass-left" class="label dim"></div>
+            </div>
+            <div class="store-hero-progress">
+              <div id="store-pass-tier" class="label store-tier"></div>
+              <div class="xp-track"><div id="store-pass-fill" class="xp-fill"></div></div>
+            </div>
+            <ul id="store-pass-perks" class="store-perks"></ul>
+            <div id="store-pass-buttons" class="store-hero-buttons"></div>
           </div>
+          <div class="settings-group">cores</div>
+          <div class="label dim setting-note">cores buy premium looks, the vault, revives and the pass, or swap for credits.</div>
+          <div id="store-packs" class="store-grid"></div>
+          <div id="store-packs-note" class="label dim setting-note store-note" hidden></div>
+          <div id="store-extras-head" class="settings-group">once, for good</div>
+          <div id="store-extras" class="store-grid"></div>
+          <div class="settings-group">swap cores for credits</div>
+          <div id="store-swap-note" class="label dim setting-note"></div>
+          <div id="store-swaps" class="store-swaps"></div>
+          <div id="store-foot" class="store-foot"></div>
         </div>
       </div>
 

@@ -38,21 +38,53 @@ interface ShopOfferView {
 export interface ShopView {
   wallet: string;
   reset: string;
-  /** The tabs (today, the weekly set, the vault, the pass, cores, premium) and which is open. */
+  /** The tabs (today, the weekly set, the vault) and which is open. */
   tabs: { id: string; label: string; on: boolean }[];
-  /** Looks as cards (today, the set, the vault), or a list of things to buy (the rest). */
-  pane: 'looks' | 'list';
-  /** The list pane's heading and the line under it. */
-  listHead: string;
-  listNote: string;
   heading: string;
   /** A line under the cards: what the set or the vault is. */
   info: string;
   offers: ShopOfferView[];
   /** The one buy button, for the picked look. */
   buy: { text: string; enabled: boolean };
-  /** The list pane's rows (a tap on one's button calls onCores with its index). */
-  cores: { label: string; button: string; enabled: boolean }[];
+}
+
+/** A button in the store: `act` says what it does (Game reads it back). */
+export interface StoreButton {
+  act: string;
+  text: string;
+  enabled: boolean;
+  primary?: boolean;
+}
+
+/** A thing for sale as a card: a cores pack, the starter pack, premium. */
+export interface StoreCard {
+  img: string; // a picture in public/store
+  name: string;
+  sub: string;
+  tag: string; // a corner badge ('' for none)
+  button: StoreButton;
+  owned: boolean;
+}
+
+/** The store: the season pass first, then cores and the rest, restore at the bottom. */
+export interface StoreView {
+  wallet: string;
+  pass: {
+    title: string;
+    left: string; // time left in the season
+    tier: string;
+    fraction: number; // through the season's tiers
+    perks: string[]; // what premium gives
+    buttons: StoreButton[];
+  };
+  packs: StoreCard[];
+  /** A line under the packs: the web build, or the store not answering. */
+  packsNote: string;
+  extras: StoreCard[];
+  swapNote: string;
+  swaps: StoreButton[];
+  /** Restore and the dev stand-ins: a label and a button each. */
+  foot: { label: string; button: StoreButton }[];
 }
 
 interface PassTierView {
@@ -106,7 +138,7 @@ export class EconomyView {
     stopTaps(this.offerEl);
     $('offer-yes').addEventListener('click', () => this.closeOffer(true));
     $('offer-no').addEventListener('click', () => this.closeOffer(false));
-    for (const id of ['screen-shop', 'screen-pass', 'countdown']) stopTaps($(id));
+    for (const id of ['screen-shop', 'screen-store', 'screen-pass', 'countdown']) stopTaps($(id));
   }
 
   // --- title ---
@@ -131,7 +163,7 @@ export class EconomyView {
 
   // --- shop ---
 
-  bindShop(onOffer: (i: number) => void, onBuy: () => void, onCores: (i: number) => void, onTab: (id: string) => void): void {
+  bindShop(onOffer: (i: number) => void, onBuy: () => void, onTab: (id: string) => void): void {
     $('shop-tabs').addEventListener('click', (e) => {
       const tab = (e.target as HTMLElement).closest<HTMLElement>('[data-shoptab]');
       if (tab) onTab(tab.dataset.shoptab ?? '');
@@ -141,9 +173,13 @@ export class EconomyView {
       if (card) onOffer(Number(card.dataset.offer));
     });
     $('shop-buy').addEventListener('click', onBuy);
-    $('shop-cores').addEventListener('click', (e) => {
-      const b = (e.target as HTMLElement).closest<HTMLElement>('[data-pack]');
-      if (b) onCores(Number(b.dataset.pack));
+  }
+
+  /** Every button in the store carries what it does in data-act. */
+  bindStore(onAct: (act: string) => void): void {
+    $('screen-store').addEventListener('click', (e) => {
+      const b = (e.target as HTMLElement).closest<HTMLButtonElement>('button[data-act]');
+      if (b && !b.disabled) onAct(b.dataset.act ?? '');
     });
   }
 
@@ -177,22 +213,59 @@ export class EconomyView {
     const buy = $('shop-buy') as HTMLButtonElement;
     buy.textContent = v.buy.text;
     buy.disabled = !v.buy.enabled;
-    const action = (label: string, button: string, enabled: boolean, data?: [string, string]) => {
-      const row = el('div', 'shop-row');
-      const text = el('span', 'shop-text');
-      text.append(el('span', 'label', label));
-      const b = el('button', 'pill shop-buy', button) as HTMLButtonElement;
-      b.type = 'button';
-      b.disabled = !enabled;
-      if (data) b.dataset[data[0]] = data[1];
-      row.append(text, b);
-      return row;
+  }
+
+  renderStore(v: StoreView): void {
+    $('store-wallet').textContent = v.wallet;
+    const button = (b: StoreButton, cls = 'pill'): HTMLButtonElement => {
+      const e = el('button', `${cls}${b.primary ? ' primary' : ''}`, b.text) as HTMLButtonElement;
+      e.type = 'button';
+      e.dataset.act = b.act;
+      e.disabled = !b.enabled;
+      return e;
     };
-    $('shop-cores').replaceChildren(...v.cores.map((c, i) => action(c.label, c.button, c.enabled, ['pack', String(i)])));
-    $('shop-looks').hidden = v.pane !== 'looks';
-    $('shop-list').hidden = v.pane !== 'list';
-    $('shop-list-head').textContent = v.listHead;
-    $('shop-list-note').textContent = v.listNote;
+    const p = v.pass;
+    $('store-pass-title').textContent = p.title;
+    $('store-pass-left').textContent = p.left;
+    $('store-pass-tier').textContent = p.tier;
+    const fill = $('store-pass-fill');
+    requestAnimationFrame(() => (fill.style.transform = `scaleX(${Math.max(0, Math.min(1, p.fraction))})`));
+    $('store-pass-perks').replaceChildren(...p.perks.map((t) => el('li', 'label', t)));
+    $('store-pass-buttons').replaceChildren(...p.buttons.map((b) => button(b, 'pill store-pass-btn')));
+    const card = (c: StoreCard): HTMLElement => {
+      const e = el('div', `store-card${c.owned ? ' owned' : ''}`);
+      const img = document.createElement('img');
+      img.className = 'store-img';
+      img.src = c.img;
+      img.alt = '';
+      img.width = 80;
+      img.height = 80;
+      img.loading = 'lazy';
+      const text = el('span', 'store-text');
+      text.append(el('span', 'label store-name', c.name));
+      if (c.sub) text.append(el('span', 'label dim store-sub', c.sub));
+      e.append(img, text);
+      if (c.tag) e.append(el('span', 'store-tag', c.tag));
+      e.append(button(c.button, 'pill store-price'));
+      return e;
+    };
+    $('store-packs').replaceChildren(...v.packs.map(card));
+    const note = $('store-packs-note');
+    note.textContent = v.packsNote;
+    note.hidden = !v.packsNote;
+    $('store-extras').replaceChildren(...v.extras.map(card));
+    $('store-extras-head').hidden = v.extras.length === 0;
+    $('store-swap-note').textContent = v.swapNote;
+    $('store-swaps').replaceChildren(...v.swaps.map((b) => button(b, 'pill store-swap')));
+    $('store-foot').replaceChildren(
+      ...v.foot.map((f) => {
+        const row = el('div', 'shop-row');
+        const text = el('span', 'shop-text');
+        text.append(el('span', 'label', f.label));
+        row.append(text, button(f.button, 'pill shop-buy'));
+        return row;
+      }),
+    );
   }
 
   // --- pass ---

@@ -1,7 +1,7 @@
 import { CONFIG } from './config';
 import { label, type SettingKey, type Settings } from './settings';
 
-export type ScreenName = 'title' | 'paused' | 'over' | 'settings' | 'goals' | 'hangar' | 'record' | 'solo' | 'league' | 'shop' | 'pass' | 'boards' | 'welcome' | 'name';
+export type ScreenName = 'title' | 'paused' | 'over' | 'settings' | 'goals' | 'hangar' | 'record' | 'solo' | 'league' | 'shop' | 'store' | 'pass' | 'boards' | 'welcome' | 'name';
 
 /** Everything the league screen shows. */
 /** The service record and league screens share one layout. */
@@ -136,6 +136,7 @@ export class UI {
     solo: $('screen-sectors'),
     league: $('screen-league'),
     shop: $('screen-shop'),
+    store: $('screen-store'),
     pass: $('screen-pass'),
     boards: $('screen-boards'),
   };
