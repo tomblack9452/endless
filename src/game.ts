@@ -30,12 +30,12 @@ import { Wallet } from './wallet';
 import { Daily, type Quest, questText } from './economy/daily';
 import { Weekly } from './economy/weekly';
 import { type GoalsTab, GoalsScreen, type TaskRow } from './goalsView';
-import { Pass, premiumReward, freeReward, runXp, seasonAt } from './economy/pass';
+import { Pass, passBought, premiumReward, freeReward, runXp, seasonAt } from './economy/pass';
 import { type Reward, rewardLook, rewardParts, rewardText } from './economy/reward';
 import { DailyShop, setOffer, vaultAt } from './economy/shop';
 import { dayKey, formatWait, untilTomorrow } from './economy/time';
 import { EconomyView } from './economy/view';
-import { type BoardId, createBackend } from './server/backend';
+import { type BoardId, createBackend, type Purchase } from './server/backend';
 import { BOARD_TABS, boardCaption, boardForRun, boardName, boardQuery } from './server/boards';
 import { Outbox } from './server/outbox';
 import { CloudSave } from './server/sync';
@@ -1178,8 +1178,11 @@ export class Game {
       this.refreshTitle();
     }
     // What the account has bought, as the server's purchase records have it.
-    const bought = (await this.backend.purchases()) ?? [];
+    const records = (await this.backend.purchases()) ?? [];
+    const bought = [...new Set(records.map((r) => r.product))];
     for (const id of bought) this.grantProduct(id);
+    const pass = this.restorePass(records);
+    if (pass) this.ui.celebrate([{ kicker: 'season pass', icon: PASS_ICON, name: 'premium restored', lines: pass }]);
     // Refunded (and not bought again): no longer owned on this device either.
     for (const id of bought) {
       const e = id.startsWith('refunded:') ? entitlementFor(id.slice(9)) : null;
@@ -1265,6 +1268,22 @@ export class Game {
     return true;
   }
 
+  /**
+   * A season pass bought for money this season (the server's records) unlocks
+   * the premium track here too: a new install, or a purchase the app didn't
+   * hear back about. Once only: an unlocked track is left alone. Returns the
+   * lines to show, or null if nothing changed.
+   */
+  private restorePass(records: readonly Purchase[]): string[] | null {
+    const now = Date.now();
+    this.pass.turn(now);
+    if (this.pass.premium || !passBought(records, now)) return null;
+    const lines = this.pass.unlockPremium().flatMap((r) => this.grant(r));
+    this.refreshTitle();
+    if (this.infoOpen === 'pass') this.openPass();
+    return lines.length > 0 ? mergeCredits(lines) : ['premium rewards from every tier you reach'];
+  }
+
   /** Restore one-time purchases on a new install (cores come back with the cloud save). */
   private async restorePurchases(): Promise<void> {
     this.ui.showNotice('checking your purchases…');
@@ -1272,10 +1291,15 @@ export class Game {
     // At least two seconds, so the answer doesn't flash past the "checking" note.
     const wait = new Promise((r) => window.setTimeout(r, 2000));
     const [fromStore, fromServer] = await Promise.all([this.store.restore(), this.backend.purchases(), wait]);
-    const ids = [...new Set([...fromStore, ...(fromServer ?? [])])].filter((id) => !id.startsWith('refunded:'));
+    const ids = [...new Set([...fromStore, ...(fromServer ?? []).map((r) => r.product)])].filter((id) => !id.startsWith('refunded:'));
     let n = 0;
     for (const id of ids) if (this.grantProduct(id)) n++;
-    const owned = ids.some((id) => entitlementFor(id) !== null && this.ownsProduct(id));
+    const pass = this.restorePass(fromServer ?? []);
+    if (pass) {
+      n++;
+      this.ui.celebrate([{ kicker: 'season pass', icon: PASS_ICON, name: 'premium restored', lines: pass }]);
+    }
+    const owned = ids.some((id) => entitlementFor(id) !== null && this.ownsProduct(id)) || (this.pass.premium && passBought(fromServer ?? [], Date.now()));
     if (n > 0) this.ui.showNotice(`restored ${n} purchase${n === 1 ? '' : 's'}`);
     else if (owned) this.ui.showNotice('all your purchases are here');
     else if (googleAvailable() && !this.googleEmail) this.ui.showNotice('nothing to restore. bought on another phone? sign in with google');

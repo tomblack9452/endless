@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { CONFIG } from '../src/config';
 import { Daily, questsFor, questText } from '../src/economy/daily';
 import { Weekly, weeklyFor } from '../src/economy/weekly';
-import { freeReward, Pass, premiumReward, seasonAt } from '../src/economy/pass';
+import { freeReward, Pass, passBought, premiumReward, seasonAt } from '../src/economy/pass';
 import { shopFor } from '../src/economy/shop';
 import { dayBefore, dayKey } from '../src/economy/time';
 import { find, LOOKS } from '../src/looks';
@@ -177,6 +177,42 @@ describe('season pass', () => {
     expect(p.addXp(T0, P.xpPerTier).length).toBe(2);
     expect(p.addXp(T0, P.xpPerTier * 100).length).toBe((P.tiers - 4) * 2);
     expect(p.tier).toBe(P.tiers);
+  });
+});
+
+describe('season pass bought for money, from the server\'s records', () => {
+  const s = seasonAt(T0);
+  const bought = (at: number, product = 'season_pass') => [{ product: 'premium', at: T0 }, { product, at }];
+
+  it('counts in the season it was bought, and only then', () => {
+    expect(passBought(bought(s.start), T0)).toBe(true);
+    expect(passBought(bought(s.end - 1), s.end - 1)).toBe(true);
+    expect(passBought(bought(s.start - 1), T0)).toBe(false); // last season's
+    expect(passBought(bought(T0), s.end)).toBe(false); // next season
+    expect(passBought(bought(s.end + 1000), T0)).toBe(false); // a clock that's behind
+    expect(passBought([], T0)).toBe(false);
+  });
+
+  it('a refunded pass, or another product, does not count', () => {
+    expect(passBought(bought(T0, 'refunded:season_pass'), T0)).toBe(false);
+    expect(passBought(bought(T0, 'starter_pack'), T0)).toBe(false);
+    expect(passBought([...bought(T0, 'refunded:season_pass'), { product: 'season_pass', at: T0 + 1 }], T0)).toBe(true);
+  });
+
+  it('unlocks the premium track once, and not next season', async () => {
+    const records = bought(T0);
+    const restore = (p: Pass, now: number) => {
+      p.turn(now);
+      return p.premium || !passBought(records, now) ? null : p.unlockPremium();
+    };
+    const p = new Pass();
+    await p.load(T0);
+    p.addXp(T0, CONFIG.economy.pass.xpPerTier * 2);
+    expect(restore(p, T0)?.length).toBe(2);
+    expect(restore(p, T0)).toBeNull();
+    expect(p.premium).toBe(true);
+    expect(restore(p, s.end)).toBeNull();
+    expect(p.premium).toBe(false);
   });
 });
 

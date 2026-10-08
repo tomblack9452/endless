@@ -1,6 +1,6 @@
 import { storage } from '../storage';
 import type { ShipLook } from '../portrait';
-import type { Backend, BoardQuery, BoardRow, LinkResult, RunSubmission, SubmitResult } from './backend';
+import type { Backend, BoardQuery, BoardRow, LinkResult, Purchase, RunSubmission, SubmitResult } from './backend';
 
 // Supabase over plain fetch (no SDK, to keep the bundle small):
 //   auth      anonymous sign-in, refreshed as it expires; a Google login can be
@@ -213,9 +213,9 @@ export class SupabaseBackend implements Backend {
     return rows ? rows.map((r) => ({ rank: Number(r.rank), name: r.name, score: r.score, you: r.you, premium: r.premium === true, ship: r.ship ?? null })) : null;
   }
 
-  async purchases(): Promise<string[] | null> {
-    const rows = await this.call<{ product: string }[]>(`/rest/v1/store_events?select=product&user_id=eq.${this.session?.user}`);
-    return rows ? [...new Set(rows.map((r) => r.product))] : null;
+  async purchases(): Promise<Purchase[] | null> {
+    const rows = await this.call<{ product: string; at: string }[]>(`/rest/v1/store_events?select=product,at&user_id=eq.${this.session?.user}`);
+    return rows ? rows.map((r) => ({ product: r.product, at: Date.parse(r.at) || 0 })) : null;
   }
 
   async pilotName(): Promise<string | null> {

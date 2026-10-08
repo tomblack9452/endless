@@ -56,6 +56,12 @@ export interface BoardRow {
 
 export type LinkResult = 'linked' | 'taken' | 'failed';
 
+/** A purchase on the server's records: the product ('refunded:<product>' once refunded) and when it was kept (ms). */
+export interface Purchase {
+  product: string;
+  at: number;
+}
+
 export interface Backend {
   /** True when talking to a real server. */
   readonly online: boolean;
@@ -77,8 +83,8 @@ export interface Backend {
   submitRun(run: RunSubmission): Promise<SubmitResult>;
   /** A board, best first (your own row last if you're below the top), or null if it couldn't be read. */
   board(query: BoardQuery): Promise<BoardRow[] | null>;
-  /** One-time products this account has bought (the purchase webhook's records), or null if unknown. */
-  purchases(): Promise<string[] | null>;
+  /** What this account has bought (the purchase webhook's records), or null if unknown. */
+  purchases(): Promise<Purchase[] | null>;
   /** Your pilot name on the boards, or null. */
   pilotName(): Promise<string | null>;
   /** Change it; says why not when the server turns it down. */

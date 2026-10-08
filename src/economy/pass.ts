@@ -137,6 +137,17 @@ export class Pass {
   }
 }
 
+/**
+ * True if a pass bought for money counts this season: a 'season_pass' row on
+ * the server's records kept during the season `now` is in (one per season, so
+ * an earlier season's doesn't unlock this one). Refunded rows are renamed
+ * 'refunded:season_pass', so they don't count.
+ */
+export function passBought(purchases: readonly { product: string; at: number }[], now: number): boolean {
+  const { start, end } = seasonAt(now);
+  return purchases.some((p) => p.product === 'season_pass' && p.at >= start && p.at < end);
+}
+
 /** Pass XP for a run's score. */
 export function runXp(score: number): number {
   const P = CONFIG.economy.pass;
