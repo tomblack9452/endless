@@ -1,5 +1,11 @@
 # Endless Space: assessment
 
+> **Historical.** A snapshot of `main` on 7 October 2026 (471 tests then).
+> Line numbers and counts below are from that commit and have moved since. Item
+> 7 (the Android project) was done after it; the code as it is now is described
+> in the README, and the later audit's fixes are in
+> [launch-audit.md](launch-audit.md#second-audit-8-october-2026).
+
 Taken from `main` at `8eb93b8` (7 October 2026). Typecheck clean, 471 tests
 passing. Every finding below was checked against the code; the server ones
 were run against a real Postgres (PGlite) with the migrations applied, acting

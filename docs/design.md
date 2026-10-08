@@ -1,5 +1,12 @@
 # Design review: progression and paid features
 
+> **Planning, mostly built.** This was the design before the October 2026
+> work. Its decisions were built (see [roadmap.md](roadmap.md), "Built"), so
+> "nothing here is built yet" and the "today" numbers below describe the game
+> before then. Where the two differ, the README and `src/config.ts` are the
+> current rules (e.g. revives: one free a day for everyone, two with premium,
+> then an ad or 50 cores; never in ranked).
+
 Phase 0 of the front page, goals and paid features work: what the game's
 progression is today, what the numbers say, how it compares with the genre, and
 a design for paid features. It ends with the decisions that are yours. Nothing

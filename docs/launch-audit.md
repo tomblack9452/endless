@@ -1,5 +1,8 @@
 # Launch audit
 
+> The first pass below is **historical** (before the Android build, Google
+> sign-in and the store page). The second, at the end, is the current one.
+
 A pass over the game before it goes on the stores: every screen played in a
 browser at phone size (390x844, 375x667 with the largest text) and on a
 desktop window, the code read for flow bugs, and the store rules checked.
@@ -71,9 +74,9 @@ practice run starts.
 18. A "rate the game" prompt after a good run. Better added once there are
     players.
 19. Interstitial ads stay off. Rewarded ads only, as agreed.
-20. Moving progress to a new phone. The account is anonymous, so a new phone
-    starts again (purchases restore). Sign in with Apple and Google would fix
-    it; support says to email in the meantime.
+20. Moving progress to a new phone. Done for Android: settings > keep it with
+    google, and "played before? sign in with google" on a new phone's welcome
+    screen. Sign in with Apple is still to come for iOS.
 
 ## Checked and fine
 
@@ -83,5 +86,46 @@ practice run starts.
 - Running with no server (offline) and with a slow one.
 - Shop prices, pass tiers and goals add up as in `docs/design.md`.
 - Ranked, weekly and solo seeds are the same for everyone.
-- Restoring purchases is in the shop (premium and cores tabs).
+- Restoring purchases is at the bottom of the store page (in the apps).
 - No console errors apart from the browser blocking vibration before a tap.
+
+## Second audit (8 October 2026)
+
+Every system read against the README, the database run for real (PGlite), and
+every screen opened at 360x640 and 427x952 in light and dark mode (dark mode
+turned on in the game's settings).
+
+**Fixed:**
+
+- Back during the revive offer (or before it showed) left the run unrecorded:
+  no stats, credits, best or board. Back now turns the offer down and shows
+  the game-over screen; leaving to the menu settles the run first.
+- A run quit from the pause menu counted for stats and credits but not for its
+  best. It counts for both now.
+- A league's weekly reward could be lost: a ranked run or a promotion in a new
+  week rolled the week over without paying it. League weeks, the ranked week
+  shown on the title and the weekly board read now follow the server's clock.
+- A server error while renewing the session started a brand new anonymous
+  account, leaving the player's server progress behind. Now only a refresh the
+  server refuses for good does that; requests renew the session one at a time.
+- The cloud save could be pushed before it was compared with the server's
+  (a slow connection on start-up), overwriting a newer save from another phone,
+  and a save that couldn't be read counted as "no save". Neither can happen now.
+- The goals' all-done cores were named by today's date, not the goals' own day
+  (wrong after midnight). Google sign-in's plugin is set up again after a
+  failed start instead of failing for good.
+- `0014`: purchases keep RevenueCat's purchase time (`store_purchase_at`), and
+  `earn_cores` pays one reward at a time per player (two calls at once could
+  both pay).
+- `.gitignore` covers keystores, signing settings and `.env.*`.
+- The season pass's premium column was too faint to read (light and dark), the
+  pass card's line was cut off on a 360 wide phone, and a long set name was cut
+  off in the shop.
+
+**Open** (needs a decision or more work):
+
+- A refunded season pass keeps its premium track and the rewards it paid.
+- The ranked board trusts the league the game sends (leagues live on the
+  device), so a run can be sent to a lower league's board.
+- The season looks in the catalogue are fixed at start-up by the phone's clock;
+  a phone set weeks behind misses a new season's looks until it restarts.

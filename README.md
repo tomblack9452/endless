@@ -78,7 +78,7 @@ Accept the certificate warning once on the phone.
 |---|---|---|
 | Steer | Drag anywhere, tap the sides, or tilt | Arrow keys or A / D |
 | Boost | Hold the boost button, or double-tap and hold anywhere | Shift, W, Up or Space |
-| Pause | `pause`, top right (play resumes after a 3-2-1) | Esc or P |
+| Pause | `pause`, top right, or Android's back button (play resumes after a 3-2-1; main menu ends the run, and it still counts) | Esc or P |
 | Start | `ranked`, `solo` or `endless` on the title screen | Space or Enter (ranked) |
 | Retry | Tap | Space or Enter |
 
@@ -480,20 +480,20 @@ tier 5 Diamond. Any bought system can be switched off in the hangar.
 ship, opened from the title screen or from the shop. The chips along the top
 are the slots of looks, with an **upgrades** chip at the end.
 
-**Looks** (any mode) are **157 of them** across seven slots, every one allowed
+**Looks** (any mode) are **164 hand-made ones** across seven slots, plus each season's generated looks (four so far, from season 1's shop), every one allowed
 in ranked because every hull shares one hitbox. Tap a look to see it on the
 ship; the button under the grid puts it on, buys it, or says how to get it, with
 how far along you are. Each slot is a chip with its count.
 
 | Slot | What's in it |
 |---|---|
-| Hull (12) | dart; wing, needle, manta (early goals); arrow, talon, viper (credits); nova, phantom (cores); raptor (season pass); kite, comet (goals) |
-| Paint (72) | plain colours for credits, rank paints (copper to pearl), a paint for each league, star paints, premium paints for cores, and paints for finishing goals (one for each area you reach, and each place you master) |
+| Hull (13) | dart; wing, needle, manta (early goals); arrow, talon, viper (credits); nova, phantom (cores; nova also comes with the starter pack); raptor (season pass); kite, comet (goals); halo (premium) |
+| Paint (75) | plain colours for credits, rank paints (copper to pearl), a paint for each league, star paints, premium paints for cores, paints for finishing goals (one for each area you reach, and each place you master), aurora (login calendar), frost and ember (season pass), eclipse and opal (the vault) and regalia (premium) |
 | Markings (13) | stripe, twin stripes, split, hazard (credits); dots, bands (cores); chevron, two-tone (stars); spine, wing tips, checker, nose cap (goals) |
 | Fins (7) | tail fin, winglets, crest (credits); twin fins (stars); blade, swept fins (goals) |
-| Engine colour (27) | single colours and two-colour flames (root to tip) for credits, cores, rank, goals and the pass |
+| Engine colour (29) | single colours and two-colour flames (root to tip) for credits, cores, rank, goals and the pass |
 | Wing decal (16) | your rank insignia, your league emblem, and pictures: flame, wings, rocket (credits); star, moon, target, crown, skull, bolt, laurel, atom, planet (goals) |
-| Flame (10) | glow only; line, dashes, ion, long, twin, pulse (goals); triple (credits); wide (cores); ribbon (the vault) |
+| Flame (11) | glow only; line, dashes, ion, long, twin, pulse (goals); triple (credits); wide (cores); ribbon (the vault); crown (premium) |
 
 **Ways to get a look:** credits, cores, a rank, a league, set level stars, a
 **goal**, the login calendar or the season pass, or the
@@ -530,7 +530,10 @@ bonus of cores.
 ## Cores and daily rewards
 
 Everything here is in `src/economy/` and tuned in `CONFIG.economy`. Days
-turn over at midnight UTC, the same moment for everyone.
+turn over at midnight UTC, the same moment for everyone, and weeks on Monday.
+With the server they follow its clock (`server_now`, migration 0012), so
+moving the phone's clock forward doesn't bring tomorrow's rewards; offline
+they follow the phone's.
 
 - **Cores** are the premium currency. They come slowly from play (login
   rewards, quests, the season pass) and, in the apps, from the store. They buy
@@ -539,10 +542,12 @@ turn over at midnight UTC, the same moment for everyone.
   ticket a try; it's unlimited now, and older saves were paid 30 cores for each
   ticket they had beyond the week's 5.
 - **Revive:** outside ranked, once a run, a crash offers to carry on (with a
-  6 s timer). The first each day is free, then
-  an ad or 50 cores, the player's pick. The ship goes back
-  onto the safe lane, obstacles near the lane just ahead are cleared, it gets
-  a shield and a moment of grace, and a 3-2-1 starts it again.
+  6 s timer). The first each day is free (two with premium), then
+  an ad or 50 cores, the player's pick (with premium the ad is skipped). The
+  ship goes back onto the safe lane, obstacles near the lane just ahead are
+  cleared, it gets a shield and a moment of grace, and a 3-2-1 starts it
+  again. Turning it down (or the Android back button) ends the run as it
+  stood. On the boards a revived run counts as it was at the first crash.
 - **Daily:** a 7-day login calendar (credits, cores, and the aurora
   paint on day 7), collected with a card when you open the game. A missed day
   just waits. Three **daily goals**, the same for everyone that day (play
@@ -556,25 +561,34 @@ turn over at midnight UTC, the same moment for everyone.
   daily gift card on the title screen (150 credits and 2 cores), and swapping
   one daily goal a day for another (free on the web, where there are no ads).
 - **Shop:** a showroom, with the camera circling your ship above a sheet of
-  cards. Tap a card to put the look on the ship, then buy it with the button
-  under the cards (tap an owned one to wear it). Three tabs of looks, the
-  same for everyone and turning over on the UTC clock, and a **cores & pass**
-  chip that opens the store.
-- **Store:** one scrolling page, no showroom: the season pass first (time left,
-  tier progress, what premium gives, unlock for cores or money), then the cores
-  packs, the starter pack and premium as cards, swapping cores for credits, and
-  restore at the bottom. Tapping cores in the top bar opens it; on the web the
-  real-money cards say they're in the Android app.
+  cards; drag sideways over the ship to turn it yourself (a flick carries on,
+  and the slow spin comes back a few seconds after you let go). At the top of
+  the sheet, a **store card**: the season pass (time left, its hook, your
+  tier) with a **buy cores** row under it, both opening the store. Then
+  segmented tabs of looks (below), each with its timer, the same for everyone
+  and turning over on the UTC clock. Tap a card to put the look on the ship, then
+  buy it with the button under the cards (tap an owned one to wear it). A row
+  of cards scrolls sideways, with a thin scroll bar under it.
   - **today:** four looks a day, at least one premium, one a deal at a quarter
     off. Looks you don't own come first, and the day's picks are kept for the
     day, so buying one doesn't reshuffle the rest.
   - **weekly set:** one themed set a week, as a bundle for what you're missing
     at a fifth off (in cores). Every set comes round once before any repeats.
+    **see all** shows the whole set as a grid (and **show as row** goes back),
+    and **try the set on** puts every look in it on the ship at once to see
+    (tap **take the set off**, pick a single card, change tab or leave the
+    shop and it comes off; nothing is put on for keeps).
   - **vault:** one rare look a month, for cores. When it goes it's away for the
     rest of the cycle.
+- **Store:** one scrolling page, no showroom: the season pass first (time left,
+  tier progress, what premium gives, unlock for cores or money), then the cores
+  packs, the starter pack and premium as cards, swapping cores for credits, and
+  restore at the bottom. Tapping cores in the top bar opens it (the shop's
+  buy cores row opens it at the packs); on the web the
+  real-money cards say they're in the Android app.
 - **Season pass:** six weeks (six weekly runs), 30 tiers of 600 XP, paced so
   a regular player finishes in about five weeks. Runs earn XP (1 per 500
-  points, up to 30) and each quest 30. The free track pays credits and cores;
+  points, up to 30), each daily goal 30 and each weekly goal 400. The free track pays credits and cores;
   the premium track (550 cores, or a purchase in
   the apps) pays more, with the frost and ember paints, the solar engine and
   the raptor hull. Rewards are paid as you reach each tier, and unlocking
@@ -738,6 +752,8 @@ new build drops the old build's cached scripts and styles.
 | `tests/determinism.test.ts` | No unseeded randomness or clock in course generation |
 | `tests/economy.test.ts` | The calendar, quests, the shop, the pass and the revive |
 | `tests/server.test.ts` | Offline fallback and the store webhook |
+| `tests/clock.test.ts` | The trusted clock: the server's time, the Date header, the device's offline |
+| `tests/account.test.ts`, `tests/session.test.ts` | Keeping an account with Google; signing in again without losing the player, and the cloud save never pushed before it's compared |
 | `tests/sql.test.ts`, `tests/leaderboard.test.ts` | The database run for real (PGlite): checks, boards, names, row security, and the game's server code against it |
 | `tests/collisions.test.ts` | Every solid pool checked against its mesh across every area |
 | `tests/unlocks.test.ts` | Solo environment unlocks |
@@ -791,7 +807,7 @@ that opens a panel. It isn't in production builds.
 - **Reset all progress:** clears everything but settings
 - an FPS readout with the pixel ratio and draw calls
 
-The shop's cores section also has a free "+500" in dev. `window.game` is
+The store has a free "+500" and a premium on/off toggle in dev. `window.game` is
 exposed in dev for poking at state from the console.
 
 ## Testing
@@ -853,13 +869,19 @@ Without keys, everything lives on the device. With them:
 - **Supabase** (`src/server/`, `supabase/`): an anonymous account per
   player (in the Android app it can be kept with a Google login and signed
   back into on a new phone: docs/store.md, "Google sign-in"), a cloud save of every saved
-  setting and stat (the newer save wins; a fresh install takes the cloud's),
-  cores held on the server (earned cores capped per day, spending checked),
+  setting and stat (the newer save wins; a fresh install takes the cloud's;
+  nothing is pushed until the two have been compared), cores held on the
+  server (each reward named and paid once, at most its size, and only for
+  the current day, week or season; spending checked), the server's clock for
+  days, weeks and seasons (`server_now`, so moving the phone's clock doesn't
+  turn the day),
   credits mirrored there (so balances can be changed from the dashboard),
   and **leaderboards**: this week's ranked run per league, endless, and one
   for each solo environment, with pilot names and each pilot's ship drawn next
-  to their name from the looks they have on (tap a row to see it bigger, with
-  what's on it). Runs are checked in the database (the score has to fit the distance
+  to their name from the looks they have on. Tap a pilot to see their ship
+  bigger, what's on it, and their **service record**: rank, XP, runs, time,
+  distance, furthest level, best chain, near misses, pickups and their best on
+  each board (shared through a public id, never the account id). Runs are checked in the database (the score has to fit the distance
   and time, and the path the distance), kept and retried if there's no signal.
   Setup is two keys and `npm run db:apply` (or pasting the small SQL parts): [docs/leaderboards.md](docs/leaderboards.md).
 - **RevenueCat** (`src/store/`) in the iOS and Android apps: core packs
@@ -940,9 +962,11 @@ afterwards are flown with a maxed ship.
 
 After every update that adds a file to `supabase/migrations/`, run
 `npm run db:apply` (it only applies what's new), then `npm run check-server`
-to see it's all there. Recent ones: `0005` (deleting an account from
-settings), `0006` (ships on the leaderboards), `0007` (credits in `wallets`), `0008` (maxing out a player), `0009` (the pilot
-name profanity filter).
+to see it's all there. There are 14 so far; recent ones: `0010` (cores only
+from real rewards), `0011` (purchases and refunds in one call), `0012` (the
+trusted clock), `0013` (service records on the boards), `0014` (a purchase
+keeps RevenueCat's purchase time, and cores rewards are paid one at a time).
+`0014` has to be applied before the webhook is deployed again.
 
 **Bad names.** Names are checked against a profanity list
 ([zautumnz/profane-words](https://github.com/zautumnz/profane-words), WTFPL)
@@ -955,7 +979,7 @@ from `name_words`).
 
 Still to do on the server: a full re-fly of submitted runs with the game's
 own code (it needs the run simulation pulled out of `game.ts` first), and
-linking accounts to Apple or Google sign-in.
+Apple sign-in for an iOS build (Google sign-in is done, in the Android app).
 
 ## Deploying
 

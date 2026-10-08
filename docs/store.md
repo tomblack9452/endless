@@ -19,7 +19,8 @@ The short version is in [leaderboards.md](leaderboards.md). In full:
    (`VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`); `deploy.yml` passes them to
    the build.
 6. `npm run check-server` checks all of the above.
-7. Only for store purchases (section 3): deploy the webhook.
+7. Only for store purchases (section 3): deploy the webhook, after
+   `npm run db:apply` (the webhook calls `store_purchase_at`, from `0014`).
    ```
    supabase secrets set REVENUECAT_WEBHOOK_SECRET=<a long random string>
    supabase functions deploy revenuecat-webhook --no-verify-jwt
@@ -54,6 +55,14 @@ The short version is in [leaderboards.md](leaderboards.md). In full:
 4. Integrations > Webhooks: the `revenuecat-webhook` function's URL, with the
    Authorization header `Bearer <REVENUECAT_WEBHOOK_SECRET>`.
 
+The webhook pays cores for `INITIAL_PURCHASE` and `NON_RENEWING_PURCHASE`
+events and takes them back on a `CANCELLATION` (a refund), keeping each event
+once by its id. Each purchase is kept with RevenueCat's `purchased_at_ms`
+(0014), so a season pass bought just before a season ends counts for that
+season. A refunded row is renamed `refunded:<product>`: premium and the starter
+pack stop counting. A refunded season pass doesn't take back the tier rewards
+it already paid.
+
 ## 4. Ads (AdMob)
 
 Rewarded ads only at launch (a revive, doubled run credits, a daily gift, a new
@@ -66,7 +75,8 @@ never see an ad and get those rewards free. The web build has no ads.
    `VITE_ADMOB_REWARDED_IOS`, `VITE_ADMOB_REWARDED_ANDROID`, and, for later,
    `VITE_ADMOB_INTERSTITIAL_IOS`, `VITE_ADMOB_INTERSTITIAL_ANDROID`. Without
    them the apps run with no ads.
-4. After `npx cap add` (below), put the AdMob **app** ids in the native projects:
+4. Put the AdMob **app** ids in the native projects (Android's is already in
+   the manifest; iOS's goes in after `npx cap add ios`):
    `GADApplicationIdentifier` in `ios/App/App/Info.plist`, and the
    `com.google.android.gms.ads.APPLICATION_ID` meta-data in
    `android/app/src/main/AndroidManifest.xml`. On iOS also add
@@ -74,7 +84,8 @@ never see an ad and get those rewards free. The web build has no ads.
 5. In AdMob > Privacy & messaging, publish a GDPR message (UK and EU) and an
    IDFA explainer. The game shows Google's consent form and Apple's tracking
    prompt on first start; if either is declined, ads are non-personalised.
-   Settings has a "privacy choices" row to change it later.
+   Where Google's rules ask for it (the EU and UK), settings has an "ad
+   privacy choices" row to change it later.
 
 ## 5. Building the apps
 
@@ -180,7 +191,9 @@ while to apply.
   be personalised, with consent).
 - **Privacy:** an anonymous account id, the Google account's email and id
   when the player chooses to sign in with Google (account management),
-  gameplay data (scores, runs),
+  gameplay data (scores, runs, and the service record summary: rank, XP, runs,
+  time played, distance and bests, which other players see when they tap a
+  pilot on a board, with the pilot name),
   purchase history, and for ads the device's advertising id when the player
   allows it (AdMob). Needs a privacy policy URL.
 - **Screenshots** (6.7" iPhone 1290×2796, 5.5" 1242×2208, Android phone

@@ -36,7 +36,7 @@ Play takes an **Android App Bundle** (`.aab`), signed with your **upload key**.
    - `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`: set.
    - `VITE_GOOGLE_WEB_CLIENT_ID`: set (Google sign-in).
    - `VITE_ADMOB_REWARDED_ANDROID`: your rewarded unit, if you've made it (without it there are simply no ads).
-   - `VITE_REVENUECAT_GOOGLE_KEY`: once RevenueCat is set up (without it the shop's paid tabs say purchases aren't available).
+   - `VITE_REVENUECAT_GOOGLE_KEY`: once RevenueCat is set up (without it the store's real-money cards say they're in the app and nothing can be bought).
    - `VITE_ADMOB_LIVE`: **empty** for every testing build. Only `1` for the production build (part 10). Tapping your own live ads can get the AdMob account closed.
 2. Build and copy into the Android project:
    ```
@@ -196,7 +196,7 @@ This is the IARC questionnaire; it produces the age ratings for every country
    - **Controlled substances (drugs, alcohol, tobacco):** No.
    - **Crude humour:** No.
    - **Gambling:** No. **Simulated gambling:** No. The shop sells named items for a set price; nothing is random for money.
-   - **"Does the app allow users to interact or exchange content?"**: **Yes.** Players' chosen names show on public leaderboards. If asked for detail: no chat, no messaging, no photos; names are checked against a word list.
+   - **"Does the app allow users to interact or exchange content?"**: **Yes.** Players' chosen names show on public leaderboards, and tapping a pilot shows their ship and service record (rank, XP, runs, time played, distance, bests). If asked for detail: no chat, no messaging, no photos; names are checked against a word list.
    - **"Does the app share the user's current physical location with other users?"**: No.
    - **"Does the app allow users to purchase digital goods?"**: **Yes.**
    - **"Is the app a web browser or search engine?"**: No.
@@ -241,6 +241,10 @@ match what the app and its libraries actually do; Google checks.
 | App info and performance > **Crash logs**, **Diagnostics** | Yes | Yes (AdMob) | No | Required | Advertising or marketing, Analytics |
 
 Notes:
+- The pilot name, ship and service record summary (rank, XP, runs, time
+  played, distance, furthest level, chains, near misses, pickups and bests)
+  are shown to other players on the leaderboards. Check the form's own
+  wording for data other users can see when you fill it in.
 - "Shared" means sent to a **third party for its own use**. Supabase and
   RevenueCat work for you (service providers), so what goes to them isn't
   "shared". AdMob uses data for Google's advertising, so it is.
@@ -524,8 +528,12 @@ why; the usual fix is a longer test or more detailed answers, then apply again.
    when they're merged; the app only gets them with a new bundle.
 
 Google also requires apps to target a recent Android version: each August the
-minimum target goes up by one. The project targets SDK 36, which is ahead of
-the current requirement; Play Console warns you months before it matters.
+minimum target goes up by one. Since 31 August 2026 new apps and updates must
+target API 36 (Android 16); the project targets 36 (`android/variables.gradle`),
+so it meets that. The next rise (API 37) is expected in August 2027; Play
+Console warns you months before it matters. On API 36, large screens (600 dp
+and wider, e.g. tablets) ignore the portrait lock, so check the game on a
+tablet emulator before a production release.
 
 ---
 

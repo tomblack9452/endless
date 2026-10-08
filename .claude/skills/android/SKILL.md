@@ -14,7 +14,8 @@ and `docs/store.md` (store, RevenueCat, AdMob and Google sign-in setup).
 
 - Never commit `.env` or any `.jks` / keystore file. The upload key is a `.jks`
   on Tom's home PC; it is the only key that may sign a bundle for Play.
-- Commits go out as `git -c user.name="Tom Black" -c user.email="tom.black9452@gmail.com" commit ...`
+- Commits go out as Tom Black (`git -c user.name="Tom Black" -c user.email=<Tom's
+  personal address> commit ...`; ask him for it, it never goes in a file),
   with no Co-Authored-By, session links or mention of AI.
 - The public contact address is tomblackdev@proton.me. Never publish the gmail.
 - Run Capacitor commands from the project root, never from `android/`.
@@ -60,10 +61,19 @@ secrets unless a CI build is added. `npm run check-server` says what's missing.
 ## Server
 
 Supabase. New migrations in `supabase/migrations/` (now up to
-`0012_trusted_clock.sql`) only reach the live database with `npm run db:apply`.
-After adding one, remind Tom to run it. RevenueCat purchases arrive through the
-`revenuecat-webhook` edge function, which writes `store_events`.
-A refund renames the row's product to `refunded:<product>`.
+`0014_purchase_time_and_earn_lock.sql`) only reach the live database with
+`npm run db:apply`. Never edit one that has shipped: add the next number, add its
+marker to `MADE` in `scripts/apply-db-lib.mjs`, then `npm run db:setup`. After
+adding one, remind Tom to run `db:apply`. `0012` is the trusted clock
+(`server_now`: days, weeks and seasons follow the server, not the phone), `0013`
+the service records on the boards (public ids, `pilot_record`), `0014` the
+purchase time and one-at-a-time `earn_cores`.
+
+RevenueCat purchases arrive through the `revenuecat-webhook` edge function,
+which calls `store_purchase_at` (0014; apply it before redeploying the webhook)
+and writes `store_events` with RevenueCat's purchase time. A refund renames the
+row's product to `refunded:<product>`. A refunded season pass doesn't take back
+its tier rewards.
 
 ## Google sign-in (`src/account.ts`)
 
@@ -89,8 +99,11 @@ A refund renames the row's product to `refunded:<product>`.
 
 ## Ads (AdMob, `@capacitor-community/admob`)
 
+- The AdMob app id (in `AndroidManifest.xml`) is
+  `ca-app-pub-4447582079973716~3555140115`.
 - The rewarded unit is `ca-app-pub-4447582079973716/1921212980`, used for
-  revives and doubling credits.
+  revives (once the day's free one is used, the player picks an ad or 50
+  cores), doubling credits, the daily gift and swapping a daily goal.
 - Test ads show until `VITE_ADMOB_LIVE=1`. Never tap live ads on your own phone.
 - GDPR and US consent messages are set up in AdMob > Privacy & messaging.
 - `app-ads.txt` is served from the root of the `tomblack9452.github.io` user
@@ -108,8 +121,9 @@ A refund renames the row's product to `refunded:<product>`.
     Settings > License testing).
   - The app must be installed from a Play track.
   - Cores land when the webhook delivers, which `awaitPaidCores()` waits for.
-- "Restore purchases" reads the server's records for this account. A purchase
-  made on another phone shows up only after signing in with the same Google account.
+- "Restore" (bottom of the store page) reads Google Play's records and the
+  server's for this account. A purchase made on another phone shows up only
+  after signing in with the same Google account.
 
 ## Play launch status
 
@@ -123,6 +137,13 @@ These are external steps; ask Tom where each stands rather than assuming.
 - The payments profile was being verified (it set off the red "developer
   profile will be removed" banner).
 - Still to do: US tax forms (W-8BEN) and the AdSense test deposit.
+
+## Target SDK
+
+`targetSdk` and `compileSdk` are 36, `minSdk` 24 (`android/variables.gradle`).
+Since 31 August 2026 Play needs API 36 for new apps and updates; the next rise
+(37) is expected in August 2027. On API 36 large screens ignore the portrait
+lock.
 
 ## Checks before handing back a change
 

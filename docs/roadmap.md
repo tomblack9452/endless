@@ -1,5 +1,8 @@
 # Roadmap
 
+> **Planning.** What's next as of October 2026; it changes as things ship. The
+> README describes what's built.
+
 What comes next, in order, for a live mobile game with a premium unlock and
 in-app purchases. The finished work (collision audit, the asteroid belt and
 volcanic plain, solo unlocks, leaderboards, the shop and the hangar) is described
@@ -15,8 +18,8 @@ onboarding with a practice run.
 
 ## Before the store launch
 
-1. **Sign in with Apple and Google.** Google is in the Android app (docs/store.md,
-   "Google sign-in"); Apple (and Google) still to add for iOS.
+1. **Sign in with Apple** for an iOS build. Google sign-in is done in the
+   Android app (docs/store.md, "Google sign-in").
 2. **Set up the stores and AdMob** ([store.md](store.md)): the products
    (including `premium`), RevenueCat, the AdMob ad units and app ids, and the
    consent messages.

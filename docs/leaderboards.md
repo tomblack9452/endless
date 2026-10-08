@@ -21,8 +21,8 @@ to a board.
      file, `supabase/setup.sql` is all of it.
 3. **Allow anonymous sign-ins.** Authentication > Sign In / Providers > turn on
    *Allow anonymous sign-ins*. (Players get an account without a sign-up screen.)
-4. **Add the keys.** Project settings > API: copy the project URL and the
-   `anon` public key.
+4. **Add the keys.** Project Settings > API Keys: copy the project URL and the
+   **publishable** key (`sb_publishable_...`, or the legacy `anon` key).
    - Locally: copy `.env.example` to `.env` and fill in `VITE_SUPABASE_URL` and
      `VITE_SUPABASE_ANON_KEY`.
    - The live site: GitHub repo > Settings > Secrets and variables > Actions >
@@ -31,7 +31,8 @@ to a board.
 5. **Check it.** `npm run check-server` signs in once and tells you what, if
    anything, is missing and how to fix it.
 
-Never put the `service_role` key in `.env`: the game only ever needs `anon`.
+Never put the secret or `service_role` key in `.env`: the game only ever needs
+the publishable (`anon`) key.
 
 ## What's on the boards
 
@@ -44,7 +45,21 @@ Never put the `service_role` key in `.env`: the game only ever needs `anon`.
 Each row shows the pilot's ship, drawn by the game from the looks they have
 on (`players.ship`, sent with `set_ship` a couple of seconds after the player changes a look, signs in or finishes a run; only its shape is
 checked, so an edited client could show a look it doesn't own). Tap a row for a
-bigger picture and the names of the looks.
+bigger picture, the names of the looks, and the pilot's **service record**.
+
+## Service records (0013)
+
+Each player sends a summary of their own service record with `set_record` when
+they open a board and it has changed: rank, XP, runs, ranked runs, time played,
+distance, furthest level, best chain, near misses and pickups (numbers only,
+the shape checked, like the ship). `leaderboard()` gives every row the pilot's
+**public id** (`players.public_id`), never the account id, and
+`pilot_record(public id)` reads their card: name, premium, ship, that summary,
+when they joined, and their best on each board (ranked: their best week).
+Hidden pilots have no card. The stats live on the device, so like the ship an
+edited client could show stats it hasn't earned. This needs `0013` on the live
+database (`npm run db:apply`); without it, rows have no public id and tapping
+a pilot shows only their ship.
 
 Set levels have no board (they're the same every time, so they have times and
 stars instead). Assisted runs, and anything flown with the dev tools, are never
@@ -69,7 +84,8 @@ and rank under a gap.
 
 Every submission, in `supabase/migrations/0003_leaderboards.sql`:
 
-- the board exists, the league is 0-6, the week is the server's own week
+- the board exists, the league is 0-6, the week is the server's own week (the
+  game reads the week's board by the server's clock too, `server_now` in 0012)
 - the score can come from the distance (distance points plus the most the
   bonuses could add) and the time (no faster than a full-boost flight)
 - ranked runs carry the ship's path: one sample per 4 units of distance, never
@@ -96,9 +112,11 @@ the run. If that starts to matter, the next steps in order of effort:
 
 ## Changing the database
 
-Add a new file in `supabase/migrations/` (`0006_...sql`), run `npm run db:setup`
-to rebuild `supabase/setup.sql` and `supabase/parts/`, then `npm run db:apply` on a
-live project (it applies only what's new). `npm test` runs every migration on a real Postgres (PGlite), the
+Add a new file in `supabase/migrations/` (the next number: `0015_...sql`; never
+edit one that has been applied), add a table or function it creates to `MADE` in
+`scripts/apply-db-lib.mjs` (how a hand-pasted database is recognised), run
+`npm run db:setup` to rebuild `supabase/setup.sql` and `supabase/parts/`, then
+`npm run db:apply` on a live project (it applies only what's new). `npm test` runs every migration on a real Postgres (PGlite), the
 client against it, and checks `setup.sql` is up to date.
 
 ## Running costs and limits
