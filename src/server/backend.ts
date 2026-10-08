@@ -92,8 +92,8 @@ export interface Backend {
   syncClock(): Promise<boolean>;
   /** Sign in (or restore the session). Resolves false if the server can't be reached. */
   signIn(): Promise<boolean>;
-  /** The cloud save: every saved key, and when it was written (ms), or null if none. */
-  loadSave(): Promise<{ data: Record<string, string>; savedAt: number } | null>;
+  /** The cloud save: every saved key, and when it was written (ms); null if there's none, undefined if it couldn't be read. */
+  loadSave(): Promise<{ data: Record<string, string>; savedAt: number } | null | undefined>;
   pushSave(data: Record<string, string>, savedAt: number): Promise<void>;
   /** The server's cores balance, or null to keep the device's. */
   cores(): Promise<number | null>;

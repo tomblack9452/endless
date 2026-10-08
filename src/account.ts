@@ -27,7 +27,11 @@ let ready: Promise<void> | null = null;
 
 async function plugin() {
   const { SocialLogin } = await import('@capgo/capacitor-social-login');
-  ready ??= SocialLogin.initialize({ google: { webClientId: CLIENT_ID, mode: 'online' } });
+  // A failed start is tried again next time, not kept.
+  ready ??= SocialLogin.initialize({ google: { webClientId: CLIENT_ID, mode: 'online' } }).catch((e: unknown) => {
+    ready = null;
+    throw e;
+  });
   await ready;
   return SocialLogin;
 }

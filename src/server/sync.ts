@@ -26,6 +26,8 @@ async function snapshot(): Promise<Record<string, string>> {
 
 export class CloudSave {
   private timer = 0;
+  /** Compared with the cloud yet (start)? Until then nothing is pushed, or a stale device could overwrite a newer save. */
+  private started = false;
 
   constructor(private readonly backend: Backend) {}
 
@@ -35,7 +37,10 @@ export class CloudSave {
    */
   async start(): Promise<boolean> {
     if (!this.backend.online) return false;
+    clearTimeout(this.timer); // anything queued before the comparison waits for its answer
     const remote = await this.backend.loadSave();
+    // Couldn't read it (no signal): don't push this device's save over one we haven't seen. The next start tries again.
+    if (remote === undefined) return false;
     const local = await snapshot();
     const localAt = Number((await storage.get(SAVED_AT)) ?? 0) || 0;
     const takeRemote = remote !== null && (localAt > 0 ? remote.savedAt > localAt : lifetimeCredits(remote.data) > lifetimeCredits(local));
@@ -44,13 +49,14 @@ export class CloudSave {
       await storage.set(SAVED_AT, String(remote.savedAt));
       return true;
     }
+    this.started = true;
     this.push();
     return false;
   }
 
   /** Save to the cloud a moment after things settle (runs, purchases). */
   push(): void {
-    if (!this.backend.online) return;
+    if (!this.backend.online || !this.started) return;
     clearTimeout(this.timer);
     this.timer = window.setTimeout(() => {
       void (async () => {

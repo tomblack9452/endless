@@ -69,14 +69,25 @@ export class SupabaseBackend implements Backend {
     private readonly key: string,
   ) {}
 
-  async signIn(): Promise<boolean> {
+  private signing: Promise<boolean> | null = null;
+
+  signIn(): Promise<boolean> {
+    // One at a time: requests that find the session expiring all ask here, and two refreshes with one token race.
+    this.signing ??= this.restore().finally(() => (this.signing = null));
+    return this.signing;
+  }
+
+  private async restore(): Promise<boolean> {
     try {
       const raw = await storage.get(SESSION_KEY);
       if (raw) this.session = JSON.parse(raw) as Session;
       if (this.session && this.session.expires - Date.now() > 60_000) return true;
       if (this.session) {
-        const s = await this.auth('token?grant_type=refresh_token', { refresh_token: this.session.refresh });
-        if (s) return true;
+        const r = await this.authRequest('token?grant_type=refresh_token', { refresh_token: this.session.refresh });
+        if (r.session) return true;
+        // A busy or failing server: try again later, still as this player. Only a refresh the
+        // server has turned down for good starts a new account (the old one can't be reached again).
+        if (!r.refused) return false;
       }
       return (await this.auth('signup', { data: {} })) !== null;
     } catch {
@@ -89,7 +100,7 @@ export class SupabaseBackend implements Backend {
   }
 
   /** An auth call that answers with a session (kept, and saved on the device), or the server's error code. */
-  private async authRequest(path: string, body: unknown, bearer?: string): Promise<{ session: Session | null; code: string }> {
+  private async authRequest(path: string, body: unknown, bearer?: string): Promise<{ session: Session | null; code: string; refused?: boolean }> {
     const headers: Record<string, string> = { apikey: this.key, 'Content-Type': 'application/json' };
     if (bearer) headers.Authorization = `Bearer ${bearer}`;
     const sent = Date.now();
@@ -100,7 +111,8 @@ export class SupabaseBackend implements Backend {
       const code = typeof e.error_code === 'string' ? e.error_code : typeof e.code === 'string' ? e.code : '';
       const why = code || (/already/i.test(e.msg ?? e.message ?? '') ? 'identity_already_exists' : `http_${res.status}`);
       this.authError = e.msg ?? e.message ? `${why}: ${e.msg ?? e.message}` : why;
-      return { session: null, code: why };
+      // 4xx is the server saying no (a bad or used-up token); 5xx, 408 and 429 are worth another try.
+      return { session: null, code: why, refused: res.status >= 400 && res.status < 500 && res.status !== 408 && res.status !== 429 };
     }
     this.authError = '';
     const j = (await res.json()) as { access_token: string; refresh_token: string; expires_in: number; user: { id: string } };
@@ -186,9 +198,10 @@ export class SupabaseBackend implements Backend {
     return typeof m === 'string' ? m : 'turned down';
   }
 
-  async loadSave(): Promise<{ data: Record<string, string>; savedAt: number } | null> {
+  async loadSave(): Promise<{ data: Record<string, string>; savedAt: number } | null | undefined> {
     const rows = await this.call<{ data: Record<string, string>; saved_at: number }[]>(`/rest/v1/saves?select=data,saved_at&user_id=eq.${this.session?.user}`);
-    const row = rows?.[0];
+    if (!Array.isArray(rows)) return undefined; // no answer: not the same as no save
+    const row = rows[0];
     return row ? { data: row.data, savedAt: row.saved_at } : null;
   }
 
