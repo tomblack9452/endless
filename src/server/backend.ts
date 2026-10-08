@@ -52,6 +52,23 @@ export interface BoardRow {
   premium?: boolean;
   /** The looks the pilot has on (drawn next to their name), if they've sent them. */
   ship?: ShipLook | null;
+  /** The pilot's public id, for their service record (pilotRecord); not their account id. */
+  pid?: string;
+}
+
+/** The summary of a service record each pilot sends for others to see: rank, xp and lifetime stats, all numbers. */
+export type PilotStats = Partial<Record<'rank' | 'xp' | 'runs' | 'seconds' | 'distance' | 'bestLevel' | 'bestChain' | 'nearMisses' | 'pickups' | 'rankedRuns', number>>;
+
+/** A pilot's service record as the boards show it. */
+export interface PilotRecord {
+  name: string;
+  premium: boolean;
+  ship: ShipLook | null;
+  stats: PilotStats;
+  /** The best score on each board they're on (board id to score). */
+  bests: Record<string, number>;
+  /** When they joined (ms). */
+  since: number;
 }
 
 export type LinkResult = 'linked' | 'taken' | 'failed';
@@ -97,6 +114,10 @@ export interface Backend {
   setPilotName(name: string): Promise<{ ok: boolean; message: string }>;
   /** Show these looks next to your name on the boards; false if it didn't get there. */
   setShip(ship: ShipLook): Promise<boolean>;
+  /** Share your service record's summary, for others tapping you on the boards; false if it didn't get there. */
+  setRecord(stats: PilotStats): Promise<boolean>;
+  /** A pilot's service record by the public id a board row gave, or null if it couldn't be read. */
+  pilotRecord(pid: string): Promise<PilotRecord | null>;
   /** True once if the account was marked to be maxed out from the SQL editor (players.max_out); clears the mark. */
   takeMaxOut(): Promise<boolean>;
   /** The Google account this account is kept with (its email), '' if none, or null if unknown. */

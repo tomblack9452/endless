@@ -64,6 +64,14 @@ export class LocalBackend implements Backend {
     return false;
   }
 
+  async setRecord(): Promise<boolean> {
+    return false;
+  }
+
+  async pilotRecord(): Promise<null> {
+    return null;
+  }
+
   readonly authError = '';
 
   async googleAccount(): Promise<string | null> {

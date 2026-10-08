@@ -74,7 +74,14 @@ export interface TitleCard {
   hot?: boolean;
 }
 
-/** Everything the service record screen shows. */
+/** A pilot's service record, opened by tapping them on a board. */
+export interface PilotCardView {
+  icon: string; // their rank's insignia (svg)
+  rank: string;
+  note: string; // under the rank: premium, when they joined
+  rows: [string, string][];
+}
+
 /** The rank block on the game-over screen. */
 export interface RankResultView {
   icon: string;
@@ -439,7 +446,7 @@ export class UI {
   /** The board's rows: rank, name, score. A pilot below the top comes after a gap. */
   renderLeaderboard(
     caption: string,
-    rows: { rank: number; name: string; score: string; you: boolean; premium?: boolean; picture?: (() => string | null) | null; looks?: string }[],
+    rows: { rank: number; name: string; score: string; you: boolean; premium?: boolean; picture?: (() => string | null) | null; looks?: string; record?: (() => Promise<PilotCardView | null>) | null }[],
     status: string,
   ): void {
     $('board-caption').textContent = caption;
@@ -480,20 +487,30 @@ export class UI {
       score.className = 'pts';
       score.textContent = r.score;
       row.append(rank, ship, who, score);
-      // Tap a pilot to see their ship bigger, and what's on it.
-      if (r.picture) {
+      // Tap a pilot to see their ship bigger, what's on it, and their service record.
+      if (r.picture || r.record) {
         const more = document.createElement('div');
         more.className = 'board-more';
         more.hidden = true;
         const big = document.createElement('img');
         big.alt = '';
+        big.hidden = !r.picture;
         const looks = document.createElement('div');
         looks.className = 'label dim';
         looks.textContent = r.looks ?? '';
-        more.append(big, looks);
+        const card = document.createElement('div');
+        card.className = 'pilot-card';
+        more.append(big, looks, card);
+        let asked = false;
+        row.setAttribute('aria-expanded', 'false');
         row.addEventListener('click', () => {
           more.hidden = !more.hidden;
-          big.src = ship.src;
+          row.setAttribute('aria-expanded', String(!more.hidden));
+          if (r.picture) big.src = ship.src;
+          if (more.hidden || asked || !r.record) return;
+          asked = true;
+          card.replaceChildren(Object.assign(document.createElement('div'), { className: 'label dim', textContent: 'loading service record' }));
+          void r.record().then((v) => this.fillPilotCard(card, v));
         });
         out.push(row, more);
       } else out.push(row);
@@ -511,6 +528,27 @@ export class UI {
       if (pictures.length > 0) requestAnimationFrame(step);
     };
     requestAnimationFrame(step);
+  }
+
+  /** A pilot's service record under their row on a board (null: it couldn't be read). */
+  private fillPilotCard(card: HTMLElement, v: PilotCardView | null): void {
+    if (!v) {
+      card.replaceChildren(Object.assign(document.createElement('div'), { className: 'label dim', textContent: "couldn't load their service record" }));
+      return;
+    }
+    const head = document.createElement('div');
+    head.className = 'pilot-head';
+    const icon = document.createElement('span');
+    icon.className = 'pilot-insignia';
+    icon.innerHTML = v.icon;
+    const text = document.createElement('span');
+    text.className = 'pilot-rank';
+    text.append(Object.assign(document.createElement('span'), { className: 'label', textContent: v.rank }), Object.assign(document.createElement('span'), { className: 'label dim', textContent: v.note }));
+    head.append(icon, text);
+    const rows = document.createElement('div');
+    rows.className = 'pilot-rows';
+    this.fillRows(rows, v.rows);
+    card.replaceChildren(head, rows);
   }
 
   /** A pilot name box ("board", "settings", "name"): its current value and a line under it. */

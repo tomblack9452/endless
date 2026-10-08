@@ -1,6 +1,6 @@
 import { storage } from '../storage';
 import type { ShipLook } from '../portrait';
-import type { Backend, BoardQuery, BoardRow, LinkResult, Purchase, RunSubmission, SubmitResult } from './backend';
+import type { Backend, BoardQuery, BoardRow, LinkResult, PilotRecord, PilotStats, Purchase, RunSubmission, SubmitResult } from './backend';
 
 // Supabase over plain fetch (no SDK, to keep the bundle small):
 //   auth      anonymous sign-in, refreshed as it expires; a Google login can be
@@ -245,11 +245,11 @@ export class SupabaseBackend implements Backend {
   }
 
   async board(q: BoardQuery): Promise<BoardRow[] | null> {
-    const rows = await this.call<{ rank: number; name: string; score: number; you: boolean; premium?: boolean; ship?: ShipLook | null }[]>('/rest/v1/rpc/leaderboard', {
+    const rows = await this.call<{ rank: number; name: string; score: number; you: boolean; premium?: boolean; ship?: ShipLook | null; pid?: string | null }[]>('/rest/v1/rpc/leaderboard', {
       method: 'POST',
       body: JSON.stringify({ p_board: q.board, p_period: q.period, p_league: q.league, p_limit: q.limit ?? 50 }),
     });
-    return rows ? rows.map((r) => ({ rank: Number(r.rank), name: r.name, score: r.score, you: r.you, premium: r.premium === true, ship: r.ship ?? null })) : null;
+    return rows ? rows.map((r) => ({ rank: Number(r.rank), name: r.name, score: r.score, you: r.you, premium: r.premium === true, ship: r.ship ?? null, pid: r.pid ?? undefined })) : null;
   }
 
   async purchases(): Promise<Purchase[] | null> {
@@ -269,6 +269,20 @@ export class SupabaseBackend implements Backend {
   async setShip(ship: ShipLook): Promise<boolean> {
     const { status } = await this.request('/rest/v1/rpc/set_ship', { method: 'POST', body: JSON.stringify({ p_ship: ship }) });
     return status >= 200 && status < 300;
+  }
+
+  async setRecord(stats: PilotStats): Promise<boolean> {
+    const { status } = await this.request('/rest/v1/rpc/set_record', { method: 'POST', body: JSON.stringify({ p_record: stats }) });
+    return status >= 200 && status < 300;
+  }
+
+  async pilotRecord(pid: string): Promise<PilotRecord | null> {
+    const r = await this.call<{ name: string; premium: boolean; ship: ShipLook | null; record: PilotStats | null; bests: Record<string, number> | null; since: number } | null>('/rest/v1/rpc/pilot_record', {
+      method: 'POST',
+      body: JSON.stringify({ p_pid: pid }),
+    });
+    if (!r) return null;
+    return { name: r.name, premium: r.premium === true, ship: r.ship ?? null, stats: r.record ?? {}, bests: r.bests ?? {}, since: Number(r.since) || 0 };
   }
 
   async deleteAccount(): Promise<boolean> {

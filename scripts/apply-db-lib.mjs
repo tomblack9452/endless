@@ -6,7 +6,7 @@
 // hand (no record yet) is recognised by a table each migration creates.
 
 /** A table, index or function each migration creates: how a hand-pasted database is recognised. */
-const MADE = { '0001_init.sql': 'players', '0002_store.sql': 'store_events', '0003_leaderboards.sql': 'bests', '0004_premium.sql': 'store_events_by_user', '0005_delete_account.sql': 'delete_my_account()', '0006_ship_looks.sql': 'set_ship(jsonb)', '0007_wallet_credits.sql': 'sync_credits(bigint,bigint)', '0008_max_out.sql': 'take_max_out()', '0009_name_filter.sql': 'name_words', '0010_secure_cores.sql': 'core_log_reason', '0011_store_purchases.sql': 'store_refund(text,uuid,text,text,integer)', '0012_trusted_clock.sql': 'server_now()' };
+const MADE = { '0001_init.sql': 'players', '0002_store.sql': 'store_events', '0003_leaderboards.sql': 'bests', '0004_premium.sql': 'store_events_by_user', '0005_delete_account.sql': 'delete_my_account()', '0006_ship_looks.sql': 'set_ship(jsonb)', '0007_wallet_credits.sql': 'sync_credits(bigint,bigint)', '0008_max_out.sql': 'take_max_out()', '0009_name_filter.sql': 'name_words', '0010_secure_cores.sql': 'core_log_reason', '0011_store_purchases.sql': 'store_refund(text,uuid,text,text,integer)', '0012_trusted_clock.sql': 'server_now()', '0013_pilot_records.sql': 'pilot_record(uuid)' };
 
 /**
  * `db.query(sql, params?)` resolving `{ rows }`. `migrations`: [[file name, sql], ...] in order.

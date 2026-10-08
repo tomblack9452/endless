@@ -1,4 +1,4 @@
--- Endless Space database: part 24 of 26. Run the parts in order, 01 first.
+-- Endless Space database: part 24 of 28. Run the parts in order, 01 first.
 
 create or replace function public.earn_cores(amount integer, reason text) returns integer
 language plpgsql security definer set search_path = public as $$

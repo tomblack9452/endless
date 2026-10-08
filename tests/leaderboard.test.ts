@@ -126,6 +126,23 @@ describe('the game talking to the database', () => {
     ]);
   });
 
+  it("shows a pilot's service record to whoever taps them on a board", async () => {
+    const [a, b] = [await player(), await player()];
+    await a.submitRun(run({ board: 'solo:volcanic', score: 2100 }));
+    await wait();
+    await a.submitRun(run({ board: 'solo:asteroids', score: 900 }));
+    expect(await a.setRecord({ rank: 3, xp: 1200, runs: 40, seconds: 3600 })).toBe(true);
+    const rows = await b.board({ board: 'solo:volcanic', period: 'all', league: 0 });
+    const row = rows?.find((r) => r.score === 2100);
+    expect(row?.pid).toMatch(/^[0-9a-f-]{36}$/);
+    expect(row?.pid).not.toBe(a.userId); // a public id, never the account's
+    const rec = await b.pilotRecord(row!.pid!);
+    expect(rec).toMatchObject({ name: expect.stringMatching(/^pilot-/), premium: false, stats: { rank: 3, xp: 1200, runs: 40, seconds: 3600 } });
+    expect(rec?.bests).toMatchObject({ 'solo:volcanic': 2100, 'solo:asteroids': 900 });
+    // Only numbers go in a record.
+    expect(await a.setRecord({ rank: 'general' } as unknown as Record<string, number>)).toBe(false);
+  });
+
   it('reads the week per league using the same keys the screen uses', async () => {
     const b = await player();
     const tab = BOARD_TABS[0];

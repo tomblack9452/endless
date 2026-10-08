@@ -35,7 +35,7 @@ import { type Reward, rewardLook, rewardParts, rewardText } from './economy/rewa
 import { DailyShop, setOffer, vaultAt } from './economy/shop';
 import { dayKey, formatWait, untilTomorrow } from './economy/time';
 import { EconomyView, type StoreButton, type StoreCard } from './economy/view';
-import { type BoardId, createBackend, type Purchase } from './server/backend';
+import { type BoardId, createBackend, type PilotStats, type Purchase } from './server/backend';
 import { BOARD_TABS, boardCaption, boardForRun, boardName, boardQuery } from './server/boards';
 import { Outbox } from './server/outbox';
 import { CloudSave } from './server/sync';
@@ -58,7 +58,7 @@ import type { Fin, Marking } from './looks';
 import { MAX_TIER, type ShipStats, STANDARD, SYSTEMS, type SystemId, TIER_COST, TIER_LEAGUE, Upgrades } from './upgrades';
 import { newSeed } from './rng';
 import { loadNumber } from './storage';
-import { type Celebration, formatScore, type ProgressView, type RankResultView, type TitleCard, UI } from './ui';
+import { type Celebration, formatScore, type PilotCardView, type ProgressView, type RankResultView, type TitleCard, UI } from './ui';
 import type { RoomId } from './interior';
 import { biomeForLevel, type PowerKind, themeForLevel, themeName, World } from './world';
 import { tintBiome } from './biomes';
@@ -174,6 +174,7 @@ export class Game {
   private deleteArmed = false;
   private portraits = new Portraits(this.palette);
   private shipSent = ''; // the looks last sent to the boards (JSON)
+  private recordSent = ''; // the service record summary last sent (JSON)
   private shipTimer = 0;
   private nameOk = false; // the player has a pilot name of their own
   private googleEmail: string | null = null; // the Google account this account is kept with ('' none, null unknown)
@@ -1707,10 +1708,70 @@ export class Game {
     if (await this.backend.setShip(ship)) this.shipSent = key;
   }
 
-  /** A board row for the UI, with a picture of the pilot's ship (yours as you have it on now). */
-  private boardRow(r: { rank: number; name: string; score: number; you: boolean; premium?: boolean; ship?: ShipLook | null }) {
-    const ship = r.you ? this.shipLook() : (r.ship ?? null);
+  /** Your service record's summary, as others see it when they tap you on a board. */
+  private pilotStats(): PilotStats {
+    const s = this.progress.stats;
     return {
+      rank: this.ranked.rank,
+      xp: Math.floor(this.ranked.xp),
+      runs: s.runs,
+      seconds: Math.floor(s.seconds),
+      distance: Math.floor(s.distance),
+      bestLevel: s.bestLevel,
+      bestChain: s.bestChain,
+      nearMisses: s.nearMisses,
+      pickups: s.pickups,
+      rankedRuns: this.ranked.history.length,
+    };
+  }
+
+  /** Send your service record's summary to the boards if it's changed since last time. */
+  private async syncRecord(): Promise<void> {
+    if (!this.backend.online) return;
+    const stats = this.pilotStats();
+    const key = JSON.stringify(stats);
+    if (key === this.recordSent) return;
+    if (await this.backend.setRecord(stats)) this.recordSent = key;
+  }
+
+  /** A pilot's service record for their board row: rank, lifetime stats and bests. */
+  private async pilotCard(pid: string): Promise<PilotCardView | null> {
+    const p = await this.backend.pilotRecord(pid);
+    if (!p) return null;
+    const st = p.stats;
+    const rank = Math.max(0, Math.min(RANKS.length - 1, Math.floor(st.rank ?? 0)));
+    const n = (v: number | undefined): string => formatScore(v ?? 0);
+    const rows: [string, string][] = [];
+    if (st.runs !== undefined) {
+      const secs = st.seconds ?? 0;
+      const hours = Math.floor(secs / 3600);
+      const mins = Math.floor((secs % 3600) / 60);
+      rows.push(
+        ['xp', n(st.xp)],
+        ['runs', n(st.runs)],
+        ['ranked runs', n(st.rankedRuns)],
+        ['time played', hours > 0 ? `${hours}h ${mins}m` : `${mins}m`],
+        ['distance', `${((st.distance ?? 0) / 1000).toFixed(1)} km`],
+      );
+    }
+    const best = (board: string, label: string): void => {
+      if (p.bests[board]) rows.push([label, formatScore(p.bests[board])]);
+    };
+    best('ranked', 'best ranked week');
+    best('endless', 'best endless');
+    for (const e of ENVIRONMENTS) best(`solo:${e.id}`, `best solo: ${e.name}`);
+    if (st.runs !== undefined) rows.push(['furthest level', String(st.bestLevel || 1)], ['best chain', `x${st.bestChain ?? 0}`], ['near misses', n(st.nearMisses)], ['pickups', n(st.pickups)]);
+    const since = p.since ? `since ${new Date(p.since).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' }).toLowerCase()}` : '';
+    const note = [p.premium ? '◆ premium' : '', since, st.runs === undefined ? 'no stats shared yet' : ''].filter(Boolean).join(' · ');
+    return { icon: insignia(rank), rank: st.rank === undefined ? 'rank unknown' : rankName(rank), note, rows };
+  }
+
+  /** A board row for the UI, with a picture of the pilot's ship (yours as you have it on now). */
+  private boardRow(r: { rank: number; name: string; score: number; you: boolean; premium?: boolean; ship?: ShipLook | null; pid?: string }) {
+    const ship = r.you ? this.shipLook() : (r.ship ?? null);
+    const pid = r.pid;
+    return {
+      record: pid ? () => this.pilotCard(pid) : null,
       rank: r.rank,
       name: r.name,
       score: formatScore(r.score),
@@ -1744,7 +1805,7 @@ export class Game {
       return;
     }
     this.ui.renderLeaderboard(caption, [], 'loading');
-    await Promise.all([this.outbox.flush(), this.syncShip()]); // so a run you just finished, and your ship, are on the board
+    await Promise.all([this.outbox.flush(), this.syncShip(), this.syncRecord()]); // so a run you just finished, your ship and your record are on the board
     const rows = await this.backend.board(boardQuery(tab, this.leagues.league));
     if (seq !== this.boardSeq || this.infoOpen !== 'boards') return; // moved on while it loaded
     if (rows === null) this.ui.renderLeaderboard(caption, own, "couldn't load the board. check your connection");

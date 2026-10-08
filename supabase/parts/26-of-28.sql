@@ -1,4 +1,4 @@
--- Endless Space database: part 26 of 26. Run the parts in order, 01 first.
+-- Endless Space database: part 26 of 28. Run the parts in order, 01 first.
 
 create or replace function public.earn_cores(amount integer, reason text) returns integer
 language plpgsql security definer set search_path = public as $$
@@ -64,3 +64,16 @@ grant execute on function public.earn_cores to authenticated;
 revoke execute on function public.grant_cores from public, anon, authenticated;
 
 grant execute on function public.grant_cores to service_role;
+
+-- Service records on the boards: tap a pilot to see their rank and stats.
+--
+-- Each player sends a small summary of their own service record (rank, xp,
+-- lifetime stats) with set_record, kept on their players row. The boards hand
+-- out a public id per pilot (never the account id), and pilot_record() reads a
+-- pilot's card by it: name, premium, ship, that summary, and their bests.
+
+alter table public.players add column if not exists public_id uuid not null default gen_random_uuid();
+
+create unique index if not exists players_public_id on public.players (public_id);
+
+alter table public.players add column if not exists record jsonb;

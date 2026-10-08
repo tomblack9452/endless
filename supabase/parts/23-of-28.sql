@@ -1,4 +1,4 @@
--- Endless Space database: part 23 of 26. Run the parts in order, 01 first.
+-- Endless Space database: part 23 of 28. Run the parts in order, 01 first.
 
 -- END WORDS
 
