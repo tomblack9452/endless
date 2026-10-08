@@ -1,4 +1,4 @@
--- Endless Space database: part 4 of 28. Run the parts in order, 01 first.
+-- Endless Space database: part 4 of 29. Run the parts in order, 01 first.
 
 -- The checks on a run: is it possible? (not that it's honest: a full re-fly on the
 -- server is the next step, see docs/leaderboards.md). Raises a reason if not.

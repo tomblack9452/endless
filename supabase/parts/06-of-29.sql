@@ -1,4 +1,4 @@
--- Endless Space database: part 6 of 28. Run the parts in order, 01 first.
+-- Endless Space database: part 6 of 29. Run the parts in order, 01 first.
 
 -- its columns change in 0004
 create function public.leaderboard(

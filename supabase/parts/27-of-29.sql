@@ -1,4 +1,4 @@
--- Endless Space database: part 27 of 28. Run the parts in order, 01 first.
+-- Endless Space database: part 27 of 29. Run the parts in order, 01 first.
 
 -- Set your own. Only the shape is checked (an object of numbers, small): the
 -- stats live on the device, and the card only shows them.

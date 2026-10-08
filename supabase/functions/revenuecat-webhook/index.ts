@@ -4,7 +4,7 @@
 // The app buys as the player's Supabase account id (appUserID), so the
 // event's app_user_id is the account to pay.
 //
-// Set up:
+// Set up (the database first: npm run db:apply, for 0014's purchase time):
 //   supabase secrets set REVENUECAT_WEBHOOK_SECRET=<any long random string>
 //   supabase functions deploy revenuecat-webhook --no-verify-jwt
 //   RevenueCat > Project > Integrations > Webhooks: the function's URL, with
@@ -32,6 +32,8 @@ interface RcEvent {
   product_id: string;
   transaction_id?: string;
   original_transaction_id?: string;
+  /** When it was bought (ms): kept as the purchase's time, rather than when this arrived. */
+  purchased_at_ms?: number;
 }
 
 Deno.serve(async (req) => {
@@ -44,11 +46,12 @@ Deno.serve(async (req) => {
   const user = /^[0-9a-f-]{36}$/.test(event.app_user_id) ? event.app_user_id : null;
   const cores = CORES[event.product_id] ?? 0;
   const transaction = event.transaction_id ?? event.original_transaction_id ?? null;
+  const at = typeof event.purchased_at_ms === 'number' && Number.isFinite(event.purchased_at_ms) ? new Date(event.purchased_at_ms).toISOString() : null;
   // One database call each: keeping the event and paying (or taking back) its
   // cores happen together, so an error leaves nothing half done and the retry
-  // RevenueCat makes after a 500 does the whole thing (0011_store_purchases.sql).
+  // RevenueCat makes after a 500 does the whole thing (0011_store_purchases.sql, 0014).
   const { data, error } = PAID.has(event.type)
-    ? await admin.rpc('store_purchase', { p_id: event.id, p_user: user, p_product: event.product_id, p_type: event.type, p_transaction: transaction, p_cores: cores })
+    ? await admin.rpc('store_purchase_at', { p_id: event.id, p_user: user, p_product: event.product_id, p_type: event.type, p_transaction: transaction, p_cores: cores, p_at: at })
     : await admin.rpc('store_refund', { p_id: event.id, p_user: user, p_product: event.product_id, p_transaction: transaction, p_cores: cores });
   if (error) return new Response(error.message, { status: 500 });
   return new Response(String(data));

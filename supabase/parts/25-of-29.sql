@@ -1,4 +1,4 @@
--- Endless Space database: part 25 of 28. Run the parts in order, 01 first.
+-- Endless Space database: part 25 of 29. Run the parts in order, 01 first.
 
 create or replace function public.store_purchase(p_id text, p_user uuid, p_product text, p_type text, p_transaction text, p_cores integer)
 returns text language plpgsql security definer set search_path = public as $$

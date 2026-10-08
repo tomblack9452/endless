@@ -1,4 +1,4 @@
--- Endless Space database: part 11 of 28. Run the parts in order, 01 first.
+-- Endless Space database: part 11 of 29. Run the parts in order, 01 first.
 
 insert into public.name_words (word, strong) values ('fuck', true), ('fuk', true), ('shit', true), ('cunt', true), ('nigg', true), ('fagg', true), ('faggot', true), ('whore', true), ('slut', true), ('bitch', true), ('penis', true), ('pussy', true), ('porn', true), ('jizz', true), ('twat', true), ('wank', true), ('dildo', true), ('boob', true), ('kike', true), ('chink', true), ('retard', true), ('nazi', true), ('hitler', true), ('sperm', true), ('vagina', true), ('clit', true), ('hentai', true), ('rapist', true), ('molest', true), ('asshole', true), ('bastard', true), ('bollock', true), ('cocksuck', true), ('motherf', true), ('blowjob', true), ('handjob', true), ('skank', true)
 on conflict (word) do update set strong = true;

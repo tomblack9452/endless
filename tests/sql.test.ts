@@ -516,11 +516,23 @@ describe('store purchases (the webhook, with the service key)', () => {
     expect(await coresOf(a)).toBe(0);
   });
 
+  it('keep when the purchase was made, not when the webhook arrived (never a time ahead of the server)', async () => {
+    const a = await newUser();
+    await admin();
+    const at = async (id: string) => (await db.query<{ at: Date }>('select at from public.store_events where id = $1', [id])).rows[0].at.getTime();
+    const bought = Date.now() - 3 * 86_400_000;
+    await db.query('select public.store_purchase_at($1, $2, $3, $4, $5, $6, $7)', ['ev-at', a, 'season_pass', 'NON_RENEWING_PURCHASE', 'tx-at', 0, new Date(bought).toISOString()]);
+    expect(Math.abs((await at('ev-at')) - bought)).toBeLessThan(1000);
+    await db.query('select public.store_purchase_at($1, $2, $3, $4, $5, $6, $7)', ['ev-later', a, 'premium', 'NON_RENEWING_PURCHASE', 'tx-later', 0, new Date(Date.now() + 86_400_000).toISOString()]);
+    expect(await at('ev-later')).toBeLessThanOrEqual(Date.now() + 1000);
+  });
+
   it("can't be called by a player", async () => {
     const a = await newUser();
     await as(a);
     await rejects(db.query(`select public.store_purchase('x', '${a}', 'premium', 'INITIAL_PURCHASE', 'x', 0)`), /permission denied/);
     await rejects(db.query(`select public.store_refund('x', '${a}', 'premium', 'x', 0)`), /permission denied/);
+    await rejects(db.query(`select public.store_purchase_at('x', '${a}', 'premium', 'INITIAL_PURCHASE', 'x', 0, now())`), /permission denied/);
   });
 });
 

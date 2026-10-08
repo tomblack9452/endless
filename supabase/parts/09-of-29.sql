@@ -1,4 +1,4 @@
--- Endless Space database: part 9 of 28. Run the parts in order, 01 first.
+-- Endless Space database: part 9 of 29. Run the parts in order, 01 first.
 
 -- A board, best first: the top p_limit pilots and, if you are further down,
 -- your own row at the end with your rank.
