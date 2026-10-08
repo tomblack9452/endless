@@ -5,4 +5,13 @@ dist
 !.claude/skills/
 .DS_Store
 .env
-.env.local
+.env.*
+!.env.example
+# Signing keys and their settings never go in the repo (the upload key lives on Tom's PC).
+*.jks
+*.keystore
+*.p12
+keystore.properties
+local.properties
+google-services.json
+android/app/release/
