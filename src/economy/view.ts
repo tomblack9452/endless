@@ -121,6 +121,9 @@ export interface OfferView {
   lines: string[];
   yes: string;
   yesEnabled: boolean;
+  /** A second way to say yes (the revive's cores, beside its ad); '' for none. */
+  alt?: string;
+  altEnabled?: boolean;
   no: string;
   /** Seconds before it closes itself (as "no"), shown in the ring; 0 = no timer. */
   seconds: number;
@@ -137,6 +140,7 @@ export class EconomyView {
   private readonly offerEl = $('offer');
   private offerYes: (() => void) | null = null;
   private offerNo: (() => void) | null = null;
+  private offerAlt: (() => void) | null = null;
   private offerLeft = 0;
   private offerTotal = 0;
   private readonly countdownEl = $('countdown');
@@ -146,6 +150,7 @@ export class EconomyView {
     stopTaps(this.offerEl);
     $('offer-yes').addEventListener('click', () => this.closeOffer(true));
     $('offer-no').addEventListener('click', () => this.closeOffer(false));
+    $('offer-alt').addEventListener('click', () => this.closeOffer('alt'));
     for (const id of ['screen-shop', 'screen-store', 'screen-pass', 'countdown']) stopTaps($(id));
   }
 
@@ -363,16 +368,21 @@ export class EconomyView {
     return this.offerEl.classList.contains('show');
   }
 
-  offer(v: OfferView, onYes: () => void, onNo: () => void): void {
+  offer(v: OfferView, onYes: () => void, onNo: () => void, onAlt?: () => void): void {
     $('offer-kicker').textContent = v.kicker;
     $('offer-name').textContent = v.name;
     $('offer-lines').replaceChildren(...v.lines.map((l) => el('div', 'label', l)));
     const yes = $('offer-yes') as HTMLButtonElement;
     yes.textContent = v.yes;
     yes.disabled = !v.yesEnabled;
+    const alt = $('offer-alt') as HTMLButtonElement;
+    alt.hidden = !v.alt;
+    alt.textContent = v.alt ?? '';
+    alt.disabled = !v.altEnabled;
     $('offer-no').textContent = v.no;
     this.offerYes = onYes;
     this.offerNo = onNo;
+    this.offerAlt = onAlt ?? null;
     this.offerTotal = this.offerLeft = v.seconds;
     $('offer-ring').hidden = v.seconds <= 0;
     this.drawRing();
@@ -393,18 +403,18 @@ export class EconomyView {
     $('offer-count').textContent = String(Math.max(0, Math.ceil(this.offerLeft)));
   }
 
-  private closeOffer(yes: boolean): void {
+  private closeOffer(answer: boolean | 'alt'): void {
     if (!this.offerOpen) return;
     this.offerEl.classList.remove('show');
-    const run = yes ? this.offerYes : this.offerNo;
-    this.offerYes = this.offerNo = null;
+    const run = answer === 'alt' ? this.offerAlt : answer ? this.offerYes : this.offerNo;
+    this.offerYes = this.offerNo = this.offerAlt = null;
     run?.();
   }
 
   /** Close without answering (a run is starting). */
   dismissOffer(): void {
     this.offerEl.classList.remove('show');
-    this.offerYes = this.offerNo = null;
+    this.offerYes = this.offerNo = this.offerAlt = null;
   }
 
   // --- countdown ---

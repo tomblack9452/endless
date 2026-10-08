@@ -1122,28 +1122,35 @@ export class Game {
   private offerRevive(): void {
     const day = dayKey(this.now());
     const free = this.daily.freeRevivesLeft(day, this.freeRevivesADay()) > 0;
-    // Out of free ones: a rewarded ad if there is one (free with premium), otherwise cores.
+    // Out of free ones: a rewarded ad (free with premium) or cores, the player's pick.
     const byAd = !free && this.ads.offers('revive');
     const cost = CONFIG.economy.revive.coreCost;
+    const cores = `revive · ${cost} cores`;
+    const byCores = (): void => {
+      if (!this.wallet.spendCores(cost)) return this.settleCrash();
+      this.revive();
+    };
     this.econ.offer(
       {
         kicker: 'crashed',
         name: 'keep going?',
         lines: [free ? 'your free revive today' : `you have ${formatScore(this.wallet.cores)} cores`, `score so far ${formatScore(this.score)}`],
-        yes: free ? 'revive · free' : byAd ? `revive · ${this.ads.label()}` : `revive · ${cost} cores`,
+        yes: free ? 'revive · free' : byAd ? `revive · ${this.ads.label()}` : cores,
         yesEnabled: free || byAd || this.wallet.cores >= cost,
+        alt: byAd ? cores : '',
+        altEnabled: this.wallet.cores >= cost,
         no: 'no thanks',
         seconds: 6,
       },
       () => {
-        if (free) this.daily.useFreeRevive(day);
-        else if (byAd) {
-          void this.reviveByAd();
-          return;
-        } else if (!this.wallet.spendCores(cost)) return this.settleCrash();
-        this.revive();
+        if (free) {
+          this.daily.useFreeRevive(day);
+          this.revive();
+        } else if (byAd) void this.reviveByAd();
+        else byCores();
       },
       () => this.settleCrash(),
+      byCores,
     );
   }
 

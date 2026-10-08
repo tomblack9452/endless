@@ -2712,6 +2712,11 @@ body {
   min-width: 220px;
 }
 
+.pill.offer-alt {
+  margin-top: 10px;
+  min-width: 220px;
+}
+
 .offer-no {
   margin-top: 16px;
   padding: 8px 16px;

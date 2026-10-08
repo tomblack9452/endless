@@ -57,7 +57,7 @@ The recommended direction (section 5):
 | Season pass | earn pass XP | 30 tiers in 6 weeks; free track (6,000 credits, 15 cores, 6 tickets); premium (950 cores or a purchase: 8,800 credits, 170 cores, 4 tickets, 4 looks) | per season | a reason to play all season; revenue |
 | Goals | lifetime counts | 53 goals: 34,000 credits and a look each | long term | collection and direction |
 | Shop | spend | 4 looks a day, a weekly set (20% off), a monthly vault look; core packs | daily, weekly, monthly | rotation, revenue |
-| Revive | crash in solo or endless | carry on: free once a day, then 20 cores | per run | convenience, revenue |
+| Revive | crash in solo or endless | carry on: free once a day, then an ad or 50 cores | per run | convenience, revenue |
 | Looks | | 157: 9 free, 53 goals, 41 credits, 23 cores, 9 rank, 6 league, 6 stars, 5 rewards, 5 vault | | expression |
 
 ## 2. The numbers

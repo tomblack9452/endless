@@ -539,7 +539,8 @@ turn over at midnight UTC, the same moment for everyone.
   ticket a try; it's unlimited now, and older saves were paid 30 cores for each
   ticket they had beyond the week's 5.
 - **Revive:** outside ranked, once a run, a crash offers to carry on (with a
-  6 s timer). The first each day is free, then 20 cores. The ship goes back
+  6 s timer). The first each day is free, then
+  an ad or 50 cores, the player's pick. The ship goes back
   onto the safe lane, obstacles near the lane just ahead are cleared, it gets
   a shield and a moment of grace, and a 3-2-1 starts it again.
 - **Daily:** a 7-day login calendar (credits, cores, and the aurora
