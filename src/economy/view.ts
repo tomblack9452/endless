@@ -41,8 +41,8 @@ export interface ShopView {
   reset: string;
   /** The tabs (today, the weekly set, the vault), when each turns over, and which is open. */
   tabs: { id: string; label: string; note: string; on: boolean }[];
-  /** The store's ad above the tabs: the season and the pass's hook, the best pack of cores, and what tapping it does. */
-  store: { kicker: string; title: string; teaser: string; cta: string };
+  /** The store's card above the tabs: the season pass on top, buying cores along the bottom. */
+  store: { pass: { title: string; left: string; hook: string; tier: string; fraction: number }; cores: string };
   heading: string;
   /** A line over a lone card (the vault's), '' for none. */
   kicker: string;
@@ -177,6 +177,7 @@ export class EconomyView {
       if (tab) onTab(tab.dataset.shoptab ?? '');
     });
     $('shop-store').addEventListener('click', () => onTab('store'));
+    $('shop-cores').addEventListener('click', () => onTab('store-cores'));
     $('shop-offers').addEventListener('click', (e) => {
       const card = (e.target as HTMLElement).closest<HTMLElement>('[data-offer]');
       if (card) onOffer(Number(card.dataset.offer));
@@ -198,10 +199,13 @@ export class EconomyView {
     $('shop-wallet').textContent = v.wallet;
     $('shop-reset').textContent = v.reset;
     $('shop-heading').textContent = v.heading;
-    $('shop-store-kicker').textContent = v.store.kicker;
-    $('shop-store-title').textContent = v.store.title;
-    $('shop-store-teaser').textContent = v.store.teaser;
-    $('shop-store-cta').textContent = v.store.cta;
+    const sp = v.store.pass;
+    $('shop-pass-title').textContent = sp.title;
+    $('shop-pass-left').textContent = sp.left;
+    $('shop-pass-hook').textContent = sp.hook;
+    $('shop-pass-tier').textContent = sp.tier;
+    $('shop-pass-fill').style.transform = `scaleX(${Math.min(1, Math.max(0, sp.fraction))})`;
+    $('shop-cores-note').textContent = v.store.cores;
     $('shop-info').textContent = v.info;
     $('shop-tabs').replaceChildren(
       ...v.tabs.map((t) => {

@@ -384,20 +384,23 @@
         </div>
         <div id="shop-wallet" class="label dim showroom-note"></div>
         <div class="sheet settings">
-          <button id="shop-store" class="store-ad" type="button" data-shoptab="store">
-            <span class="store-ad-art" aria-hidden="true">
-              <img class="store-ad-img" src="store/season_pass.png" alt="" width="52" height="52" />
-              <img class="store-ad-img cores" src="store/cores_2500.png" alt="" width="40" height="40" />
-            </span>
-            <span class="store-ad-text">
-              <span id="shop-store-kicker" class="store-ad-kicker"></span>
-              <span id="shop-store-title" class="store-ad-title"></span>
-            </span>
-            <span class="store-ad-foot">
-              <span id="shop-store-teaser" class="store-ad-teaser"></span>
-              <span id="shop-store-cta" class="store-ad-cta"></span>
-            </span>
-          </button>
+          <div class="store-card">
+            <button id="shop-store" class="store-card-pass" type="button">
+              <img class="store-card-img" src="store/season_pass.png" alt="" width="64" height="64" />
+              <span class="store-card-text">
+                <span class="store-card-head"><span id="shop-pass-title" class="store-card-title"></span><span id="shop-pass-left" class="store-card-left"></span></span>
+                <span id="shop-pass-hook" class="store-card-hook"></span>
+                <span class="store-card-bar"><span class="xp-track"><span id="shop-pass-fill" class="xp-fill"></span></span><span id="shop-pass-tier" class="store-card-tier"></span></span>
+              </span>
+              <span class="store-card-go" aria-hidden="true">›</span>
+            </button>
+            <button id="shop-cores" class="store-card-cores" type="button">
+              <img class="store-card-core" src="store/cores_100.png" alt="" width="28" height="28" />
+              <span class="store-card-buy">buy cores</span>
+              <span id="shop-cores-note" class="store-card-note"></span>
+              <span class="store-card-go" aria-hidden="true">›</span>
+            </button>
+          </div>
           <div id="shop-tabs" class="shop-tabs" role="tablist"></div>
           <div id="shop-looks">
             <div class="settings-group shop-head"><span id="shop-heading">today's looks</span> <span id="shop-reset" class="group-note"></span><button id="shop-layout" class="shop-tool" type="button" hidden>see all</button><button id="shop-tryset" class="shop-tool" type="button" aria-label="try the whole set on" hidden>try the set on</button></div>
@@ -430,7 +433,7 @@
             <ul id="store-pass-perks" class="store-perks"></ul>
             <div id="store-pass-buttons" class="store-hero-buttons"></div>
           </div>
-          <div class="settings-group">cores</div>
+          <div id="store-packs-head" class="settings-group">cores</div>
           <div class="label dim setting-note">cores buy premium looks, the vault, revives and the pass, or swap for credits.</div>
           <div id="store-packs" class="store-grid"></div>
           <div id="store-packs-note" class="label dim setting-note store-note" hidden></div>

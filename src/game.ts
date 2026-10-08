@@ -816,19 +816,25 @@ export class Game {
   }
 
   /** The store's ad on the shop: the season's countdown, the pass's hook, and the best pack of cores. */
-  private storeAd(now: number): { kicker: string; title: string; teaser: string; cta: string } {
+  private storeAd(now: number): { pass: { title: string; left: string; hook: string; tier: string; fraction: number }; cores: string } {
     this.pass.turn(now);
     const s = seasonAt(now);
     const tier = this.pass.tier;
-    const kicker = `season ${s.season} · ends in ${formatWait(s.end - now)}`;
+    const tiers = CONFIG.economy.pass.tiers;
     // The biggest pack, with its bonus and (in the app) its price.
     let best: { id: ProductId; cores: number; bonus: number } | null = null;
     for (const p of CONFIG.economy.store.products) if ('bonus' in p && (!best || p.cores > best.cores)) best = p;
     const price = best && this.storeProducts.find((p) => p.id === best.id)?.price;
-    const teaser = best ? `${formatScore(best.cores)} cores${best.bonus ? ` · +${best.bonus}%` : ''}${price ? ` · ${price}` : ''}` : '';
-    if (this.pass.premium) return { kicker, title: `premium pass · tier ${tier} of ${CONFIG.economy.pass.tiers}`, teaser, cta: 'get cores' };
-    const title = tier > 0 ? `premium: ${tier} reward${tier === 1 ? '' : 's'} waiting` : 'premium rewards, every tier';
-    return { kicker, title, teaser, cta: 'see the pass' };
+    const cores = best ? `up to ${formatScore(best.cores)}${best.bonus ? ` · +${best.bonus}%` : ''}${price ? ` · ${price}` : ''}` : '';
+    const hook = this.pass.premium
+      ? 'premium · every reward is yours'
+      : tier > 0
+        ? `${tier} premium reward${tier === 1 ? '' : 's'} waiting`
+        : 'premium rewards on every tier';
+    return {
+      pass: { title: `season ${s.season} pass`, left: `${s.end - now > 2 * 86_400_000 ? `${Math.ceil((s.end - now) / 86_400_000)}d` : formatWait(s.end - now)} left`, hook, tier: `${tier}/${tiers}`, fraction: tier / tiers },
+      cores,
+    };
   }
 
   /** Under each tab: when it turns over. */
@@ -848,8 +854,10 @@ export class Game {
   }
 
   private onShopTab = (id: string): void => {
-    if (id === 'store') {
+    if (id === 'store' || id === 'store-cores') {
       this.openStore('shop');
+      // Buy cores: straight to the packs, past the pass.
+      if (id === 'store-cores') requestAnimationFrame(() => document.getElementById('store-packs-head')?.scrollIntoView({ block: 'start' }));
       return;
     }
     if (!this.shopTabs().some((t) => t.id === id)) return;

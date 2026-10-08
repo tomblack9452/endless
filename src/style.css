@@ -2244,8 +2244,6 @@ body {
   margin: 8px calc(-1 * (var(--safe-right) + 20px)) 0 calc(-1 * (var(--safe-left) + 20px));
   padding: 4px calc(var(--safe-right) + 20px) 6px calc(var(--safe-left) + 20px);
   overflow-x: auto;
-  scroll-snap-type: x mandatory;
-  scroll-padding: 0 calc(var(--safe-right) + 20px) 0 calc(var(--safe-left) + 20px); /* snap to the sheet's margin, not the screen edge */
   scrollbar-width: none;
   touch-action: pan-x pan-y;
 }
@@ -2384,7 +2382,6 @@ body {
   background: color-mix(in srgb, currentColor 4%, transparent);
   border: 1px solid color-mix(in srgb, currentColor 14%, transparent);
   border-radius: 18px;
-  scroll-snap-align: start;
   cursor: pointer;
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
@@ -3470,148 +3467,137 @@ body.dark #screen-title .title-word.sub {
   font-family: var(--font-mono);
 }
 
-/* The shop's way into the store: an ad for the season pass and cores, in the cores' purple. */
-.store-ad {
-  --ad: #8a63d2;
-  --ad-deep: #5a3ca6;
-  --ad-ink: #fbf8ff;
-  position: relative;
-  display: grid;
-  grid-template-columns: 54px minmax(0, 1fr);
-  grid-template-areas:
-    'art text'
-    'foot foot';
-  column-gap: 12px;
-  row-gap: 7px;
+/* The shop's way into the store, as one card: the season pass on top, buying
+   cores along the bottom. Plain, in the sheet's own ink, like the look cards. */
+.store-card {
+  margin: 14px 0 12px;
+  border: 1.5px solid color-mix(in srgb, currentColor 70%, transparent);
+  border-radius: 18px;
+  overflow: hidden;
+  background: color-mix(in srgb, currentColor 3%, transparent);
+}
+
+.store-card-pass,
+.store-card-cores {
+  display: flex;
   align-items: center;
   width: 100%;
-  margin: 12px 0 10px;
-  padding: 10px 10px 10px 13px;
-  overflow: hidden;
-  border: 0;
-  border-radius: 18px;
-  background:
-    radial-gradient(120% 140% at 0% 0%, color-mix(in srgb, #fff 16%, transparent), transparent 55%),
-    linear-gradient(120deg, var(--ad), var(--ad-deep));
-  box-shadow: 0 10px 24px -16px var(--ad-deep), inset 0 0 0 1px color-mix(in srgb, #fff 14%, transparent);
-  color: var(--ad-ink);
   font: inherit;
+  color: inherit;
   text-align: left;
+  background: none;
+  border: 0;
   cursor: pointer;
 }
 
-body.dark .store-ad {
-  --ad: #7c56c9;
-  --ad-deep: #3f2a7e;
+.store-card-pass:active,
+.store-card-cores:active {
+  background: color-mix(in srgb, currentColor 6%, transparent);
 }
 
-.store-ad:active {
-  transform: scale(0.99);
+.store-card-pass {
+  gap: 14px;
+  padding: 12px 14px 12px 12px;
 }
 
-/* The pass's badge with a pack of cores tucked in front. */
-.store-ad-art {
-  grid-area: art;
-  position: relative;
-  width: 54px;
-  height: 44px;
+.store-card-img {
+  flex: none;
+  width: 64px;
+  height: 64px;
+  border-radius: 14px;
 }
 
-.store-ad-img {
-  position: absolute;
-  left: 0;
-  top: 0;
-  width: 40px;
-  height: 40px;
-  border-radius: 11px;
-  transform: rotate(-6deg);
-  box-shadow: 0 4px 10px -4px rgb(0 0 0 / 0.45);
-}
-
-.store-ad-img.cores {
-  left: auto;
-  top: auto;
-  right: 0;
-  bottom: 0;
-  width: 30px;
-  height: 30px;
-  border-radius: 9px;
-  transform: rotate(8deg);
-  box-shadow: 0 0 0 2px var(--ad), 0 4px 10px -4px rgb(0 0 0 / 0.45);
-}
-
-.store-ad-text {
-  grid-area: text;
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  min-width: 0;
-}
-
-.store-ad-kicker {
-  font-family: var(--font-mono);
-  font-size: calc(10px * var(--ui-scale));
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  opacity: 0.78;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.store-ad-title {
-  font-size: calc(16px * var(--ui-scale));
-  font-weight: 600;
-  line-height: 1.2;
-  letter-spacing: -0.01em;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-/* The best pack of cores, and the call to action. */
-.store-ad-foot {
-  grid-area: foot;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-width: 0;
-  padding-top: 7px;
-  border-top: 1px solid color-mix(in srgb, #fff 18%, transparent);
-}
-
-.store-ad-teaser {
+.store-card-text {
   flex: 1;
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.store-card-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.store-card-title {
+  flex: none;
   font-family: var(--font-mono);
-  font-size: calc(11px * var(--ui-scale));
-  letter-spacing: -0.01em;
+  font-size: calc(14px * var(--ui-scale));
+  font-weight: 500;
+  letter-spacing: 0.02em;
   white-space: nowrap;
+}
+
+.store-card-left {
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.store-ad-teaser::before {
-  content: '◆ ';
-  opacity: 0.7;
-}
-
-.store-ad-teaser:empty::before {
-  content: none;
-}
-
-.store-ad-cta {
-  flex: none;
-  padding: 5px 12px;
-  border-radius: 999px;
+.store-card-left,
+.store-card-tier,
+.store-card-note {
   font-family: var(--font-mono);
   font-size: calc(11px * var(--ui-scale));
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  color: var(--ad-deep);
-  background: var(--ad-ink);
+  opacity: 0.6;
+  white-space: nowrap;
 }
 
-.store-ad-cta::after {
-  content: ' ›';
+.store-card-hook {
+  font-size: calc(13px * var(--ui-scale));
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.store-card-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+.store-card-bar .xp-track {
+  flex: 1;
+  height: 4px;
+  margin: 0;
+}
+
+.store-card-go {
+  flex: none;
+  font-size: 22px;
+  line-height: 1;
+  opacity: 0.5;
+}
+
+.store-card-cores {
+  gap: 10px;
+  padding: 10px 14px 10px 12px;
+  border-top: 1px solid color-mix(in srgb, currentColor 18%, transparent);
+}
+
+.store-card-core {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+}
+
+.store-card-buy {
+  font-family: var(--font-mono);
+  font-size: calc(14px * var(--ui-scale));
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  color: #8a63d2;
+}
+
+.store-card-note {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: right;
 }
