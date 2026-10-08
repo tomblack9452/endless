@@ -10,7 +10,9 @@ import { Trail } from './trail';
 
 // Pictures of other pilots' ships for the leaderboard: the game's own ship
 // and engine flames, drawn from the looks a pilot has on (see set_ship on the
-// server), in a small renderer of their own and kept as images.
+// server), in a small renderer of their own and kept as images. The renderer
+// (a WebGL context: browsers allow only a few) is let go once the board closes
+// or nothing has been drawn for a while, and made again when next needed.
 
 /** A pilot's equipped looks, as the server keeps them; the rank and league are for the badge decals. */
 export type ShipLook = Partial<Record<Slot, string>> & { rank?: number; league?: number; division?: number };
@@ -18,6 +20,7 @@ export type ShipLook = Partial<Record<Slot, string>> & { rank?: number; league?:
 const W = 168;
 const H = 100;
 const KEEP = 200; // pictures kept before the oldest go
+const IDLE_MS = 30_000; // the renderer is let go after this long without drawing
 
 /** Looks that don't exist here (a newer version's, or nonsense) fall back to the slot's first. */
 function look(ship: ShipLook, slot: Slot): string {
@@ -44,6 +47,7 @@ export class Portraits {
   private player: Player | null = null;
   private trail: Trail | null = null;
   private readonly cache = new Map<string, string>();
+  private idle: ReturnType<typeof setTimeout> | null = null;
 
   constructor(private readonly palette: LivePalette) {}
 
@@ -56,7 +60,28 @@ export class Portraits {
     const url = this.draw(ship);
     if (this.cache.size >= KEEP) this.cache.delete(this.cache.keys().next().value!);
     this.cache.set(key, url);
+    if (this.idle !== null) clearTimeout(this.idle);
+    this.idle = setTimeout(() => this.release(), IDLE_MS);
     return url;
+  }
+
+  /** Whether a renderer is being held (for the tests). */
+  get holding(): boolean {
+    return this.renderer !== null;
+  }
+
+  /** Let go of the renderer and the ship drawn in it; the pictures are kept. */
+  release(): void {
+    if (this.idle !== null) clearTimeout(this.idle);
+    this.idle = null;
+    this.trail?.dispose();
+    this.player?.dispose();
+    this.trail = null;
+    this.player = null;
+    if (!this.renderer) return;
+    this.renderer.dispose();
+    this.renderer.forceContextLoss();
+    this.renderer = null;
   }
 
   private ready(): boolean {

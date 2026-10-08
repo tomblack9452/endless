@@ -167,6 +167,15 @@ export class Trail {
     this.right.mesh.visible = this.shown && n > 2;
   }
 
+  /** Free the flames' geometry and material, and take them off their mount. */
+  dispose(): void {
+    for (const f of [this.centre, this.left, this.right]) {
+      f.geometry.dispose();
+      f.mesh.removeFromParent();
+    }
+    this.material.dispose();
+  }
+
   /** `boost` 0..1 stretches the flames; `halfSpan` is half the wing span (where side flames sit). */
   update(dt: number, boost: number, halfSpan: number): void {
     if (!this.shown) return;

@@ -2610,6 +2610,7 @@ export class Game {
       this.applyLooks();
     }
     if (this.infoOpen === 'welcome' || this.infoOpen === 'name') return; // these end by their own buttons
+    if (this.infoOpen === 'boards') this.portraits.release(); // its pictures stay cached; the renderer goes
     if (this.state === 'title') {
       // The ship only shows on the screens that show it off (hangar, shop, welcome).
       this.player.setVisible(false);

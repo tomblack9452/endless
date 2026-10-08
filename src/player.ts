@@ -639,6 +639,20 @@ export class Player {
     }
   }
 
+  /** Take the ship out of its scene and free what it holds on the GPU (the game's ship lives for good; this is for the leaderboard's). */
+  dispose(): void {
+    const meshes = [this.shadow, ...this.fragments.map((f) => f.mesh)];
+    this.root.traverse((o) => {
+      if (o instanceof Mesh) meshes.push(o);
+    });
+    for (const m of meshes) m.geometry.dispose();
+    this.root.removeFromParent();
+    this.shadow.removeFromParent();
+    for (const f of this.fragments) f.mesh.removeFromParent();
+    for (const m of [this.matTop, this.matShade, this.matShadow, this.matFin, this.matDecal, this.shieldMat]) m.dispose();
+    this.decalTexture.dispose();
+  }
+
   private buildFragments(scene: Scene): void {
     const a = NOSE.clone().lerp(LEFT, 0.5);
     const b = LEFT.clone().lerp(RIGHT, 0.5);
