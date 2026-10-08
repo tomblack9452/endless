@@ -382,11 +382,17 @@
         </div>
         <div id="shop-wallet" class="label dim showroom-note"></div>
         <div class="sheet settings">
-          <div id="shop-tabs" class="chip-row"></div>
+          <button id="shop-store" class="store-link" type="button" data-shoptab="store">
+            <img class="store-link-img" src="store/season_pass.png" alt="" width="44" height="44" />
+            <img class="store-link-img second" src="store/cores_550.png" alt="" width="44" height="44" />
+            <span class="store-link-text"><span class="store-link-title">cores &amp; season pass</span><span id="shop-store-note" class="label dim store-link-note"></span></span>
+            <span class="store-link-go" aria-hidden="true">›</span>
+          </button>
+          <div id="shop-tabs" class="shop-tabs" role="tablist"></div>
           <div id="shop-looks">
             <div class="settings-group"><span id="shop-heading">today's looks</span> <span id="shop-reset" class="group-note"></span></div>
             <div id="shop-offers" class="offer-cards"></div>
-            <div id="shop-info" class="label dim setting-note"></div>
+            <div id="shop-info" class="label dim shop-info"></div>
             <button id="shop-buy" class="pill primary sheet-buy" type="button"></button>
             <button id="shop-hangar" class="pill sheet-buy" type="button">open your hangar</button>
           </div>

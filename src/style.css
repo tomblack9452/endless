@@ -2180,13 +2180,55 @@ body {
   margin-top: 14px;
 }
 
-/* Today's looks: a row of cards that scrolls sideways. */
+/* The looks' tabs: one segmented track, each tab with when it turns over. */
+.shop-tabs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px;
+  margin: 0 0 4px;
+  padding: 4px;
+  border-radius: 14px;
+  background: color-mix(in srgb, currentColor 6%, transparent);
+}
+
+.shop-tabs .tab {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  min-width: 0;
+  padding: 7px 4px 6px;
+  border: 0;
+  border-radius: 10px;
+  letter-spacing: 0.08em;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.shop-tabs .tab-label,
+.shop-tabs .tab-note {
+  max-width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.shop-tabs .tab-note {
+  font-size: calc(10px * var(--ui-scale));
+  letter-spacing: 0.04em;
+  opacity: 0.6;
+}
+
+.shop-tabs .tab.on .tab-note {
+  opacity: 0.8;
+}
+
+/* The looks: a row of cards that scrolls sideways. */
 .offer-cards {
   display: grid;
   grid-auto-flow: column;
-  grid-auto-columns: calc(31% - 6px);
+  grid-auto-columns: calc(35% - 6px);
   gap: 8px;
-  margin: 10px calc(-1 * (var(--safe-right) + 20px)) 0 calc(-1 * (var(--safe-left) + 20px));
+  margin: 8px calc(-1 * (var(--safe-right) + 20px)) 0 calc(-1 * (var(--safe-left) + 20px));
   padding: 4px calc(var(--safe-right) + 20px) 6px calc(var(--safe-left) + 20px);
   overflow-x: auto;
   scroll-snap-type: x mandatory;
@@ -2203,27 +2245,36 @@ body {
   position: relative;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 3px;
-  padding: 14px 6px 12px;
+  align-items: stretch;
+  gap: 8px;
+  padding: 5px 5px 10px;
   font: inherit;
   color: inherit;
   text-align: center;
   background: color-mix(in srgb, currentColor 4%, transparent);
-  border: 1px solid color-mix(in srgb, currentColor 22%, transparent);
-  border-radius: 16px;
+  border: 1px solid color-mix(in srgb, currentColor 14%, transparent);
+  border-radius: 18px;
   scroll-snap-align: start;
   cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
 .offer-card.picked {
-  border: 2px solid currentColor;
-  padding: 13px 5px 11px;
-  background: color-mix(in srgb, currentColor 9%, transparent);
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent), 0 6px 18px -12px var(--accent);
 }
 
 .offer-card:active {
   transform: scale(0.97);
+}
+
+/* The picture sits on its own tile. */
+.card-art {
+  display: grid;
+  place-items: center;
+  aspect-ratio: 1.25;
+  border-radius: 13px;
+  background: color-mix(in srgb, currentColor 7%, transparent);
 }
 
 .card-swatch {
@@ -2231,21 +2282,32 @@ body {
   place-items: center;
   width: 46px;
   height: 46px;
-  margin-bottom: 6px;
   border-radius: 50%;
-  border: 1px solid color-mix(in srgb, currentColor 30%, transparent);
+  border: 1px solid color-mix(in srgb, currentColor 22%, transparent);
 }
 
 .card-swatch svg {
-  width: 30px;
-  height: 30px;
+  width: 32px;
+  height: 32px;
   fill: none;
   stroke: currentColor;
   stroke-width: 1.5;
   stroke-linejoin: round;
 }
 
+.card-text {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+}
+
 .card-name {
+  max-width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
   font-size: calc(13px * var(--ui-scale));
   font-weight: 500;
 }
@@ -2255,29 +2317,102 @@ body {
 }
 
 .card-price {
+  max-width: 100%;
   margin-top: 6px;
-  font-size: calc(12px * var(--ui-scale));
-  letter-spacing: 0.04em;
+  padding: 3px 6px;
+  border-radius: 999px;
+  font-family: var(--font-mono);
+  font-size: calc(10.5px * var(--ui-scale));
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  background: color-mix(in srgb, currentColor 8%, transparent);
 }
 
 .card-price.premium {
   color: #8a63d2;
+  background: color-mix(in srgb, #8a63d2 13%, transparent);
 }
 
 .offer-card.owned .card-price {
+  color: inherit;
+  background: none;
   opacity: 0.6;
+}
+
+.card-kicker {
+  margin-bottom: 4px;
+  font-size: calc(10px * var(--ui-scale));
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #8a63d2;
+}
+
+/* One look alone (the vault): a wide card, the picture beside the words. */
+.offer-cards.feature {
+  grid-auto-columns: 100%;
+}
+
+.offer-cards.feature .offer-card {
+  flex-direction: row;
+  align-items: center;
+  gap: 16px;
+  padding: 8px 16px 8px 8px;
+  text-align: left;
+}
+
+.offer-cards.feature .card-art {
+  flex: none;
+  width: 104px;
+  aspect-ratio: 1;
+}
+
+.offer-cards.feature .card-swatch {
+  width: 64px;
+  height: 64px;
+}
+
+.offer-cards.feature .card-swatch svg {
+  width: 44px;
+  height: 44px;
+}
+
+.offer-cards.feature .card-text {
+  align-items: flex-start;
+}
+
+.offer-cards.feature .card-name {
+  font-size: calc(17px * var(--ui-scale));
+}
+
+.offer-cards.feature .card-slot {
+  font-size: calc(12px * var(--ui-scale));
 }
 
 .card-deal {
   position: absolute;
-  top: 6px;
-  right: 6px;
+  top: 10px;
+  right: 10px;
   padding: 2px 6px;
   font-size: calc(10px * var(--ui-scale));
   font-weight: 600;
   color: var(--sky, #f1ede4);
   background: #e0503f;
   border-radius: 999px;
+}
+
+/* What the set or the vault is, in a soft box under the cards. */
+.shop-info {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  line-height: 1.45;
+  background: color-mix(in srgb, currentColor 5%, transparent);
+}
+
+.shop-info:empty {
+  display: none;
 }
 
 .pill.sheet-buy {
@@ -2898,9 +3033,6 @@ body {
   height: 4px;
 }
 
-#screen-shop .chip-row {
-  margin-top: 10px;
-}
 
 /* The store: no showroom, one scrolling page. The pass first, then cores. */
 .store-wallet {
@@ -3195,4 +3327,66 @@ body.dark #screen-title .title-word.sub {
 .pts,
 .stat-value {
   font-family: var(--font-mono);
+}
+
+/* The shop's way into the store: a banner above the looks' tabs, in the rank accent. */
+.store-link {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  margin: 14px 0 12px;
+  padding: 10px 14px 10px 10px;
+  border-radius: 16px;
+  border: 1.5px solid color-mix(in srgb, var(--accent) 65%, currentColor);
+  background: color-mix(in srgb, var(--accent) 10%, var(--ui-bg));
+  color: var(--ui-fg);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.store-link:active {
+  transform: scale(0.99);
+}
+
+.store-link-img {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+}
+
+.store-link-img.second {
+  margin-left: -22px;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 10%, var(--ui-bg));
+}
+
+.store-link-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.store-link-title {
+  font-family: var(--font-mono);
+  font-weight: 500;
+  font-size: calc(14px * var(--ui-scale));
+  letter-spacing: 0.08em;
+}
+
+.store-link-note {
+  font-size: calc(12px * var(--ui-scale));
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.store-link-go {
+  flex: none;
+  font-size: 24px;
+  line-height: 1;
+  opacity: 0.7;
 }

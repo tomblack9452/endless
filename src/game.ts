@@ -781,8 +781,10 @@ export class Game {
     this.econ.renderShop({
       wallet: `${formatScore(this.wallet.credits)} credits · ${formatScore(this.wallet.cores)} cores`,
       reset: v.reset,
-      tabs: [...tabs.map((t) => ({ ...t, on: t.id === this.shopTab })), { id: 'store', label: 'cores & pass', on: false }],
+      tabs: tabs.map((t) => ({ ...t, note: this.shopTabNote(t.id, now), on: t.id === this.shopTab })),
+      storeNote: this.storeNote(now),
       heading: v.heading,
+      kicker: this.shopTab === 'vault' ? 'rare · one month only' : '',
       info: v.info,
       offers: v.items.map((item, i) => ({
         name: item.name,
@@ -802,6 +804,22 @@ export class Game {
     this.player.setVisible(true);
     this.trail.setVisible(true);
     this.openInfo('shop');
+  }
+
+  /** The store banner's line: where the season pass stands. */
+  private storeNote(now: number): string {
+    this.pass.turn(now);
+    const s = seasonAt(now);
+    const ends = `ends in ${formatWait(s.end - now)}`;
+    if (this.pass.premium) return `premium pass · tier ${this.pass.tier} of ${CONFIG.economy.pass.tiers} · ${ends}`;
+    return `season ${s.season} pass · unlock premium rewards · ${ends}`;
+  }
+
+  /** Under each tab: when it turns over. */
+  private shopTabNote(id: ShopTab, now: number): string {
+    if (id === 'set') return formatWait(Date.parse(`${weekKey(now)}T00:00:00Z`) + 7 * 86_400_000 - now);
+    if (id === 'vault') return formatWait(vaultAt(now).leaves);
+    return formatWait(untilTomorrow(now));
   }
 
   /** The looks shop's tabs (the store, for cores and the pass, is its own screen). */
