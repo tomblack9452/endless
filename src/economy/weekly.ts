@@ -74,6 +74,11 @@ export class Weekly {
     return this.s.goals;
   }
 
+  /** The Monday these goals belong to (YYYY-MM-DD). */
+  get week(): string {
+    return this.s.week;
+  }
+
   recordRun(week: string, run: QuestRun): Quest[] {
     this.turn(week);
     const done = progressQuests(this.s.goals, run);

@@ -378,12 +378,8 @@ export class Game {
       this.economyLoaded = true;
       // A save from before goals: what it has already done counts, with no payout.
       if (!this.goalLog.started) this.goalLog.startWith(ACHIEVEMENTS.filter((a) => progressOn(a, this.snapshot()).done).map((a) => a.id));
-      // A new week: pay last week's league reward.
-      const weekly = this.leagues.rollWeek(this.now());
-      if (weekly > 0) {
-        this.wallet.add(weekly);
-        this.ui.showNotice(`weekly league reward +${formatScore(weekly)} credits`);
-      }
+      // A new week: this week's ranked run, and last week's league reward.
+      this.turnWeek(this.now());
       this.refreshTitle();
       // A new player starts with the welcome; the first daily reward waits for the end of it.
       if (this.onboarding.done) this.claimLogin();
@@ -1276,7 +1272,23 @@ export class Game {
     this.daily.turn(dayKey(now));
     this.weeklyGoals.turn(weekKey(now));
     this.pass.turn(now);
+    this.turnWeek(now);
     this.refreshBar(now);
+  }
+
+  /** The week by the trusted clock: this week's ranked run, and last week's league reward paid. Not mid-run. */
+  private turnWeek(now: number): void {
+    const week = weekKey(now);
+    if (this.weekly.id !== `ranked-${week}`) this.weekly = weeklyRun(week);
+    this.payLeagueWeek(now);
+  }
+
+  /** A new league week: pay last week's reward (before anything else rolls the week over and it's lost). */
+  private payLeagueWeek(now: number): void {
+    const weekly = this.leagues.rollWeek(now);
+    if (weekly <= 0) return;
+    this.wallet.add(weekly);
+    this.ui.showNotice(`weekly league reward +${formatScore(weekly)} credits`);
   }
 
   /** The time for rewards, streaks, days and weeks: the server's clock when known, the device's offline. */
@@ -1481,7 +1493,8 @@ export class Game {
       this.submitToBoard('ranked', finished);
       this.ui.showShare(true);
       this.beatPar = score >= leaguePar(lg.league, target);
-      const res = lg.record(this.score, target);
+      this.payLeagueWeek(this.now()); // a run in a new week: last week's reward first
+      const res = lg.record(this.score, target, this.now());
       bonus += res.credits;
       leagueLines.push(`${leagueName(lg.league, lg.division)} · ${res.lp >= 0 ? '+' : ''}${res.lp} lp (${lg.lp}/${LP_PER_DIVISION})`);
       if (res.divisionUp) {
@@ -1527,6 +1540,7 @@ export class Game {
   /** Promote to the next league if ready and enough upgrade points are owned. Returns credits. */
   private promoteLeague(lines: string[] | null, party: Celebration[] = []): number {
     const lg = this.leagues;
+    this.payLeagueWeek(this.now());
     const credits = lg.tryPromote(this.upgrades.points(), this.now());
     if (credits > 0) {
       party.push({
@@ -1645,7 +1659,7 @@ export class Game {
     const lg = this.leagues;
     const tab = BOARD_TABS[0];
     this.ui.renderBoard([], this.backend.online ? 'loading' : '');
-    const rows = await this.backend.board(boardQuery(tab, lg.league));
+    const rows = await this.backend.board(boardQuery(tab, lg.league, this.now()));
     const mine = this.progress.weeklyBest(this.weekly.id);
     if (!this.backend.online || rows === null) {
       this.ui.renderBoard(mine > 0 ? [['your best', formatScore(mine)]] : [['no ranked run yet this week', '']], this.backend.online ? "couldn't load the board" : 'the leaderboards need the server');
@@ -1806,7 +1820,7 @@ export class Game {
     }
     this.ui.renderLeaderboard(caption, [], 'loading');
     await Promise.all([this.outbox.flush(), this.syncShip(), this.syncRecord()]); // so a run you just finished, your ship and your record are on the board
-    const rows = await this.backend.board(boardQuery(tab, this.leagues.league));
+    const rows = await this.backend.board(boardQuery(tab, this.leagues.league, this.now()));
     if (seq !== this.boardSeq || this.infoOpen !== 'boards') return; // moved on while it loaded
     if (rows === null) this.ui.renderLeaderboard(caption, own, "couldn't load the board. check your connection");
     else if (rows.length === 0) this.ui.renderLeaderboard(caption, [], 'nobody yet. fly a run to be first');
@@ -2279,9 +2293,11 @@ export class Game {
       name = questText(q, this.open('ranked'));
       lines = [...this.grant({ credits: q.credits }), ...this.passXp(CONFIG.economy.weekly.passXp)];
     } else if (id === 'qall' || id === 'wall') {
+      // Named for the day or week the goals belong to (not the clock now: it may have turned since), so the server pays it once.
+      const source = id === 'qall' ? `goals:${this.daily.day}` : `weekly:${this.weeklyGoals.week}`;
       const cores = id === 'qall' ? this.daily.claimBonus() : this.weeklyGoals.claimBonus();
       if (cores <= 0) return;
-      this.ui.celebrate([{ kicker: id === 'qall' ? "today's goals" : "this week's goals", icon: GOAL_ICON, name: 'all done', lines: this.grant({ cores }, id === 'qall' ? `goals:${dayKey(this.now())}` : `weekly:${weekKey(this.now())}`) }]);
+      this.ui.celebrate([{ kicker: id === 'qall' ? "today's goals" : "this week's goals", icon: GOAL_ICON, name: 'all done', lines: this.grant({ cores }, source) }]);
     } else if (id.startsWith('a:')) {
       const a = achievement(id.slice(2));
       if (!a || this.goalLog.has(a.id) || !progressOn(a, this.snapshot()).done) return;
@@ -2432,8 +2448,7 @@ export class Game {
       return;
     }
     // The week may have turned since the game started.
-    const week = weekKey(this.now());
-    if (this.weekly.id !== weeklyRun(week).id) this.weekly = weeklyRun(week);
+    this.turnWeek(this.now());
     this.beginRun(0, this.weekly.seed, 'ranked');
   }
 
@@ -2753,9 +2768,17 @@ export class Game {
     else if (this.infoOpen) this.closeInfo();
     else if (this.state === 'playing' || this.state === 'countdown') this.pause();
     else if (this.state === 'paused') this.resume();
+    else if (this.state === 'crashed' && this.revivePending) this.declineRevive();
     else if (this.state === 'crashed' || this.state === 'finished') this.toMainMenu();
     else return false;
     return true;
+  }
+
+  /** Back on the revive offer (or before it shows): no thanks, and the game-over screen. */
+  private declineRevive(): void {
+    this.econ.dismissOffer();
+    this.reviveAsked = true;
+    this.settleCrash();
   }
 
   private pause(): void {
@@ -2950,7 +2973,13 @@ export class Game {
 
   /** Abandon the run and go back to the live title scene. Best score still counts. */
   private toMainMenu(): void {
-    if (this.state === 'paused') this.finishRun(null); // abandoned mid-run: still counts for stats
+    if (this.state === 'paused' && !this.recorded) {
+      // Abandoned mid-run: it still counts, for its best and the stats.
+      this.recordBest(false);
+      this.finishRun(null);
+    }
+    // Left with a revive still on offer: the run ends as it stood, rather than not at all.
+    if (this.state === 'crashed' && this.revivePending) this.settleCrash();
     if (this.practice) {
       this.practice = null;
       this.ui.showTutorial(null);

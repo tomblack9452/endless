@@ -185,6 +185,11 @@ export class Daily {
     return this.s.quests;
   }
 
+  /** The UTC date today's quests belong to (YYYY-MM-DD). */
+  get day(): string {
+    return this.s.questDay;
+  }
+
   // --- login calendar ---
 
   /** The calendar day (0..6) to claim today, or -1 if today's is claimed. */
