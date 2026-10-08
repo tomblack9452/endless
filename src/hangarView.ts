@@ -1,5 +1,6 @@
 import type { Slot } from './looks';
 import type { HangarView } from './hangar';
+import { scrollHint } from './scrollHint';
 
 // The hangar screen: looks, and the upgrades chip. The model is hangar.ts;
 // Game wires the taps. This only draws.
@@ -35,6 +36,8 @@ export interface HangarFrame {
 }
 
 export class HangarScreen {
+  private readonly slotsHint = scrollHint($('hangar-slots'));
+
   constructor() {
     // Taps on these screens never start a run.
     for (const id of ['screen-hangar']) $(id).addEventListener('pointerdown', (e) => e.stopPropagation());
@@ -71,6 +74,7 @@ export class HangarScreen {
     up.dataset.slot = 'upgrades';
     up.append(el('small', '', frame.upgradeTag));
     $('hangar-slots').replaceChildren(...chips, up);
+    this.slotsHint();
     $('hangar-looks').hidden = frame.upgrades;
     $('hangar-upgrades').hidden = !frame.upgrades;
     if (frame.upgrades) return;

@@ -63,6 +63,7 @@ import type { RoomId } from './interior';
 import { biomeForLevel, type PowerKind, themeForLevel, themeName, World } from './world';
 import { tintBiome } from './biomes';
 import { terrain } from './terrain';
+import { ShowroomSpin } from './showroom';
 
 type State = 'title' | 'playing' | 'paused' | 'countdown' | 'crashed' | 'finished';
 
@@ -212,7 +213,8 @@ export class Game {
   private pathTimes: number[] = [];
   private pathNext = 0;
   private economyTimer = 0;
-  private showroomTime = 0; // turns the showroom camera
+  /** Turns the showroom camera: on its own, or by a drag on the open scene. */
+  private readonly showroomSpin = new ShowroomSpin({ spin: CONFIG.camera.showroom.spin });
   // Revive (not in ranked): once a run. While the offer is up the run isn't recorded yet.
   private revived = false;
   /** The run as it stood at the first crash, when revived: what the boards get (a paid revive never adds to a board score). */
@@ -231,7 +233,7 @@ export class Game {
   private ship: ShipStats = STANDARD;
   private readonly looks = new Looks();
   /** A locked look being tried on in the hangar (not yet owned). */
-  private preview: { slot: Slot; id: string } | null = null;
+  private preview: Partial<Record<Slot, string>> | null = null;
   private pickupCount = 0;
   private recorded = false; // this run's stats are saved
   private assisted = false; // assist mode was on at some point this run
@@ -387,7 +389,8 @@ export class Game {
       else this.openWelcome();
       void this.connect();
     });
-    this.econ.bindShop(this.onShopOffer, this.onShopBuy, this.onShopTab);
+    this.econ.bindShop(this.onShopOffer, this.onShopBuy, this.onShopTab, this.onShopSet);
+    this.bindShowroomDrag();
     this.econ.bindStore(this.onStoreAct);
     this.hangarUi.bindHangar({
       tab: (tab) => this.onHangarTab(tab),
@@ -706,6 +709,10 @@ export class Game {
   }
 
   private shopTab: ShopTab = 'today';
+  /** The weekly set shown all at once (a grid), not as a row. */
+  private shopGrid = false;
+  /** The whole weekly set is on the ship to try. */
+  private shopTrying = false;
 
   /** The cards for the open shop tab, and the line, heading and buy button that go with them. */
   private shopTabView(now: number, owned: (key: string) => boolean): { heading: string; reset: string; info: string; items: LookItem[]; cards: { price: string; premium: boolean; deal: boolean }[]; buy: { text: string; enabled: boolean } } {
@@ -767,6 +774,7 @@ export class Game {
     if (tab) {
       this.shopTab = tab;
       this.shopPick = -1;
+      this.shopTrying = false;
       this.preview = null;
       this.applyLooks();
     }
@@ -782,7 +790,7 @@ export class Game {
       wallet: `${formatScore(this.wallet.credits)} credits · ${formatScore(this.wallet.cores)} cores`,
       reset: v.reset,
       tabs: tabs.map((t) => ({ ...t, note: this.shopTabNote(t.id, now), on: t.id === this.shopTab })),
-      storeNote: this.storeNote(now),
+      store: this.storeAd(now),
       heading: v.heading,
       kicker: this.shopTab === 'vault' ? 'rare · one month only' : '',
       info: v.info,
@@ -798,6 +806,7 @@ export class Game {
         owned: owned(keyOf(item)),
         picked: i === this.shopPick,
       })),
+      set: this.shopTab === 'set' ? { grid: this.shopGrid, trying: this.shopTrying && this.preview !== null } : null,
       buy: v.buy,
     });
     this.player.reset();
@@ -806,13 +815,20 @@ export class Game {
     this.openInfo('shop');
   }
 
-  /** The store banner's line: where the season pass stands. */
-  private storeNote(now: number): string {
+  /** The store's ad on the shop: the season's countdown, the pass's hook, and the best pack of cores. */
+  private storeAd(now: number): { kicker: string; title: string; teaser: string; cta: string } {
     this.pass.turn(now);
     const s = seasonAt(now);
-    const ends = `ends in ${formatWait(s.end - now)}`;
-    if (this.pass.premium) return `premium pass · tier ${this.pass.tier} of ${CONFIG.economy.pass.tiers} · ${ends}`;
-    return `season ${s.season} pass · unlock premium rewards · ${ends}`;
+    const tier = this.pass.tier;
+    const kicker = `season ${s.season} · ends in ${formatWait(s.end - now)}`;
+    // The biggest pack, with its bonus and (in the app) its price.
+    let best: { id: ProductId; cores: number; bonus: number } | null = null;
+    for (const p of CONFIG.economy.store.products) if ('bonus' in p && (!best || p.cores > best.cores)) best = p;
+    const price = best && this.storeProducts.find((p) => p.id === best.id)?.price;
+    const teaser = best ? `${formatScore(best.cores)} cores${best.bonus ? ` · +${best.bonus}%` : ''}${price ? ` · ${price}` : ''}` : '';
+    if (this.pass.premium) return { kicker, title: `premium pass · tier ${tier} of ${CONFIG.economy.pass.tiers}`, teaser, cta: 'get cores' };
+    const title = tier > 0 ? `premium: ${tier} reward${tier === 1 ? '' : 's'} waiting` : 'premium rewards, every tier';
+    return { kicker, title, teaser, cta: 'see the pass' };
   }
 
   /** Under each tab: when it turns over. */
@@ -938,6 +954,7 @@ export class Game {
     };
     const item = this.shopTabView(now, owned).items[i];
     if (!item) return;
+    this.shopTrying = false; // one look again, not the whole set
     if (this.shopPick === i && !owned(keyOf(item))) {
       this.shopPick = -1;
       this.preview = null;
@@ -946,9 +963,34 @@ export class Game {
       if (owned(keyOf(item))) {
         this.preview = null;
         this.looks.equip(item.slot, item.id);
-      } else this.preview = { slot: item.slot, id: item.id };
+      } else this.preview = { [item.slot]: item.id };
     }
     this.haptics.pickup();
+    this.applyLooks();
+    this.openShop();
+  };
+
+  /** The weekly set's buttons: every look at once or back to a row, and the whole set on the ship (tap again to take it off). */
+  private onShopSet = (act: 'grid' | 'try'): void => {
+    if (this.shopTab !== 'set') return;
+    if (act === 'grid') this.shopGrid = !this.shopGrid;
+    else if (this.shopTrying && this.preview) {
+      this.shopTrying = false;
+      this.preview = null;
+    } else {
+      const o = this.owner();
+      const items = setOffer(weekKey(this.now()), (key) => {
+        const it = byKey(key);
+        return !!it && this.looks.owns(it, o);
+      }).items;
+      // One look per slot, all on at once. Nothing is put on for keeps.
+      const all: Partial<Record<Slot, string>> = {};
+      for (const item of items) all[item.slot] ??= item.id;
+      this.preview = all;
+      this.shopTrying = true;
+      this.shopPick = -1;
+      this.haptics.pickup();
+    }
     this.applyLooks();
     this.openShop();
   };
@@ -957,6 +999,7 @@ export class Game {
   private afterBuy(items: LookItem[], notice: string): void {
     for (const item of items) this.looks.equip(item.slot, item.id);
     this.preview = null;
+    this.shopTrying = false;
     this.sound.pickup();
     this.haptics.pickup();
     this.ui.showNotice(notice);
@@ -1976,7 +2019,7 @@ export class Game {
   /** Put the equipped looks (plus any preview) on the ship. */
   private applyLooks(): void {
     const eq = { ...this.looks.equipped };
-    if (this.preview) eq[this.preview.slot] = this.preview.id;
+    if (this.preview) Object.assign(eq, this.preview);
     this.player.setShape(eq.hull as ShipId);
     this.player.setPaint(find('paint', eq.paint).colors ?? null);
     const decal = eq.decal === 'rank' ? insignia(this.ranked.rank) : eq.decal === 'league' ? emblem(this.leagues.league, this.leagues.division) : decalArt(eq.decal);
@@ -2035,7 +2078,7 @@ export class Game {
   /** Tap a look: it goes on the ship to see (owned or not); the button underneath puts it on for good, or buys it. */
   private onHangarPick(id: string): void {
     this.hangar.pick = id;
-    this.preview = { slot: this.hangar.slot, id };
+    this.preview = { [this.hangar.slot]: id };
     this.haptics.pickup();
     this.applyLooks();
     this.renderHangar(true);
@@ -2657,6 +2700,39 @@ export class Game {
     this.startCountdown(); // a moment to get ready before control comes back
   }
 
+  /** A sideways drag on the open scene over a showroom turns the ship round. It never reaches the tap or the steering. */
+  private bindShowroomDrag(): void {
+    const spin = this.showroomSpin;
+    for (const surface of document.querySelectorAll<HTMLElement>('.showroom-spin')) {
+      let id = -1;
+      let lastX = 0;
+      const end = (e: PointerEvent): void => {
+        if (e.pointerId !== id) return;
+        e.stopPropagation();
+        id = -1;
+        spin.release();
+      };
+      surface.addEventListener('pointerdown', (e) => {
+        e.stopPropagation();
+        if (id !== -1) return;
+        id = e.pointerId;
+        lastX = e.clientX;
+        spin.perPx = (1.3 * Math.PI) / Math.max(1, window.innerWidth); // a full width's drag: a bit over half a turn
+        spin.drag(0);
+        surface.setPointerCapture?.(id);
+      });
+      surface.addEventListener('pointermove', (e) => {
+        if (e.pointerId !== id) return;
+        e.stopPropagation();
+        spin.drag(e.clientX - lastX);
+        lastX = e.clientX;
+      });
+      surface.addEventListener('pointerup', end);
+      surface.addEventListener('pointercancel', end);
+      surface.addEventListener('lostpointercapture', end);
+    }
+  }
+
   private onTap = (): void => {
     if (this.settingsOpen || this.infoOpen) return;
     switch (this.state) {
@@ -3014,11 +3090,10 @@ export class Game {
     const S = CONFIG.camera.showroom;
     if (showroom) {
       this.trail.update(dt, 0, this.player.engineHalfSpan);
-      this.showroomTime += dt;
+      this.stage.showroomAngle = S.angle + this.showroomSpin.update(dt);
       this.stage.showroomY = S.y;
     }
     this.stage.showroom += ((showroom ? 1 : 0) - this.stage.showroom) * (1 - Math.exp(-S.ease * dt));
-    this.stage.showroomAngle = S.angle + this.showroomTime * S.spin;
     this.speed = CONFIG.speed.titleDrift;
     // Slow lateral sway so the idle scene feels alive.
     const lateral = Math.sin(this.titleTime * 0.23) * 2.2;

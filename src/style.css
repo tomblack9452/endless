@@ -2144,12 +2144,25 @@ body {
   cursor: default;
 }
 
-/* The shop is a showroom: the camera circles the ship in the clear top half,
-   and the looks sit on a sheet at the bottom. */
+/* The shop is a showroom: the camera circles the ship in the clear top third,
+   and the looks sit on a sheet below. */
 .screen.panel.showroom {
   background: linear-gradient(to bottom, color-mix(in srgb, var(--ui-bg) 70%, transparent), transparent 18%);
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
+}
+
+/* The open scene over a showroom: drag sideways to turn the ship. The sheet and the head sit above it. */
+.showroom-spin {
+  position: absolute;
+  inset: 0;
+  pointer-events: auto;
+  touch-action: none;
+  cursor: grab;
+}
+
+.showroom-spin:active {
+  cursor: grabbing;
 }
 
 .showroom-note {
@@ -2167,7 +2180,7 @@ body {
   left: 0;
   right: 0;
   bottom: 0;
-  height: 54%;
+  height: 66%; /* the banner, the tabs and a whole row of cards, with the ship small above */
   padding: 4px calc(var(--safe-right) + 20px) calc(var(--safe-bottom) + 20px) calc(var(--safe-left) + 20px);
   border-radius: 22px 22px 0 0;
   background: color-mix(in srgb, var(--ui-bg) 94%, transparent);
@@ -2197,7 +2210,7 @@ body {
   align-items: center;
   gap: 1px;
   min-width: 0;
-  padding: 7px 4px 6px;
+  padding: 6px 4px 5px;
   border: 0;
   border-radius: 10px;
   letter-spacing: 0.08em;
@@ -2241,6 +2254,123 @@ body {
   display: none;
 }
 
+/* More to the right: the row fades out at the edge. */
+.offer-cards.more-right,
+.chip-row.more-right {
+  -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 44px), transparent);
+  mask-image: linear-gradient(to right, #000 calc(100% - 44px), transparent);
+}
+
+/* A sideways row's scroll bar (scrollHint.ts): a thin track, the thumb the part in view. */
+.scroll-hint {
+  position: relative;
+  height: 3px;
+  margin: 5px 0 0;
+  border-radius: 999px;
+  background: color-mix(in srgb, currentColor 10%, transparent);
+  pointer-events: none;
+}
+
+.scroll-hint[hidden] {
+  display: none;
+}
+
+.scroll-thumb {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  min-width: 18px;
+  border-radius: inherit;
+  background: color-mix(in srgb, currentColor 45%, transparent);
+  transition: left 0.08s linear;
+}
+
+.hangar-sheet .scroll-hint {
+  flex: none;
+  margin: -4px 0 10px;
+}
+
+/* The weekly set, all at once: three to a row, no scrolling sideways. */
+.offer-cards.grid {
+  grid-auto-flow: row;
+  grid-auto-columns: auto;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-left: 0;
+  margin-right: 0;
+  padding: 4px 0 2px;
+  overflow: visible;
+  scroll-snap-type: none;
+}
+
+/* The heading over the cards, with the weekly set's see-all toggle at its end. */
+.sheet .settings-group.shop-head {
+  margin-top: 10px;
+}
+
+.settings-group.shop-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  min-width: 0;
+  opacity: 1;
+}
+
+.shop-head > span {
+  opacity: 0.6;
+  white-space: nowrap;
+}
+
+.shop-head .group-note {
+  float: none;
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: right;
+}
+
+/* Small outlined buttons for the weekly set: see all, and try the whole set on. */
+.shop-tool {
+  flex: none;
+  margin: -2px 0;
+  padding: 3px 10px;
+  border: 1px solid color-mix(in srgb, currentColor 30%, transparent);
+  border-radius: 999px;
+  font: inherit;
+  font-family: var(--font-mono);
+  font-size: calc(10.5px * var(--ui-scale));
+  letter-spacing: 0.04em;
+  text-transform: none;
+  color: inherit;
+  background: none;
+  cursor: pointer;
+}
+
+#shop-layout {
+  margin-left: auto;
+}
+
+.shop-tool[hidden] {
+  display: none;
+}
+
+.shop-head .group-note[hidden] {
+  display: none;
+}
+
+#shop-heading {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.shop-tool.on {
+  color: var(--on-accent);
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
 .offer-card {
   position: relative;
   display: flex;
@@ -2257,6 +2387,17 @@ body {
   scroll-snap-align: start;
   cursor: pointer;
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+/* Short screens: flatter pictures, so the whole card shows under the banner and the tabs. */
+@media (max-height: 700px) {
+  .card-art {
+    aspect-ratio: 1.8;
+  }
+
+  .offer-card {
+    gap: 6px;
+  }
 }
 
 .offer-card.picked {
@@ -3329,64 +3470,148 @@ body.dark #screen-title .title-word.sub {
   font-family: var(--font-mono);
 }
 
-/* The shop's way into the store: a banner above the looks' tabs, in the rank accent. */
-.store-link {
-  display: flex;
+/* The shop's way into the store: an ad for the season pass and cores, in the cores' purple. */
+.store-ad {
+  --ad: #8a63d2;
+  --ad-deep: #5a3ca6;
+  --ad-ink: #fbf8ff;
+  position: relative;
+  display: grid;
+  grid-template-columns: 54px minmax(0, 1fr);
+  grid-template-areas:
+    'art text'
+    'foot foot';
+  column-gap: 12px;
+  row-gap: 7px;
   align-items: center;
-  gap: 10px;
   width: 100%;
-  margin: 14px 0 12px;
-  padding: 10px 14px 10px 10px;
-  border-radius: 16px;
-  border: 1.5px solid color-mix(in srgb, var(--accent) 65%, currentColor);
-  background: color-mix(in srgb, var(--accent) 10%, var(--ui-bg));
-  color: var(--ui-fg);
+  margin: 12px 0 10px;
+  padding: 10px 10px 10px 13px;
+  overflow: hidden;
+  border: 0;
+  border-radius: 18px;
+  background:
+    radial-gradient(120% 140% at 0% 0%, color-mix(in srgb, #fff 16%, transparent), transparent 55%),
+    linear-gradient(120deg, var(--ad), var(--ad-deep));
+  box-shadow: 0 10px 24px -16px var(--ad-deep), inset 0 0 0 1px color-mix(in srgb, #fff 14%, transparent);
+  color: var(--ad-ink);
   font: inherit;
   text-align: left;
   cursor: pointer;
 }
 
-.store-link:active {
+body.dark .store-ad {
+  --ad: #7c56c9;
+  --ad-deep: #3f2a7e;
+}
+
+.store-ad:active {
   transform: scale(0.99);
 }
 
-.store-link-img {
-  flex: none;
-  width: 44px;
+/* The pass's badge with a pack of cores tucked in front. */
+.store-ad-art {
+  grid-area: art;
+  position: relative;
+  width: 54px;
   height: 44px;
-  border-radius: 12px;
 }
 
-.store-link-img.second {
-  margin-left: -22px;
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 10%, var(--ui-bg));
+.store-ad-img {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 40px;
+  height: 40px;
+  border-radius: 11px;
+  transform: rotate(-6deg);
+  box-shadow: 0 4px 10px -4px rgb(0 0 0 / 0.45);
 }
 
-.store-link-text {
-  flex: 1;
-  min-width: 0;
+.store-ad-img.cores {
+  left: auto;
+  top: auto;
+  right: 0;
+  bottom: 0;
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  transform: rotate(8deg);
+  box-shadow: 0 0 0 2px var(--ad), 0 4px 10px -4px rgb(0 0 0 / 0.45);
+}
+
+.store-ad-text {
+  grid-area: text;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 3px;
+  min-width: 0;
 }
 
-.store-link-title {
+.store-ad-kicker {
   font-family: var(--font-mono);
-  font-weight: 500;
-  font-size: calc(14px * var(--ui-scale));
-  letter-spacing: 0.08em;
-}
-
-.store-link-note {
-  font-size: calc(12px * var(--ui-scale));
+  font-size: calc(10px * var(--ui-scale));
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  opacity: 0.78;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.store-link-go {
-  flex: none;
-  font-size: 24px;
-  line-height: 1;
+.store-ad-title {
+  font-size: calc(16px * var(--ui-scale));
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* The best pack of cores, and the call to action. */
+.store-ad-foot {
+  grid-area: foot;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding-top: 7px;
+  border-top: 1px solid color-mix(in srgb, #fff 18%, transparent);
+}
+
+.store-ad-teaser {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--font-mono);
+  font-size: calc(11px * var(--ui-scale));
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.store-ad-teaser::before {
+  content: '◆ ';
   opacity: 0.7;
+}
+
+.store-ad-teaser:empty::before {
+  content: none;
+}
+
+.store-ad-cta {
+  flex: none;
+  padding: 5px 12px;
+  border-radius: 999px;
+  font-family: var(--font-mono);
+  font-size: calc(11px * var(--ui-scale));
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--ad-deep);
+  background: var(--ad-ink);
+}
+
+.store-ad-cta::after {
+  content: ' ›';
 }

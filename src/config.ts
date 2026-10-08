@@ -59,7 +59,8 @@ export const CONFIG = {
     height: 2.0,
     distanceBehind: 2.5,
     // Hangar and shop: the camera circles close to the ship so looks can be seen.
-    showroom: { distance: 1.75, height: 1.0, angle: 2.2, spin: 0.22, ease: 4, y: 0.29 },
+    // y is high and the orbit a little wider, so the ship sits whole between the wallet line and the sheet.
+    showroom: { distance: 2.1, height: 1.0, angle: 2.2, spin: 0.22, ease: 4, y: 0.245 },
     maxRollDeg: 10,
     rollEase: 6, // higher = snappier
     near: 0.1,
@@ -666,13 +667,14 @@ export const CONFIG = {
     pass: { weeks: 6, tiers: 30, xpPerTier: 600, premiumCores: 550, runXpPer: 500, runXpMax: 30 },
     // Real-money products (src/store): create these ids in App Store Connect,
     // Google Play and RevenueCat. Prices are set in the stores. Bonus sizes:
-    // 550 is +10%, 1,200 +20%, 2,500 +25% over the 100 pack.
+    // 550 is +10%, 1,200 +20%, 2,500 +25% over the 100 pack (`bonus`, which
+    // the shop's store banner shows off).
     store: {
       products: [
-        { id: 'cores_100', cores: 100 },
-        { id: 'cores_550', cores: 550 },
-        { id: 'cores_1200', cores: 1200 },
-        { id: 'cores_2500', cores: 2500 },
+        { id: 'cores_100', cores: 100, bonus: 0 },
+        { id: 'cores_550', cores: 550, bonus: 10 },
+        { id: 'cores_1200', cores: 1200, bonus: 20 },
+        { id: 'cores_2500', cores: 2500, bonus: 25 },
         // Once per account: cores and the nova hull.
         { id: 'starter_pack', cores: 500, look: 'hull:nova', once: true },
         // The season pass's premium track, for money instead of cores.

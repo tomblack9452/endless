@@ -1,3 +1,4 @@
+import { scrollHint } from '../scrollHint';
 import { formatScore } from '../ui';
 
 // The economy's screens: the wallet bar on the title, the shop, the season
@@ -40,14 +41,16 @@ export interface ShopView {
   reset: string;
   /** The tabs (today, the weekly set, the vault), when each turns over, and which is open. */
   tabs: { id: string; label: string; note: string; on: boolean }[];
-  /** The line on the store banner above the tabs (the pass's state). */
-  storeNote: string;
+  /** The store's ad above the tabs: the season and the pass's hook, the best pack of cores, and what tapping it does. */
+  store: { kicker: string; title: string; teaser: string; cta: string };
   heading: string;
   /** A line over a lone card (the vault's), '' for none. */
   kicker: string;
   /** A line under the cards: what the set or the vault is. */
   info: string;
   offers: ShopOfferView[];
+  /** The weekly set's own buttons: every look at once (`grid`), and the whole set on the ship (`trying`). Null elsewhere. */
+  set: { grid: boolean; trying: boolean } | null;
   /** The one buy button, for the picked look. */
   buy: { text: string; enabled: boolean };
 }
@@ -137,6 +140,7 @@ export class EconomyView {
   private offerLeft = 0;
   private offerTotal = 0;
   private readonly countdownEl = $('countdown');
+  private readonly offersHint = scrollHint($('shop-offers'));
 
   constructor() {
     stopTaps(this.offerEl);
@@ -167,7 +171,7 @@ export class EconomyView {
 
   // --- shop ---
 
-  bindShop(onOffer: (i: number) => void, onBuy: () => void, onTab: (id: string) => void): void {
+  bindShop(onOffer: (i: number) => void, onBuy: () => void, onTab: (id: string) => void, onSet: (act: 'grid' | 'try') => void): void {
     $('shop-tabs').addEventListener('click', (e) => {
       const tab = (e.target as HTMLElement).closest<HTMLElement>('[data-shoptab]');
       if (tab) onTab(tab.dataset.shoptab ?? '');
@@ -178,6 +182,8 @@ export class EconomyView {
       if (card) onOffer(Number(card.dataset.offer));
     });
     $('shop-buy').addEventListener('click', onBuy);
+    $('shop-layout').addEventListener('click', () => onSet('grid'));
+    $('shop-tryset').addEventListener('click', () => onSet('try'));
   }
 
   /** Every button in the store carries what it does in data-act. */
@@ -192,7 +198,10 @@ export class EconomyView {
     $('shop-wallet').textContent = v.wallet;
     $('shop-reset').textContent = v.reset;
     $('shop-heading').textContent = v.heading;
-    $('shop-store-note').textContent = v.storeNote;
+    $('shop-store-kicker').textContent = v.store.kicker;
+    $('shop-store-title').textContent = v.store.title;
+    $('shop-store-teaser').textContent = v.store.teaser;
+    $('shop-store-cta').textContent = v.store.cta;
     $('shop-info').textContent = v.info;
     $('shop-tabs').replaceChildren(
       ...v.tabs.map((t) => {
@@ -207,6 +216,17 @@ export class EconomyView {
     );
     const offers = $('shop-offers');
     offers.classList.toggle('feature', v.offers.length === 1); // the vault: one look, shown big
+    offers.classList.toggle('grid', !!v.set?.grid); // the weekly set, every look at once
+    const layout = $('shop-layout');
+    layout.hidden = !v.set;
+    layout.textContent = v.set?.grid ? 'show as row' : 'see all';
+    layout.setAttribute('aria-pressed', String(!!v.set?.grid));
+    const tryOn = $('shop-tryset');
+    tryOn.hidden = !v.set;
+    tryOn.classList.toggle('on', !!v.set?.trying);
+    tryOn.textContent = v.set?.trying ? 'take the set off' : 'try the set on';
+    $('shop-reset').hidden = !!v.set; // the set's tab already shows when it turns over: room for its buttons
+    tryOn.setAttribute('aria-pressed', String(!!v.set?.trying));
     offers.replaceChildren(
       ...v.offers.map((o, i) => {
         const card = el('button', `offer-card${o.picked ? ' picked' : ''}${o.owned ? ' owned' : ''}`) as HTMLButtonElement;
@@ -226,6 +246,7 @@ export class EconomyView {
         return card;
       }),
     );
+    this.offersHint();
     const buy = $('shop-buy') as HTMLButtonElement;
     buy.textContent = v.buy.text;
     buy.disabled = !v.buy.enabled;

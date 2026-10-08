@@ -130,6 +130,7 @@
       </div>
 
       <div id="screen-welcome" class="layer screen panel showroom">
+        <div class="showroom-spin" aria-hidden="true"></div>
         <div class="panel-head">
           <div class="panel-title" id="welcome-title">welcome, pilot</div>
         </div>
@@ -376,21 +377,30 @@
       </div>
 
       <div id="screen-shop" class="layer screen panel showroom">
+        <div class="showroom-spin" aria-hidden="true"></div>
         <div class="panel-head">
           <button class="label link back" type="button" data-action="back">back</button>
           <div class="panel-title">shop</div>
         </div>
         <div id="shop-wallet" class="label dim showroom-note"></div>
         <div class="sheet settings">
-          <button id="shop-store" class="store-link" type="button" data-shoptab="store">
-            <img class="store-link-img" src="store/season_pass.png" alt="" width="44" height="44" />
-            <img class="store-link-img second" src="store/cores_550.png" alt="" width="44" height="44" />
-            <span class="store-link-text"><span class="store-link-title">cores &amp; season pass</span><span id="shop-store-note" class="label dim store-link-note"></span></span>
-            <span class="store-link-go" aria-hidden="true">›</span>
+          <button id="shop-store" class="store-ad" type="button" data-shoptab="store">
+            <span class="store-ad-art" aria-hidden="true">
+              <img class="store-ad-img" src="store/season_pass.png" alt="" width="52" height="52" />
+              <img class="store-ad-img cores" src="store/cores_2500.png" alt="" width="40" height="40" />
+            </span>
+            <span class="store-ad-text">
+              <span id="shop-store-kicker" class="store-ad-kicker"></span>
+              <span id="shop-store-title" class="store-ad-title"></span>
+            </span>
+            <span class="store-ad-foot">
+              <span id="shop-store-teaser" class="store-ad-teaser"></span>
+              <span id="shop-store-cta" class="store-ad-cta"></span>
+            </span>
           </button>
           <div id="shop-tabs" class="shop-tabs" role="tablist"></div>
           <div id="shop-looks">
-            <div class="settings-group"><span id="shop-heading">today's looks</span> <span id="shop-reset" class="group-note"></span></div>
+            <div class="settings-group shop-head"><span id="shop-heading">today's looks</span> <span id="shop-reset" class="group-note"></span><button id="shop-layout" class="shop-tool" type="button" hidden>see all</button><button id="shop-tryset" class="shop-tool" type="button" aria-label="try the whole set on" hidden>try the set on</button></div>
             <div id="shop-offers" class="offer-cards"></div>
             <div id="shop-info" class="label dim shop-info"></div>
             <button id="shop-buy" class="pill primary sheet-buy" type="button"></button>
@@ -434,6 +444,7 @@
       </div>
 
       <div id="screen-hangar" class="layer screen panel showroom">
+        <div class="showroom-spin" aria-hidden="true"></div>
         <div class="panel-head">
           <button class="label link back" type="button" data-action="back">back</button>
           <div class="panel-title">hangar</div>
