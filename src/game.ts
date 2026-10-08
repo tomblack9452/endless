@@ -22,7 +22,7 @@ import { Hints } from './hints';
 import { migrateMissionLooks, migrateTickets } from './legacy';
 import { type Feature, isOpen, nextStageText, STAGES, stageFor } from './reveal';
 import { hasTouch, type Lesson, LESSONS, LESSON_SECONDS, lessonText, Onboarding, PRACTICE_SEED, STARTER } from './onboarding';
-import { Ads, createAdNetwork } from './ads/ads';
+import { Ads, createAdNetwork, type RewardedPlacement } from './ads/ads';
 import { entitlementFor, Entitlements } from './store/entitlements';
 import { Progress } from './progress';
 import { creditsFor, insignia, promotionBonus, RANK_COLOURS, rankColour, Ranked, rankName, RANKS, type RunMode, xpToRank } from './ranks';
@@ -328,7 +328,10 @@ export class Game {
     document.addEventListener('visibilitychange', () => {
       if (document.hidden) this.pause();
       // Back to the front: pick up any change to the balances made on the server (the dashboard).
-      else void this.wallet.refresh().then(() => this.checkMaxOut()).then(() => this.refreshTitle());
+      else {
+        void this.wallet.refresh().then(() => this.checkMaxOut()).then(() => this.refreshTitle());
+        this.ads.preload();
+      }
     });
     window.addEventListener('blur', () => this.pause());
 
@@ -601,6 +604,7 @@ export class Game {
     this.lastRunCredits = credits;
     this.ui.showDouble(credits > 0 && this.ads.offers('doubleCredits') ? `double +${formatScore(credits)} credits · ${this.ads.label()}` : null);
     this.ads.afterRun(Date.now(), false);
+    this.ads.preload(); // an ad ready for the offers after a run (none for premium)
     lines.push(`+${formatScore(credits)} credits${fromPickups > 0 ? ` (${formatScore(fromPickups)} from pickups)` : ''}`);
     const board = boardForRun(this.mode, this.environment?.id ?? null, this.course !== null);
     if (board && board !== 'ranked') this.submitToBoard(board, this.state === 'finished');
@@ -1021,7 +1025,7 @@ export class Game {
       () => {
         if (free) this.daily.useFreeRevive(day);
         else if (byAd) {
-          void this.ads.reward('revive').then((ok) => (ok ? this.revive() : this.settleCrash()));
+          void this.reviveByAd();
           return;
         } else if (!this.wallet.spendCores(cost)) return this.settleCrash();
         this.revive();
@@ -1030,17 +1034,37 @@ export class Game {
     );
   }
 
+  /** Revive for a rewarded ad; without one the offer comes back, to try again or turn down. */
+  private async reviveByAd(): Promise<void> {
+    const ok = await this.watchAd('revive');
+    if (this.state !== 'crashed' || !this.revivePending) return; // moved on meanwhile
+    if (ok) this.revive();
+    else this.offerRevive();
+  }
+
+  /**
+   * Earn a reward by ad (at once for premium and on the web). Says why not:
+   * no ad loaded in time, or closed early. The offer is the caller's to keep.
+   */
+  private async watchAd(p: RewardedPlacement): Promise<boolean> {
+    if (this.ads.showsAds && !this.ads.adReady) this.ui.showNotice('loading an ad…');
+    const r = await this.ads.watch(p);
+    if (r === 'unavailable') this.ui.showNotice('no ad available right now. try again in a moment');
+    else if (r === 'skipped') this.ui.showNotice('ad closed early, so no reward. try again any time');
+    return r === 'rewarded';
+  }
+
   /** Double the last run's credits for a rewarded ad (free with premium), once. */
   private async doubleCredits(): Promise<void> {
     const n = this.lastRunCredits;
     if (n <= 0) return;
     this.lastRunCredits = 0;
     this.ui.showDouble(null);
-    if (!(await this.ads.reward('doubleCredits'))) {
-      // No reward (the ad didn't load or was closed early): the offer stays.
+    if (!(await this.watchAd('doubleCredits'))) {
+      // No reward (the ad didn't load or was closed early): the offer stays, unless another run has ended since.
+      if (this.lastRunCredits > 0) return;
       this.lastRunCredits = n;
       this.ui.showDouble(`double +${formatScore(n)} credits · ${this.ads.label()}`);
-      this.ui.showNotice("no ad, no double. try again in a moment");
       return;
     }
     this.grant({ credits: n });
@@ -1053,7 +1077,7 @@ export class Game {
   /** The free daily gift (a rewarded ad, or free with premium). */
   private async claimGift(): Promise<void> {
     const day = dayKey(Date.now());
-    if (!this.daily.giftReady(day) || !(await this.ads.reward('dailyGift'))) return;
+    if (!this.daily.giftReady(day) || !(await this.watchAd('dailyGift')) || !this.daily.giftReady(day)) return;
     this.daily.takeGift(day);
     const lines = this.grant(CONFIG.ads.dailyGift, `gift:${day}`);
     this.ui.celebrate([{ kicker: 'free gift', icon: GIFT_ICON, name: 'daily gift', lines }]);
@@ -1064,7 +1088,7 @@ export class Game {
   private async onReroll(id: string): Promise<void> {
     const i = Number(id.slice(1));
     const day = dayKey(Date.now());
-    if (!/^q\d$/.test(id) || !this.daily.canReroll(day) || !(await this.ads.reward('rerollQuest'))) return;
+    if (!/^q\d$/.test(id) || !this.daily.canReroll(day) || !(await this.watchAd('rerollQuest')) || !this.daily.canReroll(day)) return;
     const q = this.daily.reroll(i, day);
     if (q) this.ui.showNotice(`new goal: ${questText(q, this.open('ranked'))}`);
     this.renderGoals();

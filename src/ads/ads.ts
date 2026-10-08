@@ -9,15 +9,21 @@ import { CONFIG } from '../config';
 //
 // The AdMob version asks for consent first (Google's form, for the UK and EU)
 // and for Apple's tracking permission; if either is declined, ads are
-// non-personalised.
+// non-personalised. A rewarded ad is loaded ahead of time (after consent, and
+// again after each one), so tapping an offer usually shows one at once.
 
 export type RewardedPlacement = 'revive' | 'doubleCredits' | 'dailyGift' | 'rerollQuest';
 export type AdResult = 'rewarded' | 'skipped' | 'unavailable';
+/** What a tap on an offer came to: 'busy' when an ad is already on its way. */
+export type WatchResult = AdResult | 'busy';
 
 /** An ad network: AdMob in the apps, nothing on the web. */
 export interface AdNetwork {
   readonly available: boolean;
   start(): Promise<void>;
+  /** Load a rewarded ad ahead of time; true once one is ready to show. */
+  loadRewarded(): Promise<boolean>;
+  /** Show the loaded rewarded ad, settling when it's closed ('skipped' if closed early). */
   rewarded(placement: RewardedPlacement): Promise<AdResult>;
   interstitial(): Promise<void>;
   /** Show the consent form again (settings > ad privacy choices). */
@@ -30,6 +36,9 @@ class NoAds implements AdNetwork {
   readonly available = false;
   readonly privacyRequired = false;
   async start(): Promise<void> {}
+  async loadRewarded(): Promise<boolean> {
+    return false;
+  }
   async rewarded(): Promise<AdResult> {
     return 'unavailable';
   }
@@ -66,15 +75,45 @@ class AdMobAds implements AdNetwork {
     }
   }
 
-  async rewarded(): Promise<AdResult> {
-    if (!this.m || !this.ids.rewarded) return 'unavailable';
+  async loadRewarded(): Promise<boolean> {
+    if (!this.m || !this.ids.rewarded) return false;
     try {
       await this.m.AdMob.prepareRewardVideoAd({ adId: this.ids.rewarded, npa: this.npa });
-      const reward = await this.m.AdMob.showRewardVideoAd();
-      return reward && reward.amount > 0 ? 'rewarded' : 'skipped';
+      return true;
     } catch {
-      return 'skipped';
+      return false;
     }
+  }
+
+  async rewarded(): Promise<AdResult> {
+    if (!this.m || !this.ids.rewarded) return 'unavailable';
+    const { AdMob, RewardAdPluginEvents: E } = this.m;
+    // showRewardVideoAd only settles on a reward, so the ad's own events say
+    // when it's closed (early or not) or couldn't show.
+    return new Promise<AdResult>((resolve) => {
+      let earned = false;
+      let done = false;
+      const handles: Promise<{ remove: () => Promise<void> }>[] = [];
+      const finish = (r: AdResult): void => {
+        if (done) return;
+        done = true;
+        for (const h of handles) void h.then((x) => x.remove()).catch(() => {});
+        resolve(r);
+      };
+      try {
+        handles.push(AdMob.addListener(E.Rewarded, () => void (earned = true)));
+        handles.push(AdMob.addListener(E.Dismissed, () => finish(earned ? 'rewarded' : 'skipped')));
+        handles.push(AdMob.addListener(E.FailedToShow, () => finish('unavailable')));
+        void Promise.all(handles)
+          .then(() => AdMob.showRewardVideoAd())
+          .then(
+            (reward) => void (earned ||= !!reward && reward.amount > 0),
+            () => finish('unavailable'),
+          );
+      } catch {
+        finish('unavailable');
+      }
+    });
   }
 
   async interstitial(): Promise<void> {
@@ -122,13 +161,33 @@ export function createAdNetwork(): AdNetwork {
   return units.rewarded || units.interstitial ? new AdMobAds(units) : new NoAds();
 }
 
+/** Settles as `fallback` if `p` hasn't settled within `ms`. */
+function within<T>(p: Promise<T>, ms: number, fallback: T): Promise<T> {
+  return new Promise((resolve) => {
+    const t = setTimeout(() => resolve(fallback), ms);
+    p.then(
+      (v) => resolve(v),
+      () => resolve(fallback),
+    ).finally(() => clearTimeout(t));
+  });
+}
+
+/** How long a tap waits for an ad to load, and the waits between failed loads. */
+export const AD_TIMING = { tapWaitMs: 8_000, loadGiveUpMs: 30_000, retryMs: [5_000, 15_000, 60_000] };
+
 /**
  * The rules, whatever the network: what can be offered, premium's free rewards,
- * and the interstitial caps. Pure enough to test.
+ * the ad kept loaded ahead of time, and the interstitial caps. Pure enough to test.
  */
 export class Ads {
   private runsSinceInterstitial = 0;
   private lastInterstitial = 0;
+  private started = false;
+  private ready = false;
+  private loading: Promise<boolean> | null = null;
+  private failures = 0;
+  private retry: ReturnType<typeof setTimeout> | null = null;
+  private watching = false;
 
   constructor(
     private readonly network: AdNetwork,
@@ -149,11 +208,71 @@ export class Ads {
 
   /** Earn the reward: premium (or no ad network) at once, everyone else by watching to the end. */
   async reward(p: RewardedPlacement): Promise<boolean> {
-    if (!this.offers(p)) return false;
-    if (this.premium() || !this.network.available) return true;
-    return (await this.network.rewarded(p)) === 'rewarded';
+    return (await this.watch(p)) === 'rewarded';
   }
 
+  /**
+   * Like reward, but says why not: 'unavailable' (no ad loaded in time),
+   * 'skipped' (closed early) or 'busy' (one is already on its way).
+   */
+  async watch(p: RewardedPlacement): Promise<WatchResult> {
+    if (!this.offers(p)) return 'unavailable';
+    if (this.premium() || !this.network.available) return 'rewarded';
+    if (this.watching) return 'busy';
+    this.watching = true;
+    try {
+      if (!this.ready) {
+        this.preload();
+        if (!this.loading || !(await within(this.loading, AD_TIMING.tapWaitMs, false)) || !this.ready) return 'unavailable';
+      }
+      this.ready = false;
+      const r = await this.network.rewarded(p).catch((): AdResult => 'unavailable');
+      this.preload(); // the next one, after each shown, closed or failed
+      return r;
+    } finally {
+      this.watching = false;
+    }
+  }
+
+  /** Whether rewards here come from watching an ad (not premium, not the web). */
+  get showsAds(): boolean {
+    return this.network.available && !this.premium();
+  }
+
+  /** Whether an ad is loaded and waiting. */
+  get adReady(): boolean {
+    return this.ready;
+  }
+
+  /**
+   * Load a rewarded ad in the background, unless one is ready or loading.
+   * Never before consent (start), and never for premium. A failed load tries
+   * again after a wait (5 s, 15 s, then every minute).
+   */
+  preload(): void {
+    if (!this.started || !this.network.available || this.premium() || this.ready || this.loading) return;
+    if (this.retry) clearTimeout(this.retry);
+    this.retry = null;
+    const p = within(this.network.loadRewarded(), AD_TIMING.loadGiveUpMs, false);
+    this.loading = p;
+    void p.then((ok) => {
+      if (this.loading === p) this.loading = null;
+      this.ready = ok;
+      if (ok) this.failures = 0;
+      else this.retryLater();
+    });
+  }
+
+  private retryLater(): void {
+    if (this.premium() || this.retry) return;
+    const waits = AD_TIMING.retryMs;
+    const wait = waits[Math.min(this.failures, waits.length - 1)];
+    this.failures++;
+    this.retry = setTimeout(() => {
+      this.retry = null;
+      this.preload();
+    }, wait);
+  }
   /** Whether an interstitial would show now after a run (and counts the run). */
   afterRun(now: number, newBest: boolean): boolean {
     const I = CONFIG.ads.interstitial;
@@ -167,8 +286,11 @@ export class Ads {
     return true;
   }
 
-  start(): Promise<void> {
-    return this.network.start();
+  /** Start the network (consent first), then load the first rewarded ad. */
+  async start(): Promise<void> {
+    await this.network.start();
+    this.started = true;
+    this.preload();
   }
 
   privacyChoices(): Promise<void> {

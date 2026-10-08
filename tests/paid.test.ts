@@ -1,5 +1,5 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { Ads, adUnits, type AdNetwork, type AdResult } from '../src/ads/ads';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { AD_TIMING, Ads, adUnits, type AdNetwork, type AdResult } from '../src/ads/ads';
 import { LOOKS } from '../src/catalogue';
 import { CONFIG } from '../src/config';
 import { Looks, type Owner } from '../src/looks';
@@ -70,12 +70,20 @@ describe('entitlements', () => {
 class FakeNetwork implements AdNetwork {
   privacyRequired = false;
   shown = 0;
+  loads = 0;
   interstitials = 0;
+  /** What the next loads do: fill, fail, or never answer. */
+  fill: 'ok' | 'fail' | 'hang' = 'ok';
   constructor(
     readonly available: boolean,
-    private readonly result: AdResult = 'rewarded',
+    public result: AdResult = 'rewarded',
   ) {}
   async start(): Promise<void> {}
+  loadRewarded(): Promise<boolean> {
+    this.loads++;
+    if (this.fill === 'hang') return new Promise(() => {});
+    return Promise.resolve(this.fill === 'ok');
+  }
   async rewarded(): Promise<AdResult> {
     this.shown++;
     return this.result;
@@ -84,6 +92,14 @@ class FakeNetwork implements AdNetwork {
     this.interstitials++;
   }
   async privacyChoices(): Promise<void> {}
+}
+
+/** Ads on a started network (consent done). */
+async function started(net: FakeNetwork, premium = false): Promise<Ads> {
+  const ads = new Ads(net, () => premium, () => 0);
+  await ads.start();
+  await Promise.resolve();
+  return ads;
 }
 
 const DAY = 86_400_000;
@@ -117,11 +133,80 @@ describe('ads', () => {
 
   it('reward only an ad watched to the end, and never show one to premium', async () => {
     const net = new FakeNetwork(true);
-    expect(await new Ads(net, () => false, () => 0).reward('doubleCredits')).toBe(true);
-    expect(await new Ads(new FakeNetwork(true, 'skipped'), () => false, () => 0).reward('doubleCredits')).toBe(false);
+    expect(await (await started(net)).reward('doubleCredits')).toBe(true);
+    expect(await (await started(new FakeNetwork(true, 'skipped'))).reward('doubleCredits')).toBe(false);
     const premiumNet = new FakeNetwork(true);
-    expect(await new Ads(premiumNet, () => true, () => 0).reward('doubleCredits')).toBe(true);
+    expect(await (await started(premiumNet, true)).reward('doubleCredits')).toBe(true);
     expect(premiumNet.shown).toBe(0);
+    expect(premiumNet.loads).toBe(0); // nothing loaded for premium either
+  });
+
+  it('load one ad ahead after consent, and another after each is shown', async () => {
+    const net = new FakeNetwork(true);
+    const ads = new Ads(net, () => false, () => 0);
+    ads.preload();
+    expect(net.loads).toBe(0); // not before consent
+    await ads.start();
+    await Promise.resolve();
+    expect(net.loads).toBe(1);
+    expect(ads.adReady).toBe(true);
+    ads.preload();
+    expect(net.loads).toBe(1); // one is enough
+    expect(await ads.watch('revive')).toBe('rewarded');
+    expect(net.loads).toBe(2);
+    net.result = 'skipped';
+    await Promise.resolve();
+    expect(await ads.watch('dailyGift')).toBe('skipped'); // closed early: no reward
+    expect(net.loads).toBe(3);
+    expect(net.shown).toBe(2);
+  });
+
+  it("say so when no ad loads in time, and don't stall", async () => {
+    vi.useFakeTimers();
+    try {
+      const net = new FakeNetwork(true);
+      net.fill = 'hang';
+      const ads = new Ads(net, () => false, () => 0);
+      await ads.start();
+      const tap = ads.watch('revive');
+      expect(await ads.watch('revive')).toBe('busy'); // a second tap waits for the first
+      await vi.advanceTimersByTimeAsync(AD_TIMING.tapWaitMs);
+      expect(await tap).toBe('unavailable');
+      expect(net.shown).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('retry a failed load with backoff, and stop for premium', async () => {
+    vi.useFakeTimers();
+    try {
+      let premium = false;
+      const net = new FakeNetwork(true);
+      net.fill = 'fail';
+      const ads = new Ads(net, () => premium, () => 0);
+      await ads.start();
+      await vi.advanceTimersByTimeAsync(0);
+      expect(net.loads).toBe(1);
+      await vi.advanceTimersByTimeAsync(AD_TIMING.retryMs[0]);
+      expect(net.loads).toBe(2);
+      await vi.advanceTimersByTimeAsync(AD_TIMING.retryMs[1] - 1);
+      expect(net.loads).toBe(2);
+      await vi.advanceTimersByTimeAsync(1);
+      expect(net.loads).toBe(3);
+      // A tap while it's failing: a clear no, and the offer can be tried again.
+      expect(await ads.watch('doubleCredits')).toBe('unavailable');
+      expect(net.loads).toBe(4);
+      net.fill = 'ok';
+      expect(await ads.watch('doubleCredits')).toBe('rewarded');
+      net.fill = 'fail';
+      premium = true;
+      const before = net.loads;
+      await vi.advanceTimersByTimeAsync(10 * 60_000);
+      expect(net.loads).toBe(before);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('keep interstitials off at launch', () => {
