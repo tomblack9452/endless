@@ -6,6 +6,15 @@ import type { Backend, BoardQuery, BoardRow, LinkResult, RunSubmission, SubmitRe
 export class LocalBackend implements Backend {
   readonly online = false;
   readonly userId = null;
+  readonly clockKnown = false;
+
+  now(): number {
+    return Date.now(); // no server: the device's clock is the only one
+  }
+
+  async syncClock(): Promise<boolean> {
+    return false;
+  }
 
   async signIn(): Promise<boolean> {
     return false;

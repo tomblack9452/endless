@@ -1,4 +1,4 @@
--- Endless Space database: part 25 of 25. Run the parts in order, 01 first.
+-- Endless Space database: part 25 of 26. Run the parts in order, 01 first.
 
 create or replace function public.store_purchase(p_id text, p_user uuid, p_product text, p_type text, p_transaction text, p_cores integer)
 returns text language plpgsql security definer set search_path = public as $$
@@ -41,3 +41,24 @@ end $$;
 revoke execute on function public.store_purchase, public.store_refund from public, anon, authenticated;
 
 grant execute on function public.store_purchase, public.store_refund, public.grant_cores to service_role;
+
+-- A clock the game can trust for daily rewards.
+--
+-- server_now: the server's time, for the game to keep its days and weeks by
+-- (src/server/supabase.ts) instead of a phone's clock, which can be moved.
+-- Anyone may ask, before signing in too.
+--
+-- earn_cores: every rule from 0010 kept, and the date-keyed rewards (login:,
+-- gift:, goals:, weekly:) checked more strictly:
+--   * a date that isn't real ("2026-02-30") is turned down, not an error;
+--   * nothing dated more than a day ahead of the server's UTC date (the day
+--     either side still covers time zones ahead of UTC, and midnight);
+--   * weekly: only a Monday (the week's key), so one week can't be claimed as
+--     seven different days.
+
+create or replace function public.server_now() returns timestamptz
+language sql stable as $$ select now() $$;
+
+revoke execute on function public.server_now() from public;
+
+grant execute on function public.server_now() to anon, authenticated;

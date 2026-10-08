@@ -24,6 +24,41 @@ export class SupabaseBackend implements Backend {
   readonly online = true;
   private session: Session | null = null;
   authError = '';
+  /** The server's clock minus the device's (ms), once known. */
+  private offset: number | null = null;
+
+  get clockKnown(): boolean {
+    return this.offset !== null;
+  }
+
+  now(): number {
+    return Date.now() + (this.offset ?? 0);
+  }
+
+  async syncClock(): Promise<boolean> {
+    // server_now (0012) answers to the anon key, so this works before signing in.
+    try {
+      const sent = Date.now();
+      const res = await fetch(`${this.url}/rest/v1/rpc/server_now`, { method: 'POST', headers: { apikey: this.key, 'Content-Type': 'application/json' }, body: '{}' });
+      const got = Date.now();
+      const at = res.ok ? Date.parse(String(await res.json().catch(() => ''))) : NaN;
+      if (Number.isFinite(at) && got - sent < 10_000) this.offset = at + (got - sent) / 2 - got;
+      else this.learnClock(res, sent);
+    } catch {
+      // offline: the device's clock until the server answers
+    }
+    return this.clockKnown;
+  }
+
+  /** Keep the clock from a response's Date header (when the browser lets us read it). */
+  private learnClock(res: Response, sent: number): void {
+    const got = Date.now();
+    const at = Date.parse(res.headers?.get('date') ?? '');
+    if (!Number.isFinite(at) || got - sent > 10_000) return;
+    const offset = at + 500 + (got - sent) / 2 - got; // the header is in whole seconds
+    // Only a real change (the device's clock moved): the RPC's answer is finer.
+    if (this.offset === null || Math.abs(offset - this.offset) > 2000) this.offset = offset;
+  }
 
   get userId(): string | null {
     return this.session?.user ?? null;
@@ -57,7 +92,9 @@ export class SupabaseBackend implements Backend {
   private async authRequest(path: string, body: unknown, bearer?: string): Promise<{ session: Session | null; code: string }> {
     const headers: Record<string, string> = { apikey: this.key, 'Content-Type': 'application/json' };
     if (bearer) headers.Authorization = `Bearer ${bearer}`;
+    const sent = Date.now();
     const res = await fetch(`${this.url}/auth/v1/${path}`, { method: 'POST', headers, body: JSON.stringify(body) });
+    this.learnClock(res, sent);
     if (!res.ok) {
       const e = (await res.json().catch(() => ({}))) as { error_code?: string; code?: string | number; msg?: string; message?: string };
       const code = typeof e.error_code === 'string' ? e.error_code : typeof e.code === 'string' ? e.code : '';
@@ -113,6 +150,7 @@ export class SupabaseBackend implements Backend {
     if (!this.session) return { status: 0, body: null };
     if (this.session.expires - Date.now() < 60_000 && !(await this.signIn())) return { status: 0, body: null };
     try {
+      const sent = Date.now();
       const res = await fetch(`${this.url}${path}`, {
         ...init,
         headers: {
@@ -122,6 +160,7 @@ export class SupabaseBackend implements Backend {
           ...(init.headers as Record<string, string> | undefined),
         },
       });
+      this.learnClock(res, sent);
       const text = await res.text();
       let body: unknown = null;
       try {

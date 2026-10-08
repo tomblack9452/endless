@@ -1,4 +1,4 @@
--- Endless Space database: part 2 of 25. Run the parts in order, 01 first.
+-- Endless Space database: part 2 of 26. Run the parts in order, 01 first.
 
 -- New accounts get a player row and an empty wallet.
 create or replace function public.on_new_user() returns trigger

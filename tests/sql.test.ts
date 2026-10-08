@@ -451,6 +451,33 @@ describe('cores', () => {
     expect((await db.query<{ cores: number }>('select cores from public.wallets where user_id = $1', [a])).rows[0].cores).toBe(15 + 2 + 40 + 50);
   });
 
+  it("turn down date-keyed rewards from the future, made-up dates, and weeks that aren't a Monday", async () => {
+    const a = await newUser();
+    await as(a);
+    const day = (n: number) => new Date(Date.now() + n * 86_400_000).toISOString().slice(0, 10);
+    const monday = (n: number) => {
+      const d = new Date();
+      return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() - ((d.getUTCDay() + 6) % 7) + n)).toISOString().slice(0, 10);
+    };
+    for (const kind of ['login', 'gift', 'goals']) {
+      expect(await earn(15, `${kind}:${day(2)}`)).toBe(0); // a moved clock
+      expect(await earn(15, `${kind}:${day(30)}`)).toBe(0);
+    }
+    expect(await earn(15, `login:${day(1)}`)).toBe(15); // a time zone ahead of UTC, after its midnight
+    expect(await earn(15, `login:${day(-1)}`)).toBe(15); // behind, before its midnight
+    expect(await earn(15, 'login:2026-02-30')).toBe(0); // not a date: no, and no error
+    expect(await earn(15, 'gift:2026-13-01')).toBe(0);
+    expect(await earn(15, `weekly:${monday(0)}`)).toBe(15); // this week
+    expect(await earn(15, `weekly:${monday(7)}`)).toBe(0); // next week
+    expect(await earn(15, `weekly:${monday(1)}`)).toBe(0); // this week again, as a Tuesday
+  });
+
+  it("tell anyone the server's time", async () => {
+    await as(null);
+    const at = (await db.query<{ server_now: Date }>('select public.server_now()')).rows[0].server_now;
+    expect(Math.abs(new Date(at).getTime() - Date.now())).toBeLessThan(60_000);
+  });
+
   it('pay no more pass cores in a season than the whole pass holds', async () => {
     const a = await newUser();
     await as(a);

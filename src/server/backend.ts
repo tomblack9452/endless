@@ -67,6 +67,12 @@ export interface Backend {
   readonly online: boolean;
   /** The signed-in account's id (the store buys as this account), or null. */
   readonly userId: string | null;
+  /** The time to trust for rewards, streaks, days and weeks (ms): the server's clock once known, the device's until then and offline. */
+  now(): number;
+  /** True once now() follows the server's clock. */
+  readonly clockKnown: boolean;
+  /** Learn (or refresh) the server's clock; resolves true if it's known. Quick, and needs no sign-in. */
+  syncClock(): Promise<boolean>;
   /** Sign in (or restore the session). Resolves false if the server can't be reached. */
   signIn(): Promise<boolean>;
   /** The cloud save: every saved key, and when it was written (ms), or null if none. */

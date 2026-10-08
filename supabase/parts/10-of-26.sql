@@ -1,4 +1,4 @@
--- Endless Space database: part 10 of 25. Run the parts in order, 01 first.
+-- Endless Space database: part 10 of 26. Run the parts in order, 01 first.
 
 -- p_credits: the device's balance now. p_last: what the server said last time
 -- (null if this device has never synced). Returns the balance to keep.

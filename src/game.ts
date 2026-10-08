@@ -183,6 +183,8 @@ export class Game {
   /** One-time products already bought. */
   private readonly entitlements = new Entitlements();
   private firstPlayed = Date.now();
+  /** The saved days, weeks and pass are loaded (retime waits for them). */
+  private economyLoaded = false;
   private readonly onboarding = new Onboarding();
   /** The practice run in progress (onboarding): the lesson it's on and what's been seen. */
   private practice: { lesson: number; t: number; steerT: number; nearMisses: number; pickups: number } | null = null;
@@ -327,8 +329,10 @@ export class Game {
     this.ui.titleRank.addEventListener('click', () => this.onTitleLink('record'));
     document.addEventListener('visibilitychange', () => {
       if (document.hidden) this.pause();
-      // Back to the front: pick up any change to the balances made on the server (the dashboard).
+      // Back to the front: pick up any change to the balances made on the server (the dashboard),
+      // and the server's clock again (the device's may have been moved meanwhile).
       else {
+        void this.backend.syncClock().then((known) => known && this.retime());
         void this.wallet.refresh().then(() => this.checkMaxOut()).then(() => this.refreshTitle());
         this.ads.preload();
       }
@@ -341,7 +345,14 @@ export class Game {
     this.ui.bindNameBox('settings', (name) => void this.savePilotName(name, 'settings'));
     this.ui.bindNameBox('name', (name) => void this.saveNameScreen(name));
     window.addEventListener('online', () => void this.outbox.flush());
-    const now = Date.now();
+    // The server's clock, for the day's and week's keys: asked for now, alongside
+    // the loads, and waited for a moment at most (a slow or missing signal keeps
+    // the device's clock, and connect() checks again once it's known).
+    const clock = Promise.race([this.backend.syncClock(), new Promise((done) => setTimeout(done, 800))]);
+    const dated = clock.then(() => {
+      const now = this.now();
+      return Promise.all([this.daily.load(dayKey(now)), this.weeklyGoals.load(weekKey(now)), this.pass.load(now)]);
+    });
     // Looks load once; a login reward can give one, so it waits for them.
     const looksReady = Promise.all([this.looks.load().then(() => migrateMissionLooks(this.looks)), this.entitlements.load()]);
     void storage.get(FIRST_PLAYED_KEY).then((v) => {
@@ -354,18 +365,17 @@ export class Game {
       this.wallet.load(),
       this.leagues.load(),
       this.upgrades.load(),
-      this.daily.load(dayKey(now)),
-      this.weeklyGoals.load(weekKey(now)),
-      this.pass.load(now),
+      dated,
       this.dailyShop.load(),
       this.goalLog.load(),
       looksReady,
     ]).then(async () => {
       await this.onboarding.load(this.progress.stats.runs > 0);
+      this.economyLoaded = true;
       // A save from before goals: what it has already done counts, with no payout.
       if (!this.goalLog.started) this.goalLog.startWith(ACHIEVEMENTS.filter((a) => progressOn(a, this.snapshot()).done).map((a) => a.id));
       // A new week: pay last week's league reward.
-      const weekly = this.leagues.rollWeek();
+      const weekly = this.leagues.rollWeek(this.now());
       if (weekly > 0) {
         this.wallet.add(weekly);
         this.ui.showNotice(`weekly league reward +${formatScore(weekly)} credits`);
@@ -603,7 +613,7 @@ export class Game {
     this.wallet.add(credits);
     this.lastRunCredits = credits;
     this.ui.showDouble(credits > 0 && this.ads.offers('doubleCredits') ? `double +${formatScore(credits)} credits · ${this.ads.label()}` : null);
-    this.ads.afterRun(Date.now(), false);
+    this.ads.afterRun(Date.now(), false); // the device clock, like the first-played time it is measured from
     this.ads.preload(); // an ad ready for the offers after a run (none for premium)
     lines.push(`+${formatScore(credits)} credits${fromPickups > 0 ? ` (${formatScore(fromPickups)} from pickups)` : ''}`);
     const board = boardForRun(this.mode, this.environment?.id ?? null, this.course !== null);
@@ -620,7 +630,7 @@ export class Game {
 
   /** Daily and weekly goal progress and season pass XP for the run just recorded; lines for the end screen. */
   private runRewards(): string[] {
-    const now = Date.now();
+    const now = this.now();
     const score = this.assisted ? 0 : this.score;
     const out: string[] = [];
     const run = {
@@ -654,7 +664,7 @@ export class Game {
   /** Add pass XP from anywhere (a claimed goal); pays any tiers reached. Returns lines. */
   private passXp(xp: number): string[] {
     const before = this.pass.tier;
-    const paid = this.pass.addXp(Date.now(), xp);
+    const paid = this.pass.addXp(this.now(), xp);
     const lines = [`+${formatScore(xp)} pass xp`];
     for (const r of paid) lines.push(...this.grant(r));
     if (this.pass.tier > before) lines.push(`season pass tier ${this.pass.tier}`);
@@ -680,7 +690,7 @@ export class Game {
 
   /** Today's login reward, if it's not claimed yet: paid and shown. */
   private claimLogin(): void {
-    const day = dayKey(Date.now());
+    const day = dayKey(this.now());
     const step = this.daily.loginDue(day);
     if (step < 0) return;
     const r = this.daily.claimLogin(day);
@@ -751,7 +761,7 @@ export class Game {
   }
 
   private openShop(tab?: ShopTab): void {
-    const now = Date.now();
+    const now = this.now();
     if (tab) {
       this.shopTab = tab;
       this.shopPick = -1;
@@ -827,13 +837,13 @@ export class Game {
     };
     if (tab === 'pass') {
       const P = CONFIG.economy.pass;
-      const s = seasonAt(Date.now());
+      const s = seasonAt(this.now());
       if (this.pass.premium) row(`season ${s.season}'s premium track is yours`, 'see tiers', true, 'pass-open');
       else {
         row(`premium track, season ${s.season}`, `${formatScore(P.premiumCores)} cores`, this.wallet.cores >= P.premiumCores, 'pass-cores');
         const money = price.get('season_pass');
         if (money) row('premium track, for money', money, true, 'season_pass');
-        row(`tier ${this.pass.tier} of ${P.tiers} · ends in ${formatWait(s.end - Date.now())}`, 'see tiers', true, 'pass-open');
+        row(`tier ${this.pass.tier} of ${P.tiers} · ends in ${formatWait(s.end - this.now())}`, 'see tiers', true, 'pass-open');
       }
       return { head: 'season pass', note: "every tier pays on the free track; premium pays more, with the season's new looks.", rows };
     }
@@ -868,7 +878,7 @@ export class Game {
 
   /** Tap a look: it goes on the ship to try (owned ones are just put on). Tap again to take it off. */
   private onShopOffer = (i: number): void => {
-    const now = Date.now();
+    const now = this.now();
     const o = this.owner();
     const owned = (key: string): boolean => {
       const it = byKey(key);
@@ -904,7 +914,7 @@ export class Game {
   }
 
   private onShopBuy = (): void => {
-    const now = Date.now();
+    const now = this.now();
     const o = this.owner();
     const owned = (key: string): boolean => {
       const it = byKey(key);
@@ -963,7 +973,7 @@ export class Game {
   }
 
   private openPass(): void {
-    const now = Date.now();
+    const now = this.now();
     this.pass.turn(now);
     const P = CONFIG.economy.pass;
     const tier = this.pass.tier;
@@ -1007,7 +1017,7 @@ export class Game {
   }
 
   private offerRevive(): void {
-    const day = dayKey(Date.now());
+    const day = dayKey(this.now());
     const free = this.daily.freeRevivesLeft(day, this.freeRevivesADay()) > 0;
     // Out of free ones: a rewarded ad if there is one (free with premium), otherwise cores.
     const byAd = !free && this.ads.offers('revive');
@@ -1076,7 +1086,7 @@ export class Game {
 
   /** The free daily gift (a rewarded ad, or free with premium). */
   private async claimGift(): Promise<void> {
-    const day = dayKey(Date.now());
+    const day = dayKey(this.now());
     if (!this.daily.giftReady(day) || !(await this.watchAd('dailyGift')) || !this.daily.giftReady(day)) return;
     this.daily.takeGift(day);
     const lines = this.grant(CONFIG.ads.dailyGift, `gift:${day}`);
@@ -1087,7 +1097,7 @@ export class Game {
   /** Swap an unfinished daily goal for another (a rewarded ad, or free with premium), once a day. */
   private async onReroll(id: string): Promise<void> {
     const i = Number(id.slice(1));
-    const day = dayKey(Date.now());
+    const day = dayKey(this.now());
     if (!/^q\d$/.test(id) || !this.daily.canReroll(day) || !(await this.watchAd('rerollQuest')) || !this.daily.canReroll(day)) return;
     const q = this.daily.reroll(i, day);
     if (q) this.ui.showNotice(`new goal: ${questText(q, this.open('ranked'))}`);
@@ -1151,15 +1161,29 @@ export class Game {
     this.economyTimer -= dt;
     if (this.economyTimer > 0) return;
     this.economyTimer = 1;
-    const now = Date.now();
+    const now = this.now();
     this.daily.turn(dayKey(now));
     this.weeklyGoals.turn(weekKey(now));
     this.pass.turn(now);
     this.refreshBar(now);
   }
 
+  /** The time for rewards, streaks, days and weeks: the server's clock when known, the device's offline. */
+  private now(): number {
+    return this.backend.now();
+  }
+
+  /** The server's clock has arrived (late at start-up, or moved): turn the day and week by it, and pay today's login reward if it's due. */
+  private retime(): void {
+    if (!this.economyLoaded) return;
+    this.tickEconomy(Infinity);
+    if (this.onboarding.done) this.claimLogin();
+  }
+
   /** Sign in and sync with the server, if there is one (see src/server). */
   private async connect(): Promise<void> {
+    // The server's clock may have come after start-up stopped waiting: check today by it (asking again if need be).
+    if (this.backend.clockKnown || (await this.backend.syncClock())) this.retime();
     if (await this.backend.signIn()) {
       if (await this.cloud.start()) {
         location.reload(); // the cloud save is newer: start again from it
@@ -1275,7 +1299,7 @@ export class Game {
    * lines to show, or null if nothing changed.
    */
   private restorePass(records: readonly Purchase[]): string[] | null {
-    const now = Date.now();
+    const now = this.now();
     this.pass.turn(now);
     if (this.pass.premium || !passBought(records, now)) return null;
     const lines = this.pass.unlockPremium().flatMap((r) => this.grant(r));
@@ -1299,7 +1323,7 @@ export class Game {
       n++;
       this.ui.celebrate([{ kicker: 'season pass', icon: PASS_ICON, name: 'premium restored', lines: pass }]);
     }
-    const owned = ids.some((id) => entitlementFor(id) !== null && this.ownsProduct(id)) || (this.pass.premium && passBought(fromServer ?? [], Date.now()));
+    const owned = ids.some((id) => entitlementFor(id) !== null && this.ownsProduct(id)) || (this.pass.premium && passBought(fromServer ?? [], this.now()));
     if (n > 0) this.ui.showNotice(`restored ${n} purchase${n === 1 ? '' : 's'}`);
     else if (owned) this.ui.showNotice('all your purchases are here');
     else if (googleAvailable() && !this.googleEmail) this.ui.showNotice('nothing to restore. bought on another phone? sign in with google');
@@ -1320,7 +1344,7 @@ export class Game {
     });
   }
 
-  private refreshBar(now = Date.now()): void {
+  private refreshBar(now = this.now()): void {
     this.econ.setBar(this.wallet.credits, this.wallet.cores);
     this.econ.setNews('goals', this.daily.loginDue(dayKey(now)) >= 0 || this.goalsToClaim() > 0);
   }
@@ -1332,7 +1356,7 @@ export class Game {
     const score = this.assisted ? 0 : this.score;
     const target = this.weekly.target;
     this.beatPar = false;
-    const r = this.ranked.record(this.mode, score, this.level, this.seed, Date.now(), ranked ? this.weekly.id : undefined);
+    const r = this.ranked.record(this.mode, score, this.level, this.seed, this.now(), ranked ? this.weekly.id : undefined);
     const promoted = r.rankAfter > r.rankBefore;
     const leagueLines: string[] = [];
     const party: Celebration[] = [];
@@ -1387,7 +1411,7 @@ export class Game {
   /** Promote to the next league if ready and enough upgrade points are owned. Returns credits. */
   private promoteLeague(lines: string[] | null, party: Celebration[] = []): number {
     const lg = this.leagues;
-    const credits = lg.tryPromote(this.upgrades.points());
+    const credits = lg.tryPromote(this.upgrades.points(), this.now());
     if (credits > 0) {
       party.push({
         kicker: 'new league',
@@ -1772,7 +1796,7 @@ export class Game {
     const xpSum = recent.reduce((t, h) => t + h.xp, 0);
     const avg = recent.length ? Math.round(xpSum / recent.length) : 0;
     const runsToGo = avg > 0 ? Math.ceil(xpLeft / avg) : 0;
-    const b = rk.bests();
+    const b = rk.bests(this.now());
 
     this.ui.renderProgress('record', {
       icon: insignia(i),
@@ -1793,7 +1817,7 @@ export class Game {
       },
       rows: [
         ['xp a run', `ranked 1 per ${CONFIG.rank.rankedPointsPerXp} points · others 1 per ${formatScore(CONFIG.rank.pointsPerXp)} · goals ${CONFIG.rank.goalXp}`],
-        ['double xp runs left today', String(rk.bonusRunsLeft())],
+        ['double xp runs left today', String(rk.bonusRunsLeft(this.now()))],
         ['best this week', formatScore(b.week)],
         ['best ever', formatScore(b.all)],
         ['ranked runs', formatScore(rk.history.length)],
@@ -1924,7 +1948,7 @@ export class Game {
   }
 
   private renderHangar(keepScroll: boolean): void {
-    const now = new Date();
+    const now = new Date(this.now());
     const v = vaultAt(now.getTime());
     const month = now.getUTCFullYear() * 12 + now.getUTCMonth();
     const view = buildHangar(this.hangar, {
@@ -1978,7 +2002,7 @@ export class Game {
     } else if (u.by === 'cores') {
       if (!this.wallet.spendCores(u.cost)) return;
     } else if (u.by === 'vault') {
-      if (keyOf(item) !== keyOf(vaultAt(Date.now()).item) || !this.wallet.spendCores(u.cost)) return;
+      if (keyOf(item) !== keyOf(vaultAt(this.now()).item) || !this.wallet.spendCores(u.cost)) return;
     } else return;
     this.looks.buy(item);
     this.afterBuy([item], `${item.name} bought and on your ship`);
@@ -1995,7 +2019,7 @@ export class Game {
 
   /** The goals screen's three tabs. */
   private renderGoals(): void {
-    const now = Date.now();
+    const now = this.now();
     const day = dayKey(now);
     this.daily.turn(day);
     this.weeklyGoals.turn(weekKey(now));
@@ -2081,7 +2105,7 @@ export class Game {
     } else if (id === 'qall' || id === 'wall') {
       const cores = id === 'qall' ? this.daily.claimBonus() : this.weeklyGoals.claimBonus();
       if (cores <= 0) return;
-      this.ui.celebrate([{ kicker: id === 'qall' ? "today's goals" : "this week's goals", icon: GOAL_ICON, name: 'all done', lines: this.grant({ cores }, id === 'qall' ? `goals:${dayKey(Date.now())}` : `weekly:${weekKey(Date.now())}`) }]);
+      this.ui.celebrate([{ kicker: id === 'qall' ? "today's goals" : "this week's goals", icon: GOAL_ICON, name: 'all done', lines: this.grant({ cores }, id === 'qall' ? `goals:${dayKey(this.now())}` : `weekly:${weekKey(this.now())}`) }]);
     } else if (id.startsWith('a:')) {
       const a = achievement(id.slice(2));
       if (!a || this.goalLog.has(a.id) || !progressOn(a, this.snapshot()).done) return;
@@ -2232,7 +2256,7 @@ export class Game {
       return;
     }
     // The week may have turned since the game started.
-    const week = weekKey(Date.now());
+    const week = weekKey(this.now());
     if (this.weekly.id !== weeklyRun(week).id) this.weekly = weeklyRun(week);
     this.beginRun(0, this.weekly.seed, 'ranked');
   }
@@ -2517,7 +2541,7 @@ export class Game {
     const next = RANKS[i + 1];
     this.ui.setTitleRank(insignia(i), rankName(i), next ? `${formatScore(xpToRank(this.ranked.xp, i + 1))} xp to ${rankName(i + 1)}` : 'the top rank');
     const wb = this.progress.weeklyBest(this.weekly.id);
-    const now = Date.now();
+    const now = this.now();
     const runs = this.progress.stats.validRuns;
     if (this.open('ranked')) this.ui.setPrimary('ranked', wb > 0 ? `your best this week ${formatScore(wb)}` : 'the same run for everyone, all week');
     else this.ui.setPrimary('fly', this.progress.endlessBest > 0 ? `endless · best ${formatScore(this.progress.endlessBest)}` : 'endless: every area in turn');
