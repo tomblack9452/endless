@@ -112,6 +112,8 @@ App Signing and lets you create in-app products, which need an uploaded build.
    It takes a minute to process. Warnings you can ignore on this game:
    - *"This App Bundle contains Java/Kotlin code, which might be obfuscated. We recommend you upload a deobfuscation file"*: the game doesn't shrink its code, so there's nothing to upload.
    - *"This App Bundle contains native code, and you've not uploaded debug symbols"*: from the ads and store libraries; harmless.
+   - Play's large-screen and edge-to-edge checks (they flagged release 4,
+     1.0.3) are answered in the app; see "Orientation and edge to edge" below.
    Errors you can't ignore:
    - *"Version code 1 has already been used"*: raise `versionCode` and build again.
    - *"Your APK or Android App Bundle was signed in debug mode"*: you built **debug**; build **release** with your `.jks`.
@@ -136,6 +138,31 @@ App Signing and lets you create in-app products, which need an uploaded build.
    the first rollout and try again.
 
 ---
+
+### 2d. Orientation and edge to edge
+
+Play warned on release 4 (1.0.3) about edge-to-edge, deprecated edge-to-edge
+APIs, and the portrait lock on large screens. What the app does now:
+
+- **Orientation:** no lock in the manifest. `MainActivity` holds phones
+  upright (smallest width under 600dp) and lets tablets, unfolded foldables
+  and Chromebooks turn freely; it checks again when a foldable folds or opens.
+  In landscape the game plays in a centred portrait column.
+- **Edge to edge:** `MainActivity` calls `EdgeToEdge.enable`, so the game draws
+  under the status bar and the gesture bar on every Android version.
+  Capacitor's SystemBars (`capacitor.config.ts`) hands the insets to the CSS,
+  and `style.css` keeps everything clear of them (`--safe-*`). The bars' icons
+  are set from the game (`src/systemBars.ts`): dark over a light sky, light
+  over a night sky or a dark-mode panel.
+- **Deprecated APIs:** none in the game's own code or resources. If Play still
+  lists calls such as `setStatusBarColor` or `LAYOUT_IN_DISPLAY_CUTOUT_MODE_*`,
+  its warning names the class: `androidx.activity` (EdgeToEdge, only on older
+  Android versions), the AdMob SDK or another library. Those can only be fixed
+  by updating the library; the warning doesn't block a release.
+
+After a change here: a higher `versionCode`, and a look on a tablet emulator in
+both orientations and on a real phone (nothing under the status bar or the
+gesture bar).
 
 ## 3. App signing and the Google sign-in fingerprints
 
@@ -314,7 +341,9 @@ Notes:
   5. the leaderboard with ships by the names
   6. the asteroid belt or the volcanic plain
   Screenshots must show the real game; no device frames needed.
-- **7-inch / 10-inch tablet screenshots:** optional. Skip them (the game is portrait, phone-first).
+- **7-inch / 10-inch tablet screenshots:** optional. The game is phone-first,
+  but it runs on tablets in either orientation (a centred play column), so
+  these can be added later.
 - **Video:** optional. A YouTube link (public or unlisted, ads off, no age
   restriction), landscape works best. Can be added later.
 - **Save**.

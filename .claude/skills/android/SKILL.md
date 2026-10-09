@@ -138,12 +138,35 @@ These are external steps; ask Tom where each stands rather than assuming.
   profile will be removed" banner).
 - Still to do: US tax forms (W-8BEN) and the AdSense test deposit.
 
+## Orientation and edge to edge
+
+- Portrait on phones only: `MainActivity` holds the screen upright when the
+  smallest width is under 600dp and leaves tablets, unfolded foldables and
+  Chromebooks free to turn (it re-checks on fold and unfold). The manifest has
+  no `screenOrientation`; don't add one back (Play's large-screen check).
+  Landscape plays in a centred portrait column (`--play-w`, `renderer.ts`).
+  Tilt steering reads beta instead of gamma when the screen is on its side.
+- Edge to edge everywhere: `EdgeToEdge.enable` in `MainActivity`. Capacitor's
+  SystemBars (`capacitor.config.ts`, `insetsHandling: 'css'`) passes the insets
+  to `env()` on WebView 140+ and sets `--safe-area-inset-*` on older ones;
+  `style.css` reads both into `--safe-top/bottom/left/right`. Anything placed
+  against a screen edge uses those.
+- The bar icons follow what's behind them, not the phone's theme:
+  `src/systemBars.ts`, from the open screen, dark mode and the scene's text
+  colour.
+- No deprecated edge-to-edge calls (`setStatusBarColor`, cutout modes,
+  `statusBarColor` theme items) in our code or resources. Any Play still lists
+  come from libraries (androidx.activity on old Android versions, AdMob...);
+  the Play Console warning names the class.
+- Check a change on a tablet emulator in both orientations, and on a real
+  phone that the status bar and gesture bar cover nothing.
+
 ## Target SDK
 
 `targetSdk` and `compileSdk` are 36, `minSdk` 24 (`android/variables.gradle`).
 Since 31 August 2026 Play needs API 36 for new apps and updates; the next rise
-(37) is expected in August 2027. On API 36 large screens ignore the portrait
-lock.
+(37) is expected in August 2027. On API 36 large screens ignore an orientation
+lock anyway, which is why the game only holds phones upright.
 
 ## Checks before handing back a change
 
