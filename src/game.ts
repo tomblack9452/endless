@@ -2954,7 +2954,7 @@ export class Game {
     if (this.assistOn() && this.state !== 'title') this.assisted = true;
     this.ui.setDisplay(TEXT_SCALE[s.textSize], (['right', 'left', 'middle'] as const)[s.boostSide] ?? 'right', s.reduceMotion);
     this.applyLook(this.distanceScore / CONFIG.score.levelLength);
-    document.body.classList.toggle('dark', s.dark);
+    this.ui.setDark(s.dark);
     this.refreshTitle(); // the rank colour has a light and a dark version
     this.ui.renderSettings(s);
   }

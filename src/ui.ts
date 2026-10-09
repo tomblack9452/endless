@@ -1,5 +1,6 @@
 import { CONFIG } from './config';
 import { label, type SettingKey, type Settings } from './settings';
+import { Bars } from './systemBars';
 
 export type ScreenName = 'title' | 'paused' | 'over' | 'settings' | 'goals' | 'hangar' | 'record' | 'solo' | 'league' | 'shop' | 'store' | 'pass' | 'boards' | 'welcome' | 'name';
 
@@ -164,6 +165,9 @@ export class UI {
   private shownScore = -1;
   private shownLevel = -1;
   private textColor = '';
+  private screen: ScreenName | null = null;
+  private dark = false;
+  private readonly bars = new Bars();
 
   constructor() {
     document.documentElement.style.setProperty('--fade', `${CONFIG.ui.fadeMs}ms`);
@@ -173,6 +177,14 @@ export class UI {
     if (css === this.textColor) return;
     this.textColor = css;
     document.documentElement.style.setProperty('--text', css);
+    this.bars.sync(this.screen, this.dark, css);
+  }
+
+  /** Dark mode: menus on dark panels with light text (the settings' "dark mode"). */
+  setDark(on: boolean): void {
+    this.dark = on;
+    document.body.classList.toggle('dark', on);
+    this.bars.sync(this.screen, on, this.textColor);
   }
 
   /** Colour of the margins beside the play column on wide screens. */
@@ -186,6 +198,8 @@ export class UI {
     }
     // Every screen but the title is a menu panel: the HUD hides behind it.
     document.getElementById('ui')?.classList.toggle('menu-open', screen !== null && screen !== 'title');
+    this.screen = screen;
+    this.bars.sync(screen, this.dark, this.textColor);
   }
 
   showHud(on: boolean): void {
