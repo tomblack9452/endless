@@ -15,8 +15,8 @@
             android:label="@string/title_activity_main"
             android:theme="@style/AppTheme.NoActionBarLaunch"
             android:launchMode="singleTask"
-            android:screenOrientation="portrait"
             android:exported="true">
+            <!-- No orientation lock here: MainActivity holds phones upright and lets large screens turn (Play's large-screen rules). -->
 
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
