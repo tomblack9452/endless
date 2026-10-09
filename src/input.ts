@@ -3,8 +3,8 @@ import { CONFIG } from './config';
 // One interface for all steering sources. steering() returns -1 (left) .. 1 (right).
 // Priority: drag (while a finger is down) > keyboard > tilt.
 //
-// Tilt uses the device orientation's gamma (left/right lean in portrait),
-// measured from a neutral angle captured by calibrate() at the start of each
+// Tilt uses the device orientation's gamma (left/right lean in portrait; beta
+// when the screen is turned on its side, see leanOf), measured from a neutral angle captured by calibrate() at the start of each
 // run and on resume, with a small deadzone. iOS only sends orientation after
 // a permission prompt answered from a tap; phones also need HTTPS.
 
@@ -60,6 +60,8 @@ export class Input {
     // Always listen; where the browser gates motion behind a permission
     // prompt (iOS, some others) also ask on the first tap.
     window.addEventListener('deviceorientation', this.onOrient);
+    // A tablet turned mid-run leans on another axis: straight ahead is taken again from the next reading.
+    globalThis.screen?.orientation?.addEventListener?.('change', () => (this.tiltSeen = false));
     const gated = typeof (DeviceOrientationEvent as unknown as { requestPermission?: unknown }).requestPermission === 'function';
     if (gated) {
       const ask = () => this.requestTilt();
@@ -87,10 +89,9 @@ export class Input {
   }
 
   private onOrient = (e: DeviceOrientationEvent): void => {
-    if (e.gamma === null) return;
-    // Upside-down portrait reverses left and right.
-    const angle = screen.orientation?.angle ?? 0;
-    this.tiltRaw = angle === 180 ? -e.gamma : e.gamma;
+    const lean = leanOf(screenAngle(), e.beta, e.gamma);
+    if (lean === null) return;
+    this.tiltRaw = lean;
     if (!this.tiltSeen) {
       this.tiltSeen = true;
       this.tiltNeutral = this.tiltRaw;
@@ -222,6 +223,24 @@ export class Input {
     else if (e.code === 'ArrowRight' || e.code === 'KeyD') this.right = false;
     else if (BOOST_KEYS.has(e.code)) this.boostKey = false;
   };
+}
+
+/** The screen's turn from the device's natural way up: 0, 90, 180 or 270. */
+function screenAngle(): number {
+  const a = globalThis.screen?.orientation?.angle ?? 0;
+  return ((a % 360) + 360) % 360;
+}
+
+/**
+ * The left-right lean (degrees, right positive) for how the screen is turned.
+ * Gamma is the lean upright; on its side (a tablet in landscape) the same lean
+ * shows in beta. Upside down reverses either. Null when the axis isn't known.
+ */
+export function leanOf(angle: number, beta: number | null, gamma: number | null): number | null {
+  if (angle === 90) return beta;
+  if (angle === 270) return beta === null ? null : -beta;
+  if (gamma === null) return null;
+  return angle === 180 ? -gamma : gamma;
 }
 
 const BOOST_KEYS = new Set(['ShiftLeft', 'ShiftRight', 'KeyW', 'ArrowUp', 'Space']);

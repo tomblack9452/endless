@@ -97,3 +97,26 @@ describe('double-tap and hold to boost', () => {
     expect(off.input.boostHeld()).toBe(false);
   });
 });
+
+describe('tilt in every orientation', () => {
+  let leanOf: typeof import('../src/input').leanOf;
+  beforeAll(async () => {
+    ({ leanOf } = await import('../src/input'));
+  });
+
+  it('leans on gamma upright and reversed upside down', () => {
+    expect(leanOf(0, 40, 12)).toBe(12);
+    expect(leanOf(180, 40, 12)).toBe(-12);
+  });
+
+  it('leans on beta with the screen on its side (a tablet in landscape)', () => {
+    // Right edge down, held on its side: beta rises at 90 and falls at 270.
+    expect(leanOf(90, 7, -45)).toBe(7);
+    expect(leanOf(270, -7, 45)).toBe(7);
+  });
+
+  it('has no lean when the axis it needs is missing', () => {
+    expect(leanOf(0, 10, null)).toBeNull();
+    expect(leanOf(90, null, 10)).toBeNull();
+  });
+});
