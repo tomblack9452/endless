@@ -2,6 +2,7 @@ import { CONFIG } from './config';
 import { label, type SettingKey, type Settings } from './settings';
 import { SHOW_MS as HINT_MS } from './hints';
 import { Bars } from './systemBars';
+import { type CardView, renderControlCards, renderGuide } from './tutorialView';
 
 export type ScreenName = 'title' | 'paused' | 'over' | 'settings' | 'goals' | 'hangar' | 'record' | 'solo' | 'league' | 'shop' | 'store' | 'pass' | 'boards' | 'welcome' | 'name';
 
@@ -361,15 +362,29 @@ export class UI {
 
   // --- first launch ---
 
-  bindWelcome(on: { control: (id: string) => void; practice: () => void; skip: () => void; pick: (key: string) => void; done: () => void }): void {
+  bindWelcome(on: {
+    control: (id: string) => void;
+    practice: () => void;
+    skip: () => void;
+    pick: (key: string) => void;
+    done: () => void;
+    feel: (id: string) => void;
+    tryIt: () => void;
+    keep: () => void;
+    guideClose: () => void;
+  }): void {
     const stop = (e: Event) => e.stopPropagation();
     $('screen-welcome').addEventListener('pointerdown', stop);
     $('screen-name').addEventListener('pointerdown', stop);
     $('tutorial').addEventListener('pointerdown', stop);
-    $('welcome-controls').addEventListener('click', (e) => {
-      const b = (e.target as HTMLElement).closest<HTMLElement>('[data-control]');
-      if (b) on.control(b.dataset.control ?? '');
-    });
+    $('guide').addEventListener('pointerdown', stop);
+    const cards = (id: string, then: (control: string) => void) =>
+      $(id).addEventListener('click', (e) => {
+        const b = (e.target as HTMLElement).closest<HTMLElement>('[data-control]');
+        if (b) then(b.dataset.control ?? '');
+      });
+    cards('welcome-controls', on.control);
+    cards('welcome-feel', on.feel);
     for (const id of ['welcome-hull', 'welcome-paint', 'welcome-engine'])
       $(id).addEventListener('click', (e) => {
         const b = (e.target as HTMLElement).closest<HTMLElement>('[data-look]');
@@ -379,11 +394,23 @@ export class UI {
     $('welcome-skip').addEventListener('click', on.skip);
     $('tutorial-skip').addEventListener('click', on.skip);
     $('welcome-done').addEventListener('click', on.done);
+    $('welcome-try').addEventListener('click', on.tryIt);
+    $('welcome-keep').addEventListener('click', on.keep);
+    $('guide-close').addEventListener('click', on.guideClose);
   }
 
-  /** The welcome screen: choosing controls, or dressing the ship (chips: [key, label, on]). */
-  renderWelcome(step: 'controls' | 'dress', controls: [string, string, boolean][], dress: Record<'hull' | 'paint' | 'engine', [string, string, boolean][]>): void {
-    $('welcome-title').textContent = step === 'controls' ? 'welcome, pilot' : 'dress your ship';
+  /**
+   * The welcome screen: choosing controls, "how did that feel?" (the cards again,
+   * with the one flown marked used; `tryLabel` null when the one picked is the one
+   * flown), or dressing the ship (chips: [key, label, on]).
+   */
+  renderWelcome(
+    step: 'controls' | 'feel' | 'dress',
+    controls: CardView[],
+    dress: Record<'hull' | 'paint' | 'engine', [string, string, boolean][]>,
+    feel: { note: string; tryLabel: string | null; keepLabel: string } | null = null,
+  ): void {
+    $('welcome-title').textContent = step === 'controls' ? 'welcome, pilot' : step === 'feel' ? 'how did that feel?' : 'dress your ship';
     for (const p of document.querySelectorAll<HTMLElement>('[data-welcome]')) p.hidden = p.dataset.welcome !== step;
     const chips = (into: string, list: [string, string, boolean][], attr: string) =>
       $(into).replaceChildren(
@@ -396,19 +423,37 @@ export class UI {
           return b;
         }),
       );
-    chips('welcome-controls', controls, 'control');
+    if (step === 'controls') renderControlCards($('welcome-controls'), controls);
+    if (step === 'feel' && feel) {
+      renderControlCards($('welcome-feel'), controls);
+      $('welcome-feel-note').textContent = feel.note;
+      const tryIt = $('welcome-try');
+      tryIt.hidden = feel.tryLabel === null;
+      tryIt.textContent = feel.tryLabel ?? '';
+      const keep = $('welcome-keep');
+      keep.textContent = feel.keepLabel;
+      keep.classList.toggle('primary', feel.tryLabel === null);
+    }
     chips('welcome-hull', dress.hull, 'look');
     chips('welcome-paint', dress.paint, 'look');
     chips('welcome-engine', dress.engine, 'look');
   }
 
-  /** The practice run's prompt (null hides it). */
-  showTutorial(text: string | null, step = ''): void {
-    $('tutorial').hidden = text === null;
-    if (text !== null) {
-      $('tutorial-text').textContent = text;
-      $('tutorial-step').textContent = step;
+  /** The pickups and power-ups recap over everything; `button` is its button's word ("next" after practice, "got it" from settings). */
+  showGuide(button: string | null): void {
+    const g = $('guide');
+    if (button === null) {
+      g.hidden = true;
+      return;
     }
+    renderGuide($('guide-list'));
+    $('guide-close').textContent = button;
+    g.hidden = false;
+    $('guide-close').focus({ preventScroll: true });
+  }
+
+  get guideOpen(): boolean {
+    return !$('guide').hidden;
   }
 
   bindTitleCards(onCard: (id: string) => void): void {

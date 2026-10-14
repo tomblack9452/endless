@@ -137,10 +137,17 @@
         <div class="sheet settings welcome-sheet">
           <div data-welcome="controls">
             <div class="label setting-note">pick how you steer. you can change it any time in settings.</div>
-            <div id="welcome-controls" class="chip-row"></div>
+            <div id="welcome-controls" class="ctl-cards" role="group" aria-label="steering"></div>
             <button id="welcome-practice" class="pill primary sheet-buy" type="button">practice run</button>
             <button id="welcome-skip" class="label link welcome-skip" type="button">skip the tutorial</button>
             <button id="welcome-google" class="label link welcome-skip" type="button" data-action="google-welcome" hidden>played before? sign in with google</button>
+          </div>
+          <div data-welcome="feel" hidden>
+            <div id="welcome-feel-note" class="label setting-note"></div>
+            <div id="welcome-feel" class="ctl-cards" role="group" aria-label="steering"></div>
+            <button id="welcome-try" class="pill primary sheet-buy" type="button">try it</button>
+            <button id="welcome-keep" class="pill sheet-buy" type="button">keep</button>
+            <div class="label dim setting-note welcome-later">change it later in settings › controls</div>
           </div>
           <div data-welcome="dress" hidden>
             <div class="label setting-note">dress your ship. there are many more looks to earn in the hangar.</div>
@@ -170,9 +177,20 @@
       </div>
 
       <div id="tutorial" class="tutorial" hidden>
-        <div id="tutorial-step" class="label dim"></div>
-        <div id="tutorial-text" class="tutorial-text"></div>
+        <div class="tutorial-head"><span id="tutorial-step" class="label dim"></span><span id="tutorial-dots" class="tutorial-dots" aria-hidden="true"></span></div>
+        <div id="tutorial-item" class="tutorial-item" hidden><span id="tutorial-icon" class="tutorial-icon"></span><span id="tutorial-name" class="tutorial-name"></span></div>
+        <div id="tutorial-text" class="tutorial-text" aria-live="polite"></div>
         <button id="tutorial-skip" class="label link" type="button">skip</button>
+      </div>
+      <div id="teach-art" class="teach-art" hidden><span class="ctl-art"></span></div>
+      <div id="teach-marks" class="teach-marks" aria-hidden="true"></div>
+
+      <div id="guide" class="guide" role="dialog" aria-modal="true" aria-labelledby="guide-title" hidden>
+        <div class="guide-card">
+          <div id="guide-title" class="settings-group">pickups &amp; power-ups</div>
+          <div id="guide-list"></div>
+          <button id="guide-close" class="pill primary sheet-buy" type="button">got it</button>
+        </div>
       </div>
 
       <div id="screen-paused" class="layer screen panel">
@@ -231,6 +249,7 @@
           <div class="settings-group">help</div>
           <button class="setting-row" type="button" data-action="tutorial"><span class="label">replay the tutorial</span><span class="value">play</span></button>
           <button class="setting-row" type="button" data-action="tips"><span class="label">replay tips</span><span class="value">replay</span></button>
+          <button class="setting-row" type="button" data-action="guide"><span class="label">pickups &amp; power-ups</span><span class="value">open</span></button>
           <button class="setting-row" type="button" data-action="feedback"><span class="label">send feedback</span><span class="value">write</span></button>
           <a class="setting-row" href="https://tomblack9452.github.io/endless/support.html" target="_blank" rel="noopener"><span class="label">help and contact</span><span class="value">open</span></a>
           <a class="setting-row" href="https://tomblack9452.github.io/endless/privacy.html" target="_blank" rel="noopener"><span class="label">privacy policy</span><span class="value">open</span></a>

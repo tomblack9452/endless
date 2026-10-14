@@ -29,13 +29,18 @@ export const AFTER: Record<TipId, TipId | null> = {
 export const SHOW_MS = 3600;
 export const GAP_MS = 1400;
 
-export type Controls = 'drag' | 'sides' | 'tilt';
+/** The ways to steer: three on a touch screen, and the keys on a computer. */
+export type Controls = 'drag' | 'sides' | 'tilt' | 'keys';
 
-/** What a tip says, for the steering in use (`keys`: a keyboard rather than a touch screen). */
-export function tipText(id: HintId, controls: Controls, how: { keys?: boolean; doubleTap?: boolean } = {}): string {
+/**
+ * What a tip says, for the steering in use (`keys`: a keyboard rather than a
+ * touch screen). The practice run's lessons use the same words (onboarding.ts),
+ * so a tip and the lesson it stands in for never disagree.
+ */
+export function tipText(id: HintId, controls: Controls, how: { keys?: boolean; doubleTap?: boolean; side?: 'right' | 'left' | 'middle' } = {}): string {
   switch (id) {
     case 'steer':
-      if (how.keys) return 'arrow keys or a / d to steer';
+      if (how.keys || controls === 'keys') return 'arrow keys or a / d to steer';
       return controls === 'tilt' ? 'tilt your phone to steer' : controls === 'sides' ? 'hold the left or right side to steer' : 'drag left and right to steer';
     case 'avoid':
       return 'steer clear of everything. one hit ends the run';
@@ -47,7 +52,10 @@ export function tipText(id: HintId, controls: Controls, how: { keys?: boolean; d
       return 'power-up ahead: shield, magnet or slow-mo. grab it';
     case 'boost':
       if (how.keys) return 'hold shift, space or up to boost';
-      return how.doubleTap === false ? 'hold the boost button to boost' : 'hold the boost button, or double-tap and hold, to boost';
+      {
+        const button = how.side ? `the boost button (bottom ${how.side})` : 'the boost button';
+        return how.doubleTap === false ? `hold ${button} to boost` : `hold ${button}, or double-tap and hold, to boost`;
+      }
     case 'pits':
       return 'gaps in the floor. stay over the deck';
   }

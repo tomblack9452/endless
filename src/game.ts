@@ -24,7 +24,26 @@ import { sendFeedback } from './feedback';
 import { type HintId, Hints, tipText } from './hints';
 import { migrateMissionLooks, migrateTickets } from './legacy';
 import { type Feature, isOpen, nextStageText, STAGES, stageFor } from './reveal';
-import { hasTouch, type Lesson, LESSONS, LESSON_SECONDS, lessonText, Onboarding, PRACTICE_SEED, STARTER } from './onboarding';
+import {
+  CONTROL_CARDS,
+  controlChoices,
+  type ControlId,
+  freshLesson,
+  hasTouch,
+  type Lesson,
+  lessonMet,
+  lessonOver,
+  type LessonState,
+  LESSONS,
+  lessonText,
+  Onboarding,
+  PRACTICE_SEED,
+  STARTER,
+  TRIAL_SECONDS,
+} from './onboarding';
+import { itemCard, powerItem } from './guide';
+import { type Mark, TeachView } from './tutorialView';
+import { Vector3 } from 'three';
 import { Ads, createAdNetwork, type RewardedPlacement } from './ads/ads';
 import { entitlementFor, Entitlements } from './store/entitlements';
 import { Progress } from './progress';
@@ -105,7 +124,18 @@ function musicFor(level: number): MusicId {
   return biome === 'ice' || biome === 'volcanic' || biome === 'asteroids' ? biome : themeForLevel(level);
 }
 
-const POWER_NOTICE = ['shield. takes one hit', 'magnet. pulls in boost', 'slow-mo'];
+/** Where the boost button sits, by the boostSide setting (0 right, 1 left, 2 middle). */
+const BOOST_SIDES = ['right', 'left', 'middle'] as const;
+/** The practice run puts each pickup and power-up this far ahead (about 2.5 s at its speed). */
+const ITEM_AHEAD = 95;
+/** How long a picked-up item's "on" line stays before the next. */
+const CONFIRM_SECONDS = 1.8;
+/** After the practice magnet: pickups this far ahead, this far to the side of the lane, for it to pull in. */
+const MAGNET_DEMO: [number, number][] = [
+  [36, 1.6],
+  [50, -1.6],
+  [64, 1.6],
+];
 
 /** A wrapped present, for the daily reward. */
 const GIFT_ICON =
@@ -196,8 +226,30 @@ export class Game {
   /** The saved days, weeks and pass are loaded (retime waits for them). */
   private economyLoaded = false;
   private readonly onboarding = new Onboarding();
-  /** The practice run in progress (onboarding): the lesson it's on and what's been seen. */
-  private practice: { lesson: number; t: number; steerT: number; nearMisses: number; pickups: number } | null = null;
+  /**
+   * The practice run in progress (onboarding), or a trial of other controls: the
+   * lesson it's on, what the player has done in it, the controls flown, the
+   * lessons done, and the pickup or power-up coming up (and those still to come).
+   */
+  private practice: {
+    kind: 'lessons' | 'trial';
+    lesson: number;
+    s: LessonState;
+    control: ControlId;
+    learned: Lesson[];
+    item: 'pickup' | PowerKind | null;
+    coming: boolean;
+    queue: ('pickup' | PowerKind)[];
+    confirmT: number;
+  } | null = null;
+  /** The next run is the practice course (its own pickups and power-ups). */
+  private practiceNext = false;
+  /** "how did that feel?": the controls the last practice or trial was flown with. */
+  private feelUsed: ControlId | null = null;
+  private readonly teach = new TeachView();
+  private readonly markV = new Vector3();
+  /** Obstacles flown past this run (the practice run's obstacle lesson). */
+  private passCount = 0;
   /** The reveal stage last announced (null until read from storage). */
   private revealSeen: number | null = null;
   private readonly ads = new Ads(createAdNetwork(), () => this.entitlements.has('premium'), () => this.firstPlayed);
@@ -336,9 +388,13 @@ export class Game {
     this.ui.bindWelcome({
       control: (id) => this.chooseControls(id),
       practice: () => this.startPractice(),
-      skip: () => this.finishOnboarding(),
+      skip: () => this.skipPractice(),
       pick: (key) => this.pickStarter(key),
       done: () => this.finishOnboarding(),
+      feel: (id) => this.chooseControls(id),
+      tryIt: () => this.startTrial(),
+      keep: () => this.keepControls(),
+      guideClose: () => this.closeGuide(),
     });
     this.ui.bindRecordTabs((tab) => this.ui.setRecordTab(tab));
     void storage.get(REVEAL_KEY).then((v) => (this.revealSeen = v === null ? -1 : Number(v) || 0));
@@ -475,6 +531,9 @@ export class Game {
     this.environment = env;
     this.world.setCourse(course);
     this.world.setEnvironment(env);
+    this.world.scripted = this.practiceNext; // the practice course places its own pickups and power-ups
+    this.practiceNext = false;
+    this.passCount = 0;
     this.sectionIdx = -1;
     this.hitThisRun = false;
     this.scoreBase = 0;
@@ -2522,27 +2581,41 @@ export class Game {
     return this.dev.invincible || this.practice !== null;
   }
 
-  private controlsNow(): 'drag' | 'sides' | 'tilt' {
-    return this.settings.tilt ? 'tilt' : this.settings.touch === 1 ? 'sides' : 'drag';
+  /** How the player steers now (keys: a computer, with the keys chosen over the mouse). */
+  private controlsNow(): ControlId {
+    if (this.settings.tilt) return 'tilt';
+    if (this.settings.touch === 1) return 'sides';
+    return !hasTouch() && (this.onboarding.keys ?? true) ? 'keys' : 'drag';
   }
 
-  /** The welcome screen, on the step onboarding is at (choosing controls, or dressing the ship). */
+  /** The ways to steer this device offers (tilt where the phone can tell its lean). */
+  private controlChoices(): ControlId[] {
+    return controlChoices({ touch: hasTouch(), tilt: typeof DeviceOrientationEvent !== 'undefined' });
+  }
+
+  /** The welcome screen, on the step onboarding is at (choosing controls, "how did that feel?", or dressing the ship). */
   private openWelcome(): void {
-    const step = this.onboarding.step === 'dress' ? 'dress' : 'controls';
+    const step = this.onboarding.step === 'dress' ? 'dress' : this.onboarding.step === 'feel' ? 'feel' : 'controls';
     if (!hasTouch() && this.settings.tilt) {
       this.settings.tilt = false; // no tilt without a phone
       void saveSettings(this.settings);
     }
     const c = this.controlsNow();
-    const controls: [string, string, boolean][] = [
-      ['drag', 'drag', c === 'drag'],
-      ['sides', 'tap sides', c === 'sides'],
-    ];
-    if (hasTouch() && typeof DeviceOrientationEvent !== 'undefined') controls.push(['tilt', 'tilt', c === 'tilt']);
+    const used = this.feelUsed ?? c;
+    const cards = this.controlChoices().map((id) => ({ id, on: id === c, used: step === 'feel' && id === used }));
+    const name = (id: ControlId) => CONTROL_CARDS[id].name;
+    const feel =
+      step === 'feel'
+        ? {
+            note: c === used ? `you flew with ${name(used)}. keep it, or tap another card to try it for ${TRIAL_SECONDS} s.` : `${name(c)} it is. try it for ${TRIAL_SECONDS} s first, or keep it.`,
+            tryLabel: c === used ? null : `try ${name(c)} · ${TRIAL_SECONDS} s`,
+            keepLabel: `keep ${name(c)}`,
+          }
+        : null;
     const eq = this.looks.equipped;
     const chips = (slot: 'hull' | 'paint' | 'engine'): [string, string, boolean][] =>
       STARTER[slot].map((key) => [key, byKey(key)?.name ?? key, `${slot}:${eq[slot]}` === key]);
-    this.ui.renderWelcome(step, controls, { hull: chips('hull'), paint: chips('paint'), engine: chips('engine') });
+    this.ui.renderWelcome(step, cards, { hull: chips('hull'), paint: chips('paint'), engine: chips('engine') }, feel);
     const google = document.getElementById('welcome-google');
     if (google) google.hidden = !(googleAvailable() && this.backend.online);
     this.player.reset();
@@ -2551,64 +2624,230 @@ export class Game {
     this.openInfo('welcome');
   }
 
+  /** A control card: saved to settings straight away. */
   private chooseControls(id: string): void {
+    if (!(this.controlChoices() as string[]).includes(id)) return;
     this.settings.tilt = id === 'tilt';
     this.settings.touch = id === 'sides' ? 1 : 0;
+    if (!hasTouch()) this.onboarding.setKeys(id === 'keys');
     void saveSettings(this.settings);
     this.applySettings();
+    this.haptics.pickup();
     this.openWelcome();
   }
 
   /** The practice run: a fixed course you can't fail, one lesson at a time. */
   private startPractice(): void {
-    this.onboarding.set('practice');
+    this.onboarding.go('practice');
+    this.beginPractice('lessons');
+  }
+
+  /** "try another": a short steering-only run with the controls just picked. */
+  private startTrial(): void {
+    this.onboarding.go('try');
+    this.beginPractice('trial');
+  }
+
+  private beginPractice(kind: 'lessons' | 'trial'): void {
+    this.ui.showGuide(null);
     this.infoOpen = null;
+    this.practiceNext = true;
     this.beginRun(0, PRACTICE_SEED, 'endless');
+    this.ui.hideBanner(); // the lesson card has the top band
     this.recorded = true; // nothing from it counts: no stats, no bests, no boards
     this.unlockable = false; // ...and no unlocks
-    this.practice = { lesson: 0, t: 0, steerT: 0, nearMisses: this.nearMissCount, pickups: this.pickupCount };
+    this.practice = { kind, lesson: 0, s: freshLesson(), control: this.controlsNow(), learned: [], item: null, coming: false, queue: [], confirmT: 0 };
+    this.teach.show(true);
     this.showLesson();
   }
 
+  /** Put the lesson (or the trial) up: the card in the top band and its indicator. */
   private showLesson(): void {
     const p = this.practice;
     if (!p) return;
+    // Steering is worded for the controls chosen (keys only if the keys were); boost for the device.
+    const keys = { keys: !hasTouch(), doubleTap: this.settings.doubleTapBoost, side: BOOST_SIDES[this.settings.boostSide] };
+    const steerHow = { ...keys, keys: false };
+    if (p.kind === 'trial') {
+      this.teach.setStep(`trying ${CONTROL_CARDS[p.control].name} · ${Math.max(0, Math.ceil(TRIAL_SECONDS - p.s.t))} s`, 0, 0);
+      this.teach.setItem(null);
+      this.teach.setText(lessonText('steer', p.control, steerHow));
+      this.teach.point(null);
+      return;
+    }
     const lesson = LESSONS[p.lesson];
     if (lesson === 'boost') this.boostMeter = 1; // a full meter, so boost works straight away
-    const how = { keys: !hasTouch(), doubleTap: this.settings.doubleTapBoost };
-    this.ui.showTutorial(lessonText(lesson, this.controlsNow(), how), `practice · ${p.lesson + 1} of ${LESSONS.length}`);
+    if (lesson === 'pickup') p.queue = ['pickup'];
+    if (lesson === 'power') p.queue = [0, 1, 2];
+    p.item = null;
+    this.teach.setStep(`practice · ${p.lesson + 1} of ${LESSONS.length}`, p.lesson, LESSONS.length);
+    this.teach.setItem(null);
+    this.teach.setText(lessonText(lesson, p.control, lesson === 'boost' ? keys : steerHow));
+    this.teach.point(lesson === 'nearMiss' ? 'score' : lesson === 'boost' ? 'boost' : null);
+    this.teach.setArt(lesson === 'steer' ? p.control : null);
+    this.teach.setMarks([]);
   }
 
-  /** Has the player done what the lesson asks? Then the next, and after the last, dress the ship. */
+  /** Has the player done what the lesson asks? Then the next, and after the last, the recap and "how did that feel?". */
   private practiceTick(dt: number): void {
     const p = this.practice!;
+    const s = p.s;
+    s.t += dt;
+    const steer = this.input.steering();
+    if (steer < -0.35) s.left += dt;
+    if (steer > 0.35) s.right += dt;
+    if (this.boosting) s.boostT += dt;
+    if (p.kind === 'trial') {
+      this.teach.setArt(p.control, this.laneDir());
+      this.showLesson(); // the countdown
+      if (s.t >= TRIAL_SECONDS) this.endTrial();
+      return;
+    }
     const lesson: Lesson = LESSONS[p.lesson];
-    p.t += dt;
-    if (Math.abs(this.input.steering()) > 0.35) p.steerT += dt;
-    const done =
-      p.t > LESSON_SECONDS ||
-      (lesson === 'steer' && p.steerT > 1.2) ||
-      (lesson === 'nearMiss' && this.nearMissCount > p.nearMisses) ||
-      (lesson === 'pickup' && this.pickupCount > p.pickups) ||
-      (lesson === 'boost' && this.boosting);
-    if (!done) return;
-    this.sound.pickup();
-    this.haptics.pickup();
+    if (lesson === 'steer') this.teach.setArt(p.control, this.laneDir());
+    if (lesson === 'pickup' || lesson === 'power') this.runItems(dt);
+    this.updateMarks(lesson);
+    // An item's "on" line stays up for a moment before the lesson moves on.
+    if (!lessonOver(lesson, s) || p.confirmT > 0) return;
+    if (lessonMet(lesson, s)) {
+      p.learned.push(lesson);
+      this.sound.pickup();
+      this.haptics.pickup();
+    }
     p.lesson++;
-    p.t = 0;
-    p.nearMisses = this.nearMissCount;
-    p.pickups = this.pickupCount;
+    p.s = freshLesson();
     if (p.lesson < LESSONS.length) {
       this.showLesson();
       return;
     }
-    this.ui.showTutorial(null);
-    this.hints.learned(['steer', 'nearMiss', 'pickup', 'boost']); // the walkthrough needn't say them again
-    this.ui.showNotice('nicely flown. now dress your ship');
+    this.finishPractice();
+  }
+
+  /** Which way the steering diagram leans: towards the safe lane a little ahead (0 when it's straight on). */
+  private laneDir(): number {
+    const off = this.world.laneOffset(26);
+    return off === null || Math.abs(off) < 0.8 ? 0 : Math.sign(off);
+  }
+
+  /**
+   * The pickup and power-up lessons: place the next one on the lane ahead, put
+   * its card up as it comes, say what it did once it's picked up, and place it
+   * again if it's missed.
+   */
+  private runItems(dt: number): void {
+    const p = this.practice!;
+    if (p.confirmT > 0) {
+      p.confirmT -= dt;
+      if (p.confirmT > 0) return;
+      p.item = null;
+    }
+    if (p.item === null) {
+      if (p.queue.length === 0) return;
+      const next = p.queue[0];
+      this.world.place(next, ITEM_AHEAD);
+      p.item = next;
+      p.coming = true;
+      this.teach.setItem(next === 'pickup' ? 'pickup' : powerItem(next));
+      this.teach.setText(itemCard(next === 'pickup' ? 'pickup' : powerItem(next)).does);
+      return;
+    }
+    if (p.coming && !this.world.itemAhead(p.item, -2, ITEM_AHEAD + 40)) {
+      // Flown past: another one.
+      this.world.place(p.item, ITEM_AHEAD);
+      this.teach.setText(`missed it. here's another. ${itemCard(p.item === 'pickup' ? 'pickup' : powerItem(p.item)).does}`);
+    }
+  }
+
+  /** The practice run saw a pickup (or power-up) collected: say what it did. */
+  private practiceGot(item: 'pickup' | PowerKind): void {
+    const p = this.practice;
+    if (!p || p.kind === 'trial' || p.item !== item || !p.coming) return;
+    p.coming = false;
+    p.queue.shift();
+    p.confirmT = CONFIRM_SECONDS;
+    const id = item === 'pickup' ? 'pickup' : powerItem(item);
+    this.teach.setText(itemCard(id).on);
+    if (item === 'pickup') p.s.pickups++;
+    else {
+      p.s.powers++;
+      // The magnet pulls in pickups: a few to the side of the lane show it.
+      if (item === 1) for (const [ahead, side] of MAGNET_DEMO) this.world.place('pickup', ahead, side);
+    }
+  }
+
+  /** Markers on the world: the next obstacle and the gap, or the item coming up. */
+  private updateMarks(lesson: Lesson): void {
+    const p = this.practice!;
+    const marks: Mark[] = [];
+    if (lesson === 'avoid') {
+      const o = this.world.obstacleAhead(12, 70, 6);
+      if (o) {
+        const a = this.toScreen(o.x, o.y, o.z);
+        const g = this.toScreen(o.gap, 1.4, o.z);
+        if (a) marks.push({ ...a, label: 'obstacle', color: '' });
+        if (g && Math.abs(o.gap - o.x) > 1.2) marks.push({ ...g, label: 'gap', color: '' });
+      }
+    } else if ((lesson === 'pickup' || lesson === 'power') && p.item !== null && p.coming) {
+      const it = this.world.itemAhead(p.item, 6, ITEM_AHEAD + 40);
+      const id = p.item === 'pickup' ? 'pickup' : powerItem(p.item);
+      const at = it && this.toScreen(it.x, it.y + 0.7, it.z);
+      if (at) marks.push({ ...at, label: itemCard(id).name, color: itemCard(id).color });
+    }
+    this.teach.setMarks(marks);
+  }
+
+  /** A point in the scene, in pixels over the play area; null if it's behind the camera or off screen. */
+  private toScreen(x: number, y: number, z: number): { x: number; y: number } | null {
+    const v = this.markV.set(x, y, z).project(this.stage.camera);
+    if (v.z > 1 || v.x < -1.1 || v.x > 1.1 || v.y < -1.1 || v.y > 1.1) return null;
+    const canvas = this.stage.renderer.domElement;
+    return { x: ((v.x + 1) / 2) * canvas.clientWidth, y: ((1 - v.y) / 2) * canvas.clientHeight };
+  }
+
+  /** The last lesson done: the recap of the pickups and power-ups, then "how did that feel?". */
+  private finishPractice(): void {
+    const p = this.practice!;
+    // The walkthrough needn't say any of it again (a lesson only timed out still showed what it's about).
+    this.hints.learned(LESSONS);
+    this.feelUsed = p.control;
+    this.endPractice();
+    this.onboarding.go('finished');
+    this.openWelcome();
+    this.ui.showGuide('next');
+  }
+
+  /** The trial's time is up (or skipped): back to "how did that feel?". */
+  private endTrial(): void {
+    const p = this.practice!;
+    this.feelUsed = p.control;
+    this.endPractice();
+    this.onboarding.go('finished');
+    this.openWelcome();
+  }
+
+  /** Off the practice course and its indicators, back to the title scene. */
+  private endPractice(): void {
+    this.teach.show(false);
     this.toMainMenu();
     this.practice = null;
-    this.onboarding.set('dress');
+  }
+
+  /** "skip" during the practice run ends the tutorial; during a trial it goes back to "how did that feel?". */
+  private skipPractice(): void {
+    if (this.practice?.kind === 'trial') this.endTrial();
+    else this.finishOnboarding();
+  }
+
+  /** "keep": on to dressing the ship. */
+  private keepControls(): void {
+    this.feelUsed = null;
+    this.onboarding.go('keep');
     this.openWelcome();
+  }
+
+  /** The recap's button: closes it (over "how did that feel?" or settings). */
+  private closeGuide(): void {
+    this.ui.showGuide(null);
   }
 
   /** Try a look from the starter set on (owned or not; the hull chosen is given at the end). */
@@ -2623,10 +2862,12 @@ export class Game {
   /** Done (or skipped): keep the hull chosen, and on to the front page. */
   private finishOnboarding(): void {
     if (this.practice) {
-      this.practice = null;
-      this.ui.showTutorial(null);
-      this.toMainMenu();
+      // Skipped part way: the tips still cover what the practice run didn't get to.
+      this.hints.learned(this.practice.learned);
+      this.endPractice();
     }
+    this.ui.showGuide(null);
+    this.feelUsed = null;
     const hull = `hull:${this.looks.equipped.hull}`;
     if (STARTER.hull.includes(hull) && !this.looks.owns(byKey(hull)!, this.owner())) this.looks.give(hull);
     this.onboarding.set('done');
@@ -2786,6 +3027,7 @@ export class Game {
    */
   back(): boolean {
     if (this.exitAsking) this.closeExitAsk();
+    else if (this.ui.guideOpen) this.closeGuide();
     else if (this.settingsOpen) this.closeSettings();
     else if (this.infoOpen === 'welcome') return this.backAtTop();
     else if (this.infoOpen) this.closeInfo();
@@ -2926,15 +3168,19 @@ export class Game {
     }
     else if (action === 'tutorial') {
       if (this.state !== 'title') this.toMainMenu();
-      this.onboarding.set('controls');
+      this.onboarding.go('replay');
+      this.feelUsed = null;
       this.closeSettings();
       this.openWelcome();
     }
+    else if (action === 'guide') this.ui.showGuide('got it');
     else if (action === 'menu') {
-      const practising = this.practice !== null;
+      const practising = this.practice;
       this.toMainMenu();
       if (practising) {
-        this.onboarding.set('controls'); // left the practice run: back to the start of onboarding
+        // Left the practice run: back to the start of onboarding (a trial: back to "how did that feel?").
+        if (practising.kind === 'trial') this.feelUsed = practising.control;
+        this.onboarding.go('quit');
         this.openWelcome();
       }
     }
@@ -3040,7 +3286,7 @@ export class Game {
     if (this.state === 'crashed' && this.revivePending) this.settleCrash();
     if (this.practice) {
       this.practice = null;
-      this.ui.showTutorial(null);
+      this.teach.show(false);
     }
     this.econ.setCountdown(0);
     this.econ.dismissOffer();
@@ -3316,6 +3562,7 @@ export class Game {
       this.bonus += got * CONFIG.score.pickupPoints;
       this.pickupCount += got;
       this.tip('pickup');
+      if (this.practice) this.practiceGot('pickup');
       this.ui.flashBoost();
       this.sound.pickup();
       this.haptics.pickup();
@@ -3338,7 +3585,7 @@ export class Game {
       this.level = level;
       this.ui.setLevel(level);
       if (this.unlockable) this.noteReached(level);
-      this.ui.announceLevel(level, this.areaName(level));
+      if (!this.practice) this.ui.announceLevel(level, this.areaName(level)); // in practice the lesson card has the top band
       this.sound.level(themeChange, this.areaMusic(level));
       this.haptics.level(themeChange);
       this.maybeStartEvent(level);
@@ -3402,6 +3649,8 @@ export class Game {
   private updateNearMisses(dt: number, prev: number): void {
     const nm = CONFIG.score.nearMiss;
     const n = this.world.passes(prev, CONFIG.audio.passRange);
+    this.passCount += n;
+    if (this.practice) this.practice.s.passed += n;
     for (let i = 0; i < n; i++) {
       const gap = this.world.passGap[i];
       const side = this.world.passSide[i];
@@ -3413,6 +3662,7 @@ export class Game {
       const points = nm.points * this.chain;
       this.bonus += points;
       this.nearMissCount++;
+      if (this.practice) this.practice.s.nearMisses++;
       if (this.chain > this.bestChain) this.bestChain = this.chain;
       this.chainTimer = nm.comboWindow;
       this.nudgeMs = nm.nudgeMs;
@@ -3446,7 +3696,7 @@ export class Game {
   /** Offer hint `id`, worded for the steering in use. Not during the practice run, which has its own prompts. */
   private tip(id: HintId): void {
     if (this.practice) return;
-    this.hints.offer(id, tipText(id, this.controlsNow(), { keys: !hasTouch(), doubleTap: this.settings.doubleTapBoost }));
+    this.hints.offer(id, tipText(id, this.controlsNow(), { keys: id === 'boost' && !hasTouch(), doubleTap: this.settings.doubleTapBoost, side: BOOST_SIDES[this.settings.boostSide] }));
   }
 
   /** Fill or drain the meter and ease the boost amount in and out. */
@@ -3649,7 +3899,8 @@ export class Game {
     } else if (kind === 1) this.magnetT = p.magnet.seconds + this.ship.magnetExtra;
     else this.slowT = p.slow.seconds;
     this.pickupCount++;
-    this.ui.showNotice(POWER_NOTICE[kind]);
+    if (this.practice) this.practiceGot(kind); // the lesson card says it
+    else this.ui.showNotice(itemCard(powerItem(kind)).on);
     this.sound.power();
     this.haptics.pickup();
   }
