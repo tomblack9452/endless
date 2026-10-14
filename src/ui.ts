@@ -997,6 +997,20 @@ export class UI {
     this.hint.classList.add('show');
   }
 
+  /** The pause button also answers a click and Enter (keyboard and screen readers), not just a press. */
+  bindPause(onPause: () => void): void {
+    this.pauseButton.addEventListener('click', (e) => {
+      e.stopPropagation();
+      onPause();
+    });
+    this.pauseButton.addEventListener('keydown', (e) => {
+      if (e.key !== 'Enter') return;
+      e.preventDefault();
+      e.stopPropagation();
+      onPause();
+    });
+  }
+
   /** Briefly show the name of the room just entered. */
   showRoom(name: string): void {
     this.roomLabel.textContent = name;

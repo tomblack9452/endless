@@ -315,6 +315,7 @@ export class Game {
     document.body.addEventListener('pointerdown', this.onTap);
     window.addEventListener('keydown', this.onKey);
     this.ui.pauseButton.addEventListener('pointerdown', this.onPauseButton);
+    this.ui.bindPause(() => this.pause());
     // Tapping anywhere also starts; the button is the explicit target.
     this.ui.startButton.addEventListener('click', () => {
       if (this.state === 'title') this.startPrimary();
@@ -332,10 +333,14 @@ export class Game {
     this.ui.titleRank.addEventListener('pointerdown', (e) => e.stopPropagation());
     this.ui.titleRank.addEventListener('click', () => this.onTitleLink('record'));
     document.addEventListener('visibilitychange', () => {
-      if (document.hidden) this.pause();
+      if (document.hidden) {
+        this.pause();
+        this.sound.suspend(); // no music or engine from the background, whatever screen was up
+      }
       // Back to the front: pick up any change to the balances made on the server (the dashboard),
       // and the server's clock again (the device's may have been moved meanwhile).
       else {
+        if (this.state !== 'paused') this.sound.resume(); // a paused run stays quiet until it's resumed
         void this.backend.syncClock().then((known) => known && this.retime());
         void this.wallet.refresh().then(() => this.checkMaxOut()).then(() => this.refreshTitle());
         this.ads.preload();
@@ -2852,7 +2857,8 @@ export class Game {
       if (this.state === 'title' && !this.settingsOpen && !this.infoOpen) this.startPrimary();
       else this.onTap();
     }
-    else if (e.code === 'Escape' || e.code === 'KeyP') {
+    else if (e.code === 'Escape') this.back(); // what Android's back button does
+    else if (e.code === 'KeyP') {
       if (this.settingsOpen) this.closeSettings();
       else if (this.infoOpen) this.closeInfo();
       else if (this.state === 'playing') this.pause();
