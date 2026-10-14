@@ -1,7 +1,8 @@
 # Launch audit
 
 > The first pass below is **historical** (before the Android build, Google
-> sign-in and the store page). The second, at the end, is the current one.
+> sign-in and the store page). The second and third, at the end, are the
+> current ones.
 
 A pass over the game before it goes on the stores: every screen played in a
 browser at phone size (390x844, 375x667 with the largest text) and on a
@@ -129,3 +130,30 @@ turned on in the game's settings).
   device), so a run can be sent to a lower league's board.
 - The season looks in the catalogue are fixed at start-up by the phone's clock;
   a phone set weeks behind misses a new season's looks until it restarts.
+
+## Third pass (1.0.5, 14 October 2026)
+
+The bugs left from the second audit, and what the closed testers asked for.
+
+**Fixed:**
+
+- Going to the background only paused a run: on the title screen or a menu the
+  music and engine kept playing. The sound now stops whenever the game is
+  hidden, and comes back when it's in front again (a paused run stays quiet
+  until it's resumed).
+- Escape only closed settings or paused; now it does exactly what Android's
+  back button does (`back()`), short of leaving the page.
+- The pause button was a `<span>` that only answered a press. It's a button
+  now for keyboards and screen readers (`role="button"`, `aria-label`,
+  `tabindex`, click and Enter).
+
+**Added (tester feedback):**
+
+- **Send feedback** in settings and on the pause screen: a mail to
+  tomblackdev@proton.me with the version and build, the device and Android
+  version, and the screen it came from.
+- **Ask before closing:** back on the title screen asks "close endless
+  space?" in the app (a setting, on by default).
+- **First-run tips:** a short, skippable walkthrough over the first runs
+  (steering, obstacles, near misses and chains, pickups, power-ups and boost),
+  with replay tips in settings.

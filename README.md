@@ -78,7 +78,8 @@ Accept the certificate warning once on the phone.
 |---|---|---|
 | Steer | Drag anywhere, tap the sides, or tilt | Arrow keys or A / D |
 | Boost | Hold the boost button, or double-tap and hold anywhere | Shift, W, Up or Space |
-| Pause | `pause`, top right, or Android's back button (play resumes after a 3-2-1; main menu ends the run, and it still counts) | Esc or P |
+| Pause | `pause`, top right (a button for keyboards and screen readers too: Enter or a click), or Android's back button (play resumes after a 3-2-1; main menu ends the run, and it still counts) | Esc or P |
+| Back | Android's back button closes the open screen, pauses a run or leaves the end screen; on the title screen it asks "close endless space?" (**close** / **stay**; back again stays) unless "ask before closing" is off | Esc does the same, but never leaves the page |
 | Start | `ranked`, `solo` or `endless` on the title screen | Space or Enter (ranked) |
 | Retry | Tap | Space or Enter |
 
@@ -110,8 +111,16 @@ On a wide screen the game plays in a centred portrait column.
   than a black one.
 - Near a theme change the path is kept clear for a stretch so you can read
   the new theme.
-- First-run hints explain steering, boost, pickups, near misses and floor
-  gaps, each shown once.
+- **First-run tips** (`src/hints.ts`): a short walkthrough over a new
+  player's first runs, each tip once and at its moment: how to steer (in the
+  steering chosen: drag, tap the sides, tilt, or the keys), steering clear of
+  obstacles, near misses and chains (at the first near miss), pickups (when
+  one is coming up), power-ups (when one is coming up) and boost (once the
+  meter has some). They're small lines in the middle of the screen that never
+  stop or slow the run, with **skip tips** under each. Tips the practice run
+  already taught are left out, a save that had runs before the tips came in
+  never sees them, and settings > replay tips brings them all back. The
+  floor-gap hint in the ship shows once, too.
 
 ## Themes and biomes
 
@@ -289,7 +298,8 @@ run** on a fixed course you can't fail, which asks for one thing at a time:
 steer, a near miss, a pickup, boost. Then **dress your ship** from a starter
 set (three hulls, three paints, three engine colours) and you're on the front
 page, with the first daily reward. It resumes after a restart, can be skipped,
-and can be replayed from settings; anyone who had already played skips it. The
+and can be replayed from settings; anyone who had already played skips it.
+The first real runs then carry the first-run tips (see [How it plays](#how-it-plays)). The
 pilot name is asked for when ranked and the leaderboards open, while it's
 still the generated one (the name screen stays until one is saved).
 
@@ -613,6 +623,8 @@ are saved on the device.
   - where the boost button sits: right, left or middle
   - double-tap and hold to boost, on or off
   - vibration
+  - ask before closing (the Android app only, on by default): back on the
+    title screen asks before it closes the game
 - **Display:**
   - reduce motion: no shake, roll or speed lines
   - text size
@@ -622,6 +634,12 @@ are saved on the device.
     older phones
 - **Assist mode:** 80% speed and teal markers along the safe line. Assisted
   runs never count as a best score.
+- **Help:** replay the tutorial, replay tips, **send feedback** (also on the
+  pause screen: a mail to tomblackdev@proton.me with the subject "Endless Space
+  feedback", room to write, and the version and build, the device and Android
+  version, and the screen it was sent from; `src/feedback.ts`), help and
+  contact, the privacy policy, ad privacy choices (in the app), and deleting
+  your account. The version and build are at the bottom.
 
 ## Sound
 
@@ -742,7 +760,8 @@ new build drops the old build's cached scripts and styles.
 | `src/courses.ts` | The set levels, the solo environments and the week's ranked run |
 | `src/fx.ts` | Animated interior detail: liquids, steam, blinkers, holograms, sparks |
 | `src/settings.ts` | Settings table and storage |
-| `src/hints.ts`, `src/haptics.ts` | First-run hints, vibration |
+| `src/hints.ts`, `src/haptics.ts` | The first-run tips (walkthrough), vibration |
+| `src/exit.ts`, `src/feedback.ts` | Android back on the title screen (ask before closing); the feedback mail |
 | `src/rng.ts` | Seeded random numbers (mulberry32) |
 | `src/audio/` | Sound engine, synth helpers, generative music |
 | `src/ui.ts`, `src/style.css`, `index.html` | HUD and screens |
