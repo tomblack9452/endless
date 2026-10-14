@@ -997,6 +997,11 @@ export class UI {
     this.hint.classList.add('show');
   }
 
+  /** Settings that only mean something in the Android app ("ask before closing"). */
+  setNative(native: boolean): void {
+    $('confirm-exit-row').hidden = !native;
+  }
+
   /** The pause button also answers a click and Enter (keyboard and screen readers), not just a press. */
   bindPause(onPause: () => void): void {
     this.pauseButton.addEventListener('click', (e) => {

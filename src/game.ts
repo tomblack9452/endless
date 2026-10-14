@@ -18,6 +18,8 @@ import { Weather } from './weather';
 import { Ghost } from './ghost';
 import { decalArt } from './decals';
 import { Haptics } from './haptics';
+import { Capacitor } from '@capacitor/core';
+import { exitChoice } from './exit';
 import { Hints } from './hints';
 import { migrateMissionLooks, migrateTickets } from './legacy';
 import { type Feature, isOpen, nextStageText, STAGES, stageFor } from './reveal';
@@ -148,6 +150,10 @@ export class Game {
   private settingsOpen = false; // settings screen showing (from the title or pause)
   private readonly ui = new UI();
   private readonly hints = new Hints((text) => this.ui.showHint(text));
+  /** The Android app (not the web): back can leave it, so "ask before closing" applies. */
+  private native = Capacitor.getPlatform() === 'android';
+  /** The "close endless space?" dialog is up. */
+  private exitAsking = false;
   private readonly haptics = new Haptics();
   private readonly progress = new Progress();
   // Run mode: ranked (the weekly level), solo (an environment or a set level) or endless.
@@ -2766,17 +2772,42 @@ export class Game {
     ]);
   }
 
-  /** The Android back button: close what's open, pause a run; false on the title screen (leave the app). */
+  /**
+   * The Android back button (and Escape): close what's open, pause a run. At the top (the title or
+   * welcome screen) it asks before closing, or returns false to leave the app (see exit.ts).
+   */
   back(): boolean {
-    if (this.settingsOpen) this.closeSettings();
-    else if (this.infoOpen === 'welcome') return false;
+    if (this.exitAsking) this.closeExitAsk();
+    else if (this.settingsOpen) this.closeSettings();
+    else if (this.infoOpen === 'welcome') return this.backAtTop();
     else if (this.infoOpen) this.closeInfo();
     else if (this.state === 'playing' || this.state === 'countdown') this.pause();
     else if (this.state === 'paused') this.resume();
     else if (this.state === 'crashed' && this.revivePending) this.declineRevive();
     else if (this.state === 'crashed' || this.state === 'finished') this.toMainMenu();
-    else return false;
+    else return this.backAtTop();
     return true;
+  }
+
+  /** Back with nothing left to close: ask first (true), or false to leave (Android) or do nothing (web). */
+  private backAtTop(): boolean {
+    if (exitChoice({ native: this.native, ask: this.settings.confirmExit, asking: this.exitAsking }) !== 'ask') return false;
+    this.exitAsking = true;
+    this.econ.offer(
+      { kicker: '', name: 'close endless space?', lines: ['your progress is saved'], yes: 'close', yesEnabled: true, no: 'stay', seconds: 0 },
+      () => {
+        this.exitAsking = false;
+        void import('@capacitor/app').then(({ App }) => App.exitApp());
+      },
+      () => (this.exitAsking = false),
+    );
+    return true;
+  }
+
+  /** "stay" (or back again while the dialog shows). */
+  private closeExitAsk(): void {
+    this.exitAsking = false;
+    this.econ.dismissOffer();
   }
 
   /** Back on the revive offer (or before it shows): no thanks, and the game-over screen. */
@@ -2967,6 +2998,7 @@ export class Game {
 
   private openSettings(): void {
     this.settingsOpen = true;
+    this.ui.setNative(this.native);
     this.ui.show('settings');
     this.refreshAccount();
     void this.backend.pilotName().then((name) => this.ui.setPilotName(name ?? '', this.backend.online ? '3 to 16 letters, numbers, spaces, - or _' : 'names come with the server', 'settings'));

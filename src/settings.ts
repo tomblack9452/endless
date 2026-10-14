@@ -23,6 +23,7 @@ export interface Settings {
   ghost: boolean; // ranked: fly against your week's best
   performance: boolean; // lower resolution and lighter weather, for older phones
   dark: boolean; // menus on dark panels with light text
+  confirmExit: boolean; // Android: back on the title screen asks before closing the app
 }
 
 export type SettingKey = keyof Settings;
@@ -69,6 +70,7 @@ export const DEFAULT_SETTINGS: Settings = {
   ghost: true,
   performance: false,
   dark: false,
+  confirmExit: true,
 };
 
 const KEY = 'endless.settings';
