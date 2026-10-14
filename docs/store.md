@@ -170,6 +170,9 @@ while to apply.
 
 - **Name:** Endless Space
 - **Subtitle (iOS, 30 characters):** Fly the endless frontier
+- **Play's short and full description, tags and release notes:** see
+  `docs/store-listing.md` (current, checked against the code). The text below
+  is the first draft, kept for the App Store.
 - **Short description (Play, 80 characters):** A fast, calm space runner. A new
   ranked run every week.
 - **Description:**

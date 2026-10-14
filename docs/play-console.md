@@ -316,9 +316,9 @@ Notes:
 
 **App details**
 - **App name:** `Endless Space`
-- **Short description** (80 characters max):
-  `A fast, calm space runner. A new ranked run every week.`
-- **Full description** (4,000 max): the description in `docs/store.md`, section 6.
+- **Short description** (80 characters max) and **full description** (4,000
+  max): both in `docs/store-listing.md`, with the tags and the release notes,
+  and every claim checked against the code.
   Rules: no "best game", "#1", no prices or "free" claims, no other games'
   names, no keyword lists.
 
