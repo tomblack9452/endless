@@ -20,6 +20,7 @@ import { decalArt } from './decals';
 import { Haptics } from './haptics';
 import { Capacitor } from '@capacitor/core';
 import { exitChoice } from './exit';
+import { sendFeedback } from './feedback';
 import { Hints } from './hints';
 import { migrateMissionLooks, migrateTickets } from './legacy';
 import { type Feature, isOpen, nextStageText, STAGES, stageFor } from './reveal';
@@ -2911,6 +2912,7 @@ export class Game {
     else if (action === 'google') void this.keepWithGoogle(false);
     else if (action === 'google-welcome') void this.keepWithGoogle(true);
     else if (action === 'privacy-choices') void this.ads.privacyChoices();
+    else if (action === 'feedback') void sendFeedback(this.feedbackScreen());
     else if (action === 'tutorial') {
       if (this.state !== 'title') this.toMainMenu();
       this.onboarding.set('controls');
@@ -2994,6 +2996,13 @@ export class Game {
     this.ui.setDark(s.dark);
     this.refreshTitle(); // the rank colour has a light and a dark version
     this.ui.renderSettings(s);
+  }
+
+  /** Where "send feedback" was pressed, for the mail: settings (over the title or a paused run), or the pause screen. */
+  private feedbackScreen(): string {
+    const run = `${this.mode} run, level ${this.level}`;
+    if (this.settingsOpen) return this.state === 'paused' ? `settings (paused ${run})` : 'settings';
+    return this.state === 'paused' ? `pause (${run})` : this.state;
   }
 
   private openSettings(): void {

@@ -16,3 +16,6 @@ interface ImportMeta {
 
 /** Which build this is: the commit and the day (see vite.config.ts). */
 declare const __BUILD__: string;
+
+/** The game's version (package.json; the Android app reports its own through App.getInfo). */
+declare const __APP_VERSION__: string;
