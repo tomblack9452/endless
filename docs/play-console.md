@@ -332,18 +332,14 @@ Notes:
   game's font.
 - **Phone screenshots:** 2 to 8, PNG or JPG, each side between 320 and 3,840 px,
   portrait 9:16. For a game to be eligible for featuring, at least **4 at
-  1080 × 1920 or more**. Take them on your phone (power + volume down) from the
-  test build; suggested order:
-  1. a canyon run at speed, near-miss combo on screen
-  2. the title screen
-  3. inside the ship, the laser room
-  4. the hangar with a dressed-up ship
-  5. the leaderboard with ships by the names
-  6. the asteroid belt or the volcanic plain
-  Screenshots must show the real game; no device frames needed.
+  1080 × 1920 or more**. Six are ready, at 1080 × 1920, in
+  `docs/store-assets/screenshots/` (`phone-01.png` ... `phone-06.png`, in
+  order; see `docs/store-listing.md`). Screenshots must show the real game; no
+  device frames needed.
 - **7-inch / 10-inch tablet screenshots:** optional. The game is phone-first,
-  but it runs on tablets in either orientation (a centred play column), so
-  these can be added later.
+  but it runs on tablets in either orientation (a centred play column).
+  Two landscape ones, 1920 × 1200, are in the same folder (`tablet-01.png`,
+  `tablet-02.png`): they fit both the 7-inch and the 10-inch slots.
 - **Video:** optional. A YouTube link (public or unlisted, ads off, no age
   restriction), landscape works best. Can be added later.
 - **Save**.

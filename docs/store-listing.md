@@ -78,6 +78,31 @@ The first five are the best fit.
 
 > Send feedback from settings or the pause screen, a check before back closes the game, and short tips on your first runs. Plus fixes: no sound in the background, and Escape works like back.
 
+## Screenshots
+
+In `docs/store-assets/screenshots/`, for Play Console > Main store listing >
+Graphics. All real captures of the game (Chromium, the dev build), with a
+caption in the game's own type (Host Grotesk and Geist Mono) and colours, on its
+paper background; no device frames.
+
+| File | Size | Caption | What it shows |
+|---|---|---|---|
+| `phone-01.png` | 1080 × 1920 | one thumb. endless sky. | open ground, level 3, the forest path |
+| `phone-02.png` | 1080 × 1920 | six places to fly | the ship's open deck, level 8 |
+| `phone-03.png` | 1080 × 1920 | a new ranked run every week | the title screen, with this week's ranked best |
+| `phone-04.png` | 1080 × 1920 | 160+ looks for your ship | the hangar, paints |
+| `phone-05.png` | 1080 × 1920 | something new every day | goals: the login calendar and today's goals |
+| `phone-06.png` | 1080 × 1920 | climb the ranks | the service record |
+| `tablet-01.png` | 1920 × 1200 | six places to fly | the ice field, level 11, on a tablet held sideways |
+| `tablet-02.png` | 1920 × 1200 | 160+ looks for your ship | the hangar on a tablet held sideways |
+
+How they were made: a fresh save with the dev panel's "unlock all" (every
+look, the top rank and league), the phantom hull in the aurora paint, three
+ranked runs flown by the dev autopilot (the best this week, the runs on the
+record), and runs started with the dev panel's "start just before level N".
+The fps counter and dev link are hidden. The boards need the live server, so
+no leaderboard is shown and no other pilots appear anywhere.
+
 ## What was checked, and what changed
 
 | Claim | In the code | Wording used |
