@@ -689,6 +689,38 @@ body {
   animation: hint 3600ms ease-out both;
 }
 
+/* The walkthrough's tips wrap clear of the edges, and grow upwards from the middle so a
+   long one (or large text) never runs into the near-miss chain below. */
+.hint {
+  top: auto;
+  bottom: 50%;
+  padding: 0 calc(var(--safe-right) + 28px) 0 calc(var(--safe-left) + 28px);
+}
+
+#hint-text {
+  text-wrap: balance;
+}
+
+/* "skip tips" under a tip: small, and the only part of the hint that takes a tap. */
+.hint-skip {
+  display: inline-block;
+  margin: 2px 0 0;
+  padding: 8px 14px;
+  font: inherit;
+  font-size: calc(11px * var(--ui-scale));
+  letter-spacing: 0.08em;
+  color: inherit;
+  background: none;
+  border: none;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  opacity: 0.8;
+}
+
+.hint-skip[hidden] {
+  display: none;
+}
+
 /* "send feedback" under the pause menu. */
 .pause-feedback {
   margin: 28px 0 0;

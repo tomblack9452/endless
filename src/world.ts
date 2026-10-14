@@ -767,6 +767,25 @@ export class World {
     return -1;
   }
 
+  /** Is a boost pickup between `near` and `far` ahead? (The walkthrough points it out.) */
+  pickupAhead(near: number, far: number): boolean {
+    return this.anyAhead(this.pickups, near, far);
+  }
+
+  /** Is a power-up between `near` and `far` ahead? */
+  powerAhead(near: number, far: number): boolean {
+    return this.anyAhead(this.powers, near, far);
+  }
+
+  private anyAhead(f: InstancedField, near: number, far: number): boolean {
+    for (let i = 0; i < f.top; i++) {
+      if (!f.active[i]) continue;
+      const ahead = f.d[i] - this.distance;
+      if (ahead >= near && ahead <= far) return true;
+    }
+    return false;
+  }
+
   /** Magnet: boost pickups within `reach` ahead slide towards the ship. */
   attractPickups(dt: number): void {
     const m = CONFIG.powers.magnet;

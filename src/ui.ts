@@ -1,5 +1,6 @@
 import { CONFIG } from './config';
 import { label, type SettingKey, type Settings } from './settings';
+import { SHOW_MS as HINT_MS } from './hints';
 import { Bars } from './systemBars';
 
 export type ScreenName = 'title' | 'paused' | 'over' | 'settings' | 'goals' | 'hangar' | 'record' | 'solo' | 'league' | 'shop' | 'store' | 'pass' | 'boards' | 'welcome' | 'name';
@@ -116,6 +117,8 @@ export class UI {
   private readonly roomLabel = $('room-label');
   private readonly notice = $('notice');
   private readonly hint = $('hint');
+  private readonly hintSkip = $('hint-skip');
+  private hintTimer: ReturnType<typeof setTimeout> | undefined;
   readonly boostControl = $('hud-boost');
   private readonly combo = $('combo');
   private readonly comboCount = $('combo-count');
@@ -989,12 +992,28 @@ export class UI {
     this.notice.classList.add('show');
   }
 
-  /** A first-run hint in the middle of the screen. */
-  showHint(text: string): void {
-    this.hint.textContent = text;
+  /** A first-run hint in the middle of the screen; a walkthrough `tip` has "skip tips" under it while it shows. */
+  showHint(text: string, tip = false): void {
+    $('hint-text').textContent = text;
+    this.hintSkip.hidden = !tip;
+    clearTimeout(this.hintTimer);
+    if (tip) this.hintTimer = setTimeout(() => (this.hintSkip.hidden = true), HINT_MS);
     this.hint.classList.remove('show');
     void this.hint.offsetWidth; // restart the animation
     this.hint.classList.add('show');
+  }
+
+  /** Take the hint down now ("skip tips"). */
+  hideHint(): void {
+    clearTimeout(this.hintTimer);
+    this.hintSkip.hidden = true;
+    this.hint.classList.remove('show');
+  }
+
+  /** "skip tips" under a tip. Its taps never steer or reach the game. */
+  bindHintSkip(onSkip: () => void): void {
+    this.hintSkip.addEventListener('pointerdown', (e) => e.stopPropagation());
+    this.hintSkip.addEventListener('click', onSkip);
   }
 
   /** Settings that only mean something in the Android app ("ask before closing"). */

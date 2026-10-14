@@ -21,7 +21,7 @@ import { Haptics } from './haptics';
 import { Capacitor } from '@capacitor/core';
 import { exitChoice } from './exit';
 import { sendFeedback } from './feedback';
-import { Hints } from './hints';
+import { type HintId, Hints, tipText } from './hints';
 import { migrateMissionLooks, migrateTickets } from './legacy';
 import { type Feature, isOpen, nextStageText, STAGES, stageFor } from './reveal';
 import { hasTouch, type Lesson, LESSONS, LESSON_SECONDS, lessonText, Onboarding, PRACTICE_SEED, STARTER } from './onboarding';
@@ -150,7 +150,7 @@ export class Game {
   private settings = { ...DEFAULT_SETTINGS };
   private settingsOpen = false; // settings screen showing (from the title or pause)
   private readonly ui = new UI();
-  private readonly hints = new Hints((text) => this.ui.showHint(text));
+  private readonly hints = new Hints((text, tip) => this.ui.showHint(text, tip));
   /** The Android app (not the web): back can leave it, so "ask before closing" applies. */
   private native = Capacitor.getPlatform() === 'android';
   /** The "close endless space?" dialog is up. */
@@ -323,6 +323,11 @@ export class Game {
     window.addEventListener('keydown', this.onKey);
     this.ui.pauseButton.addEventListener('pointerdown', this.onPauseButton);
     this.ui.bindPause(() => this.pause());
+    this.ui.bindHintSkip(() => {
+      this.hints.skip();
+      this.ui.hideHint();
+      this.ui.showNotice('tips off. settings can replay them');
+    });
     // Tapping anywhere also starts; the button is the explicit target.
     this.ui.startButton.addEventListener('click', () => {
       if (this.state === 'title') this.startPrimary();
@@ -387,6 +392,7 @@ export class Game {
       looksReady,
     ]).then(async () => {
       await this.onboarding.load(this.progress.stats.runs > 0);
+      await this.hints.load(this.progress.stats.runs > 0);
       this.economyLoaded = true;
       // A save from before goals: what it has already done counts, with no payout.
       if (!this.goalLog.started) this.goalLog.startWith(ACHIEVEMENTS.filter((a) => progressOn(a, this.snapshot()).done).map((a) => a.id));
@@ -2597,6 +2603,7 @@ export class Game {
       return;
     }
     this.ui.showTutorial(null);
+    this.hints.learned(['steer', 'nearMiss', 'pickup', 'boost']); // the walkthrough needn't say them again
     this.ui.showNotice('nicely flown. now dress your ship');
     this.toMainMenu();
     this.practice = null;
@@ -2913,6 +2920,10 @@ export class Game {
     else if (action === 'google-welcome') void this.keepWithGoogle(true);
     else if (action === 'privacy-choices') void this.ads.privacyChoices();
     else if (action === 'feedback') void sendFeedback(this.feedbackScreen());
+    else if (action === 'tips') {
+      this.hints.replay();
+      this.ui.showNotice('tips are back for your next runs');
+    }
     else if (action === 'tutorial') {
       if (this.state !== 'title') this.toMainMenu();
       this.onboarding.set('controls');
@@ -3304,7 +3315,7 @@ export class Game {
       this.boostMeter = Math.min(1, this.boostMeter + got * CONFIG.boost.pickup.amount);
       this.bonus += got * CONFIG.score.pickupPoints;
       this.pickupCount += got;
-      this.hints.offer('pickup');
+      this.tip('pickup');
       this.ui.flashBoost();
       this.sound.pickup();
       this.haptics.pickup();
@@ -3406,7 +3417,7 @@ export class Game {
       this.chainTimer = nm.comboWindow;
       this.nudgeMs = nm.nudgeMs;
       this.ui.showCombo(this.chain, points);
-      this.hints.offer('nearMiss');
+      this.tip('nearMiss');
       this.haptics.nearMiss();
       this.sound.pass(side, gap, this.chain);
     }
@@ -3419,12 +3430,23 @@ export class Game {
     }
   }
 
-  /** First-run hints, each once ever (see hints.ts). */
+  /** The first-run walkthrough, each tip at its moment and once (see hints.ts); and the pits hint. */
   private offerHints(): void {
-    if (this.runTime > 1) this.hints.offer('steer');
-    if (this.boostMeter >= 0.5 && !this.boosting) this.hints.offer('boost');
+    if (this.hints.active) {
+      if (this.runTime > 0.8) this.tip('steer');
+      if (this.runTime > 4) this.tip('avoid');
+      if (this.world.pickupAhead(40, 110)) this.tip('pickup');
+      if (this.world.powerAhead(40, 120)) this.tip('power');
+      if (this.boostMeter >= 0.5 && !this.boosting) this.tip('boost');
+    }
     const room = this.world.roomName;
-    if (room === 'maintenance gantry' || room === 'hull breach') this.hints.offer('pits');
+    if (room === 'maintenance gantry' || room === 'hull breach') this.tip('pits');
+  }
+
+  /** Offer hint `id`, worded for the steering in use. Not during the practice run, which has its own prompts. */
+  private tip(id: HintId): void {
+    if (this.practice) return;
+    this.hints.offer(id, tipText(id, this.controlsNow(), { keys: !hasTouch(), doubleTap: this.settings.doubleTapBoost }));
   }
 
   /** Fill or drain the meter and ease the boost amount in and out. */
