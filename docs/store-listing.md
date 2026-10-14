@@ -1,7 +1,7 @@
 # Store listing (Google Play)
 
 The text for Play Console > Grow users > Store presence > Main store listing,
-for 1.0.5. Every claim was checked against the code (the notes at the end say
+for 1.0.6. Every claim was checked against the code (the notes at the end say
 what changed from the live text and why). Paste the text between the rules;
 Play counts every character, line breaks included.
 
@@ -17,7 +17,7 @@ One-thumb space runner: dodge, fly close, and top a new ranked run every week.
 
 ## Full description
 
-4,000 characters at most. This one is about 2,900.
+4,000 characters at most. This one is about 3,000.
 
 ---
 
@@ -47,7 +47,7 @@ PLAY YOUR WAY
 - One-hand play: drag, tap the sides, or tilt your phone, with adjustable sensitivity
 - Boost with a button on the left, right or middle, or double-tap and hold anywhere
 - Reduce motion, larger text, high contrast, dark mode, and an assist mode that slows the game and marks a safe line
-- Short tips on your first runs, which you can skip or replay
+- A hands-on tutorial (try each way to steer, then a practice run that shows every pickup and power-up) and short tips on your first runs, all skippable and replayable
 - Plays offline; leaderboards need a connection
 - Made for phones and tablets: on a tablet, play upright or on its side
 - Keep your progress with Google sign-in, and take it to a new phone
@@ -73,6 +73,10 @@ where these names may differ slightly):
 8. Stylized
 
 The first five are the best fit.
+
+## Release notes for 1.0.6
+
+> A new tutorial: pick how you steer from cards that show each way in motion, then a practice run with an indicator for every lesson and a card for each pickup and power-up, with its real numbers. Afterwards, switch controls and try them for 15 seconds. Pickups & power-ups is now in settings > help.
 
 ## Release notes for 1.0.5
 
@@ -124,6 +128,7 @@ no leaderboard is shown and no other pilots appear anywhere.
 | Accessibility | reduce motion, text size (three), high contrast, dark mode, assist mode, tap-sides steering, boost button position, vibration off | listed as they are. There is no colour-blind mode or screen-reader support in a run, so neither is claimed |
 | Ads | Rewarded only; interstitials are off (`CONFIG.ads.interstitial`) | "optional rewarded ads" |
 | "Free" | Play's rules (`docs/play-console.md`) rule out "free" as a selling point | only the free daily revive, which is a feature; no "free to play" |
+| Tutorial | `src/onboarding.ts`: control cards with moving diagrams, a six-lesson practice run with a card for the boost pickup, shield, magnet and slow-mo, a 15 s trial of other controls; skip and replay in settings | "a hands-on tutorial", as listed |
 | Upgrades | thrusters, capacitor, tractor beam, deflector, stabilisers, scanner | named ones that exist ("shield" isn't one: it's the deflector) |
 
 Keywords worked in, once each where they fit: space game, arcade, endless

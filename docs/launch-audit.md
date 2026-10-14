@@ -157,3 +157,31 @@ The bugs left from the second audit, and what the closed testers asked for.
 - **First-run tips:** a short, skippable walkthrough over the first runs
   (steering, obstacles, near misses and chains, pickups, power-ups and boost),
   with replay tips in settings.
+
+## Fourth pass (1.0.6, 14 October 2026)
+
+The tutorial, rebuilt from what testers said: the steering choice was three
+plain words, and the practice run only said what to do in a line of text, so
+the pickups and power-ups were still a mystery after it.
+
+**Changed:**
+
+- Choosing controls is a card for each way (drag, tap sides, tilt where the
+  phone has it, keys on a computer), each with a small looping diagram, how it
+  works and what it's good for. The diagrams stand still with reduce motion.
+- The practice run has six lessons (the same six as the first-run tips), each
+  with an indicator in the top or bottom band, progress dots and a skip. A
+  lesson moves on when it's done, or after a gentle timeout.
+- The practice course now brings a boost pickup, a shield, a magnet and a
+  slow-mo, each with a card (icon, colour, and its real numbers from `CONFIG`)
+  and a marker in the world; a missed one comes round again. The course
+  itself is unchanged (the same random draws; a test checks it).
+- After it: a recap of the pickups and power-ups (also settings > help >
+  pickups & power-ups), then "how did that feel?", where another way to steer
+  can be tried for 15 s, as often as wanted, before dressing the ship.
+
+**Checked:** a save that finished onboarding never sees it again unless it's
+replayed; skipping the tutorial keeps every first-run tip; skipping part way
+keeps the tips for the lessons not reached; nothing in the practice run or a
+trial counts (no stats, bests, boards or unlocks); the level banner and the
+in-run tips stay out of the practice run. Tilt needs checking on a real phone.

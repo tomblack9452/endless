@@ -118,7 +118,9 @@ On a wide screen the game plays in a centred portrait column.
   one is coming up), power-ups (when one is coming up) and boost (once the
   meter has some). They're small lines in the middle of the screen that never
   stop or slow the run, with **skip tips** under each. Tips the practice run
-  already taught are left out, a save that had runs before the tips came in
+  already taught are left out (all six after a full practice run, the lessons
+  reached if it was skipped part way; skipping the tutorial keeps them all),
+  and a lesson says steering and boost in its tip's words. A save that had runs before the tips came in
   never sees them, and settings > replay tips brings them all back. The
   floor-gap hint in the ship shows once, too.
 
@@ -293,12 +295,29 @@ with a dot when something there needs you. Settings is the gear top left;
 credits and cores sit top right (tapping them opens the shop).
 
 **First launch** (`src/onboarding.ts`) opens on a welcome: pick how you steer
-(drag, tap sides, or tilt where the phone has it), then a short **practice
-run** on a fixed course you can't fail, which asks for one thing at a time:
-steer, a near miss, a pickup, boost. Then **dress your ship** from a starter
-set (three hulls, three paints, three engine colours) and you're on the front
-page, with the first daily reward. It resumes after a restart, can be skipped,
-and can be replayed from settings; anyone who had already played skips it.
+from a card for each way (drag, tap sides, tilt where the phone has it, and
+the keys on a computer), each with a small looping line diagram of a thumb, the
+halves of the screen or the phone rocking, and the ship following
+(`src/controlArt.ts`; it stands still with reduce motion). Then a short
+**practice run** on a fixed course you can't fail, six lessons one at a time,
+each with "2 of 6" and dots, a skip, and its own indicator
+(`src/tutorialView.ts`): steering (the chosen card's diagram in the bottom
+band, leaning towards the safe line), obstacles (a marker on the next one and
+on the gap), near misses (the card points at the score, and the chain is
+marked "up to x10"), a boost pickup and then each power-up (a card with its
+icon, colour and real numbers from `CONFIG` as it comes up, a marker on it in
+the world, and what it did once picked up; `src/guide.ts`), and boost (a ring
+round the button, worded for the boost mode). A lesson moves on when it's
+done, or after a gentle timeout. The practice course is the fairness-tested
+one, with its own pickups and power-ups placed as each lesson comes up. After
+it a **recap** lists the pickups and power-ups (also in settings > help), then
+**how did that feel?** shows the cards again with the one flown marked
+"used": keep it, or tap another (saved straight away) and try it for 15 s of
+steering, then back to the same question. Then **dress your ship** from a
+starter set (three hulls, three paints, three engine colours) and you're on
+the front page, with the first daily reward. It resumes after a restart, can
+be skipped, and can be replayed from settings; anyone who had already played
+skips it.
 The first real runs then carry the first-run tips (see [How it plays](#how-it-plays)). The
 pilot name is asked for when ranked and the leaderboards open, while it's
 still the generated one (the name screen stays until one is saved).
@@ -634,7 +653,8 @@ are saved on the device.
     older phones
 - **Assist mode:** 80% speed and teal markers along the safe line. Assisted
   runs never count as a best score.
-- **Help:** replay the tutorial, replay tips, **send feedback** (also on the
+- **Help:** replay the tutorial, replay tips, **pickups & power-ups** (the
+  tutorial's recap), **send feedback** (also on the
   pause screen: a mail to tomblackdev@proton.me with the subject "Endless Space
   feedback", room to write, and the version and build, the device and Android
   version, and the screen it was sent from; `src/feedback.ts`), help and
@@ -753,7 +773,8 @@ new build drops the old build's cached scripts and styles.
 | `src/hangar.ts`, `src/hangarView.ts` | The hangar's model and its screen (looks and the upgrades chip) |
 | `src/goalsView.ts` | The goals screen: daily, weekly and achievements, with claiming |
 | `src/reveal.ts` | What new players see, in stages |
-| `src/onboarding.ts` | First launch: controls, the practice run's lessons, the starter set |
+| `src/onboarding.ts` | First launch: the steps, the control cards, the practice run's lessons, the starter set |
+| `src/guide.ts`, `src/controlArt.ts`, `src/tutorialView.ts` | The pickup and power-up cards (from `CONFIG`), the control diagrams, the tutorial's indicators and recap |
 | `src/legacy.ts` | Carries older saves' mission unlocks over to the looks (missions were removed) |
 | `src/decals.ts` | Wing decal pictures |
 | `src/progress.ts` | Stats, set level results, weekly, endless and environment bests |
