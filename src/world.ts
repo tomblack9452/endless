@@ -767,6 +767,70 @@ export class World {
     return -1;
   }
 
+  /**
+   * The practice run: no boost pickups or power-ups of the course's own (it
+   * places them itself, one at a time, as each lesson comes up). The course is
+   * otherwise exactly the same: the same random draws are made.
+   */
+  scripted = false;
+
+  /** Put a boost pickup (or power-up `kind`) on the safe lane `ahead` units in front, `offset` to the side of it. */
+  place(item: 'pickup' | PowerKind, ahead: number, offset = 0): void {
+    const d = this.distance + ahead;
+    const x = (this.laneAt(d) ?? this.shipX) + offset - this.shipX;
+    const f = item === 'pickup' ? this.pickups : this.powers;
+    if (item !== 'pickup') f.nextColor = item;
+    f.spawn(x, CONFIG.boost.pickup.height, d, 1, 1, 1, 0, false, this.theme === 'land', 0, 0);
+  }
+
+  /** Where the nearest boost pickup (or power-up `kind`) between `near` and `far` ahead is, in scene coordinates; null if none. */
+  itemAhead(item: 'pickup' | PowerKind, near: number, far: number): { x: number; y: number; z: number } | null {
+    const f = item === 'pickup' ? this.pickups : this.powers;
+    let best = -1;
+    for (let i = 0; i < f.top; i++) {
+      if (!f.active[i] || (item !== 'pickup' && f.colorIdx[i] !== item)) continue;
+      const ahead = f.d[i] - this.distance;
+      if (ahead >= near && ahead <= far && (best < 0 || f.d[i] < f.d[best])) best = i;
+    }
+    return best < 0 ? null : { x: f.x[best], y: f.y[best] + this.rise(f.d[best], f.x[best]), z: this.distance - f.d[best] };
+  }
+
+  /**
+   * The nearest obstacle (not a wall) between `near` and `far` ahead within
+   * `width` of the ship, in scene coordinates (its top), with the safe lane's
+   * x there (the gap); null if none.
+   */
+  obstacleAhead(near: number, far: number, width: number): { x: number; y: number; z: number; gap: number } | null {
+    let best: InstancedField | null = null;
+    let bi = -1;
+    for (const f of this.solids) {
+      for (let i = 0; i < f.top; i++) {
+        if (!f.active[i] || !f.scores[i]) continue;
+        const ahead = f.d[i] - this.distance;
+        if (ahead < near || ahead > far || Math.abs(f.x[i]) > width) continue;
+        if (!best || f.d[i] < best.d[bi]) {
+          best = f;
+          bi = i;
+        }
+      }
+    }
+    if (!best) return null;
+    const d = best.d[bi];
+    const x = best.x[bi];
+    return { x, y: best.y[bi] + Math.min(best.sy[bi], 3) + this.rise(d, x), z: this.distance - d, gap: (this.laneAt(d) ?? this.shipX) - this.shipX };
+  }
+
+  /** The safe lane `ahead` units in front, sideways from the ship (+ is right); null if not known. */
+  laneOffset(ahead: number): number | null {
+    const lane = this.laneAt(this.distance + ahead);
+    return lane === null ? null : lane - this.shipX;
+  }
+
+  /** How much higher the ground is at distance `d`, `x` from the ship, than under it (rolling hills). */
+  private rise(d: number, x: number): number {
+    return terrain.active ? terrain.heightAtX(d, this.shipX + x) - terrain.heightAtX(this.distance, this.shipX) : 0;
+  }
+
   /** Is a boost pickup between `near` and `far` ahead? (The walkthrough points it out.) */
   pickupAhead(near: number, far: number): boolean {
     return this.anyAhead(this.pickups, near, far);
@@ -1040,7 +1104,10 @@ export class World {
       // shift the random numbers and change the course for one player.
       const kind = Math.floor(rand() * 3);
       const spacing = range(CONFIG.powers.spacing);
-      if (d >= this.nextPowerAt) {
+      if (this.scripted) {
+        // The practice run places its own (see place); the draws above keep the course the same.
+        if (d >= this.nextPowerAt) this.nextPowerAt = d + spacing / this.powerRate;
+      } else if (d >= this.nextPowerAt) {
         // Now and then a power-up takes the boost pickup's place.
         this.nextPowerAt = d + spacing / this.powerRate;
         this.powers.nextColor = kind;
