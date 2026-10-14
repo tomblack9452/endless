@@ -93,8 +93,8 @@ paper background; no device frames.
 | `phone-04.png` | 1080 × 1920 | 160+ looks for your ship | the hangar, paints |
 | `phone-05.png` | 1080 × 1920 | something new every day | goals: the login calendar and today's goals |
 | `phone-06.png` | 1080 × 1920 | climb the ranks | the service record |
-| `tablet-01.png` | 1920 × 1200 | six places to fly | the ice field, level 11, on a tablet held sideways |
-| `tablet-02.png` | 1920 × 1200 | 160+ looks for your ship | the hangar on a tablet held sideways |
+| `tablet-01.png` | 1920 × 1080 | six places to fly | the ice field, level 11, on a tablet held sideways |
+| `tablet-02.png` | 1920 × 1080 | 160+ looks for your ship | the hangar on a tablet held sideways |
 
 How they were made: a fresh save with the dev panel's "unlock all" (every
 look, the top rank and league), the phantom hull in the aurora paint, three
