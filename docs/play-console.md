@@ -338,7 +338,7 @@ Notes:
   device frames needed.
 - **7-inch / 10-inch tablet screenshots:** optional. The game is phone-first,
   but it runs on tablets in either orientation (a centred play column).
-  Two landscape ones, 1920 × 1200, are in the same folder (`tablet-01.png`,
+  Two landscape ones, 1920 × 1080, are in the same folder (`tablet-01.png`,
   `tablet-02.png`): they fit both the 7-inch and the 10-inch slots.
 - **Video:** optional. A YouTube link (public or unlisted, ads off, no age
   restriction), landscape works best. Can be added later.
