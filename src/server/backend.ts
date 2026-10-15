@@ -75,6 +75,12 @@ export interface PilotRecord {
 
 export type LinkResult = 'linked' | 'taken' | 'failed';
 
+/** Why a pilot is reported from their card on a board. */
+export type ReportReason = 'name' | 'score' | 'other';
+
+/** How a report went: sent, already sent this week, or a reason it wasn't. */
+export type ReportResult = { ok: true; already: boolean } | { ok: false; message: string };
+
 /** A purchase on the server's records: the product ('refunded:<product>' once refunded) and when it was kept (ms). */
 export interface Purchase {
   product: string;
@@ -120,6 +126,8 @@ export interface Backend {
   setRecord(stats: PilotStats): Promise<boolean>;
   /** A pilot's service record by the public id a board row gave, or null if it couldn't be read. */
   pilotRecord(pid: string): Promise<PilotRecord | null>;
+  /** Report a pilot by the public id a board row gave (one report per pilot a week). */
+  reportPilot(pid: string, reason: ReportReason): Promise<ReportResult>;
   /** True once if the account was marked to be maxed out from the SQL editor (players.max_out); clears the mark. */
   takeMaxOut(): Promise<boolean>;
   /** The Google account this account is kept with (its email), '' if none, or null if unknown. */

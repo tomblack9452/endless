@@ -4305,3 +4305,31 @@ body.dark #screen-title .title-word.sub {
   text-overflow: ellipsis;
   text-align: right;
 }
+
+/* "report" at the foot of a pilot's card, and the reasons it opens into. */
+.pilot-report {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  text-align: center;
+}
+
+.pilot-report-link {
+  font: inherit;
+  font-size: calc(11px * var(--ui-scale));
+  letter-spacing: 0.1em;
+  color: inherit;
+  background: none;
+  border: 0;
+  padding: 8px 14px;
+  margin: -8px 0;
+}
+
+.pilot-report-reasons {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+}

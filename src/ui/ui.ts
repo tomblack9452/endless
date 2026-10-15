@@ -3,6 +3,8 @@ import { label, type SettingKey, type Settings } from '../core/settings';
 import { SHOW_MS as HINT_MS } from './hints';
 import { Bars } from './systemBars';
 import { type CardView, renderControlCards, renderGuide } from './tutorialView';
+import { reportLink } from './report';
+import type { ReportReason, ReportResult } from '../server/backend';
 
 export type ScreenName = 'title' | 'paused' | 'over' | 'settings' | 'goals' | 'hangar' | 'record' | 'solo' | 'league' | 'shop' | 'store' | 'pass' | 'boards' | 'welcome' | 'name';
 
@@ -508,7 +510,18 @@ export class UI {
   /** The board's rows: rank, name, score. A pilot below the top comes after a gap. */
   renderLeaderboard(
     caption: string,
-    rows: { rank: number; name: string; score: string; you: boolean; premium?: boolean; picture?: (() => string | null) | null; looks?: string; record?: (() => Promise<PilotCardView | null>) | null }[],
+    rows: {
+      rank: number;
+      name: string;
+      score: string;
+      you: boolean;
+      premium?: boolean;
+      picture?: (() => string | null) | null;
+      looks?: string;
+      record?: (() => Promise<PilotCardView | null>) | null;
+      /** Report this pilot (never on your own row). */
+      report?: ((reason: ReportReason) => Promise<ReportResult>) | null;
+    }[],
     status: string,
   ): void {
     $('board-caption').textContent = caption;
@@ -572,7 +585,7 @@ export class UI {
           if (more.hidden || asked || !r.record) return;
           asked = true;
           card.replaceChildren(Object.assign(document.createElement('div'), { className: 'label dim', textContent: 'loading service record' }));
-          void r.record().then((v) => this.fillPilotCard(card, v));
+          void r.record().then((v) => this.fillPilotCard(card, v, r.you ? null : (r.report ?? null)));
         });
         out.push(row, more);
       } else out.push(row);
@@ -593,7 +606,7 @@ export class UI {
   }
 
   /** A pilot's service record under their row on a board (null: it couldn't be read). */
-  private fillPilotCard(card: HTMLElement, v: PilotCardView | null): void {
+  private fillPilotCard(card: HTMLElement, v: PilotCardView | null, report: ((reason: ReportReason) => Promise<ReportResult>) | null): void {
     if (!v) {
       card.replaceChildren(Object.assign(document.createElement('div'), { className: 'label dim', textContent: "couldn't load their service record" }));
       return;
@@ -611,6 +624,7 @@ export class UI {
     rows.className = 'pilot-rows';
     this.fillRows(rows, v.rows);
     card.replaceChildren(head, rows);
+    if (report) card.append(reportLink(report));
   }
 
   /** A pilot name box ("board", "settings", "name"): its current value and a line under it. */

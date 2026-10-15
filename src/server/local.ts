@@ -1,4 +1,4 @@
-import type { Backend, BoardQuery, BoardRow, LinkResult, RunSubmission, SubmitResult } from './backend';
+import type { Backend, BoardQuery, BoardRow, LinkResult, ReportResult, RunSubmission, SubmitResult } from './backend';
 
 // No server: the device is the only record. Boards can't be read, so the
 // leaderboard screen shows your own bests and says why.
@@ -70,6 +70,10 @@ export class LocalBackend implements Backend {
 
   async pilotRecord(): Promise<null> {
     return null;
+  }
+
+  async reportPilot(): Promise<ReportResult> {
+    return { ok: false, message: 'reports need the server' };
   }
 
   readonly authError = '';

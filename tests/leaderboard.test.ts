@@ -143,6 +143,18 @@ describe('the game talking to the database', () => {
     expect(await a.setRecord({ rank: 'general' } as unknown as Record<string, number>)).toBe(false);
   });
 
+  it('reports a pilot from their card, once a week', async () => {
+    const [a, b] = [await player(), await player()];
+    await a.submitRun(run({ board: 'solo:open-ground', score: 1700 }));
+    const row = (await b.board({ board: 'solo:open-ground', period: 'all', league: 0 }))?.find((r) => r.score === 1700);
+    expect(await b.reportPilot(row!.pid!, 'name')).toEqual({ ok: true, already: false });
+    expect(await b.reportPilot(row!.pid!, 'other')).toEqual({ ok: true, already: true });
+    expect(await a.reportPilot(row!.pid!, 'score')).toEqual({ ok: false, message: "that's you" });
+    offline = true;
+    expect(await b.reportPilot(row!.pid!, 'name')).toEqual({ ok: false, message: 'no connection' });
+    offline = false;
+  });
+
   it('reads the week per league using the same keys the screen uses', async () => {
     const b = await player();
     const tab = BOARD_TABS[0];

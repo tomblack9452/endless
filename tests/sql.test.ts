@@ -121,7 +121,7 @@ describe('supabase/setup.sql', () => {
     await fresh.exec(SUPABASE_STANDIN);
     await fresh.exec(SETUP);
     const t = await fresh.query<{ table_name: string }>("select table_name from information_schema.tables where table_schema = 'public' order by 1");
-    expect(t.rows.map((r) => r.table_name)).toEqual(['bests', 'core_log', 'name_words', 'players', 'runs', 'saves', 'store_events', 'wallets']);
+    expect(t.rows.map((r) => r.table_name)).toEqual(['bests', 'core_log', 'name_words', 'players', 'reports', 'runs', 'saves', 'store_events', 'wallets']);
   });
 
   it('can run again over a database it already set up, as the Supabase GitHub integration does', async () => {
@@ -195,7 +195,7 @@ describe('db:apply (the migrations from a terminal)', () => {
     const second = await applyMigrations(asClient(d), migrations);
     expect(second).toEqual({ applied: [], recorded: [] });
     const t = await d.query<{ n: string }>("select table_name n from information_schema.tables where table_schema = 'public' order by 1");
-    expect(t.rows.map((r) => r.n)).toEqual(['bests', 'core_log', 'endless_migrations', 'name_words', 'players', 'runs', 'saves', 'store_events', 'wallets']);
+    expect(t.rows.map((r) => r.n)).toEqual(['bests', 'core_log', 'endless_migrations', 'name_words', 'players', 'reports', 'runs', 'saves', 'store_events', 'wallets']);
     // Every table has row-level security on (Supabase's advisor flags any that don't).
     const open = await d.query<{ n: string }>("select relname n from pg_class c join pg_namespace s on s.oid = c.relnamespace where s.nspname = 'public' and c.relkind = 'r' and not c.relrowsecurity");
     expect(open.rows).toEqual([]);
@@ -686,6 +686,75 @@ describe('a refunded season pass', () => {
     await as(a);
     const rows = await db.query<{ product: string }>('select product from public.store_events where user_id = $1', [a]);
     expect(rows.rows.map((r) => r.product)).toContain('refunded:season_pass');
+  });
+});
+
+describe('reporting a pilot', () => {
+  const pidOf = async (u: string) => {
+    await admin();
+    return (await db.query<{ public_id: string }>('select public_id from public.players where user_id = $1', [u])).rows[0].public_id;
+  };
+  const nameOf = async (u: string) => {
+    await admin();
+    return (await db.query<{ name: string }>('select name from public.players where user_id = $1', [u])).rows[0].name;
+  };
+  const report = async (from: string, pid: string, reason: string) => {
+    await as(from);
+    return (await db.query<{ report_pilot: string }>('select public.report_pilot($1, $2)', [pid, reason])).rows[0].report_pilot;
+  };
+
+  it('keeps one report per reporter per pilot a week, never about yourself', async () => {
+    const [a, b] = [await newUser(), await newUser()];
+    const pid = await pidOf(b);
+    expect(await report(a, pid, 'score')).toBe('reported');
+    expect(await report(a, pid, 'other')).toBe('already');
+    await rejects(report(b, pid, 'name'), /that's you/);
+    await rejects(report(a, pid, 'rude'), /pick a reason/);
+    await rejects(report(a, '00000000-0000-0000-0000-000000000000', 'name'), /no such pilot/);
+    await admin();
+    await db.query("update public.reports set week = week - 7 where reporter = $1", [a]); // a week on
+    expect(await report(a, pid, 'score')).toBe('reported');
+  });
+
+  it("can't be read or written by players, or called signed out", async () => {
+    const a = await newUser();
+    await as(a);
+    await rejects(db.query('select * from public.reports'), /permission denied/);
+    await rejects(db.query(`insert into public.reports (reporter, target, reason, name, week) values ('${a}', '${a}', 'name', 'x', now())`), /permission denied/);
+    await as(null);
+    await rejects(db.query(`select public.report_pilot('${a}', 'name')`), /permission denied/);
+  });
+
+  it('resets a name three different pilots reported, and starts counting again for the next name', async () => {
+    const target = await newUser();
+    await as(target);
+    await db.query("select public.set_pilot_name('Rude Name')");
+    const pid = await pidOf(target);
+    const [a, b, c, d] = [await newUser(), await newUser(), await newUser(), await newUser()];
+    await report(a, pid, 'name');
+    await report(a, pid, 'name'); // the same reporter twice counts once
+    await report(b, pid, 'name');
+    await report(c, pid, 'score'); // a score report doesn't count towards a name
+    expect(await nameOf(target)).toBe('Rude Name');
+    await report(d, pid, 'name');
+    expect(await nameOf(target)).toMatch(/^pilot-[0-9a-f]{4}$/);
+    // Reports of the old name don't carry over to a new one.
+    await admin();
+    await db.query("update public.players set name_changed_at = now() - interval '2 hours', name = 'Fresh Name' where user_id = $1", [target]);
+    await db.query("update public.reports set week = week - 7 where target = $1", [target]);
+    await report(a, pid, 'name');
+    expect(await nameOf(target)).toBe('Fresh Name');
+  });
+
+  it('never hides a score on its own', async () => {
+    const target = await newUser();
+    await as(target);
+    await submit({ board: 'solo:canyon', score: 4000 });
+    const pid = await pidOf(target);
+    for (let i = 0; i < 4; i++) await report(await newUser(), pid, 'score');
+    await admin();
+    expect((await db.query<{ hidden: boolean }>('select hidden from public.players where user_id = $1', [target])).rows[0].hidden).toBe(false);
+    expect((await db.query('select 1 from public.bests where user_id = $1', [target])).rows).toHaveLength(1);
   });
 });
 

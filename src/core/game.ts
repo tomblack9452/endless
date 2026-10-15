@@ -57,7 +57,7 @@ import { type Reward, rewardLook, rewardParts, rewardText } from '../economy/rew
 import { DailyShop, setOffer, vaultAt } from '../economy/shop';
 import { dayKey, formatWait, untilTomorrow } from '../economy/time';
 import { EconomyView, type StoreButton, type StoreCard } from '../economy/view';
-import { type BoardId, createBackend, type PilotStats, type Purchase } from '../server/backend';
+import { type BoardId, createBackend, type PilotStats, type Purchase, type ReportReason } from '../server/backend';
 import { BOARD_TABS, boardCaption, boardForRun, boardName, boardQuery } from '../server/boards';
 import { Outbox } from '../server/outbox';
 import { CloudSave } from '../server/sync';
@@ -1875,6 +1875,7 @@ export class Game {
     const pid = r.pid;
     return {
       record: pid ? () => this.pilotCard(pid) : null,
+      report: pid && !r.you ? (reason: ReportReason) => this.backend.reportPilot(pid, reason) : null,
       rank: r.rank,
       name: r.name,
       score: formatScore(r.score),

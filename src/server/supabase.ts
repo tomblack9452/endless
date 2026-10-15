@@ -1,6 +1,6 @@
 import { storage } from '../core/storage';
 import type { ShipLook } from '../ship/portrait';
-import type { Backend, BoardQuery, BoardRow, LinkResult, PilotRecord, PilotStats, Purchase, RunSubmission, SubmitResult } from './backend';
+import type { Backend, BoardQuery, BoardRow, LinkResult, PilotRecord, PilotStats, Purchase, ReportReason, ReportResult, RunSubmission, SubmitResult } from './backend';
 
 // Supabase over plain fetch (no SDK, to keep the bundle small):
 //   auth      anonymous sign-in, refreshed as it expires; a Google login can be
@@ -296,6 +296,12 @@ export class SupabaseBackend implements Backend {
     });
     if (!r) return null;
     return { name: r.name, premium: r.premium === true, ship: r.ship ?? null, stats: r.record ?? {}, bests: r.bests ?? {}, since: Number(r.since) || 0 };
+  }
+
+  async reportPilot(pid: string, reason: ReportReason): Promise<ReportResult> {
+    const { status, body } = await this.request('/rest/v1/rpc/report_pilot', { method: 'POST', body: JSON.stringify({ p_pid: pid, p_reason: reason }) });
+    if (status >= 200 && status < 300) return { ok: true, already: body === 'already' };
+    return { ok: false, message: status === 0 ? 'no connection' : SupabaseBackend.reason(body) };
   }
 
   async deleteAccount(): Promise<boolean> {
