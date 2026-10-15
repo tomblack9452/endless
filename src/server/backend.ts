@@ -31,6 +31,8 @@ export interface SubmitResult {
   /** The player's best on that board after this run. */
   best?: number;
   newBest?: boolean;
+  /** Ranked: the league the server counted it in (it holds each player's league, 0015). */
+  league?: number;
   /** Why it was turned down. */
   message?: string;
 }

@@ -372,6 +372,78 @@ describe('submit_run', () => {
   });
 });
 
+describe('leagues on the server', () => {
+  const leagueOf = async (u: string) => {
+    await admin();
+    return (await db.query<{ league: number | null }>('select league from public.players where user_id = $1', [u])).rows[0].league;
+  };
+  const ranked = async (league: number, score = 1500) => {
+    await age();
+    return submit({ board: 'ranked', league, score });
+  };
+
+  it('keeps a new player in the league of their first ranked run', async () => {
+    const a = await newUser();
+    await as(a);
+    await ranked(1);
+    expect(await leagueOf(a)).toBe(1);
+  });
+
+  it('seeds a player from before this from their latest ranked run, and puts a lower-league run on their own board', async () => {
+    const a = await newUser();
+    const week = await thisWeek();
+    await as(a);
+    await ranked(3, 1100);
+    await admin();
+    await db.query('update public.players set league = null where user_id = $1', [a]); // as before 0015
+    await as(a);
+    const low = await ranked(0, 2600); // sent for bronze, flown by a platinum pilot
+    expect(low.best).toBe(2600);
+    expect(await leagueOf(a)).toBe(3);
+    expect((await board('ranked', week, 0)).map((r) => r.score)).not.toContain(2600);
+    expect((await board('ranked', week, 3)).map((r) => r.score)).toContain(2600);
+  });
+
+  it('promotes one league at a time, once enough ranked runs were flown in it', async () => {
+    const a = await newUser();
+    await as(a);
+    await ranked(0);
+    await rejects(ranked(1), /not in that league yet/);
+    await rejects(ranked(4), /not in that league yet/);
+    for (let i = 0; i < 11; i++) await ranked(0); // 12 in bronze now
+    await rejects(ranked(2), /not in that league yet/); // two at once: never
+    await ranked(1);
+    expect(await leagueOf(a)).toBe(1);
+    await rejects(ranked(2), /not in that league yet/); // and again from the start
+    await ranked(0); // a late bronze run counts in silver
+    expect(await leagueOf(a)).toBe(1);
+  });
+
+  it('leaves the other boards alone', async () => {
+    const a = await newUser();
+    await as(a);
+    await ranked(2);
+    await age();
+    await submit({ board: 'endless', league: 0, score: 1300 });
+    expect(await leagueOf(a)).toBe(2);
+  });
+
+  it('puts a maxed-out player in the top league', async () => {
+    const a = await newUser();
+    await admin();
+    await db.query('update public.players set max_out = true where user_id = $1', [a]);
+    await as(a);
+    await db.query('select public.take_max_out()');
+    expect(await leagueOf(a)).toBe(6);
+  });
+
+  it("can't be called on its own", async () => {
+    const a = await newUser();
+    await as(a);
+    await rejects(db.query(`select public.ranked_league('${a}', 6::smallint)`), /permission denied/);
+  });
+});
+
 describe('pilot names', () => {
   it('lets you pick a valid free name', async () => {
     const a = await newUser();

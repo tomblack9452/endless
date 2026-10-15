@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { emblem, LEAGUES, leaguePar, Leagues, lpFor, weekKey } from '../src/progression/leagues';
 import { TIER_COST } from '../src/ship/upgrades';
+import SERVER_LEAGUES from '../supabase/migrations/0015_server_leagues.sql?raw';
 
 describe('leagues', () => {
   it('has seven brackets that tile 0..30 points with no gaps', () => {
@@ -56,5 +57,20 @@ describe('leagues', () => {
 
   it('draws an emblem for every league', () => {
     for (let i = 0; i < LEAGUES.length; i++) expect(emblem(i, 1)).toMatch(/^<svg/);
+  });
+});
+
+describe('leagues on the server (0015)', () => {
+  it('lets a promotion through after the fewest ranked runs the game can promote in', () => {
+    const l = new Leagues();
+    const T = 3000 / 0.55; // a week whose bronze par is 3,000
+    let runs = 0;
+    while (!l.promotionReady) {
+      l.record(1e9, T); // the most LP a run can give
+      runs++;
+    }
+    const sql = /c_runs_to_promote constant integer := (\d+)/.exec(SERVER_LEAGUES);
+    expect(Number(sql?.[1])).toBe(runs);
+    expect(runs).toBe(12);
   });
 });

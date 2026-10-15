@@ -246,8 +246,8 @@ export class SupabaseBackend implements Backend {
       }),
     });
     if (status >= 200 && status < 300) {
-      const r = body as { rank?: number; best?: number; newBest?: boolean };
-      return { status: 'ok', rank: r.rank, best: r.best, newBest: r.newBest };
+      const r = body as { rank?: number; best?: number; newBest?: boolean; league?: number };
+      return { status: 'ok', rank: r.rank, best: r.best, newBest: r.newBest, ...(typeof r.league === 'number' ? { league: r.league } : {}) };
     }
     // No signal, a busy server, or a session that needs renewing: try again later.
     // Any other answer is the server saying no, and asking again won't change it.
