@@ -74,7 +74,7 @@ interface Run {
 async function submit(r: Run = {}): Promise<{ rank: number; best: number; newBest: boolean }> {
   const distance = r.distance ?? 2000;
   const board = r.board ?? 'endless';
-  const path = r.path ?? (board === 'ranked' ? Array.from({ length: Math.ceil(distance / 4) }, (_, i) => Math.sin(i / 9)) : []);
+  const path = r.path ?? (board === 'ranked' || board === 'daily' ? Array.from({ length: Math.ceil(distance / 4) }, (_, i) => Math.sin(i / 9)) : []);
   const res = await db.query<{ submit_run: { rank: number; best: number; newBest: boolean } }>(
     'select public.submit_run($1, $2::smallint, $3, $4::real, $5::real, $6, $7::real[])',
     [board, r.league ?? 0, r.score ?? 1500, r.seconds ?? 40, distance, r.finished ?? false, `{${path.join(',')}}`],
@@ -369,6 +369,61 @@ describe('submit_run', () => {
     await db.query('update public.players set hidden = true where user_id = $1', [a]);
     await as(b);
     expect((await board('solo:ship')).map((r) => r.score)).toEqual([1100]);
+  });
+});
+
+describe('the daily challenge', () => {
+  const today = async (): Promise<string> => {
+    await admin();
+    return (await db.query<{ d: string }>("select ((now() at time zone 'utc')::date)::text as d")).rows[0].d;
+  };
+  const earn = async (amount: number, reason: string) => (await db.query<{ earn_cores: number }>('select public.earn_cores($1, $2)', [amount, reason])).rows[0].earn_cores;
+
+  it("takes a run on the daily board, filed under the server's day, everyone together", async () => {
+    const [a, b] = [await newUser(), await newUser()];
+    const day = await today();
+    await as(a);
+    expect(await submit({ board: 'daily', league: 3, score: 2400, distance: 3600, seconds: 70, finished: true })).toEqual({ rank: 1, best: 2400, newBest: true });
+    await as(b);
+    expect(await submit({ board: 'daily', score: 2600, distance: 3000, seconds: 60 })).toMatchObject({ rank: 1, newBest: true });
+    const rows = await board('daily', day, 0);
+    expect(rows.map((r) => r.score)).toEqual([2600, 2400]);
+    expect(rows.map((r) => r.you)).toEqual([true, false]);
+    expect(await board('daily', 'all', 0)).toEqual([]);
+    expect(await board('daily', '2001-01-01', 0)).toEqual([]);
+    await admin();
+    expect((await db.query<{ league: number }>("select distinct league from public.bests where board = 'daily'")).rows).toEqual([{ league: 0 }]);
+  });
+
+  it('checks it as ranked runs are checked, and no longer than the course', async () => {
+    const a = await newUser();
+    await as(a);
+    await rejects(submit({ board: 'daily', path: [0, 0, 0] }), /path does not match/);
+    const jumpy = Array.from({ length: 500 }, (_, i) => (i % 2 === 0 ? 0 : 40));
+    await rejects(submit({ board: 'daily', path: jumpy }), /path jumps/);
+    await rejects(submit({ board: 'daily', distance: CONFIG.daily.length + 400, seconds: 80, score: 3000 }), /longer than the daily course/);
+    await rejects(submit({ board: 'daily', score: 9_000_000 }), /too high/);
+    await rejects(submit({ board: 'daily', distance: 3000, seconds: 10, score: 2000 }), /too fast/);
+    await rejects(submit({ board: 'dailies' }), /unknown board/);
+  });
+
+  it("pays the streak's cores once a day, 3 at most, for today only", async () => {
+    const a = await newUser();
+    const day = await today();
+    await as(a);
+    expect(await earn(9, `daily:${day}`)).toBe(3);
+    expect(await earn(3, `daily:${day}`)).toBe(0);
+    expect(await earn(3, 'daily:2020-01-01')).toBe(0);
+    expect(await earn(3, `daily:${new Date(Date.now() + 3 * 86_400_000).toISOString().slice(0, 10)}`)).toBe(0);
+    expect(await earn(3, 'daily:nonsense')).toBe(0);
+    expect(Math.max(...CONFIG.daily.streak.map((s) => ('cores' in s ? s.cores : 0)))).toBeLessThanOrEqual(3);
+  });
+
+  it("keeps the course's length in step with the game", () => {
+    const sql = migrations.map(([, text]) => text).join('\n');
+    const m = /c_daily_length constant numeric := ([0-9.]+)/.exec(sql);
+    expect(Number(m?.[1])).toBeGreaterThan(CONFIG.daily.length);
+    expect(Number(m?.[1])).toBeLessThan(CONFIG.daily.length * 1.1);
   });
 });
 

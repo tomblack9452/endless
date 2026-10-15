@@ -618,6 +618,16 @@ export const CONFIG = {
     starCredits: 50, // per new star
   },
 
+  // The daily challenge (dailyRun in courses.ts, progression/challenge.ts): one
+  // short course a day with a finish line, the same for everyone.
+  daily: {
+    length: 3600, // start line to finish, in world units (check_run's c_daily_length in 0019 allows a little over)
+    difficulty: [2500, 7000], // the score whose speed and density the first and last sections fly at
+    // The streak's rewards, by days in a row (day 7 and on pay the last). Cores go
+    // through earn_cores as 'daily:<date>', which pays 3 at most (0019).
+    streak: [{ credits: 100 }, { credits: 150 }, { credits: 200, cores: 1 }, { credits: 250 }, { credits: 300, cores: 2 }, { credits: 350 }, { credits: 500, cores: 3 }],
+  },
+
   // Assist mode (settings): a gentler way to play.
   assist: {
     speed: 0.8, // forward speed multiplier
