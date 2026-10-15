@@ -71,7 +71,7 @@ import { type Course, COURSES, courseLength, type Environment, ENVIRONMENTS, typ
 import { envStatus, nextEnvironment, newlyOpened } from '../progression/unlocks';
 import { DIVISIONS, divisionReward, emblem, LEAGUES, leagueName, leaguePar, Leagues, LP_PER_DIVISION, weekKey } from '../progression/leagues';
 import { ACHIEVEMENTS, type Achievement, GROUP_NAMES, type Group, type Snapshot, achievement, progressOn, rewardKeys } from '../progression/achievements';
-import { SETS, VAULT_ORDER } from '../ship/catalogue';
+import { refreshSeasonLooks, SETS, VAULT_ORDER } from '../ship/catalogue';
 import { GoalLog } from '../progression/goals';
 import { buildHangar, type HangarState, lookIcon, lookSwatch, monthsUntilVault } from '../ship/hangar';
 import { type HangarTab, HangarScreen } from '../ui/hangarView';
@@ -1352,6 +1352,9 @@ export class Game {
     this.pass.turn(now);
     this.turnWeek(now);
     this.refreshBar(now);
+    // The season looks by the trusted clock (start-up had only the phone's); owned or worn ones stay.
+    const keep = (l: LookItem) => this.looks.has(keyOf(l)) || this.looks.equipped[l.slot] === l.id;
+    if (refreshSeasonLooks(now, keep) && this.infoOpen === 'hangar') this.renderHangar(true);
   }
 
   /** The week by the trusted clock: this week's ranked run, and last week's league reward paid. Not mid-run. */

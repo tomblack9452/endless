@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { LOOKS } from '../src/ship/catalogue';
+import { LOOKS, refreshSeasonLooks } from '../src/ship/catalogue';
 import { CONFIG } from '../src/core/config';
 import { decalArt } from '../src/ship/decals';
 import { freeReward, premiumReward } from '../src/economy/pass';
@@ -113,3 +113,36 @@ describe('in the game', () => {
     expect(offers.some((o) => isSeasonShopLook(o.item, season))).toBe(true);
   });
 });
+
+describe('following the trusted clock', () => {
+  const WEEK = 7 * 86_400_000;
+  const seasonsIn = () => new Set(LOOKS.map((l) => seasonOf(l.id)).filter((n) => n !== null));
+
+  it("gain a new season's looks when the server is ahead of the phone, and lose unowned future ones when it's behind", () => {
+    const today = Date.now();
+    const now = seasonAt(today).season;
+    const later = today + CONFIG.economy.pass.weeks * WEEK; // the next season, by the server
+    const before = LOOKS.length;
+    expect(refreshSeasonLooks(today, () => false)).toBe(false); // already right
+    expect(refreshSeasonLooks(later, () => false)).toBe(true);
+    expect(seasonsIn().has(now + 1)).toBe(true);
+    expect(LOOKS.filter((l) => seasonOf(l.id) !== null).length).toBe(seasonLooksThrough(now + 1, HAND_MADE).length);
+    // Back to the real season, owning one of next season's looks: it stays, the rest go.
+    const owned = LOOKS.find((l) => seasonOf(l.id) === now + 1)!;
+    expect(refreshSeasonLooks(today, (l) => l === owned)).toBe(true);
+    expect(LOOKS).toContain(owned);
+    expect(LOOKS.filter((l) => seasonOf(l.id) === now + 1)).toEqual([owned]);
+    expect(byKey(`${owned.slot}:${owned.id}`)).toBe(owned);
+    expect(LOOKS.length).toBe(before + 1);
+  });
+
+  it('keep the same object for every look that stays', () => {
+    const today = Date.now();
+    const first = LOOKS.find((l) => seasonOf(l.id) === 1)!;
+    refreshSeasonLooks(today + 3 * CONFIG.economy.pass.weeks * WEEK, () => false);
+    expect(LOOKS).toContain(first);
+    refreshSeasonLooks(today, () => false);
+    expect(LOOKS).toContain(first);
+  });
+});
+

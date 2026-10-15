@@ -1,6 +1,6 @@
 import type { LookItem, Slot, Unlock } from './looks';
 import { seasonAt } from '../progression/season';
-import { seasonLooksThrough } from './seasonLooks';
+import { seasonLooksThrough, seasonOf } from './seasonLooks';
 
 // Every look in the game, and how to get each. Purely cosmetic (every hull
 // shares one hitbox), so all of it is allowed in ranked.
@@ -229,8 +229,33 @@ const HAND_MADE: readonly LookItem[] = [
   trail('crown', 'crown', premium),
 ];
 
+/** The season the generated looks go up to. Start-up has only the phone's clock; refreshSeasonLooks puts it right. */
+let looksSeason = seasonAt(Date.now()).season;
+
 /** Every look: the hand-made ones, then each season's generated ones up to the current season. */
-export const LOOKS: readonly LookItem[] = [...HAND_MADE, ...seasonLooksThrough(seasonAt(Date.now()).season, HAND_MADE)];
+export const LOOKS: readonly LookItem[] = [...HAND_MADE, ...seasonLooksThrough(looksSeason, HAND_MADE)];
+
+/**
+ * Bring the season looks in line with a clock to trust (the server's, once
+ * it's known): a phone set behind gains the new season's looks, one set ahead
+ * loses those whose season hasn't come yet, except any it owns or wears
+ * (`keep`), so nothing owned vanishes mid-session. The array is changed in
+ * place, so everything holding LOOKS sees it. Returns true if anything changed.
+ */
+export function refreshSeasonLooks(now: number, keep: (item: LookItem) => boolean): boolean {
+  const season = seasonAt(now).season;
+  if (season === looksSeason) return false;
+  const all = LOOKS as LookItem[];
+  const made = new Set(all.map((l) => `${l.slot}:${l.id}`));
+  const kept = season < looksSeason ? all.filter((l) => !HAND_MADE.includes(l) && (seasonOf(l.id) ?? 0) > season && keep(l)) : [];
+  const fresh = [...HAND_MADE, ...seasonLooksThrough(season, HAND_MADE)];
+  // The same object for a look already here, so anything holding one still matches.
+  const next = [...fresh.map((l) => all.find((x) => x.slot === l.slot && x.id === l.id) ?? l), ...kept];
+  const changed = next.length !== all.length || next.some((l) => !made.has(`${l.slot}:${l.id}`));
+  all.splice(0, all.length, ...next);
+  looksSeason = season;
+  return changed;
+}
 
 /** Looks by slot, in the order the hangar shows them. */
 export const SLOT_ORDER: Slot[] = ['hull', 'paint', 'markings', 'fins', 'engine', 'decal', 'trail'];
