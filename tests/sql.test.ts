@@ -609,6 +609,86 @@ describe('store purchases (the webhook, with the service key)', () => {
   });
 });
 
+describe('a refunded season pass', () => {
+  const season = async () => {
+    await admin();
+    return (await db.query<{ s: number }>('select public.pass_season(now()) as s')).rows[0].s;
+  };
+  const coresOf = async (u: string) => {
+    await admin();
+    return (await db.query<{ cores: number }>('select cores from public.wallets where user_id = $1', [u])).rows[0].cores;
+  };
+  const earn = async (u: string, amount: number, reason: string) => {
+    await as(u);
+    return (await db.query<{ earn_cores: number }>('select public.earn_cores($1, $2)', [amount, reason])).rows[0].earn_cores;
+  };
+  const buyPass = async (u: string, id: string) => {
+    await admin();
+    await db.query('select public.store_purchase_at($1, $2, $3, $4, $5, $6, now())', [id, u, 'season_pass', 'NON_RENEWING_PURCHASE', `tx-${id}`, 0]);
+  };
+  const refundPass = async (u: string, id: string) => {
+    await admin();
+    return (await db.query<{ store_refund: string }>('select public.store_refund($1, $2, $3, $4, $5)', [`rf-${id}`, u, 'season_pass', `tx-${id}`, 0])).rows[0].store_refund;
+  };
+
+  it('takes back the cores its premium tiers paid, keeps the free track, and pays no more premium tiers', async () => {
+    const a = await newUser();
+    const s = await season();
+    await admin();
+    await db.query('update public.wallets set cores = 100 where user_id = $1', [a]);
+    await buyPass(a, 'sp1');
+    expect(await earn(a, 15, `pass:${s}:p3`)).toBe(15);
+    expect(await earn(a, 20, `pass:${s}:p5`)).toBe(20);
+    expect(await earn(a, 5, `pass:${s}:f5`)).toBe(5);
+    expect(await coresOf(a)).toBe(140);
+    expect(await refundPass(a, 'sp1')).toBe('refunded');
+    expect(await coresOf(a)).toBe(105); // 35 from the premium tiers back
+    await admin();
+    const log = await db.query<{ delta: number }>("select delta from public.core_log where user_id = $1 and reason = $2", [a, `refund:pass:${s}`]);
+    expect(log.rows.map((r) => r.delta)).toEqual([-35]);
+    expect(await earn(a, 15, `pass:${s}:p6`)).toBe(0);
+    expect(await earn(a, 5, `pass:${s}:f10`)).toBe(5);
+    expect(await refundPass(a, 'sp1')).toBe('duplicate');
+    expect(await coresOf(a)).toBe(110);
+  });
+
+  it("never goes below zero, and pays premium tiers again if the pass is bought again", async () => {
+    const a = await newUser();
+    const s = await season();
+    await buyPass(a, 'sp2');
+    expect(await earn(a, 20, `pass:${s}:p10`)).toBe(20);
+    await admin();
+    await db.query('update public.wallets set cores = 5 where user_id = $1', [a]); // spent meanwhile
+    await refundPass(a, 'sp2');
+    expect(await coresOf(a)).toBe(0);
+    await buyPass(a, 'sp3');
+    expect(await earn(a, 15, `pass:${s}:p12`)).toBe(15);
+  });
+
+  it('never touches a pass unlocked with cores', async () => {
+    const a = await newUser();
+    const s = await season();
+    await admin();
+    await db.query('update public.wallets set cores = 600 where user_id = $1', [a]);
+    await as(a);
+    expect((await db.query<{ spend_cores: boolean }>('select public.spend_cores(500, $1)', [`pass-premium:${s}`])).rows[0].spend_cores).toBe(true);
+    expect(await earn(a, 20, `pass:${s}:p5`)).toBe(20);
+    await buyPass(a, 'sp4'); // bought too, then refunded: the cores unlock still stands
+    await refundPass(a, 'sp4');
+    expect(await coresOf(a)).toBe(120);
+    expect(await earn(a, 15, `pass:${s}:p6`)).toBe(15);
+  });
+
+  it('shows the game the refunded row', async () => {
+    const a = await newUser();
+    await buyPass(a, 'sp5');
+    await refundPass(a, 'sp5');
+    await as(a);
+    const rows = await db.query<{ product: string }>('select product from public.store_events where user_id = $1', [a]);
+    expect(rows.rows.map((r) => r.product)).toContain('refunded:season_pass');
+  });
+});
+
 describe('max out', () => {
   it('is taken once after it is set from the SQL editor, and only by its player', async () => {
     const [a, b] = [await newUser(), await newUser()];

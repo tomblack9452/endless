@@ -49,6 +49,8 @@ interface Saved {
   premium: boolean;
   paidFree: number; // tiers paid on each track
   paidPremium: number;
+  /** How premium was unlocked: with cores, or bought for money (a refund takes the money one back). Older saves don't say. */
+  via?: 'cores' | 'money';
   /** 2 since tiers took 600 XP (they took 120): older saves are scaled up once to keep their tier. */
   v?: number;
 }
@@ -94,6 +96,9 @@ export class Pass {
   get premium(): boolean {
     return this.s.premium;
   }
+  get via(): 'cores' | 'money' | undefined {
+    return this.s.premium ? this.s.via : undefined;
+  }
 
   /** Tiers reached (0..tiers). */
   get tier(): number {
@@ -114,10 +119,24 @@ export class Pass {
     return this.pay();
   }
 
-  /** Unlock the premium track; returns the premium rewards already reached. */
-  unlockPremium(): Reward[] {
+  /** Unlock the premium track (with cores, or bought); returns the premium rewards already reached. */
+  unlockPremium(via: 'cores' | 'money'): Reward[] {
     this.s.premium = true;
+    this.s.via = via;
     return this.pay();
+  }
+
+  /**
+   * A pass bought for money was refunded: the premium track closes. Tiers it
+   * already paid stay paid (the server takes their cores back). A track
+   * unlocked with cores is never touched. Returns true if it closed.
+   */
+  refund(): boolean {
+    if (!this.s.premium || this.s.via === 'cores') return false;
+    this.s.premium = false;
+    delete this.s.via;
+    this.save();
+    return true;
   }
 
   private pay(): Reward[] {
@@ -146,6 +165,15 @@ export class Pass {
 export function passBought(purchases: readonly { product: string; at: number }[], now: number): boolean {
   const { start, end } = seasonAt(now);
   return purchases.some((p) => p.product === 'season_pass' && p.at >= start && p.at < end);
+}
+
+/**
+ * True if this season's pass was bought for money and then refunded (a
+ * 'refunded:season_pass' row from this season), and not bought again.
+ */
+export function passRefunded(purchases: readonly { product: string; at: number }[], now: number): boolean {
+  const { start, end } = seasonAt(now);
+  return !passBought(purchases, now) && purchases.some((p) => p.product === 'refunded:season_pass' && p.at >= start && p.at < end);
 }
 
 /** Pass XP for a run's score. */

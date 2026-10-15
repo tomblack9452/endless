@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { CONFIG } from '../src/core/config';
 import { Daily, questsFor, questText } from '../src/economy/daily';
 import { Weekly, weeklyFor } from '../src/economy/weekly';
-import { freeReward, Pass, passBought, premiumReward, seasonAt } from '../src/economy/pass';
+import { freeReward, Pass, passBought, passRefunded, premiumReward, seasonAt } from '../src/economy/pass';
 import { shopFor } from '../src/economy/shop';
 import { dayBefore, dayKey } from '../src/economy/time';
 import { find, LOOKS } from '../src/ship/looks';
@@ -173,7 +173,7 @@ describe('season pass', () => {
     const P = CONFIG.economy.pass;
     expect(p.addXp(T0, P.xpPerTier * 3).length).toBe(3);
     expect(p.addXp(T0, 1).length).toBe(0);
-    expect(p.unlockPremium().length).toBe(3);
+    expect(p.unlockPremium('cores').length).toBe(3);
     expect(p.addXp(T0, P.xpPerTier).length).toBe(2);
     expect(p.addXp(T0, P.xpPerTier * 100).length).toBe((P.tiers - 4) * 2);
     expect(p.tier).toBe(P.tiers);
@@ -203,7 +203,7 @@ describe('season pass bought for money, from the server\'s records', () => {
     const records = bought(T0);
     const restore = (p: Pass, now: number) => {
       p.turn(now);
-      return p.premium || !passBought(records, now) ? null : p.unlockPremium();
+      return p.premium || !passBought(records, now) ? null : p.unlockPremium('money');
     };
     const p = new Pass();
     await p.load(T0);
@@ -213,6 +213,42 @@ describe('season pass bought for money, from the server\'s records', () => {
     expect(p.premium).toBe(true);
     expect(restore(p, s.end)).toBeNull();
     expect(p.premium).toBe(false);
+  });
+});
+
+describe('a refunded season pass, on the device', () => {
+  const s = seasonAt(T0);
+  const refunded = [{ product: 'refunded:season_pass', at: T0 }];
+
+  it('reads a refund from this season, unless the pass was bought again', () => {
+    expect(passRefunded(refunded, T0)).toBe(true);
+    expect(passRefunded(refunded, s.end)).toBe(false); // last season's refund
+    expect(passRefunded([...refunded, { product: 'season_pass', at: T0 + 1 }], T0)).toBe(false);
+    expect(passRefunded([{ product: 'season_pass', at: T0 }], T0)).toBe(false);
+    expect(passRefunded([], T0)).toBe(false);
+  });
+
+  it('closes a premium track bought for money, keeps what it paid, and remembers how it was unlocked', async () => {
+    const p = new Pass();
+    await p.load(T0);
+    p.addXp(T0, CONFIG.economy.pass.xpPerTier * 3);
+    expect(p.unlockPremium('money').length).toBe(3);
+    expect(p.via).toBe('money');
+    expect(p.refund()).toBe(true);
+    expect(p.premium).toBe(false);
+    expect(p.refund()).toBe(false);
+    // Unlocked again later (with cores): tiers already paid aren't paid twice.
+    expect(p.unlockPremium('cores').length).toBe(0);
+    expect(p.addXp(T0, CONFIG.economy.pass.xpPerTier).length).toBe(2);
+  });
+
+  it('never touches a premium track unlocked with cores', async () => {
+    const p = new Pass();
+    await p.load(T0);
+    p.unlockPremium('cores');
+    expect(p.refund()).toBe(false);
+    expect(p.premium).toBe(true);
+    expect(p.via).toBe('cores');
   });
 });
 

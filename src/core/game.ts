@@ -52,7 +52,7 @@ import { Wallet } from '../progression/wallet';
 import { Daily, type Quest, questText } from '../economy/daily';
 import { Weekly } from '../economy/weekly';
 import { type GoalsTab, GoalsScreen, type TaskRow } from '../ui/goalsView';
-import { Pass, passBought, premiumReward, freeReward, runXp, seasonAt } from '../economy/pass';
+import { Pass, passBought, passRefunded, premiumReward, freeReward, runXp, seasonAt } from '../economy/pass';
 import { type Reward, rewardLook, rewardParts, rewardText } from '../economy/reward';
 import { DailyShop, setOffer, vaultAt } from '../economy/shop';
 import { dayKey, formatWait, untilTomorrow } from '../economy/time';
@@ -1176,8 +1176,9 @@ export class Game {
   }
 
   private onPassPremium = (): void => {
-    if (this.pass.premium || !this.wallet.spendCores(CONFIG.economy.pass.premiumCores)) return;
-    const paid = this.pass.unlockPremium();
+    // The reason tells the server this season's premium was paid in cores (a refund never touches it).
+    if (this.pass.premium || !this.wallet.spendCores(CONFIG.economy.pass.premiumCores, `pass-premium:${this.pass.season}`)) return;
+    const paid = this.pass.unlockPremium('cores');
     const lines = paid.flatMap((r) => this.grant(r));
     this.ui.celebrate([{ kicker: 'season pass', icon: PASS_ICON, name: 'premium unlocked', lines: lines.length > 0 ? mergeCredits(lines) : ['premium rewards from every tier you reach'] }]);
     this.sound.power();
@@ -1449,7 +1450,7 @@ export class Game {
       } else lines.push(...this.grant({ cores: p.cores }));
     }
     if ('look' in p) lines.push(...this.grant({ look: p.look }));
-    if ('pass' in p && !this.pass.premium) lines.push(...this.pass.unlockPremium().flatMap((r) => this.grant(r)), 'season pass premium');
+    if ('pass' in p && !this.pass.premium) lines.push(...this.pass.unlockPremium('money').flatMap((r) => this.grant(r)), 'season pass premium');
     if ('premium' in p) lines.push('premium: no ads, ad rewards free, the halo hull, regalia paint and crown flame, an extra free revive a day');
     this.grantProduct(id);
     this.ui.celebrate([{ kicker: 'thank you', icon: GIFT_ICON, name: 'purchase complete', lines: mergeCredits(lines) }]);
@@ -1503,8 +1504,16 @@ export class Game {
   private restorePass(records: readonly Purchase[]): string[] | null {
     const now = this.now();
     this.pass.turn(now);
+    // Refunded (and not bought again): a track bought for money closes; one unlocked with cores stays.
+    if (passRefunded(records, now) && this.pass.refund()) {
+      this.ui.showNotice('your season pass was refunded, so its premium track is closed');
+      void this.wallet.refresh(); // the server took back the cores its premium tiers paid
+      this.refreshTitle();
+      if (this.infoOpen === 'pass') this.openPass();
+      return null;
+    }
     if (this.pass.premium || !passBought(records, now)) return null;
-    const lines = this.pass.unlockPremium().flatMap((r) => this.grant(r));
+    const lines = this.pass.unlockPremium('money').flatMap((r) => this.grant(r));
     this.refreshTitle();
     if (this.infoOpen === 'pass') this.openPass();
     else if (this.infoOpen === 'store') this.openStore();
