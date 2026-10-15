@@ -18,5 +18,7 @@
 
     <style name="AppTheme.NoActionBarLaunch" parent="Theme.SplashScreen">
         <item name="android:background">@drawable/splash</item>
+        <!-- Android 12+ draws its own splash: the launcher icon on this colour (the icon's night sky). -->
+        <item name="windowSplashScreenBackground">#1d2031</item>
     </style>
 </resources>
