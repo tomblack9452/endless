@@ -5,6 +5,7 @@ import type { Backend, BoardQuery, BoardRow, LinkResult, ReportResult, RunSubmis
 
 export class LocalBackend implements Backend {
   readonly online = false;
+  readonly reachable = false; // there's no server to reach
   readonly userId = null;
   readonly clockKnown = false;
 

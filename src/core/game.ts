@@ -289,6 +289,9 @@ export class Game {
   private pathTimes: number[] = [];
   private pathNext = 0;
   private economyTimer = 0;
+  /** Asking the server whether it's back, and when it was last asked (the device's clock). */
+  private rechecking = false;
+  private lastRecheck = 0;
   /** The minute the title's cards were last drawn (the daily card's time left). */
   private titleMinute = 0;
   /** Turns the showroom camera: on its own, or by a drag on the open scene. */
@@ -449,7 +452,11 @@ export class Game {
     this.ui.bindBoards(BOARD_TABS, (id) => void this.showBoard(id), (name) => void this.savePilotName(name));
     this.ui.bindNameBox('settings', (name) => void this.savePilotName(name, 'settings'));
     this.ui.bindNameBox('name', (name) => void this.saveNameScreen(name));
-    window.addEventListener('online', () => void this.outbox.flush());
+    window.addEventListener('online', () => {
+      void this.outbox.flush();
+      void this.recheck();
+    });
+    window.addEventListener('offline', () => this.refreshBar());
     // The server's clock, for the day's and week's keys: asked for now, alongside
     // the loads, and waited for a moment at most (a slow or missing signal keeps
     // the device's clock, and connect() checks again once it's known).
@@ -1395,6 +1402,11 @@ export class Game {
     this.weeklyGoals.turn(weekKey(now));
     this.pass.turn(now);
     this.turnWeek(now);
+    if (Date.now() - this.lastRecheck > 20_000) {
+      // Offline: is the server back?
+      this.lastRecheck = Date.now();
+      void this.recheck();
+    }
     if (this.turnDay(now) || Math.floor(now / 60_000) !== this.titleMinute) {
       // A new day's challenge, or the minute its time left counts down.
       this.titleMinute = Math.floor(now / 60_000);
@@ -1446,19 +1458,7 @@ export class Game {
     // The server's clock may have come after start-up stopped waiting: check today by it (asking again if need be).
     if (this.backend.clockKnown || (await this.backend.syncClock())) this.retime();
     errorLog.attach(this.backend, () => this.errorScreen());
-    if (await this.backend.signIn()) {
-      void errorLog.send(); // anything noted before signing in
-      if (await this.cloud.start()) {
-        location.reload(); // the cloud save is newer: start again from it
-        return;
-      }
-      await this.wallet.link(this.backend);
-      await this.checkMaxOut();
-      this.refreshTitle();
-      this.queueShip();
-      void this.askName();
-      void this.outbox.flush(); // runs that couldn't be sent last time
-    }
+    if (!(await this.signInAndSync())) return;
     const refund = await migrateTickets((n) => this.wallet.addCores(n, 'tickets'));
     if (refund > 0) {
       this.ui.showNotice(`ranked is unlimited now: your spare tickets became ${formatScore(refund)} cores`);
@@ -1483,6 +1483,27 @@ export class Game {
     });
     this.storeProducts = await this.store.products();
     if (this.infoOpen === 'store') this.openStore();
+  }
+
+  /**
+   * Sign in, then bring the cloud save, the wallet and the waiting runs up to
+   * date. False if the cloud save was newer and the game is starting again
+   * from it. Started offline, it runs again when the server comes back (recheck).
+   */
+  private async signInAndSync(): Promise<boolean> {
+    if (!(await this.backend.signIn())) return true;
+    void errorLog.send(); // anything noted before signing in
+    if (await this.cloud.start()) {
+      location.reload(); // the cloud save is newer: start again from it
+      return false;
+    }
+    await this.wallet.link(this.backend);
+    await this.checkMaxOut();
+    this.refreshTitle();
+    this.queueShip();
+    void this.askName();
+    void this.outbox.flush(); // runs that couldn't be sent last time
+    return true;
   }
 
   /** Buy a real-money product through the app store, then deliver it. */
@@ -1633,7 +1654,32 @@ export class Game {
     else if (outcome === 'unavailable') this.ui.showNotice("sharing isn't available here");
   }
 
+  /** There's a server, but it can't be reached right now (no signal, or it's down). Everything on the device carries on. */
+  private offline(): boolean {
+    return this.backend.online && (!this.backend.reachable || (typeof navigator !== 'undefined' && navigator.onLine === false));
+  }
+
+  /** Offline: ask the server for the time now and then (it needs no sign-in), and pick everything up again when it answers. */
+  private async recheck(): Promise<void> {
+    if (!this.offline() || this.rechecking) return;
+    this.rechecking = true;
+    try {
+      if (!(await this.backend.syncClock())) return;
+      this.retime();
+      if (!this.backend.userId) await this.signInAndSync();
+      else {
+        void this.outbox.flush();
+        void errorLog.send();
+        void this.wallet.refresh().then(() => this.refreshTitle());
+      }
+    } finally {
+      this.rechecking = false;
+      this.refreshBar();
+    }
+  }
+
   private refreshBar(now = this.now()): void {
+    this.ui.setOffline(this.offline());
     this.econ.setBar(this.wallet.credits, this.wallet.cores);
     this.econ.setNews('goals', this.daily.loginDue(dayKey(now)) >= 0 || this.goalsToClaim() > 0);
   }
@@ -1818,11 +1864,17 @@ export class Game {
   private async loadBoard(): Promise<void> {
     const lg = this.leagues;
     const tab = BOARD_TABS[0];
+    const mine = this.progress.weeklyBest(this.weekly.id);
+    const own: [string, string][] = mine > 0 ? [['your best', formatScore(mine)]] : [['no ranked run yet this week', '']];
+    if (this.offline()) {
+      this.ui.renderBoard(own, "you're offline. the board comes back with a connection");
+      return;
+    }
     this.ui.renderBoard([], this.backend.online ? 'loading' : '');
     const rows = await this.backend.board(boardQuery(tab, lg.league, this.now()));
-    const mine = this.progress.weeklyBest(this.weekly.id);
     if (!this.backend.online || rows === null) {
-      this.ui.renderBoard(mine > 0 ? [['your best', formatScore(mine)]] : [['no ranked run yet this week', '']], this.backend.online ? "couldn't load the board" : 'the leaderboards need the server');
+      this.ui.renderBoard(own, !this.backend.online ? 'the leaderboards need the server' : this.offline() ? "you're offline. the board comes back with a connection" : "couldn't load the board");
+      this.refreshBar();
       return;
     }
     const view: [string, string][] = rows.map((r) => [`${r.rank}. ${r.you ? 'you' : r.name}`, formatScore(r.score)]);
@@ -1982,11 +2034,18 @@ export class Game {
       this.ui.renderLeaderboard(caption, own, 'global boards need the server. this is your best on this device.');
       return;
     }
+    const offlineNote = "you're offline. the boards come back when you're connected. this is your best on this device.";
+    if (this.offline()) {
+      this.ui.renderLeaderboard(caption, own, offlineNote);
+      void this.recheck();
+      return;
+    }
     this.ui.renderLeaderboard(caption, [], 'loading');
     await Promise.all([this.outbox.flush(), this.syncShip(), this.syncRecord()]); // so a run you just finished, your ship and your record are on the board
     const rows = await this.backend.board(boardQuery(tab, this.leagues.league, this.now()));
     if (seq !== this.boardSeq || this.infoOpen !== 'boards') return; // moved on while it loaded
-    if (rows === null) this.ui.renderLeaderboard(caption, own, "couldn't load the board. check your connection");
+    this.refreshBar();
+    if (rows === null) this.ui.renderLeaderboard(caption, own, this.offline() ? offlineNote : "couldn't load the board. try again in a moment");
     else if (rows.length === 0) this.ui.renderLeaderboard(caption, [], 'nobody yet. fly a run to be first');
     else this.ui.renderLeaderboard(caption, rows.map((r) => this.boardRow(r)), '');
   }

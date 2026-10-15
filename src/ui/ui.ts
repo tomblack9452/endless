@@ -641,6 +641,12 @@ export class UI {
     $('league-board-note').textContent = note;
   }
 
+  /** The quiet "offline" word by the wallet: the server can't be reached. */
+  setOffline(on: boolean): void {
+    const el = $('offline-mark');
+    if (el.hidden === on) el.hidden = !on;
+  }
+
   /** The share button on the end screen (a new personal best, and every ranked run). */
   showShare(on: boolean): void {
     $('over-share').hidden = !on;

@@ -2096,6 +2096,18 @@ body {
   gap: 6px;
 }
 
+/* No connection to the server: a quiet word beside the wallet. */
+.offline-mark {
+  align-self: center;
+  margin-right: 2px;
+  color: var(--ui-fg);
+  font-size: calc(10px * var(--ui-scale));
+  letter-spacing: 0.16em;
+  opacity: 0.6;
+  border-bottom-style: dashed;
+  pointer-events: none;
+}
+
 .coin {
   color: var(--ui-fg);
   display: inline-flex;

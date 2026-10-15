@@ -105,6 +105,8 @@ export interface Purchase {
 export interface Backend {
   /** True when talking to a real server. */
   readonly online: boolean;
+  /** False since the last request found no connection to the server (no signal, or it's down); true again with the next answer. */
+  readonly reachable: boolean;
   /** The signed-in account's id (the store buys as this account), or null. */
   readonly userId: string | null;
   /** The time to trust for rewards, streaks, days and weeks (ms): the server's clock once known, the device's until then and offline. */

@@ -54,3 +54,38 @@ describe('the trusted clock', () => {
     expect(Math.abs(b.now() - Date.now())).toBeLessThan(1000);
   });
 });
+
+// The offline marker (game.ts offline()): the server's there until a request finds no way through.
+describe('reaching the server', () => {
+  it('is lost with no signal or a server down, and back with the next answer', async () => {
+    const b = new SupabaseBackend('https://x.supabase.co', 'k');
+    expect(b.reachable).toBe(true);
+    vi.stubGlobal('fetch', vi.fn(async () => Promise.reject(new TypeError('offline'))));
+    expect(await b.syncClock()).toBe(false);
+    expect(b.reachable).toBe(false);
+    expect(await b.signIn()).toBe(false);
+    expect(b.reachable).toBe(false);
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('{}', { status: 503 })));
+    await b.syncClock();
+    expect(b.reachable).toBe(false);
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify(new Date().toISOString()), { status: 200 })));
+    expect(await b.syncClock()).toBe(true);
+    expect(b.reachable).toBe(true);
+  });
+
+  it('counts a refusal as reachable: the server answered', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify(session), { status: 200 })));
+    const b = new SupabaseBackend('https://x.supabase.co', 'k');
+    await b.signIn();
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ message: 'no' }), { status: 400 })));
+    expect(await b.board({ board: 'endless', period: 'all', league: 0 })).toBeNull();
+    expect(b.reachable).toBe(true);
+    vi.stubGlobal('fetch', vi.fn(async () => Promise.reject(new TypeError('offline'))));
+    expect(await b.board({ board: 'endless', period: 'all', league: 0 })).toBeNull();
+    expect(b.reachable).toBe(false);
+  });
+
+  it('is never claimed without a server', () => {
+    expect(new LocalBackend().reachable).toBe(false);
+  });
+});

@@ -23,6 +23,8 @@ interface Session {
 
 export class SupabaseBackend implements Backend {
   readonly online = true;
+  /** The last request got an answer (any answer: a refusal still means the server is there). */
+  reachable = true;
   private session: Session | null = null;
   authError = '';
   /** The server's clock minus the device's (ms), once known. */
@@ -41,12 +43,14 @@ export class SupabaseBackend implements Backend {
     try {
       const sent = Date.now();
       const res = await fetch(`${this.url}/rest/v1/rpc/server_now`, { method: 'POST', headers: { apikey: this.key, 'Content-Type': 'application/json' }, body: '{}' });
+      this.reachable = res.status < 500;
       const got = Date.now();
       const at = res.ok ? Date.parse(String(await res.json().catch(() => ''))) : NaN;
       if (Number.isFinite(at) && got - sent < 10_000) this.offset = at + (got - sent) / 2 - got;
       else this.learnClock(res, sent);
     } catch {
       // offline: the device's clock until the server answers
+      this.reachable = false;
     }
     return this.clockKnown;
   }
@@ -105,7 +109,14 @@ export class SupabaseBackend implements Backend {
     const headers: Record<string, string> = { apikey: this.key, 'Content-Type': 'application/json' };
     if (bearer) headers.Authorization = `Bearer ${bearer}`;
     const sent = Date.now();
-    const res = await fetch(`${this.url}/auth/v1/${path}`, { method: 'POST', headers, body: JSON.stringify(body) });
+    let res: Response;
+    try {
+      res = await fetch(`${this.url}/auth/v1/${path}`, { method: 'POST', headers, body: JSON.stringify(body) });
+    } catch (e) {
+      this.reachable = false;
+      throw e;
+    }
+    this.reachable = res.status < 500;
     this.learnClock(res, sent);
     if (!res.ok) {
       const e = (await res.json().catch(() => ({}))) as { error_code?: string; code?: string | number; msg?: string; message?: string };
@@ -174,6 +185,7 @@ export class SupabaseBackend implements Backend {
         },
       });
       this.learnClock(res, sent);
+      this.reachable = res.status < 500;
       const text = await res.text();
       let body: unknown = null;
       try {
@@ -183,6 +195,7 @@ export class SupabaseBackend implements Backend {
       }
       return { status: res.status, body };
     } catch {
+      this.reachable = false;
       return { status: 0, body: null }; // offline
     }
   }
