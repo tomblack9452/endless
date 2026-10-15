@@ -1,9 +1,9 @@
 # Design review: progression and paid features
 
-> **Planning, mostly built.** This was the design before the October 2026
+> **Historical (archived) planning, mostly built.** This was the design before the October 2026
 > work. Its decisions were built (see [roadmap.md](roadmap.md), "Built"), so
 > "nothing here is built yet" and the "today" numbers below describe the game
-> before then. Where the two differ, the README and `src/config.ts` are the
+> before then. Where the two differ, [docs/game.md](../game.md) and `src/core/config.ts` are the
 > current rules (e.g. revives: one free a day for everyone, two with premium,
 > then an ad or 50 cores; never in ranked).
 
@@ -304,7 +304,7 @@ bundles, and swap for credits in the cores tab.
     (`store_events`, written by the webhook).
   - Empty on the web.
   - The whole game reads this, never the store directly.
-- **A `premium` unlock kind** in `src/looks.ts`: owned while the entitlement
+- **A `premium` unlock kind** in `src/ship/looks.ts`: owned while the entitlement
   is held.
 - **`src/ads/`**: an `Ads` interface (`ready(placement)`,
   `show(placement) → 'rewarded' | 'skipped' | 'unavailable'`).
@@ -389,7 +389,7 @@ each season are generated (section 9) rather than drawn by hand.
 Each season's new looks are made by code from the season number, so a new
 season needs no drawing and no app update, and everyone gets the same looks.
 
-**What a season makes (`src/seasonLooks.ts`):**
+**What a season makes (`src/ship/seasonLooks.ts`):**
 - A theme: a name from word lists (e.g. "solar drift") and a base hue, which
   steps round the colour wheel by the golden angle each season so neighbouring
   seasons never look alike.

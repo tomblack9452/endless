@@ -8,7 +8,9 @@ description: Building, signing, testing and releasing Endless Space's Android ap
 A Vite + TypeScript game wrapped with Capacitor 8. The web build in `dist/` is
 copied into `android/` and run in a WebView. App id `com.tomblack.endlessspace`.
 The longer guides live in `docs/play-console.md` (Play Console, step by step)
-and `docs/store.md` (store, RevenueCat, AdMob and Google sign-in setup).
+and `docs/store.md` (store, RevenueCat, AdMob and Google sign-in setup);
+`docs/README.md` lists every doc. The code is grouped by area under `src/`
+(core, world, ship, progression, ui, platform, ...): see the README's project layout.
 
 ## Rules
 
@@ -75,7 +77,7 @@ and writes `store_events` with RevenueCat's purchase time. A refund renames the
 row's product to `refunded:<product>`. A refunded season pass doesn't take back
 its tier rewards.
 
-## Google sign-in (`src/account.ts`)
+## Google sign-in (`src/platform/account.ts`)
 
 `@capgo/capacitor-social-login`, Credential Manager, plus Supabase identity linking.
 
@@ -152,7 +154,7 @@ These are external steps; ask Tom where each stands rather than assuming.
   `style.css` reads both into `--safe-top/bottom/left/right`. Anything placed
   against a screen edge uses those.
 - The bar icons follow what's behind them, not the phone's theme:
-  `src/systemBars.ts`, from the open screen, dark mode and the scene's text
+  `src/ui/systemBars.ts`, from the open screen, dark mode and the scene's text
   colour.
 - No deprecated edge-to-edge calls (`setStatusBarColor`, cutout modes,
   `statusBarColor` theme items) in our code or resources. Any Play still lists

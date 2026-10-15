@@ -111,15 +111,15 @@ no leaderboard is shown and no other pilots appear anywhere.
 
 | Claim | In the code | Wording used |
 |---|---|---|
-| Six places to fly | `ENVIRONMENTS` in `src/courses.ts`: open ground, canyon, ship interior, ice field, asteroid belt, volcanic plain | six, named |
+| Six places to fly | `ENVIRONMENTS` in `src/world/courses.ts`: open ground, canyon, ship interior, ice field, asteroid belt, volcanic plain | six, named |
 | Ghost of your best run | Ranked only, and it's the best run **this week** (`ghost.ts`, the "ghost of your weekly best" setting) | "race the ghost of your best run this week" (it was "your best run") |
-| Seven leagues | `LEAGUES` in `src/leagues.ts`: bronze to grand champion | true |
+| Seven leagues | `LEAGUES` in `src/progression/leagues.ts`: bronze to grand champion | true |
 | Over 160 looks | 164 hand-made (168 in `LOOKS` with season 1's four), plus each season's | "over 160 looks" |
-| 35 ranks | `RANKS` in `src/ranks.ts`, recruit to general grade 4 | true |
+| 35 ranks | `RANKS` in `src/progression/ranks.ts`, recruit to general grade 4 | true |
 | Set levels | `COURSES`: nine, three stars each | true |
 | 53 achievements, 5 weekly goals, 3 daily goals | `ACHIEVEMENTS`, `CONFIG.economy` | true |
 | Chains up to ten times | `CONFIG.nearMiss.maxCombo` | true |
-| A way through | Every course is built round a safe lane (`README`, "How it plays") | "there is always a way through" |
+| A way through | Every course is built round a safe lane (`docs/game.md`, "How it plays") | "there is always a way through" |
 | One free revive a day | `daily.freeRevivesLeft` (two with premium), outside ranked | "one revive a day is free" |
 | Drag to spin your ship | `.showroom-spin` over the hangar, shop and welcome | hangar and shop |
 | Tap a pilot for their record | `pilot_record` (migration 0013), on the boards when online | true |
@@ -128,7 +128,7 @@ no leaderboard is shown and no other pilots appear anywhere.
 | Accessibility | reduce motion, text size (three), high contrast, dark mode, assist mode, tap-sides steering, boost button position, vibration off | listed as they are. There is no colour-blind mode or screen-reader support in a run, so neither is claimed |
 | Ads | Rewarded only; interstitials are off (`CONFIG.ads.interstitial`) | "optional rewarded ads" |
 | "Free" | Play's rules (`docs/play-console.md`) rule out "free" as a selling point | only the free daily revive, which is a feature; no "free to play" |
-| Tutorial | `src/onboarding.ts`: control cards with moving diagrams, a six-lesson practice run with a card for the boost pickup, shield, magnet and slow-mo, a 15 s trial of other controls; skip and replay in settings | "a hands-on tutorial", as listed |
+| Tutorial | `src/ui/onboarding.ts`: control cards with moving diagrams, a six-lesson practice run with a card for the boost pickup, shield, magnet and slow-mo, a 15 s trial of other controls; skip and replay in settings | "a hands-on tutorial", as listed |
 | Upgrades | thrusters, capacitor, tractor beam, deflector, stabilisers, scanner | named ones that exist ("shield" isn't one: it's the deflector) |
 
 Keywords worked in, once each where they fit: space game, arcade, endless

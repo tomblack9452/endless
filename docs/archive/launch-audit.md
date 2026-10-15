@@ -1,8 +1,9 @@
 # Launch audit
 
-> The first pass below is **historical** (before the Android build, Google
-> sign-in and the store page). The second and third, at the end, are the
-> current ones.
+> **Historical (archived).** Four passes over the game before launch, up to
+> 1.0.6 (14 October 2026); the first is from before the Android build, Google
+> sign-in and the store page. The game as it is now is described in the
+> [README](../../README.md) and [docs/game.md](../game.md).
 
 A pass over the game before it goes on the stores: every screen played in a
 browser at phone size (390x844, 375x667 with the largest text) and on a
@@ -85,7 +86,7 @@ practice run starts.
 - Settings save and come back after a reload.
 - The fps counter and dev panel only show on the dev server.
 - Running with no server (offline) and with a slow one.
-- Shop prices, pass tiers and goals add up as in `docs/design.md`.
+- Shop prices, pass tiers and goals add up as in `docs/archive/design.md`.
 - Ranked, weekly and solo seeds are the same for everyone.
 - Restoring purchases is at the bottom of the store page (in the apps).
 - No console errors apart from the browser blocking vibration before a tap.

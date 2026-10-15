@@ -152,7 +152,7 @@ APIs, and the portrait lock on large screens. What the app does now:
   under the status bar and the gesture bar on every Android version.
   Capacitor's SystemBars (`capacitor.config.ts`) hands the insets to the CSS,
   and `style.css` keeps everything clear of them (`--safe-*`). The bars' icons
-  are set from the game (`src/systemBars.ts`): dark over a light sky, light
+  are set from the game (`src/ui/systemBars.ts`): dark over a light sky, light
   over a night sky or a dark-mode panel.
 - **Deprecated APIs:** none in the game's own code or resources. If Play still
   lists calls such as `setStatusBarColor` or `LAYOUT_IN_DISPLAY_CUTOUT_MODE_*`,
@@ -454,7 +454,7 @@ For each product, **Create one-time product**:
 - Play has no "consumable" switch: whether a product can be bought again is
   decided when it's **consumed**. In RevenueCat, set the cores and the season
   pass as **consumable**, the starter pack and premium as **non-consumable**.
-- The IDs must match `CONFIG.economy.store.products` in `src/config.ts` and the
+- The IDs must match `CONFIG.economy.store.products` in `src/core/config.ts` and the
   webhook (`supabase/functions/revenuecat-webhook`). They already do for the
   table above.
 

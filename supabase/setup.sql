@@ -2,7 +2,7 @@
 -- from supabase/migrations/*.sql: edit those, not this.
 --
 -- Safe on a fresh project. If pasting this into the Supabase SQL editor gets cut off,
--- use the small files in supabase/parts/ instead, one at a time, in order.
+-- run `npm run db:setup` and use the small files it writes in supabase/parts/ instead, one at a time, in order.
 
 -- ===== 0001_init.sql =====
 

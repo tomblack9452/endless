@@ -14,7 +14,8 @@ to a board.
      It applies each migration once, so running it again (or after a later update)
      is safe. This is a secret; it's not a `VITE_` variable, so it never goes into
      the game's build.
-   - **Or paste it:** SQL editor > New query > paste the files in `supabase/parts/`
+   - **Or paste it:** run `npm run db:setup` first: it writes the files in
+     `supabase/parts/` (they aren't committed). Then SQL editor > New query > paste them
      one at a time, in order (`01-of-...sql` first), running each. They are small
      on purpose: pasting one big file can get cut off part way (about 4 KB), which
      shows up as `unterminated dollar-quoted string`. If you'd rather paste one
@@ -70,7 +71,7 @@ and rank under a gap.
 
 ## How a run gets there
 
-1. The run ends and `submitToBoard` (in `src/game.ts`) writes it into the
+1. The run ends and `submitToBoard` (in `src/core/game.ts`) writes it into the
    **outbox** (`src/server/outbox.ts`), which is kept on the device.
 2. The outbox calls the `submit_run` database function. If there's no signal, or
    the server's busy, the run stays and is retried on the next flush: when the
@@ -115,7 +116,8 @@ the run. If that starts to matter, the next steps in order of effort:
 Add a new file in `supabase/migrations/` (the next number: `0015_...sql`; never
 edit one that has been applied), add a table or function it creates to `MADE` in
 `scripts/apply-db-lib.mjs` (how a hand-pasted database is recognised), run
-`npm run db:setup` to rebuild `supabase/setup.sql` and `supabase/parts/`, then
+`npm run db:setup` to rebuild `supabase/setup.sql` (and the paste-sized `supabase/parts/`, which
+stay on your computer), then
 `npm run db:apply` on a live project (it applies only what's new). `npm test` runs every migration on a real Postgres (PGlite), the
 client against it, and checks `setup.sql` is up to date.
 

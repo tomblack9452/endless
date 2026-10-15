@@ -1,9 +1,9 @@
 # Endless Space: assessment
 
-> **Historical.** A snapshot of `main` on 7 October 2026 (471 tests then).
+> **Historical (archived).** A snapshot of `main` on 7 October 2026 (471 tests then).
 > Line numbers and counts below are from that commit and have moved since. Item
 > 7 (the Android project) was done after it; the code as it is now is described
-> in the README, and the later audit's fixes are in
+> in the [README](../../README.md) and [docs/game.md](../game.md), and the later audit's fixes are in
 > [launch-audit.md](launch-audit.md#second-audit-8-october-2026).
 
 Taken from `main` at `8eb93b8` (7 October 2026). Typecheck clean, 471 tests
@@ -13,7 +13,7 @@ as an ordinary signed-in player.
 
 **Status (8 October 2026):** every critical and high item is fixed except the
 Android project (item 7, left until the app is otherwise ready): items 1-2 in
-`supabase/migrations/0010_secure_cores.sql`, 3 in `src/game.ts` buyProduct and
+`supabase/migrations/0010_secure_cores.sql`, 3 in `src/core/game.ts` buyProduct and
 `src/store/store.ts`, 4-5 in `0011_store_purchases.sql` and the webhook, 6 as
 "ad privacy choices" in settings, 8 in `docs/store.md` and the README. Run
 `npm run db:apply` and redeploy the webhook to put the server side live.
@@ -90,7 +90,7 @@ only be claimed once.
 ### Purchases and ads
 
 **3. Purchases made while sign-in failed pay nobody (high).**
-Where: `src/game.ts` start-up (store started with `this.backend.userId`),
+Where: `src/core/game.ts` start-up (store started with `this.backend.userId`),
 `src/store/store.ts:52-58`, webhook `index.ts` (skips non-UUID users).
 What happens: if the game starts without reaching Supabase (no signal, a
 timeout), RevenueCat is configured with an anonymous id and never told the real
@@ -145,7 +145,7 @@ packages, `npx cap add android`, put the AdMob app id in
 
 **8. The store listing promises something that's no longer true (high).**
 Where: `docs/store.md` description ("Nothing you can buy makes you faster in
-ranked") and the premium note in `src/game.ts:840`.
+ranked") and the premium note in `src/core/game.ts:840`.
 What happens: cores now swap for credits (`CONFIG.economy.shop.swaps`), and
 credits buy upgrades that make the ship faster and stronger. Leagues cap
 active upgrade points in ranked, so the claim is half true there, but the
@@ -195,7 +195,7 @@ fix the valuable part.
 `public/privacy.html` lists names and scores; `set_ship` (`0006`) now publishes
 each player's equipped looks too. Add a line.
 
-**16. The second WebGL context is never released.** `src/portrait.ts` makes its
+**16. The second WebGL context is never released.** `src/ship/portrait.ts` makes its
 own `WebGLRenderer` for leaderboard pictures and keeps it for the session. On
 older Android phones contexts are scarce and this one holds GPU memory. Dispose
 it when the boards close, or draw the portraits with the main renderer into a

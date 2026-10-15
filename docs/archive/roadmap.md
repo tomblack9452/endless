@@ -1,7 +1,8 @@
 # Roadmap
 
-> **Planning.** What's next as of October 2026; it changes as things ship. The
-> README describes what's built.
+> **Historical (archived).** The plan as of October 2026, kept for reference;
+> what's built is described in the [README](../../README.md) and
+> [docs/game.md](../game.md).
 
 What comes next, in order, for a live mobile game with a premium unlock and
 in-app purchases. The finished work (collision audit, the asteroid belt and
@@ -20,12 +21,12 @@ onboarding with a practice run.
 
 1. **Sign in with Apple** for an iOS build. Google sign-in is done in the
    Android app (docs/store.md, "Google sign-in").
-2. **Set up the stores and AdMob** ([store.md](store.md)): the products
+2. **Set up the stores and AdMob** ([store.md](../store.md)): the products
    (including `premium`), RevenueCat, the AdMob ad units and app ids, and the
    consent messages.
 3. **Re-fly ranked runs on the server.** The weekly run is deterministic, so a
    ranked score can be checked by replaying its path. It needs the run simulation
-   pulled out of `src/game.ts`; it is what makes the weekly board trustworthy.
+   pulled out of `src/core/game.ts`; it is what makes the weekly board trustworthy.
 4. **Limited offers from the server** (designed in design.md): an `offers` table
    and a live card on the front page.
 

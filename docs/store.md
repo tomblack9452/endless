@@ -11,7 +11,8 @@ The short version is in [leaderboards.md](leaderboards.md). In full:
 1. Create a project at supabase.com.
 2. Authentication > Sign In / Providers: turn on **anonymous sign-ins**.
 3. The database: `npm run db:apply` with `SUPABASE_DB_URL` in `.env` (see
-   leaderboards.md), or paste the files in `supabase/parts/` into the SQL editor one at a
+   leaderboards.md), or run `npm run db:setup` and paste the files it writes in
+   `supabase/parts/` into the SQL editor one at a
    time, in order. (Or with the CLI: `supabase link`, then `supabase db push`.)
 4. Copy `.env.example` to `.env` and fill in `VITE_SUPABASE_URL` and
    `VITE_SUPABASE_ANON_KEY` (Project settings > API). `.env` is never committed.
@@ -30,7 +31,7 @@ The short version is in [leaderboards.md](leaderboards.md). In full:
 
 1. Create the app in each (bundle id `com.tomblack.endlessspace`).
 2. Create these in-app products (all **consumable** except where noted). The
-   ids must match `CONFIG.economy.store.products` in `src/config.ts`:
+   ids must match `CONFIG.economy.store.products` in `src/core/config.ts`:
 
    | id | type | gives | suggested price |
    |---|---|---|---|
@@ -126,7 +127,7 @@ Android app, settings has "keep it with google", and the welcome screen
 "played before? sign in with google": the first links a Google login to the
 account (Supabase identity linking), the second, on a new phone, switches to
 the account that Google login keeps and brings its cloud save down
-(`src/account.ts`, plugin `@capgo/capacitor-social-login`). On the web the
+(`src/platform/account.ts`, plugin `@capgo/capacitor-social-login`). On the web the
 rows don't show.
 
 1. **Google Cloud** ([console.cloud.google.com](https://console.cloud.google.com)),
