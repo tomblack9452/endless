@@ -360,6 +360,8 @@ export class Game {
   private quick = false;
   /** crashMs when the crashed run was settled (after any revive offer). */
   private settledMs = 0;
+  /** This run set a new personal best (the share card says so). */
+  private shareNew = false;
   /** The daily run's streak line for the end screen. */
   private dailyLine = '';
   /** The best line for quick retry's panel. */
@@ -676,6 +678,7 @@ export class Game {
     this.ui.setGameOver(this.score, best, isNew, this.nearMissCount, this.bestChain, this.seed);
     const where = themeForLevel(this.level) === 'interior' ? this.world.roomName || 'corridor' : this.areaName(this.level);
     const extra = this.finishRun(where);
+    this.offerShare(isNew);
     if (this.course) {
       const length = courseLength(this.course);
       const pct = Math.floor((100 * (this.world.distance - this.world.finishAt + length)) / length);
@@ -1604,17 +1607,30 @@ export class Game {
     else if (this.infoOpen === 'pass') this.openPass();
   }
 
-  /** A picture of this run for the share sheet. */
+  /** The end screen's share button: for a new personal best in any mode, and every ranked run. */
+  private offerShare(isNew: boolean): void {
+    this.shareNew = isNew && !this.assisted && this.score > 0;
+    this.ui.showShare(this.shareNew || this.mode === 'ranked');
+  }
+
+  /** A picture of this run for the share sheet: the score, the mode or board, and your ship, in the store art's dusk. */
   private async share(): Promise<void> {
     const lg = this.leagues;
-    const best = this.progress.weeklyBest(this.weekly.id);
-    await shareCard({
+    const lines: string[] = [];
+    if (this.mode === 'ranked') lines.push(`${rankName(this.ranked.rank)} · ${leagueName(lg.league, lg.division)}`, `best this week ${formatScore(this.progress.weeklyBest(this.weekly.id))}`);
+    else if (this.dailyRunNow) {
+      const streak = this.challenge.streakOn(this.dailyRunNow.day);
+      lines.push(streak > 1 ? `${streak} days in a row` : 'the same course for everyone today');
+    } else lines.push(rankName(this.ranked.rank));
+    const outcome = await shareCard({
       score: formatScore(this.score),
-      heading: `ranked · ${this.weekly.name}`,
-      lines: [rankName(this.ranked.rank), leagueName(lg.league, lg.division), `best this week ${formatScore(best)}`],
-      sky: '#' + this.palette.sky.getHexString(),
-      text: this.palette.textCss(),
+      mode: this.modeLabel(),
+      kicker: this.shareNew ? 'new best' : '',
+      lines,
+      ship: this.portraits.get(this.shipLook(), 4),
     });
+    if (outcome === 'saved') this.ui.showNotice('share card saved');
+    else if (outcome === 'unavailable') this.ui.showNotice("sharing isn't available here");
   }
 
   private refreshBar(now = this.now()): void {
@@ -1636,7 +1652,6 @@ export class Game {
     let bonus = r.credits;
     if (ranked) {
       this.submitToBoard('ranked', finished);
-      this.ui.showShare(true);
       this.beatPar = score >= leaguePar(lg.league, target);
       this.payLeagueWeek(this.now()); // a run in a new week: last week's reward first
       const res = lg.record(this.score, target, this.now());
@@ -3918,12 +3933,14 @@ export class Game {
     if (!this.hitThisRun && !this.assisted) stars |= 2;
     if (!this.assisted && this.score >= c.target) stars |= 4;
     const time = this.runTime;
+    const before = this.progress.course(c.id).score;
     const res = this.progress.recordCourse(c.id, stars, time, this.score);
     const starCredits = res.newStars * CONFIG.courses.starCredits;
     const best = this.progress.course(c.id);
     this.ui.setOverHeading('level complete');
     this.ui.setGameOver(this.score, best.score, this.score >= best.score, this.nearMissCount, this.bestChain, this.seed);
     const extra = this.finishRun(null);
+    this.offerShare(this.score > before);
     this.wallet.add(starCredits);
     const starText = [1, 2, 4].map((b) => (stars & b ? '★' : '☆')).join('');
     const lines = [`${starText}  ${formatTime(time)}${res.bestTime ? ' (best)' : ` · best ${formatTime(best.time)}`}`];
@@ -3948,6 +3965,7 @@ export class Game {
     this.ui.setOverHeading('finished');
     this.ui.setGameOver(this.score, best, isNew, this.nearMissCount, this.bestChain, this.seed);
     const extra = this.finishRun(null);
+    this.offerShare(isNew);
     this.ui.setGameOverExtra([`${formatTime(this.runTime)} · the daily challenge`, this.dailyLine, extra].filter(Boolean).join(' · '));
     this.refreshTitle();
   }

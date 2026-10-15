@@ -51,13 +51,15 @@ export class Portraits {
 
   constructor(private readonly palette: LivePalette) {}
 
-  /** A picture of this ship (a data URL), or null where it can't be drawn. */
-  get(ship: ShipLook): string | null {
-    const key = JSON.stringify(ship);
+  /** A picture of this ship (a data URL), or null where it can't be drawn. `scale` draws it bigger (the share card). */
+  get(ship: ShipLook, scale = 1): string | null {
+    const key = scale === 1 ? JSON.stringify(ship) : `${scale}x${JSON.stringify(ship)}`;
     const hit = this.cache.get(key);
     if (hit) return hit;
     if (!this.ready()) return null;
+    if (scale !== 1) this.renderer!.setSize(W * scale, H * scale, false);
     const url = this.draw(ship);
+    if (scale !== 1) this.renderer!.setSize(W, H, false);
     if (this.cache.size >= KEEP) this.cache.delete(this.cache.keys().next().value!);
     this.cache.set(key, url);
     if (this.idle !== null) clearTimeout(this.idle);

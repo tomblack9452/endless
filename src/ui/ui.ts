@@ -641,7 +641,7 @@ export class UI {
     $('league-board-note').textContent = note;
   }
 
-  /** The share button on the end screen (ranked runs). */
+  /** The share button on the end screen (a new personal best, and every ranked run). */
   showShare(on: boolean): void {
     $('over-share').hidden = !on;
   }
