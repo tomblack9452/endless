@@ -1,9 +1,9 @@
 import { Scene } from 'three';
 import { describe, expect, it } from 'vitest';
-import { CONFIG } from '../src/config';
-import { LivePalette } from '../src/palette';
-import { World } from '../src/world';
-import { PRACTICE_SEED } from '../src/onboarding';
+import { CONFIG } from '../src/core/config';
+import { LivePalette } from '../src/world/palette';
+import { World } from '../src/world/world';
+import { PRACTICE_SEED } from '../src/ui/onboarding';
 
 // The practice course places its own pickups and power-ups (one per lesson),
 // but is otherwise the very course the fairness tests fly.

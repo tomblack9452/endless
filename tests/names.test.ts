@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import MIGRATION from '../supabase/migrations/0009_name_filter.sql?raw';
-import { nameBlocked, STRONG } from '../src/nameFilter';
-import WORDS from '../src/nameWords.json';
+import { nameBlocked, STRONG } from '../src/platform/nameFilter';
+import WORDS from '../src/platform/nameWords.json';
 import { ALLOWED, REFUSED } from './nameCases';
 
 // The pilot name filter in the game (the database's twin is tested in sql.test.ts).

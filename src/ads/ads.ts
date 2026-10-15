@@ -1,5 +1,5 @@
 import { Capacitor } from '@capacitor/core';
-import { CONFIG } from '../config';
+import { CONFIG } from '../core/config';
 
 // Ads, behind one interface like the store. Rewarded ads are the free way to a
 // little convenience (a revive, doubled run credits, a daily gift, a new daily

@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Backend } from '../src/server/backend';
 import { SupabaseBackend, SESSION_KEY } from '../src/server/supabase';
 import { CloudSave } from '../src/server/sync';
-import { storage } from '../src/storage';
+import { storage } from '../src/core/storage';
 
 // Keeping the player's account and save safe when the signal or the server
 // misbehaves (src/server/supabase.ts signIn, src/server/sync.ts).

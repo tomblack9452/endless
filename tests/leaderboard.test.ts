@@ -5,7 +5,7 @@ import type { RunSubmission } from '../src/server/backend';
 import { BOARD_TABS, boardCaption, boardForRun, boardQuery } from '../src/server/boards';
 import { Outbox } from '../src/server/outbox';
 import { SupabaseBackend } from '../src/server/supabase';
-import { ENVIRONMENTS } from '../src/courses';
+import { ENVIRONMENTS } from '../src/world/courses';
 
 // The game's real server code (SupabaseBackend, Outbox) talking to the real
 // database schema. A stand-in for fetch answers the few Supabase calls the game

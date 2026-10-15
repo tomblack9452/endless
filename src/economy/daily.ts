@@ -1,6 +1,6 @@
-import { CONFIG } from '../config';
-import { storage } from '../storage';
-import { formatScore } from '../ui';
+import { CONFIG } from '../core/config';
+import { storage } from '../core/storage';
+import { formatScore } from '../ui/ui';
 import type { Reward } from './reward';
 import { dayBefore, hash, picker } from './time';
 

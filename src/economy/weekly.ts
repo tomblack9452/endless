@@ -1,5 +1,5 @@
-import { CONFIG } from '../config';
-import { storage } from '../storage';
+import { CONFIG } from '../core/config';
+import { storage } from '../core/storage';
 import { adds, progressQuests, type Quest, type QuestRun, type QuestType } from './daily';
 import { hash, picker } from './time';
 

@@ -1,4 +1,4 @@
-import { storage } from '../storage';
+import { storage } from '../core/storage';
 import type { Backend } from './backend';
 
 // Cloud save: every "endless." key (except the session and the outbox) as one row.

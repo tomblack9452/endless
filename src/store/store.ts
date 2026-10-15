@@ -1,5 +1,5 @@
 import { Capacitor } from '@capacitor/core';
-import { CONFIG } from '../config';
+import { CONFIG } from '../core/config';
 
 // Real-money purchases. In the iOS and Android apps, RevenueCat handles the
 // App Store and Google Play; on the web nothing is sold (the shop points to

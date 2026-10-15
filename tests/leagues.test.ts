@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { emblem, LEAGUES, leaguePar, Leagues, lpFor, weekKey } from '../src/leagues';
-import { TIER_COST } from '../src/upgrades';
+import { emblem, LEAGUES, leaguePar, Leagues, lpFor, weekKey } from '../src/progression/leagues';
+import { TIER_COST } from '../src/ship/upgrades';
 
 describe('leagues', () => {
   it('has seven brackets that tile 0..30 points with no gaps', () => {

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { AFTER, GAP_MS, Hints, mayShow, SHOW_MS, type TipState, TIPS, tipText, walkthroughDone } from '../src/hints';
+import { AFTER, GAP_MS, Hints, mayShow, SHOW_MS, type TipState, TIPS, tipText, walkthroughDone } from '../src/ui/hints';
 
 const data = new Map<string, string>();
 let now = 0;

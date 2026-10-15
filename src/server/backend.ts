@@ -1,4 +1,4 @@
-import type { ShipLook } from '../portrait';
+import type { ShipLook } from '../ship/portrait';
 import { LocalBackend } from './local';
 import { SupabaseBackend } from './supabase';
 

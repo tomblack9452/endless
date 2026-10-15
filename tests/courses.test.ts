@@ -1,10 +1,10 @@
 import { Scene } from 'three';
 import { describe, expect, it } from 'vitest';
-import { CONFIG } from '../src/config';
-import { type Course, COURSES, courseLength, ENVIRONMENTS, weeklyRun } from '../src/courses';
-import { lateralSpeedAt, speedAt } from '../src/difficulty';
-import { LivePalette } from '../src/palette';
-import { World } from '../src/world';
+import { CONFIG } from '../src/core/config';
+import { type Course, COURSES, courseLength, ENVIRONMENTS, weeklyRun } from '../src/world/courses';
+import { lateralSpeedAt, speedAt } from '../src/world/difficulty';
+import { LivePalette } from '../src/world/palette';
+import { World } from '../src/world/world';
 
 // Every set level must be finishable: the autopilot follows the safe lane at
 // each section's speed from the start line to the finish.

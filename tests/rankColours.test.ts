@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { RANK_COLOURS, rankColour, RANKS } from '../src/ranks';
+import { RANK_COLOURS, rankColour, RANKS } from '../src/progression/ranks';
 
 // The menus' colour as you climb: a change every band or two, and always readable.
 

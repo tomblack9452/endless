@@ -1,5 +1,5 @@
-import { ENVIRONMENTS } from '../courses';
-import { LEAGUES, weekKey } from '../leagues';
+import { ENVIRONMENTS } from '../world/courses';
+import { LEAGUES, weekKey } from '../progression/leagues';
 import type { BoardId, BoardQuery } from './backend';
 
 // The boards the leaderboard screen offers, and how a run maps onto one.

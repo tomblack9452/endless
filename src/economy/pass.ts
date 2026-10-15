@@ -1,7 +1,7 @@
-import { CONFIG } from '../config';
-import { storage } from '../storage';
-import { seasonAt } from '../season';
-import { seasonPassKeys } from '../seasonLooks';
+import { CONFIG } from '../core/config';
+import { storage } from '../core/storage';
+import { seasonAt } from '../progression/season';
+import { seasonPassKeys } from '../ship/seasonLooks';
 import type { Reward } from './reward';
 
 // The season pass: six weeks (six weekly levels), thirty tiers of XP. Runs

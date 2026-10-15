@@ -1,5 +1,5 @@
 import { beforeAll, describe, expect, it } from 'vitest';
-import type { Input as InputType } from '../src/input';
+import type { Input as InputType } from '../src/platform/input';
 
 // Double-tap and hold to boost, driven with fake pointer events (no browser needed).
 
@@ -22,7 +22,7 @@ beforeAll(async () => {
   const g = globalThis as Record<string, unknown>;
   g.window ??= Object.assign(new EventTarget(), { innerWidth: 375, innerHeight: 812 });
   g.DeviceOrientationEvent ??= class {};
-  ({ Input } = await import('../src/input'));
+  ({ Input } = await import('../src/platform/input'));
 });
 
 function make(): { input: InputType; h: Handlers } {
@@ -99,9 +99,9 @@ describe('double-tap and hold to boost', () => {
 });
 
 describe('tilt in every orientation', () => {
-  let leanOf: typeof import('../src/input').leanOf;
+  let leanOf: typeof import('../src/platform/input').leanOf;
   beforeAll(async () => {
-    ({ leanOf } = await import('../src/input'));
+    ({ leanOf } = await import('../src/platform/input'));
   });
 
   it('leans on gamma upright and reversed upside down', () => {

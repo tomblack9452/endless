@@ -1,4 +1,4 @@
-import { find, type Slot } from '../looks';
+import { find, type Slot } from '../ship/looks';
 
 // A reward from the login calendar, a quest or the season pass. `look` is
 // "slot:id" (see looks.ts).

@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { LocalBackend } from '../src/server/local';
 import { SupabaseBackend } from '../src/server/supabase';
-import { storage } from '../src/storage';
+import { storage } from '../src/core/storage';
 
 // The trusted clock (src/server/supabase.ts): the game keeps its days and weeks
 // by the server's time once it knows it, and by the device's until then.

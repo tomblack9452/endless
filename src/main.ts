@@ -6,9 +6,9 @@ import '@fontsource/host-grotesk/latin-500.css';
 import '@fontsource/geist-mono/latin-300.css';
 import '@fontsource/geist-mono/latin-400.css';
 import '@fontsource/geist-mono/latin-500.css';
-import './style.css';
+import './ui/style.css';
 import { Capacitor } from '@capacitor/core';
-import { Game } from './game';
+import { Game } from './core/game';
 
 // Block browser gestures that fight the game.
 const block = (e: Event) => e.preventDefault();
@@ -44,5 +44,5 @@ void document.fonts.ready.then(() => {
   if (Capacitor.getPlatform() === 'android')
     void import('@capacitor/app').then(({ App }) => App.addListener('backButton', () => (game.back() ? undefined : void App.exitApp())));
   // Dev panel (level skip, unlock all etc), on the dev server only (npm run dev).
-  if (import.meta.env.DEV) void import('./dev').then((m) => m.installDevPanel(game));
+  if (import.meta.env.DEV) void import('./core/dev').then((m) => m.installDevPanel(game));
 });

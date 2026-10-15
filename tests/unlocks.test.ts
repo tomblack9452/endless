@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { CONFIG } from '../src/config';
-import { ENVIRONMENTS } from '../src/courses';
-import { Progress } from '../src/progress';
-import { envStatus, nextEnvironment, newlyOpened, unlockLevel } from '../src/unlocks';
-import { themeForLevel } from '../src/world';
+import { CONFIG } from '../src/core/config';
+import { ENVIRONMENTS } from '../src/world/courses';
+import { Progress } from '../src/progression/progress';
+import { envStatus, nextEnvironment, newlyOpened, unlockLevel } from '../src/progression/unlocks';
+import { themeForLevel } from '../src/world/world';
 
 // Solo environments open as you reach them in the endless order.
 

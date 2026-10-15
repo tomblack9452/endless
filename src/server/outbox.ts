@@ -1,4 +1,4 @@
-import { storage } from '../storage';
+import { storage } from '../core/storage';
 import type { Backend, RunSubmission, SubmitResult } from './backend';
 
 // Runs waiting to reach the server. A phone loses signal mid-commute, so a run

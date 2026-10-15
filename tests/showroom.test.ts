@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { ShowroomSpin } from '../src/showroom';
+import { ShowroomSpin } from '../src/ship/showroom';
 
-// The showroom camera's turn (src/showroom.ts): dragging turns it, the
+// The showroom camera's turn (src/ship/showroom.ts): dragging turns it, the
 // automatic spin waits while the ship is held and after, then eases back in
 // without a jump.
 

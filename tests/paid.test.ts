@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AD_TIMING, Ads, adUnits, type AdNetwork, type AdResult } from '../src/ads/ads';
-import { LOOKS } from '../src/catalogue';
-import { CONFIG } from '../src/config';
-import { Looks, type Owner } from '../src/looks';
+import { LOOKS } from '../src/ship/catalogue';
+import { CONFIG } from '../src/core/config';
+import { Looks, type Owner } from '../src/ship/looks';
 import { entitlementFor, Entitlements } from '../src/store/entitlements';
 
 // Paid features: what premium owns, and the rules around ads.

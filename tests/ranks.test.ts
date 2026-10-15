@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { CONFIG } from '../src/config';
-import { creditsFor, insignia, rankFor, Ranked, RANKS, xpFor } from '../src/ranks';
+import { CONFIG } from '../src/core/config';
+import { creditsFor, insignia, rankFor, Ranked, RANKS, xpFor } from '../src/progression/ranks';
 
 describe('rank ladder', () => {
   it('has 35 ranks from recruit to general grade 4', () => {

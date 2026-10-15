@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { barStyles, isLight } from '../src/systemBars';
+import { barStyles, isLight } from '../src/ui/systemBars';
 
 // The status and gesture bars' icons follow what's behind them, not the phone's theme.
 

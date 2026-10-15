@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Backend } from '../src/server/backend';
-import { Wallet } from '../src/wallet';
+import { Wallet } from '../src/progression/wallet';
 
 // Credits merged with the server's copy, so a balance can be changed from the dashboard.
 

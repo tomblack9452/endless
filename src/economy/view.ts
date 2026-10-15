@@ -1,5 +1,5 @@
-import { scrollHint } from '../scrollHint';
-import { formatScore } from '../ui';
+import { scrollHint } from '../ui/scrollHint';
+import { formatScore } from '../ui/ui';
 
 // The economy's screens: the wallet bar on the title, the shop, the season
 // pass, the offer dialog (revive) and

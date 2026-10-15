@@ -1,7 +1,7 @@
 import type { BufferGeometry } from 'three';
 import { describe, expect, it } from 'vitest';
-import { alienCactus, basaltColumns, boulder, bush, crystalCluster, deadTree, mesa, MESA_RADIUS, mushroomTree, rockSpire, spireTree } from '../src/props';
-import { MESA_HIT, Prop, PROP_HIT, ROCK_HIT } from '../src/world';
+import { alienCactus, basaltColumns, boulder, bush, crystalCluster, deadTree, mesa, MESA_RADIUS, mushroomTree, rockSpire, spireTree } from '../src/world/props';
+import { MESA_HIT, Prop, PROP_HIT, ROCK_HIT } from '../src/world/world';
 
 // Nothing solid may look wider than it collides: at the height the ship flies,
 // each shape has to fit inside its hitbox (with a little leeway, since the

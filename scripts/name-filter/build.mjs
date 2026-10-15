@@ -1,5 +1,5 @@
 // `npm run names:build`: the profanity list (profane-words.json) into the
-// game's copy (src/nameWords.json) and the database's (the inserts in
+// game's copy (src/platform/nameWords.json) and the database's (the inserts in
 // supabase/migrations/0009_name_filter.sql, between the BEGIN/END WORDS lines).
 import { readFileSync, writeFileSync } from 'node:fs';
 
@@ -21,7 +21,7 @@ for (const w of JSON.parse(readFileSync('scripts/name-filter/profane-words.json'
   if (n.length >= 3 && !ALLOW.has(n)) words.add(n);
 }
 const list = [...words].sort();
-writeFileSync('src/nameWords.json', JSON.stringify(list) + '\n');
+writeFileSync('src/platform/nameWords.json', JSON.stringify(list) + '\n');
 
 const migration = 'supabase/migrations/0009_name_filter.sql';
 const sql = readFileSync(migration, 'utf8');

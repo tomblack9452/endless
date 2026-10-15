@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { migrateMissionLooks, migrateTickets } from '../src/legacy';
-import { byKey, Looks, type Owner } from '../src/looks';
+import { migrateMissionLooks, migrateTickets } from '../src/progression/legacy';
+import { byKey, Looks, type Owner } from '../src/ship/looks';
 
 // Missions are gone. A save that had unlocked hulls and flames with them keeps
 // those looks, and the hull and flame it was wearing.

@@ -1,12 +1,12 @@
 import { Scene } from 'three';
 import { describe, expect, it } from 'vitest';
-import { CONFIG } from '../src/config';
-import { lateralSpeedAt, speedAt } from '../src/difficulty';
-import { LivePalette } from '../src/palette';
-import { ROOM_IDS, type RoomId } from '../src/interior';
-import { World } from '../src/world';
-import { PRACTICE_SEED } from '../src/onboarding';
-import { weeklyRun } from '../src/courses';
+import { CONFIG } from '../src/core/config';
+import { lateralSpeedAt, speedAt } from '../src/world/difficulty';
+import { LivePalette } from '../src/world/palette';
+import { ROOM_IDS, type RoomId } from '../src/world/interior';
+import { World } from '../src/world/world';
+import { PRACTICE_SEED } from '../src/ui/onboarding';
+import { weeklyRun } from '../src/world/courses';
 
 // Fairness: every course must be survivable. A simple autopilot follows the
 // safe lane the generator records (steering at the normal limit, no boost)

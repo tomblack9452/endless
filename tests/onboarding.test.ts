@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { LOOKS } from '../src/catalogue';
-import { CONFIG } from '../src/config';
-import { chainNote, ITEMS, itemCard, itemIcon, POWER_ITEMS, powerItem } from '../src/guide';
-import { TIPS, tipText } from '../src/hints';
+import { LOOKS } from '../src/ship/catalogue';
+import { CONFIG } from '../src/core/config';
+import { chainNote, ITEMS, itemCard, itemIcon, POWER_ITEMS, powerItem } from '../src/ui/guide';
+import { TIPS, tipText } from '../src/ui/hints';
 import {
   CONTROL_CARDS,
   controlChoices,
@@ -19,9 +19,9 @@ import {
   STARTER,
   STEER_EACH_WAY,
   TRIAL_SECONDS,
-} from '../src/onboarding';
-import { controlArt } from '../src/controlArt';
-import { byKey } from '../src/looks';
+} from '../src/ui/onboarding';
+import { controlArt } from '../src/ui/controlArt';
+import { byKey } from '../src/ship/looks';
 
 const data = new Map<string, string>();
 beforeEach(() => {

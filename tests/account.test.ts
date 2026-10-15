@@ -1,9 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { makeNonce } from '../src/account';
+import { makeNonce } from '../src/platform/account';
 import { SupabaseBackend } from '../src/server/supabase';
-import { storage } from '../src/storage';
+import { storage } from '../src/core/storage';
 
-// Keeping an account with Google (src/account.ts): the nonce, and the auth
+// Keeping an account with Google (src/platform/account.ts): the nonce, and the auth
 // calls the Supabase backend makes, against a stand-in auth server.
 
 const session = (user: string) => ({ access_token: `tok-${user}`, refresh_token: 'r', expires_in: 3600, user: { id: user } });

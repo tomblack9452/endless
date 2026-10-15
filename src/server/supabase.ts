@@ -1,5 +1,5 @@
-import { storage } from '../storage';
-import type { ShipLook } from '../portrait';
+import { storage } from '../core/storage';
+import type { ShipLook } from '../ship/portrait';
 import type { Backend, BoardQuery, BoardRow, LinkResult, PilotRecord, PilotStats, Purchase, RunSubmission, SubmitResult } from './backend';
 
 // Supabase over plain fetch (no SDK, to keep the bundle small):

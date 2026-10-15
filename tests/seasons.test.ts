@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { LOOKS } from '../src/catalogue';
-import { CONFIG } from '../src/config';
-import { decalArt } from '../src/decals';
+import { LOOKS } from '../src/ship/catalogue';
+import { CONFIG } from '../src/core/config';
+import { decalArt } from '../src/ship/decals';
 import { freeReward, premiumReward } from '../src/economy/pass';
 import { shopFor } from '../src/economy/shop';
-import { byKey } from '../src/looks';
-import { seasonAt } from '../src/season';
-import { colourDistance, isSeasonShopLook, lab, MIN_DISTANCE, seasonDecalSvg, seasonLooks, seasonLooksThrough, seasonOf, seasonPassKeys, seasonTheme } from '../src/seasonLooks';
+import { byKey } from '../src/ship/looks';
+import { seasonAt } from '../src/progression/season';
+import { colourDistance, isSeasonShopLook, lab, MIN_DISTANCE, seasonDecalSvg, seasonLooks, seasonLooksThrough, seasonOf, seasonPassKeys, seasonTheme } from '../src/ship/seasonLooks';
 
 // Generated season looks: the same for everyone, distinct, readable, and kept for good.
 

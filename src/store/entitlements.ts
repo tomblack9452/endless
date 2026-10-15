@@ -1,4 +1,4 @@
-import { storage } from '../storage';
+import { storage } from '../core/storage';
 
 // What the player has bought for good: the one-off premium unlock and the
 // starter pack. The whole game asks this, never the store directly. It's filled

@@ -1,14 +1,14 @@
 import { Scene } from 'three';
 import { describe, expect, it } from 'vitest';
-import { CONFIG } from '../src/config';
+import { CONFIG } from '../src/core/config';
 import { Daily, questsFor, questText } from '../src/economy/daily';
 import { Weekly, weeklyFor } from '../src/economy/weekly';
 import { freeReward, Pass, passBought, premiumReward, seasonAt } from '../src/economy/pass';
 import { shopFor } from '../src/economy/shop';
 import { dayBefore, dayKey } from '../src/economy/time';
-import { find, LOOKS } from '../src/looks';
-import { LivePalette } from '../src/palette';
-import { World } from '../src/world';
+import { find, LOOKS } from '../src/ship/looks';
+import { LivePalette } from '../src/world/palette';
+import { World } from '../src/world/world';
 
 const HOUR = 3_600_000;
 const T0 = Date.UTC(2026, 9, 5, 9); // a Monday morning

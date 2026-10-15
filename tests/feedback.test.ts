@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { describeDevice, FEEDBACK_SUBJECT, FEEDBACK_TO, feedbackBody, feedbackUrl } from '../src/feedback';
+import { describeDevice, FEEDBACK_SUBJECT, FEEDBACK_TO, feedbackBody, feedbackUrl } from '../src/platform/feedback';
 
 const PIXEL = 'Mozilla/5.0 (Linux; Android 14; Pixel 7 Build/UQ1A.240205.004; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/129.0.6668.100 Mobile Safari/537.36';
 const REDUCED = 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Mobile Safari/537.36';

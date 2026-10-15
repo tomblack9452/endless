@@ -1,4 +1,4 @@
-import { CONFIG } from '../config';
+import { CONFIG } from '../core/config';
 import { Music, type MusicId } from './music';
 import { driveCurve, impulseResponse, midiHz, noiseBuffer, pluckEnv, ROOT_MIDI } from './synth';
 

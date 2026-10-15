@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { LOOKS, Looks, type Owner } from '../src/looks';
-import { Progress } from '../src/progress';
+import { LOOKS, Looks, type Owner } from '../src/ship/looks';
+import { Progress } from '../src/progression/progress';
 
 // Maxing out (players.max_out, or the dev panel's "unlock all").
 

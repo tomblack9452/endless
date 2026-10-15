@@ -1,10 +1,10 @@
 import { Scene } from 'three';
 import { describe, expect, it } from 'vitest';
-import { CONFIG } from '../src/config';
-import { speedAt } from '../src/difficulty';
-import type { InstancedField } from '../src/field';
-import { LivePalette } from '../src/palette';
-import { World } from '../src/world';
+import { CONFIG } from '../src/core/config';
+import { speedAt } from '../src/world/difficulty';
+import type { InstancedField } from '../src/world/field';
+import { LivePalette } from '../src/world/palette';
+import { World } from '../src/world/world';
 
 // The volcanic plain: lava rivers crossed on a causeway that follows the lane,
 // geysers on a cycle of distance, bombs in salvos, basalt columns. That the

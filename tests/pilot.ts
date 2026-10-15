@@ -1,9 +1,9 @@
 import { Scene } from 'three';
-import { CONFIG } from '../src/config';
-import { lateralSpeedAt } from '../src/difficulty';
-import { LivePalette } from '../src/palette';
-import type { RouteTag } from '../src/pieces/format';
-import { World } from '../src/world';
+import { CONFIG } from '../src/core/config';
+import { lateralSpeedAt } from '../src/world/difficulty';
+import { LivePalette } from '../src/world/palette';
+import type { RouteTag } from '../src/world/pieces/format';
+import { World } from '../src/world/world';
 
 // The test pilot for hand-made pieces (tests/pieces*.test.ts).
 

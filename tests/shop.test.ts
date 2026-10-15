@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { SETS, VAULT_ORDER } from '../src/catalogue';
-import { CONFIG } from '../src/config';
+import { SETS, VAULT_ORDER } from '../src/ship/catalogue';
+import { CONFIG } from '../src/core/config';
 import { coresWorth, DailyShop, setOffer, setOfWeek, shopFor, vaultAt } from '../src/economy/shop';
 import { dayKey } from '../src/economy/time';
-import { keyOf, LOOKS } from '../src/looks';
-import { weekKey } from '../src/leagues';
+import { keyOf, LOOKS } from '../src/ship/looks';
+import { weekKey } from '../src/progression/leagues';
 
 // The shop's rotation: the day's looks, the week's set and the month's vault,
 // all the same for everyone and all on the UTC clock.

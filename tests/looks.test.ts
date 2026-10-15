@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { ACHIEVEMENTS, achievement, doneIn, evaluate, GROUP_NAMES, progressOn, rewardKeys, type Snapshot } from '../src/achievements';
-import { LOOKS, SETS, SLOT_ORDER, VAULT_ORDER } from '../src/catalogue';
-import { COURSES, ENVIRONMENTS } from '../src/courses';
-import { LEAGUES } from '../src/leagues';
-import { buyable, byKey, itemsIn, keyOf, Looks, type LookItem, type Owner, SLOT_NAMES, SLOTS, unlockProgress, unlockText } from '../src/looks';
-import { RANKS } from '../src/ranks';
+import { ACHIEVEMENTS, achievement, doneIn, evaluate, GROUP_NAMES, progressOn, rewardKeys, type Snapshot } from '../src/progression/achievements';
+import { LOOKS, SETS, SLOT_ORDER, VAULT_ORDER } from '../src/ship/catalogue';
+import { COURSES, ENVIRONMENTS } from '../src/world/courses';
+import { LEAGUES } from '../src/progression/leagues';
+import { buyable, byKey, itemsIn, keyOf, Looks, type LookItem, type Owner, SLOT_NAMES, SLOTS, unlockProgress, unlockText } from '../src/ship/looks';
+import { RANKS } from '../src/progression/ranks';
 
 // The catalogue of looks and the goals that unlock some of them: every way to
 // get an item has to be a real, reachable thing.

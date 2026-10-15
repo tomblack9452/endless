@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { CONFIG } from '../src/config';
-import { speedAt } from '../src/difficulty';
-import { PIECES } from '../src/pieces';
-import { check, parse } from '../src/pieces/format';
+import { CONFIG } from '../src/core/config';
+import { speedAt } from '../src/world/difficulty';
+import { PIECES } from '../src/world/pieces';
+import { check, parse } from '../src/world/pieces/format';
 import { fly } from './pilot';
 
 // Hand-made pieces. First on paper: every grid parses and every route stays

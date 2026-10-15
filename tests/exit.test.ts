@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { exitChoice } from '../src/exit';
+import { exitChoice } from '../src/platform/exit';
 
 describe('back at the top of the game', () => {
   it('asks before closing the Android app when the setting is on', () => {

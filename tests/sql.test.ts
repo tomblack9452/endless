@@ -1,7 +1,7 @@
 import { PGlite } from '@electric-sql/pglite';
 import { beforeAll, describe, expect, it } from 'vitest';
 import SETUP from '../supabase/setup.sql?raw';
-import { CONFIG } from '../src/config';
+import { CONFIG } from '../src/core/config';
 import { ALLOWED, REFUSED } from './nameCases';
 import { applyMigrations } from '../scripts/apply-db-lib.mjs';
 import { parts as splitParts, statements } from '../scripts/sql-split.mjs';

@@ -1,10 +1,10 @@
 import { Scene } from 'three';
 import { describe, expect, it } from 'vitest';
-import { CONFIG } from '../src/config';
-import { speedAt } from '../src/difficulty';
-import type { InstancedField } from '../src/field';
-import { LivePalette } from '../src/palette';
-import { World } from '../src/world';
+import { CONFIG } from '../src/core/config';
+import { speedAt } from '../src/world/difficulty';
+import type { InstancedField } from '../src/world/field';
+import { LivePalette } from '../src/world/palette';
+import { World } from '../src/world/world';
 
 // The asteroid belt is open space with its own set pieces. These check they
 // happen, and that what belongs to the ground (chasms, cacti, tumbleweeds)

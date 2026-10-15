@@ -1,5 +1,5 @@
-import { CONFIG } from '../config';
-import type { ThemeId } from '../world';
+import { CONFIG } from '../core/config';
+import type { ThemeId } from '../world/world';
 import { midiHz, pluckEnv, ROOT_MIDI } from './synth';
 
 // Generative score. Everything sits in D; each theme has its own mode, chord

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { PIECES } from '../src/pieces';
+import { PIECES } from '../src/world/pieces';
 import { FAST, fly } from './pilot';
 
 // Every join between pieces, flown at top speed. Every route shares its

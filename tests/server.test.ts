@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import WEBHOOK from '../supabase/functions/revenuecat-webhook/index.ts?raw';
-import { CONFIG } from '../src/config';
+import { CONFIG } from '../src/core/config';
 import { createBackend } from '../src/server/backend';
 
 // The run checks live in the database (tests/sql.test.ts runs them).

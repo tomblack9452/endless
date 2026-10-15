@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
-import { isOpen, nextStageText, stageFor } from '../src/reveal';
-import { Progress } from '../src/progress';
-import { storage } from '../src/storage';
+import { isOpen, nextStageText, stageFor } from '../src/progression/reveal';
+import { Progress } from '../src/progression/progress';
+import { storage } from '../src/core/storage';
 
 describe('staged reveal', () => {
   it('opens solo, the shop and the record after 5 valid runs, ranked after the tutorial and 5', () => {

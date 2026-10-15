@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
-// A course is its seed: generation may only use the seeded rand() (src/rng.ts),
+// A course is its seed: generation may only use the seeded rand() (src/core/rng.ts),
 // never Math.random, the clock or frame timing. (Purely visual effects, like
 // sparks and weather, live elsewhere and may.) This keeps the weekly level the
 // same for everyone and lets a server re-fly a run from its inputs.
 
-const GENERATION = import.meta.glob(['../src/world.ts', '../src/interior.ts', '../src/courses.ts', '../src/terrain.ts', '../src/pieces/**/*.ts'], {
+const GENERATION = import.meta.glob(['../src/world/world.ts', '../src/world/interior.ts', '../src/world/courses.ts', '../src/world/terrain.ts', '../src/world/pieces/**/*.ts'], {
   query: '?raw',
   import: 'default',
   eager: true,

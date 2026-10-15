@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { describeShip, Portraits } from '../src/portrait';
-import type { LivePalette } from '../src/palette';
+import { describeShip, Portraits } from '../src/ship/portrait';
+import type { LivePalette } from '../src/world/palette';
 
 // The words under a pilot's ship on the leaderboard, and the renderer that draws its picture.
 
@@ -29,7 +29,7 @@ vi.mock('three', async (original) => {
   return { ...three, WebGLRenderer: FakeRenderer };
 });
 
-vi.mock('../src/player', async () => {
+vi.mock('../src/ship/player', async () => {
   const { Group } = await import('three');
   class Player {
     disposed = false;
@@ -49,7 +49,7 @@ vi.mock('../src/player', async () => {
   return { Player };
 });
 
-vi.mock('../src/trail', () => ({
+vi.mock('../src/ship/trail', () => ({
   Trail: class {
     setVisible(): void {}
     setTint(): void {}

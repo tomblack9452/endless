@@ -1,10 +1,10 @@
 import { Scene } from 'three';
 import { describe, expect, it } from 'vitest';
-import { CONFIG } from '../src/config';
-import { speedAt } from '../src/difficulty';
-import { InstancedField } from '../src/field';
-import { LivePalette } from '../src/palette';
-import { World } from '../src/world';
+import { CONFIG } from '../src/core/config';
+import { speedAt } from '../src/world/difficulty';
+import { InstancedField } from '../src/world/field';
+import { LivePalette } from '../src/world/palette';
+import { World } from '../src/world/world';
 
 // Collision audit over every pool in the game. The world is generated across
 // every area and sub-level for a few seeds, and every live instance is checked

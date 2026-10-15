@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { progressOn } from '../src/achievements';
-import { achievement } from '../src/achievements';
-import { LOOKS, VAULT_ORDER } from '../src/catalogue';
-import { type Slot, Looks, type Owner, SLOTS, keyOf, itemsIn } from '../src/looks';
-import { buildHangar, hullIcon, monthsUntilVault, shortUnlock, type HangarDeps } from '../src/hangar';
+import { progressOn } from '../src/progression/achievements';
+import { achievement } from '../src/progression/achievements';
+import { LOOKS, VAULT_ORDER } from '../src/ship/catalogue';
+import { type Slot, Looks, type Owner, SLOTS, keyOf, itemsIn } from '../src/ship/looks';
+import { buildHangar, hullIcon, monthsUntilVault, shortUnlock, type HangarDeps } from '../src/ship/hangar';
 
 // The hangar's cards and what its detail panel offers for each way to get a look.
 
