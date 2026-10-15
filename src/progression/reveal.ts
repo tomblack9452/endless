@@ -3,7 +3,7 @@
 //
 //   from the start      endless, the hangar, goals
 //   after 5 runs        solo, the shop, the service record
-//   after the tutorial  ranked, leagues and the leaderboard
+//   after the tutorial  ranked, the daily challenge, leagues and the leaderboard
 //   and 5 runs
 //
 // Only runs that score at least CONFIG.reveal.validScore count (valid runs),
@@ -13,11 +13,11 @@
 
 import { CONFIG } from '../core/config';
 
-export type Feature = 'solo' | 'shop' | 'record' | 'ranked' | 'leaderboard';
+export type Feature = 'solo' | 'shop' | 'record' | 'ranked' | 'daily' | 'leaderboard';
 
 export const STAGES: { runs: number; tutorial: boolean; features: Feature[]; name: string; plural: boolean; text: string }[] = [
   { runs: 5, tutorial: false, features: ['solo', 'shop', 'record'], name: 'solo, the shop and your service record', plural: true, text: 'solo, the shop and your service record are open' },
-  { runs: 5, tutorial: true, features: ['ranked', 'leaderboard'], name: 'ranked', plural: false, text: "ranked is open: the week's run, leagues and the leaderboard" },
+  { runs: 5, tutorial: true, features: ['ranked', 'daily', 'leaderboard'], name: 'ranked', plural: false, text: "ranked is open: the week's run, the daily challenge, leagues and the leaderboard" },
 ];
 
 /** How many stages are open for a player with `runs` valid runs. */

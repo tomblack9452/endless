@@ -6,6 +6,7 @@ import { BOARD_TABS, boardCaption, boardForRun, boardQuery } from '../src/server
 import { Outbox } from '../src/server/outbox';
 import { SupabaseBackend } from '../src/server/supabase';
 import { ENVIRONMENTS } from '../src/world/courses';
+import { dayBefore, dayKey } from '../src/economy/time';
 
 // The game's real server code (SupabaseBackend, Outbox) talking to the real
 // database schema. A stand-in for fetch answers the few Supabase calls the game
@@ -250,6 +251,29 @@ describe('the outbox', () => {
     expect(rows?.find((r) => r.you)?.score).toBe(1300);
   });
 
+  it("sends a daily run to the day's board, and lets one go that waited past midnight", async () => {
+    const b = await player();
+    const box = new Outbox(b);
+    const today = dayKey(b.now());
+    const path = Array.from({ length: 500 }, (_, i) => Math.sin(i / 7));
+    await wait();
+    expect(await box.send(run({ board: 'daily', score: 2100, path, day: today }))).toMatchObject({ status: 'ok', rank: 1, newBest: true });
+    const tab = BOARD_TABS.find((t) => t.board === 'daily')!;
+    const rows = await b.board(boardQuery(tab, 0, b.now()));
+    expect(rows?.find((r) => r.you)?.score).toBe(2100);
+    expect(await b.board({ board: 'daily', period: dayBefore(today), league: 0 })).toEqual([]);
+    // Yesterday's run, still waiting: dropped, never sent.
+    offline = true;
+    await box.send(run({ board: 'daily', score: 9000, path, day: dayBefore(today) }));
+    offline = false;
+    await wait();
+    calls = [];
+    await box.flush();
+    expect(box.waiting).toBe(0);
+    expect(calls.filter((c) => c.includes('submit_run'))).toEqual([]);
+    expect((await b.board(boardQuery(tab, 0, b.now())))?.find((r) => r.you)?.score).toBe(2100);
+  });
+
   it('does nothing without a server', async () => {
     const { LocalBackend } = await import('../src/server/local');
     const box = new Outbox(new LocalBackend());
@@ -259,7 +283,7 @@ describe('the outbox', () => {
 
 describe('boards', () => {
   it('has a tab for the week, endless and every solo environment', () => {
-    expect(BOARD_TABS.map((t) => t.board)).toEqual(['ranked', 'endless', ...ENVIRONMENTS.map((e) => `solo:${e.id}`)]);
+    expect(BOARD_TABS.map((t) => t.board)).toEqual(['ranked', 'daily', 'endless', ...ENVIRONMENTS.map((e) => `solo:${e.id}`)]);
   });
 
   it('puts each kind of run on its board (set levels have none)', () => {
@@ -273,7 +297,7 @@ describe('boards', () => {
     const b = await player();
     for (const tab of BOARD_TABS) {
       await wait();
-      const path = tab.board === 'ranked' ? Array.from({ length: 500 }, () => 0) : [];
+      const path = tab.board === 'ranked' || tab.board === 'daily' ? Array.from({ length: 500 }, () => 0) : [];
       const r = await b.submitRun(run({ board: tab.board, path }));
       expect(r.status, tab.board).toBe('ok');
     }

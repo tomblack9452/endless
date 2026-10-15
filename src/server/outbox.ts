@@ -1,4 +1,5 @@
 import { storage } from '../core/storage';
+import { dayKey } from '../economy/time';
 import type { Backend, RunSubmission, SubmitResult } from './backend';
 
 // Runs waiting to reach the server. A phone loses signal mid-commute, so a run
@@ -69,6 +70,12 @@ export class Outbox {
     if (!this.backend.online) return results;
     while (this.items.length > 0) {
       const next = this.items[0];
+      // A daily run that waited past midnight: the board it was for is closed (the server would file it under the new day's).
+      if (next.run.board === 'daily' && next.run.day && next.run.day !== dayKey(this.backend.now())) {
+        this.items.shift();
+        this.save();
+        continue;
+      }
       const res = await this.backend.submitRun(next.run);
       results.push([next.run, res]);
       if (res.status === 'retry') {

@@ -12,6 +12,9 @@ describe('staged reveal', () => {
     expect(isOpen('ranked', stageFor(4, true))).toBe(false);
     expect(isOpen('ranked', stageFor(5, true))).toBe(true);
     expect(isOpen('leaderboard', stageFor(5, true))).toBe(true);
+    // The daily challenge opens with ranked: it has a board, and a streak to keep.
+    expect(isOpen('daily', stageFor(10, false))).toBe(false);
+    expect(isOpen('daily', stageFor(5, true))).toBe(true);
   });
 
   it('says what opens next', () => {

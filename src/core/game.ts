@@ -70,7 +70,8 @@ import { storage } from './storage';
 import { SESSION_KEY } from '../server/supabase';
 import { googleAvailable, googleSignIn } from '../platform/account';
 import { fxDistance, fxTime } from '../world/fx';
-import { type Course, COURSES, courseLength, type Environment, ENVIRONMENTS, type WeeklyRun, weeklyRun } from '../world/courses';
+import { type Course, COURSES, courseLength, type DailyRun, dailyRun, type Environment, ENVIRONMENTS, type WeeklyRun, weeklyRun } from '../world/courses';
+import { Challenge, streakReward } from '../progression/challenge';
 import { envStatus, nextEnvironment, newlyOpened } from '../progression/unlocks';
 import { DIVISIONS, divisionReward, emblem, LEAGUES, leagueName, leaguePar, Leagues, LP_PER_DIVISION, weekKey } from '../progression/leagues';
 import { ACHIEVEMENTS, type Achievement, GROUP_NAMES, type Group, type Snapshot, achievement, progressOn, rewardKeys } from '../progression/achievements';
@@ -149,6 +150,9 @@ const GOAL_ICON =
 /** What's new: a four-point sparkle. */
 const NEW_ICON =
   '<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round"><path d="M32 6c2 14 6 20 20 22-14 2-18 8-20 22-2-14-6-20-20-22 14-2 18-8 20-22z"/><path d="M50 40c1 5 2 7 7 8-5 1-6 3-7 8-1-5-2-7-7-8 5-1 6-3 7-8z"/></svg>';
+/** The daily challenge: a flag at the finish line. */
+const FLAG_ICON =
+  '<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round"><path d="M16 58V8"/><path d="M16 10h34l-7 10 7 10H16"/><path d="M27 10v20M38 10v20M16 20h34"/></svg>';
 /** A season pass badge. */
 const PASS_ICON =
   '<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round"><path d="M32 6l22 10v16c0 13-9 22-22 26C19 54 10 45 10 32V16z"/><path d="M32 20l4 8 9 1-7 6 2 9-8-5-8 5 2-9-7-6 9-1z"/></svg>';
@@ -199,6 +203,12 @@ export class Game {
   private environment: Environment | null = null;
   /** This week's ranked level (rebuilt when the week turns). */
   private weekly: WeeklyRun = weeklyRun(weekKey(Date.now()));
+  /** Today's challenge (rebuilt when the day turns, by the trusted clock). */
+  private today: DailyRun = dailyRun(dayKey(Date.now()));
+  /** The daily challenge being flown (the day it belongs to), or null. */
+  private dailyRunNow: DailyRun | null = null;
+  /** The daily challenge's bests and streak on this device. */
+  private readonly challenge = new Challenge();
   private scoreBase = 0; // solo starts: score begins at half the skipped points
   private readonly ranked = new Ranked();
   private readonly wallet = new Wallet();
@@ -279,6 +289,8 @@ export class Game {
   private pathTimes: number[] = [];
   private pathNext = 0;
   private economyTimer = 0;
+  /** The minute the title's cards were last drawn (the daily card's time left). */
+  private titleMinute = 0;
   /** Turns the showroom camera: on its own, or by a drag on the open scene. */
   private readonly showroomSpin = new ShowroomSpin({ spin: CONFIG.camera.showroom.spin });
   // Revive (not in ranked): once a run. While the offer is up the run isn't recorded yet.
@@ -348,6 +360,8 @@ export class Game {
   private quick = false;
   /** crashMs when the crashed run was settled (after any revive offer). */
   private settledMs = 0;
+  /** The daily run's streak line for the end screen. */
+  private dailyLine = '';
   /** The best line for quick retry's panel. */
   private quickLine = '';
 
@@ -457,6 +471,7 @@ export class Game {
       dated,
       this.dailyShop.load(),
       this.goalLog.load(),
+      this.challenge.load(),
       looksReady,
     ]).then(async () => {
       await this.onboarding.load(this.progress.stats.runs > 0);
@@ -523,7 +538,7 @@ export class Game {
    * `startScore` > 0 starts part-way along (dev skip). `seed` replays a
    * known course; otherwise every run gets a fresh one.
    */
-  private beginRun(startScore = 0, seed = newSeed(), mode: RunMode = 'endless', course: Course | null = null, env: Environment | null = null): void {
+  private beginRun(startScore = 0, seed = newSeed(), mode: RunMode = 'endless', course: Course | null = null, env: Environment | null = null, daily: DailyRun | null = null): void {
     this.ui.clearCelebration();
     this.econ.dismissOffer();
     this.econ.setCountdown(0);
@@ -539,6 +554,8 @@ export class Game {
     this.preview = null;
     this.seed = seed;
     this.mode = mode;
+    this.dailyRunNow = daily;
+    this.dailyLine = '';
     this.unlockable = (mode === 'ranked' || mode === 'endless') && startScore === 0;
     this.course = course;
     this.environment = env;
@@ -552,7 +569,8 @@ export class Game {
     this.scoreBase = 0;
     this.world.assist = this.assistOn();
     // Your switched-on upgrades (ranked checks them against the league's cap before starting).
-    this.ship = this.upgrades.stats();
+    // The daily challenge is one board for everyone: the standard ship, whatever you own.
+    this.ship = daily ? STANDARD : this.upgrades.stats();
     this.world.collectScale = this.ship.collect;
     this.world.powerRate = this.ship.powerRate;
     this.ui.setMode(this.modeLabel());
@@ -603,7 +621,11 @@ export class Game {
     this.ui.setLevel(level);
     this.ui.setProgress(progress - (level - 1));
     this.applyLook(progress);
-    if (course) {
+    if (daily) {
+      this.ui.setLevel(1);
+      this.ui.setProgress(0);
+      this.ui.announceLevel(1, `daily · ${daily.name}`);
+    } else if (course) {
       const n = Math.max(1, COURSES.indexOf(course) + 1);
       this.ui.setLevel(n);
       this.ui.setProgress(0);
@@ -657,7 +679,7 @@ export class Game {
     if (this.course) {
       const length = courseLength(this.course);
       const pct = Math.floor((100 * (this.world.distance - this.world.finishAt + length)) / length);
-      this.ui.setGameOverExtra(`${Math.max(0, Math.min(99, pct))}% of ${this.course.name}${extra ? ' · ' + extra : ''}`);
+      this.ui.setGameOverExtra([`${Math.max(0, Math.min(99, pct))}% of ${this.course.name}`, this.dailyRunNow ? this.dailyLine : '', extra].filter(Boolean).join(' · '));
     } else this.ui.setGameOverExtra(extra);
   }
 
@@ -673,6 +695,7 @@ export class Game {
       if (isNew && this.path.length > 1) this.ghost.save({ week: this.weekly.id, step: PATH_STEP, xs: [...this.path], ts: [...this.pathTimes] });
       return { best: p.weeklyBest(this.weekly.id), isNew };
     }
+    if (this.dailyRunNow) return this.recordDaily(this.state === 'finished');
     if (this.course) {
       const before = p.course(this.course.id).score;
       if (!finished) p.recordCourse(this.course.id, 0, this.runTime, score);
@@ -713,7 +736,7 @@ export class Game {
     this.ads.afterRun(Date.now(), false); // the device clock, like the first-played time it is measured from
     this.ads.preload(); // an ad ready for the offers after a run (none for premium)
     lines.push(`+${formatScore(credits)} credits${fromPickups > 0 ? ` (${formatScore(fromPickups)} from pickups)` : ''}`);
-    const board = boardForRun(this.mode, this.environment?.id ?? null, this.course !== null);
+    const board = boardForRun(this.mode, this.environment?.id ?? null, this.course !== null, this.dailyRunNow !== null);
     if (board && board !== 'ranked') this.submitToBoard(board, this.state === 'finished');
     if (this.unlockable) {
       const next = nextEnvironment(this.progress.furthest);
@@ -1209,7 +1232,7 @@ export class Game {
 
   /** A revive is offered once a run, outside ranked, where the lane is known. */
   private canRevive(): boolean {
-    return this.mode !== 'ranked' && !this.revived && this.world.laneAt(this.world.distance) !== null;
+    return this.mode !== 'ranked' && !this.dailyRunNow && !this.revived && this.world.laneAt(this.world.distance) !== null;
   }
 
   private offerRevive(): void {
@@ -1369,6 +1392,11 @@ export class Game {
     this.weeklyGoals.turn(weekKey(now));
     this.pass.turn(now);
     this.turnWeek(now);
+    if (this.turnDay(now) || Math.floor(now / 60_000) !== this.titleMinute) {
+      // A new day's challenge, or the minute its time left counts down.
+      this.titleMinute = Math.floor(now / 60_000);
+      this.ui.renderTitleCards(this.titleCards(now));
+    }
     this.refreshBar(now);
     // The season looks by the trusted clock (start-up had only the phone's); owned or worn ones stay.
     const keep = (l: LookItem) => this.looks.has(keyOf(l)) || this.looks.equipped[l.slot] === l.id;
@@ -1380,6 +1408,14 @@ export class Game {
     const week = weekKey(now);
     if (this.weekly.id !== `ranked-${week}`) this.weekly = weeklyRun(week);
     this.payLeagueWeek(now);
+  }
+
+  /** Today's challenge by the trusted clock; true if the day turned. Not mid-run (the run keeps its own). */
+  private turnDay(now: number): boolean {
+    const day = dayKey(now);
+    if (this.today.day === day) return false;
+    this.today = dailyRun(day);
+    return true;
   }
 
   /** A new league week: pay last week's reward (before anything else rolls the week over and it's lost). */
@@ -1795,7 +1831,8 @@ export class Game {
         seconds: run.seconds,
         distance: run.distance,
         finished,
-        path: board === 'ranked' ? [...this.path] : [],
+        path: board === 'ranked' || board === 'daily' ? [...this.path] : [],
+        ...(board === 'daily' && this.dailyRunNow ? { day: this.dailyRunNow.day } : {}),
       })
       .then((res) => {
         if (!res) return; // waiting for a signal
@@ -1807,6 +1844,7 @@ export class Game {
   /** Your own best on a tab, for when the board can't be read. */
   private localBest(id: string): number {
     if (id === 'week') return this.progress.weeklyBest(this.weekly.id);
+    if (id === 'daily') return this.challenge.bestOn(this.today.day);
     if (id === 'endless') return this.progress.endlessBest;
     return this.progress.envBest[id] ?? 0;
   }
@@ -1881,6 +1919,7 @@ export class Game {
       if (p.bests[board]) rows.push([label, formatScore(p.bests[board])]);
     };
     best('ranked', 'best ranked week');
+    best('daily', 'best daily challenge');
     best('endless', 'best endless');
     for (const e of ENVIRONMENTS) best(`solo:${e.id}`, `best solo: ${e.name}`);
     if (st.runs !== undefined) rows.push(['furthest level', String(st.bestLevel || 1)], ['best chain', `x${st.bestChain ?? 0}`], ['near misses', n(st.nearMisses)], ['pickups', n(st.pickups)]);
@@ -2145,12 +2184,13 @@ export class Game {
 
   /** Assist mode works everywhere but ranked. */
   private assistOn(): boolean {
-    return this.settings.assist && this.mode !== 'ranked';
+    return this.settings.assist && this.mode !== 'ranked' && !this.dailyRunNow;
   }
 
   /** What the HUD and game-over screen call this run. */
   private modeLabel(): string {
     if (this.mode === 'ranked') return `ranked · ${this.weekly.name}`;
+    if (this.dailyRunNow) return `daily · ${this.dailyRunNow.name}`;
     if (this.course) return `level ${COURSES.indexOf(this.course) + 1} · ${this.course.name}`;
     if (this.environment) return `solo · ${this.environment.name}`;
     return 'endless';
@@ -2575,9 +2615,16 @@ export class Game {
     this.beginRun(0, newSeed(), 'endless');
   }
 
+  /** The daily challenge: today's course (by the trusted clock), the standard ship, one board for everyone. */
+  private startDaily(): void {
+    this.turnDay(this.now());
+    this.beginRun(0, this.today.course.seed, 'solo', this.today.course, null, this.today);
+  }
+
   /** Retry in the same mode (and environment, or level) as the run that just ended. */
   private retry(): void {
     if (this.mode === 'ranked') this.startRanked();
+    else if (this.dailyRunNow) this.startDaily();
     else if (this.course) this.startCourse(COURSES.indexOf(this.course));
     else if (this.environment) this.startSolo(ENVIRONMENTS.indexOf(this.environment));
     else this.startEndless();
@@ -2585,13 +2632,14 @@ export class Game {
 
   private onTitleLink = (name: string): void => {
     // Every way in to a part of the game that isn't open yet says when it opens (the cores chip, cards...).
-    const needs: Record<string, Feature> = { solo: 'solo', record: 'record', shop: 'shop', 'shop-cores': 'shop', pass: 'shop', boards: 'leaderboard' };
+    const needs: Record<string, Feature> = { solo: 'solo', record: 'record', shop: 'shop', 'shop-cores': 'shop', pass: 'shop', boards: 'leaderboard', challenge: 'daily' };
     const f = needs[name];
     if (f && !this.open(f)) {
       this.ui.showNotice(nextStageText(this.progress.stats.validRuns, this.onboarding.done) || 'not open yet');
       return;
     }
     if (name === 'endless') this.startEndless();
+    else if (name === 'challenge') this.startDaily();
     else if (name === 'solo') this.openSolo();
     else if (name === 'record') this.openRecord();
     else if (name === 'goals') this.openGoals();
@@ -2998,6 +3046,18 @@ export class Game {
     const due = this.daily.loginDue(day);
     if (due >= 0) cards.push({ id: 'claim', kicker: 'daily reward', title: `day ${due + 1} ready to claim`, hot: true });
     if (this.daily.giftReady(day) && this.ads.offers('dailyGift')) cards.push({ id: 'gift', kicker: 'free gift', title: this.ads.label(), hot: true });
+    if (this.open('daily')) {
+      // Today's challenge: your best and the time left, the streak in the kicker.
+      const best = this.challenge.bestOn(this.today.day);
+      const streak = this.challenge.streakOn(this.today.day);
+      const left = formatWait(untilTomorrow(now));
+      cards.push({
+        id: 'challenge',
+        kicker: streak > 0 ? `daily · ${streak} day streak` : 'daily challenge',
+        title: best > 0 ? `best ${formatScore(best)} · ${left} left` : `new course · ${left} left`,
+        hot: !this.challenge.playedOn(this.today.day),
+      });
+    }
     const quests = this.daily.quests;
     const done = quests.filter((q) => q.done).length;
     const toClaim = this.goalsToClaim();
@@ -3046,6 +3106,8 @@ export class Game {
       ['time played', hours > 0 ? `${hours}h ${mins}m` : `${mins}m`],
       ['distance', `${(s.distance / 1000).toFixed(1)} km`],
       ['best this week (ranked)', formatScore(this.progress.weeklyBest(this.weekly.id))],
+      ['best today (daily)', formatScore(this.challenge.bestOn(this.today.day))],
+      ['daily streak', `${this.challenge.streakOn(this.today.day)} (longest ${this.challenge.longest})`],
       ['best endless', formatScore(this.progress.endlessBest)],
       ...ENVIRONMENTS.map((e): [string, string] => [`best solo: ${e.name}`, formatScore(this.progress.envBest[e.id] ?? 0)]),
       ['furthest level', String(s.bestLevel || 1)],
@@ -3607,12 +3669,14 @@ export class Game {
 
     const prev = this.world.distance;
     this.world.advance(dt, speed, this.player.lateral);
-    if (this.mode === 'ranked') {
+    if (this.mode === 'ranked' || this.dailyRunNow) {
       while (this.world.distance - this.runStart >= this.pathNext) {
         this.path.push(Math.round(this.world.lateral * 100) / 100);
         this.pathTimes.push(Math.round(this.runTime * 1000) / 1000);
         this.pathNext += PATH_STEP;
       }
+    }
+    if (this.mode === 'ranked') {
       this.ghost.update(this.runTime, this.world.distance - this.runStart, this.runStart, this.world.lateral);
     }
     this.world.spinPickups(dt);
@@ -3836,9 +3900,13 @@ export class Game {
     if (this.world.distance >= this.world.finishAt) this.finishCourse();
   }
 
-  /** Crossed the finish line of a set level. */
+  /** Crossed the finish line of a set level (or the daily challenge). */
   private finishCourse(): void {
     const c = this.course!;
+    if (this.dailyRunNow) {
+      this.finishDaily();
+      return;
+    }
     this.state = 'finished';
     this.ghost.stop();
     this.finishMs = 0;
@@ -3865,6 +3933,37 @@ export class Game {
     lines.push(extra);
     this.ui.setGameOverExtra(lines.join(' · '));
     this.refreshTitle();
+  }
+
+  /** Crossed the daily challenge's finish line. */
+  private finishDaily(): void {
+    this.state = 'finished';
+    this.ghost.stop();
+    this.finishMs = 0;
+    this.input.enabled = false;
+    this.boosting = false;
+    this.sound.level(true, musicFor(1));
+    this.haptics.level(true);
+    const { best, isNew } = this.recordBest(true);
+    this.ui.setOverHeading('finished');
+    this.ui.setGameOver(this.score, best, isNew, this.nearMissCount, this.bestChain, this.seed);
+    const extra = this.finishRun(null);
+    this.ui.setGameOverExtra([`${formatTime(this.runTime)} · the daily challenge`, this.dailyLine, extra].filter(Boolean).join(' · '));
+    this.refreshTitle();
+  }
+
+  /** The daily run as it ended: today's best and the streak, and the streak's reward on a new day. */
+  private recordDaily(finished: boolean): { best: number; isNew: boolean } {
+    const d = this.dailyRunNow!;
+    const counts = finished || this.runTime >= CONFIG.daily.countsAfter;
+    const r = this.challenge.record(d.day, this.score, counts);
+    this.dailyLine = r.streak > 0 ? `${r.streak} day streak` : '';
+    if (r.reward) {
+      const lines = this.grant(r.reward);
+      this.dailyLine += ` · ${rewardText(r.reward)}`;
+      this.ui.celebrate([{ kicker: `${r.streak} day${r.streak === 1 ? '' : 's'} in a row`, icon: FLAG_ICON, name: 'daily streak', lines: [...lines, r.streak < CONFIG.daily.streak.length ? `tomorrow: ${rewardText(streakReward(r.streak + 1))}` : 'the top of the ladder: keep it going'] }]);
+    }
+    return { best: r.best, isNew: r.isNew };
   }
 
   /** Coast on for a moment after the finish, then show the results. */

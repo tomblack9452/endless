@@ -7,8 +7,8 @@ import { SupabaseBackend } from './supabase';
 // submits runs to the leaderboards and reads them. Without keys, LocalBackend
 // stands in and everything keeps working on the device.
 
-/** A leaderboard: the week's ranked run, endless, or one solo environment. */
-export type BoardId = 'ranked' | 'endless' | `solo:${string}`;
+/** A leaderboard: the week's ranked run, the day's challenge, endless, or one solo environment. */
+export type BoardId = 'ranked' | 'daily' | 'endless' | `solo:${string}`;
 
 /** A finished run as submitted for a leaderboard. */
 export interface RunSubmission {
@@ -19,8 +19,10 @@ export interface RunSubmission {
   seconds: number;
   distance: number;
   finished: boolean;
-  /** Ranked: the ship's sideways position every few units (the ghost, and a check on the run). Empty elsewhere. */
+  /** Ranked and daily: the ship's sideways position every few units (the ghost, and a check on the run). Empty elsewhere. */
   path: number[];
+  /** Daily: the day it was flown (the server files it under its own day, so one still waiting after midnight is dropped). */
+  day?: string;
 }
 
 /** How a submission went: ok, worth retrying later (no signal, server busy), or turned down for good. */
@@ -37,7 +39,7 @@ export interface SubmitResult {
   message?: string;
 }
 
-/** Which board to read. period is the week's Monday for ranked, 'all' otherwise. */
+/** Which board to read. period is the week's Monday for ranked, the UTC date for daily, 'all' otherwise. */
 export interface BoardQuery {
   board: BoardId;
   period: string;

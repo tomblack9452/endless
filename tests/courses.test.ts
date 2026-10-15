@@ -1,7 +1,7 @@
 import { Scene } from 'three';
 import { describe, expect, it } from 'vitest';
 import { CONFIG } from '../src/core/config';
-import { type Course, COURSES, courseLength, ENVIRONMENTS, weeklyRun } from '../src/world/courses';
+import { type Course, COURSES, courseLength, dailyRun, ENVIRONMENTS, weeklyRun } from '../src/world/courses';
 import { lateralSpeedAt, speedAt } from '../src/world/difficulty';
 import { LivePalette } from '../src/world/palette';
 import { World } from '../src/world/world';
@@ -192,5 +192,39 @@ describe('ranked: the weekly run', () => {
       compared++;
     }
     expect(compared).toBeGreaterThan(500);
+  });
+});
+
+// The daily challenge: a short set course built from the day's seed. Three weeks
+// of days, each flown to the finish line by the pilot that follows the lane.
+describe('the daily challenge', () => {
+  const days = Array.from({ length: 21 }, (_, i) => new Date(Date.UTC(2026, 9, 15 + i)).toISOString().slice(0, 10));
+  const runs = days.map(dailyRun);
+
+  it('is the same for everyone on a day, and new each day', () => {
+    expect(dailyRun('2026-10-15')).toEqual(dailyRun('2026-10-15'));
+    expect(new Set(runs.map((r) => r.course.seed)).size).toBe(runs.length);
+    expect(new Set(runs.map((r) => JSON.stringify(r.course.sections))).size).toBeGreaterThan(10);
+    expect(runs[0]).toMatchObject({ id: 'daily-2026-10-15', day: '2026-10-15', name: '15 oct' });
+    expect(dailyRun('2026-10-16').course.seed).not.toBe(dailyRun('2026-10-15').course.seed);
+  });
+
+  it(`is ${CONFIG.daily.length} units long and gets harder towards the line`, () => {
+    for (const r of runs) {
+      expect(courseLength(r.course), r.day).toBe(CONFIG.daily.length);
+      const d = r.course.sections.map((s) => s.difficulty);
+      expect([...d].sort((a, b) => a - b), r.day).toEqual(d);
+      // About a minute: a try, not a level.
+      const seconds = r.course.sections.reduce((t, s) => t + s.length / speedAt(s.difficulty), 0);
+      expect(seconds, r.day).toBeGreaterThan(45);
+      expect(seconds, r.day).toBeLessThan(90);
+    }
+  });
+
+  runs.forEach((r) => {
+    it(`${r.day} (${r.course.sections.map((s) => s.name).join(', ')}) can be flown to the finish`, () => {
+      const f = fly(r.course);
+      expect(f.finished, `crashed ${f.at} of ${courseLength(r.course)} units in, in ${f.section}${f.room ? ` (${f.room})` : ''}`).toBe(true);
+    });
   });
 });

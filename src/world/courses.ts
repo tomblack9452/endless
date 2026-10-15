@@ -234,3 +234,89 @@ export function weeklyRun(monday: string): WeeklyRun {
   const label = new Date(`${monday}T00:00:00Z`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' }).toLowerCase();
   return { id: `ranked-${monday}`, name: `week of ${label}`, seed: h >>> 0, target: CONFIG.score.rankedTarget };
 }
+
+// --- the daily challenge -------------------------------------------------------------
+// One short course a day with a finish line, the same for everyone: built like
+// the weekly run, from a seed that belongs to the day (the server's UTC day),
+// but laid out as a set level, so it ends. Three or four sections from the
+// areas below, getting harder towards the line, CONFIG.daily.length long.
+
+/** An area a daily course can visit: its section names by flavour, the set pieces and event that suit it. */
+interface DailyArea {
+  theme: ThemeId;
+  biome?: Biome;
+  names: [string, string, string];
+  overlays: Overlay[];
+  event: EventKind;
+}
+
+const DAILY_AREAS: readonly DailyArea[] = [
+  { theme: 'land', names: ['the plains', 'the rockfields', 'the forest path'], overlays: ['arches', 'slalom', 'gates', 'pickups'], event: 'meteors' },
+  { theme: 'land', biome: 'ice', names: ['ice field', 'the drifts', 'frozen forest'], overlays: ['pickups'], event: 'meteors' },
+  { theme: 'land', biome: 'volcanic', names: ['the burning plain', 'ash fields', 'the lava run'], overlays: ['gates', 'pickups'], event: 'meteors' },
+  { theme: 'canyon', names: ['the gorge', 'rockfall', 'the narrows'], overlays: ['slalom', 'pickups'], event: 'sandstorm' },
+  { theme: 'canyon', biome: 'asteroids', names: ['the belt', 'debris field', 'the gauntlet'], overlays: ['slalom', 'pickups'], event: 'meteors' },
+];
+
+/** Today's challenge: its course and what it's called. */
+export interface DailyRun {
+  id: string; // "daily-2026-10-15"
+  day: string; // "2026-10-15"
+  name: string; // "15 oct"
+  course: Course;
+}
+
+/** A seed from some text (FNV-1a, as the weekly run's). */
+function seedOf(text: string): number {
+  let h = 0x811c9dc5;
+  for (const ch of text) {
+    h ^= ch.charCodeAt(0);
+    h = Math.imul(h, 0x01000193);
+  }
+  return h >>> 0;
+}
+
+/** The day's own picks (mulberry32), apart from the course generator's rand() so laying it out can't shift the course. */
+function dayPicker(seed: number): () => number {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/** The daily challenge for `day` (a UTC date, "2026-10-15"): the same course for everyone that day. */
+export function dailyRun(day: string): DailyRun {
+  const seed = seedOf(`endless-day-${day}`);
+  const pick = dayPicker(seed);
+  const one = <T>(list: readonly T[]): T => list[Math.floor(pick() * list.length)];
+  const D = CONFIG.daily;
+  const outdoor = (a: DailyArea, sub: 0 | 1 | 2, length: number): Section => ({ name: a.names[sub], theme: a.theme, ...(a.biome ? { biome: a.biome } : {}), length, sub, difficulty: 0 });
+  const start = one(DAILY_AREAS);
+  // The shape of the day: one area all the way, open ground into another
+  // biome or the canyon, or out there and into the ship to finish.
+  const shape = one(['one', 'onwards', 'ship'] as const);
+  let sections: Section[];
+  if (shape === 'one') {
+    sections = [outdoor(start, 0, 1200), outdoor(start, 1, 1200), outdoor(start, 2, 1200)];
+  } else if (shape === 'onwards') {
+    // From open ground the way leads anywhere; from the canyon or the belt, on through it.
+    const next = start.theme === 'land' ? one(DAILY_AREAS.filter((a) => a !== start)) : start;
+    sections = [outdoor(start, 0, 1200), outdoor(start, 1, 1100), outdoor(next, next === start ? 2 : 1, 1300)];
+  } else {
+    sections = [outdoor(start, 0, 1300), outdoor(start, 1, 1100), { name: 'into the ship', theme: 'interior', rooms: [], length: 1200, sub: 1, difficulty: 0 }];
+  }
+  // Harder towards the line, in steps of 100.
+  sections.forEach((s, i) => (s.difficulty = Math.round((D.difficulty[0] + ((D.difficulty[1] - D.difficulty[0]) * i) / (sections.length - 1)) / 100) * 100));
+  // A set piece in the middle now and then, and the area's event near the end.
+  const middle = sections[1];
+  const area = DAILY_AREAS.find((a) => a.theme === middle.theme && a.biome === middle.biome) ?? start;
+  if (pick() < 0.7) middle.overlay = one(area.overlays);
+  const last = sections[sections.length - 1];
+  if (pick() < 0.4) last.event = last.theme === 'interior' ? 'redAlert' : (DAILY_AREAS.find((a) => a.theme === last.theme && a.biome === last.biome) ?? start).event;
+  const label = new Date(`${day}T00:00:00Z`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' }).toLowerCase();
+  return { id: `daily-${day}`, day, name: label, course: { id: `daily-${day}`, name: `daily · ${label}`, blurb: '', seed, target: 0, sections } };
+}

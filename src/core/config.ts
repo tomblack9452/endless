@@ -623,6 +623,7 @@ export const CONFIG = {
   daily: {
     length: 3600, // start line to finish, in world units (check_run's c_daily_length in 0019 allows a little over)
     difficulty: [2500, 7000], // the score whose speed and density the first and last sections fly at
+    countsAfter: 8, // seconds a run must last (or finish) to keep the streak
     // The streak's rewards, by days in a row (day 7 and on pay the last). Cores go
     // through earn_cores as 'daily:<date>', which pays 3 at most (0019).
     streak: [{ credits: 100 }, { credits: 150 }, { credits: 200, cores: 1 }, { credits: 250 }, { credits: 300, cores: 2 }, { credits: 350 }, { credits: 500, cores: 3 }],
