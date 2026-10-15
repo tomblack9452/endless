@@ -4,7 +4,8 @@
 // The app buys as the player's Supabase account id (appUserID), so the
 // event's app_user_id is the account to pay.
 //
-// Set up (the database first: npm run db:apply, for 0014's purchase time):
+// Set up (the database first: npm run db:apply, for 0014's purchase time and
+// 0016's pass refunds):
 //   supabase secrets set REVENUECAT_WEBHOOK_SECRET=<any long random string>
 //   supabase functions deploy revenuecat-webhook --no-verify-jwt
 //   RevenueCat > Project > Integrations > Webhooks: the function's URL, with
@@ -36,9 +37,22 @@ interface RcEvent {
   purchased_at_ms?: number;
 }
 
+/**
+ * The Authorization header against the secret, in constant time: both are
+ * hashed first, so the comparison takes as long whatever the header holds (a
+ * plain !== stops at the first wrong character, which timing can give away).
+ */
+async function sameSecret(header: string | null, secret: string): Promise<boolean> {
+  const hash = async (s: string) => new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s)));
+  const [a, b] = await Promise.all([hash(header ?? ''), hash(`Bearer ${secret}`)]);
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a[i] ^ b[i];
+  return diff === 0;
+}
+
 Deno.serve(async (req) => {
   const secret = Deno.env.get('REVENUECAT_WEBHOOK_SECRET');
-  if (!secret || req.headers.get('Authorization') !== `Bearer ${secret}`) return new Response('no', { status: 401 });
+  if (!secret || !(await sameSecret(req.headers.get('Authorization'), secret))) return new Response('no', { status: 401 });
   const { event } = (await req.json()) as { event: RcEvent };
   if (!PAID.has(event.type) && !REFUNDED.has(event.type)) return new Response('ignored');
   const admin = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
