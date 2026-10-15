@@ -10,7 +10,7 @@ effects and the music. There are no image or audio files apart from the app
 icons. The ship's interior is built from a pack of hand-made sections drawn
 as text grids.
 
-There's a light free-to-play layer on top: daily rewards and quests, a daily shop of ship looks, a season pass and a premium currency
+There's a light free-to-play layer on top: daily rewards and quests, a daily challenge with a streak, a daily shop of ship looks, a season pass and a premium currency
 (cores). It all works on the device; a Supabase server and RevenueCat store
 plug in behind it when their keys are set (see [docs/server.md](docs/server.md)).
 Ranked groups pilots into leagues by ship power (upgrade points), so a ship
@@ -81,10 +81,10 @@ endless/
 │   ├── world/            course generation and drawing: terrain, biomes, rooms, props, sky, weather, renderer
 │   │   └── pieces/       the hand-made ship sections, drawn as text grids
 │   ├── ship/             the player's ship: shapes, trails, looks and the catalogue, upgrades, hangar, ghost
-│   ├── progression/      stats, ranks, leagues, goals and achievements, unlocks, seasons, the wallet
+│   ├── progression/      stats, ranks, leagues, goals and achievements, the daily challenge's streak, unlocks, seasons, the wallet
 │   ├── economy/          daily rewards, weekly goals, the shop, the season pass and their screens
 │   ├── ui/               screens and HUD (ui.ts, style.css), onboarding, tips, the tutorial, the goals and hangar views
-│   ├── platform/         the device: input, haptics, share, feedback, back button, Google account, the name filter
+│   ├── platform/         the device: input, haptics, share, reminders, feedback, back button, Google account, the name filter
 │   ├── audio/            sound engine, synth helpers, generative music
 │   ├── server/           Supabase or the device alone behind one interface: cloud save, the run outbox, boards
 │   ├── store/            in-app purchases (RevenueCat) and what's owned for good

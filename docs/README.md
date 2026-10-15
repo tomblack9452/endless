@@ -5,7 +5,7 @@ guides, one line each.
 
 ## Current
 
-- [game.md](game.md): how the game plays (controls, themes, modes, ranked, leagues, looks, cores, settings, sound) and how it works inside.
+- [game.md](game.md): how the game plays (controls, themes, modes, ranked, leagues, the daily challenge, looks, cores, settings, sound) and how it works inside.
 - [development.md](development.md): working on the code: every file in a table, where to tune numbers, the dev tools, the tests, deploying.
 - [server.md](server.md): what the server, store and ads do for the game, and every setting the Supabase dashboard needs.
 - [leaderboards.md](leaderboards.md): turning the leaderboards on, what the server checks, and changing the database.

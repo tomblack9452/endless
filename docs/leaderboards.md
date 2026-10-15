@@ -91,8 +91,10 @@ Every submission, in `supabase/migrations/0003_leaderboards.sql`:
   game reads the week's board by the server's clock too, `server_now` in 0012)
 - the score can come from the distance (distance points plus the most the
   bonuses could add) and the time (no faster than a full-boost flight)
-- ranked runs carry the ship's path: one sample per 4 units of distance, never
-  jumping sideways faster than the ship can
+- ranked and daily runs carry the ship's path: one sample per 4 units of
+  distance, never jumping sideways faster than the ship can; a daily run is no
+  longer than the day's course, and goes on the board for the server's day
+  (`0019`)
 - at most one run every 8 seconds and 400 a day per player
 - players can't write any table directly (row security with no write policies:
   only the functions write), and can't read others' accounts
@@ -115,7 +117,7 @@ the run. If that starts to matter, the next steps in order of effort:
 
 ## Changing the database
 
-Add a new file in `supabase/migrations/` (the next number: `0019_...sql`; never
+Add a new file in `supabase/migrations/` (the next number: `0022_...sql`; never
 edit one that has been applied), add a table or function it creates to `MADE` in
 `scripts/apply-db-lib.mjs` (how a hand-pasted database is recognised), run
 `npm run db:setup` to rebuild `supabase/setup.sql` (and the paste-sized `supabase/parts/`, which

@@ -38,7 +38,7 @@ npx cap open android       # Android Studio
   installed from Play.
 - **Release** (an upload to a Play track):
   1. Raise `versionCode` (and `versionName`) in `android/app/build.gradle`.
-     Play refuses a versionCode it has seen before.
+     Play refuses a versionCode it has seen before. (1.0.8 is versionCode 9.)
   2. Set `VITE_ADMOB_LIVE=1` in `.env` for this build only, then
      `npm run build && npx cap sync android`.
   3. Android Studio > Build > Generate Signed App Bundle > Android App Bundle,
@@ -63,7 +63,7 @@ secrets unless a CI build is added. `npm run check-server` says what's missing.
 ## Server
 
 Supabase. New migrations in `supabase/migrations/` (now up to
-`0018_client_errors.sql`) only reach the live database with
+`0021_client_errors_upkeep.sql`) only reach the live database with
 `npm run db:apply`. Never edit one that has shipped: add the next number, add its
 marker to `MADE` in `scripts/apply-db-lib.mjs`, then `npm run db:setup`. After
 adding one, remind Tom to run `db:apply`. `0012` is the trusted clock
@@ -71,7 +71,11 @@ adding one, remind Tom to run `db:apply`. `0012` is the trusted clock
 the service records on the boards (public ids, `pilot_record`), `0014` the
 purchase time and one-at-a-time `earn_cores`, `0015` leagues on the server
 (`players.league`, checked in `submit_run`), `0016` refunded season passes,
-`0017` reports (`report_pilot`), `0018` error reports (`log_errors`).
+`0017` reports (`report_pilot`), `0018` error reports (`log_errors`), `0019`
+the daily challenge (the `daily` board, `daily_period`, the streak's cores in
+`earn_cores`), `0020` name reports only from trusted reporters
+(`trusted_reporter`), `0021` error reports clearing themselves after 60 days
+(`prune_client_errors`).
 
 RevenueCat purchases arrive through the `revenuecat-webhook` edge function,
 which calls `store_purchase_at` (0014; apply it before redeploying the webhook)
@@ -79,7 +83,8 @@ and writes `store_events` with RevenueCat's purchase time. A refund renames the
 row's product to `refunded:<product>`. A refunded season pass (bought with
 money) takes back the cores its premium tiers paid and closes the premium track
 (`0016`); one unlocked with cores is never touched. After `db:apply`, redeploy
-the webhook when its code changes (1.0.7: a constant-time secret check).
+the webhook when its code changes (1.0.7: a constant-time secret check; 1.0.8
+leaves it alone).
 
 ## Google sign-in (`src/platform/account.ts`)
 
@@ -104,6 +109,35 @@ the webhook when its code changes (1.0.7: a constant-time secret check).
   The game logs `google sign-in failed <code> <message>`. Since 1.0.7 the
   same failures (and crashes, purchases, ads, cloud saves) also land in the
   `client_errors` table: `docs/server.md`, "Error reports".
+
+## Reminders (`@capacitor/local-notifications` 8.3.1, since 1.0.8)
+
+`src/platform/reminders.ts`: an opt-in local notification once a day at most
+(settings > reminders, 18:00 by default), planned a week ahead on the phone.
+No push server and no Firebase.
+
+- The manifest has `POST_NOTIFICATIONS`; Android 13+ asks only when the player
+  turns reminders on (or says yes to the one offer after the 5th valid run),
+  never at start-up. A refusal turns the setting back off, and once refused
+  Android won't ask again: settings > apps > Endless Space > notifications.
+- The plugin also asks for `SCHEDULE_EXACT_ALARM`; the manifest removes it
+  (`tools:node="remove"`): reminders are inexact (`isExactNotification:
+  false`), so there's no exact alarm declaration in the Play Console.
+- The status bar icon is `res/drawable/ic_stat_endless.xml` (the dart ship),
+  set with the amber in `capacitor.config.ts` (`LocalNotifications`).
+- They use ids 1080-1086 and their own channel, `reminders`.
+- Testing on a phone: turn reminders on, pick the next time slot (or set the
+  phone's clock just before it), put the game in the background. Logcat
+  `Capacitor/Console` shows `reminders schedule` failures, and they also land
+  in `client_errors`.
+- After `npm install`, `npx cap sync android` adds the plugin to the Android
+  project (`capacitor.settings.gradle` and `app/capacitor.build.gradle` are
+  already updated in the repo).
+
+Sharing a new best (1.0.8) uses the Web Share API; Android's web view doesn't
+have it and no share plugin is added, so the app hides the share button for
+now. `@capacitor/share` (with `@capacitor/filesystem` for the picture) would
+bring it to the app.
 
 ## Ads (AdMob, `@capacitor-community/admob`)
 

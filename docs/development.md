@@ -29,11 +29,12 @@ The folder map is in the [README](../README.md#project-layout). File by file:
 | `src/world/atmosphere.ts` | Day/night and theme colour blending |
 | `src/world/biomes.ts` | Biome looks and names |
 | `src/world/blockTextures.ts` | Procedural metal textures |
-| `src/world/courses.ts` | The set levels, the solo environments and the week's ranked run |
+| `src/world/courses.ts` | The set levels, the solo environments, the week's ranked run and the day's challenge course |
 | `src/world/difficulty.ts` | Difficulty as smooth, capped functions of score |
 | `src/world/events.ts` | Meteor shower, sandstorm, red alert |
 | `src/world/field.ts` | Instanced pool: collision, sine and ramp motion |
 | `src/world/fx.ts` | Animated interior detail: liquids, steam, blinkers, holograms, sparks |
+| `src/world/itemColours.ts` | Colour-blind mode's palette (blue against orange) and the power-ups' shapes |
 | `src/world/interior.ts` | Ship room looks (name, light, height, windows, decor) and the room API sections build with |
 | `src/world/palette.ts` | Live palette shared by every material |
 | `src/world/pieces/` | The hand-made ship sections: format and checks, the grid builder, and the pack by family |
@@ -53,6 +54,7 @@ The folder map is in the [README](../README.md#project-layout). File by file:
 | `src/ship/portrait.ts`, `src/ship/showroom.ts` | Other pilots' ships drawn for the leaderboard; the showroom camera's spin and drag |
 | `src/ship/trail.ts` | Ship trails |
 | `src/ship/upgrades.ts` | Ship upgrade systems, points and the standard ship |
+| `src/progression/challenge.ts` | The daily challenge on the device: today's best, the streak and its reward ladder |
 | `src/progression/achievements.ts`, `src/progression/goals.ts` | The 53 goals (counted from existing stats) and which have paid |
 | `src/progression/leagues.ts` | Leagues, divisions, league points, weekly rewards, emblems |
 | `src/progression/legacy.ts` | Carries older saves' mission unlocks over to the looks (missions were removed) |
@@ -65,7 +67,7 @@ The folder map is in the [README](../README.md#project-layout). File by file:
 | `src/economy/` | Daily rewards and goals, weekly goals, the shop (today, the weekly set, the vault), the season pass, and their screens |
 | `src/ui/goalsView.ts` | The goals screen: daily, weekly and achievements, with claiming |
 | `src/ui/guide.ts`, `src/ui/controlArt.ts`, `src/ui/tutorialView.ts` | The pickup and power-up cards (from `CONFIG`), the control diagrams, the tutorial's indicators and recap |
-| `src/ui/hints.ts`, `src/platform/haptics.ts` | The first-run tips (walkthrough), vibration |
+| `src/ui/hints.ts` | The first-run tips (walkthrough) |
 | `src/ui/report.ts`, `src/ui/whatsNew.ts` | The report link on a pilot's card; the "what's new" lines for each version |
 | `src/ui/onboarding.ts` | First launch: the steps, the control cards, the practice run's lessons, the starter set |
 | `src/ui/scrollHint.ts`, `src/ui/systemBars.ts` | The always-visible scroll bar under sideways rows; Android's status and gesture bar icon colours per screen |
@@ -74,10 +76,12 @@ The folder map is in the [README](../README.md#project-layout). File by file:
 | `src/platform/exit.ts`, `src/platform/feedback.ts` | Android back on the title screen (ask before closing); the feedback mail |
 | `src/platform/errors.ts` | Error reports: caught on the device, scrubbed, kept and sent a batch at a time (`log_errors`) |
 | `src/platform/input.ts` | Drag, side taps, tilt, keyboard, boost control |
+| `src/platform/haptics.ts` | Vibration at the strength the settings pick (off, light, full) |
 | `src/platform/nameFilter.ts`, `src/platform/nameWords.json` | The pilot-name profanity check and its word list (`npm run names:build`) |
-| `src/platform/share.ts` | The share card |
+| `src/platform/share.ts` | The share card: a picture of a new best with your ship, in the store art's dusk |
+| `src/platform/reminders.ts` | Reminders: local notifications, planned a week ahead, once a day at most (`@capacitor/local-notifications`) |
 | `src/audio/` | Sound engine, synth helpers, generative music |
-| `src/server/` | The server behind one interface: Supabase, or the device alone; cloud save, the run outbox and the leaderboard boards |
+| `src/server/` | The server behind one interface: Supabase, or the device alone; cloud save, the run outbox (a daily run that waited past midnight is dropped), the leaderboard boards, and whether the server can be reached (the offline marker) |
 | `src/store/` | In-app purchases (RevenueCat in the apps, nothing on the web) and what's owned for good |
 | `src/ads/` | Ads (AdMob in the apps, nothing on the web) and their rules |
 | `tests/fairness.test.ts` | Headless survivability test |
@@ -85,13 +89,16 @@ The folder map is in the [README](../README.md#project-layout). File by file:
 | `tests/determinism.test.ts` | No unseeded randomness or clock in course generation |
 | `tests/economy.test.ts` | The calendar, quests, the shop, the pass and the revive |
 | `tests/server.test.ts` | Offline fallback and the store webhook |
-| `tests/clock.test.ts` | The trusted clock: the server's time, the Date header, the device's offline |
+| `tests/clock.test.ts` | The trusted clock: the server's time, the Date header, the device's offline; whether the server can be reached |
 | `tests/account.test.ts`, `tests/session.test.ts` | Keeping an account with Google; signing in again without losing the player, and the cloud save never pushed before it's compared |
-| `tests/sql.test.ts`, `tests/leaderboard.test.ts` | The database run for real (PGlite): checks, boards, names, row security, and the game's server code against it |
+| `tests/sql.test.ts`, `tests/leaderboard.test.ts` | The database run for real (PGlite): checks, boards (the daily one too), names, reports (trusted reporters), error reports (and their upkeep), row security, and the game's server code against it |
 | `tests/collisions.test.ts` | Every solid pool checked against its mesh across every area |
 | `tests/unlocks.test.ts` | Solo environment unlocks |
 | `tests/ranks.test.ts` | Rank ladder, XP and credit maths |
-| `tests/courses.test.ts` | Set levels fly to the finish; twelve weeks of ranked runs and every environment are survivable; the course depends only on its seed |
+| `tests/courses.test.ts` | Set levels fly to the finish; twelve weeks of ranked runs and every environment are survivable; three weeks of daily challenges fly to their finish; the course depends only on its seed |
+| `tests/challenge.test.ts` | The daily challenge: the day's seed by the trusted clock, the streak across midnight and missed days, the ladder, the board |
+| `tests/settings.test.ts` | Older saves' settings get the defaults (vibration on/off carried over), the comfort settings, colour-blind mode's palette |
+| `tests/reminders.test.ts` | Reminders: once a day at most, a week ahead, at the chosen time, the Monday one |
 | `tests/input.test.ts` | Double-tap and hold to boost |
 | `tests/leagues.test.ts` | League brackets, LP, divisions, promotion, weekly rewards, prices |
 | `public/` | Icons, manifest, service worker |
@@ -111,6 +118,9 @@ Nearly every number lives in `src/core/config.ts`, grouped by system:
 - `assist`: assist mode
 - `courses`: credits per set level star (rank, upgrade and look tables live in
   `ranks.ts`, `upgrades.ts` and `looks.ts`)
+- `daily`: the daily challenge's length, difficulty, the seconds a run needs
+  to keep the streak, and the streak's reward ladder (keep its cores within
+  `earn_cores`' 3 a day, and the length within `check_run`'s, `0019`)
 - `audio`: every gain, the music and the engine
 - `hazards`, `weather`: ice and lava lakes, lava bombs, snow and ash
 - `economy`: run credits, revives, the login calendar, quests, the shop, the
@@ -133,6 +143,8 @@ that opens a panel. It isn't in production builds.
 - **Show routes:** draws each section's routes on the floor (main white,
   alternative teal, risky amber)
 - **Add 500 cores:** a stand-in for purchases
+- From the console: `game.backend.online = true; game.backend.reachable = false`
+  shows the offline marker and the boards' offline message without a server
 - **Unlock all:** the same as maxing out a player ([server.md](server.md#supabase-settings)): the top rank and
   league, every look, every upgrade, every solo environment and set level,
   and 100,000 credits (saved in that browser)
@@ -157,8 +169,17 @@ four seeds.
 
 `tests/courses.test.ts` flies every set level from start to finish at each
 section's speed and checks each runs 100-260 seconds, flies twelve weeks of
-ranked runs for 90 seconds each, and every solo environment for 40 seconds on
-three seeds.
+ranked runs for 90 seconds each, every solo environment for 40 seconds on
+three seeds, and three weeks of daily challenges to their finish line
+(checking each is the same all day, new each day, 3,600 units and 45-90
+seconds).
+
+`tests/challenge.test.ts` checks the daily challenge's streak by the trusted
+clock: it grows a day at a time, holds within a day, turns over at UTC
+midnight to the millisecond, lapses after a missed day, pays the ladder once a
+day, and gives nothing for a day before the last one played (a clock put
+back). `tests/settings.test.ts` loads 1.0.7's settings and checks every
+choice is kept and the new settings get their defaults.
 
 `tests/input.test.ts` checks double-tap and hold: a quick double-tap boosts,
 a slow one, a long press, a drag or taps on opposite sides don't, and the

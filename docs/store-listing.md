@@ -1,7 +1,8 @@
 # Store listing (Google Play)
 
 The text for Play Console > Grow users > Store presence > Main store listing,
-for 1.0.6. Every claim was checked against the code (the notes at the end say
+for 1.0.8 (the daily challenge, sharing and the comfort settings added to
+1.0.6's text). Every claim was checked against the code (the notes at the end say
 what changed from the live text and why). Paste the text between the rules;
 Play counts every character, line breaks included.
 
@@ -11,13 +12,13 @@ Play counts every character, line breaks included.
 
 ---
 
-One-thumb space runner: dodge, fly close, and top a new ranked run every week.
+One-thumb space runner: fly close, top the daily challenge and the weekly run.
 
 ---
 
 ## Full description
 
-4,000 characters at most. This one is about 3,000.
+4,000 characters at most. This one is about 3,500.
 
 ---
 
@@ -27,6 +28,9 @@ Endless Space is a calm, quick arcade space game: an endless runner (an endless 
 
 A NEW RANKED RUN EVERY WEEK
 Every Monday brings a new ranked course, the same for every pilot. Fly it as often as you like; your best counts. Race the ghost of your best run this week, climb your league's weekly leaderboard, and move up seven leagues, from bronze to grand champion. Leagues group pilots by their ship's upgrades, so you always race ships like yours. Tap a pilot on a leaderboard to see their service record: rank, runs and bests.
+
+A DAILY CHALLENGE
+One short course a day, the same for every pilot, new at midnight. Everyone flies the same standard ship, so it's down to you. Climb the day's leaderboard, and fly it days in a row to keep your streak, earning credits and cores as it grows.
 
 SIX PLACES TO FLY
 Alien open ground, deep canyons, frozen ice fields, burning volcanic plains, asteroid belts, and the cargo bays, server halls and reactor rooms inside a great ship. Day turns to night as you fly, meteor showers and sandstorms roll in, and the music is made as you play, speeding up with you.
@@ -45,8 +49,9 @@ A login calendar, three daily goals and five weekly ones, 53 achievements, a dai
 
 PLAY YOUR WAY
 - One-hand play: drag, tap the sides, or tilt your phone, with adjustable sensitivity
-- Boost with a button on the left, right or middle, or double-tap and hold anywhere
-- Reduce motion, larger text, high contrast, dark mode, and an assist mode that slows the game and marks a safe line
+- Boost with a button on the left, right or middle, or double-tap and hold anywhere, and a left-handed layout
+- Reduce motion, larger text, high contrast, a colour-blind mode (with shapes as well as colours), dark mode, separate music and effects volume, light or full vibration, and an assist mode that slows the game and marks a safe line
+- An optional daily reminder, once a day at most
 - A hands-on tutorial (try each way to steer, then a practice run that shows every pickup and power-up) and short tips on your first runs, all skippable and replayable
 - Plays offline; leaderboards need a connection
 - Made for phones and tablets: on a tablet, play upright or on its side
@@ -73,6 +78,14 @@ where these names may differ slightly):
 8. Stylized
 
 The first five are the best fit.
+
+## Release notes for 1.0.8
+
+414 characters (500 at most):
+
+<en-GB>
+A daily challenge: one short course a day, the same for every pilot, with its own leaderboard and a streak that pays credits and cores. Comfort settings: vibration strength, a left-handed layout and a colour-blind mode that adds shapes as well as colours. Optional reminders, once a day at most. A quiet offline marker, and leaderboards that say when you're offline. Plus fairer name reports and tidier error logs.
+</en-GB>
 
 ## Release notes for 1.0.7
 
@@ -131,7 +144,10 @@ no leaderboard is shown and no other pilots appear anywhere.
 | Tap a pilot for their record | `pilot_record` (migration 0013), on the boards when online | true |
 | Tablets | `MainActivity` only holds phones upright; landscape plays in a centred column, and tilt reads the side-on lean | true |
 | Offline | The whole game runs on the device; the boards, sign-in, ads and purchases need the server | "plays offline; leaderboards need a connection" |
-| Accessibility | reduce motion, text size (three), high contrast, dark mode, assist mode, tap-sides steering, boost button position, vibration off | listed as they are. There is no colour-blind mode or screen-reader support in a run, so neither is claimed |
+| Accessibility | reduce motion, text size (three), high contrast, colour-blind mode (1.0.8: blue and orange, shapes for the power-ups), dark mode, music and effects levels, vibration off/light/full, left-handed layout, assist mode, tap-sides steering, boost button position | listed as they are. There is no screen-reader support in a run, so none is claimed |
+| Daily challenge | `dailyRun` in `src/world/courses.ts` (the day's seed, the server's day), the standard ship (`STANDARD`), the `daily` board (0019), the streak ladder in `CONFIG.daily` | "one short course a day, the same for every pilot", "the same standard ship", streak credits and cores |
+| Share a new best | `offerShare` and `shareCard` (`src/platform/share.ts`): any new personal best, and every ranked run, through the Web Share API. Android's web view has no Web Share API and no share plugin is added, so the app hides the button | not claimed on Play (it works on the web) |
+| Reminders | `src/platform/reminders.ts`: off until turned on, once a day at most, the Android app | "an optional daily reminder, once a day at most" |
 | Ads | Rewarded only; interstitials are off (`CONFIG.ads.interstitial`) | "optional rewarded ads" |
 | "Free" | Play's rules (`docs/play-console.md`) rule out "free" as a selling point | only the free daily revive, which is a feature; no "free to play" |
 | Tutorial | `src/ui/onboarding.ts`: control cards with moving diagrams, a six-lesson practice run with a card for the boost pickup, shield, magnet and slow-mo, a 15 s trial of other controls; skip and replay in settings | "a hands-on tutorial", as listed |

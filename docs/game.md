@@ -14,6 +14,7 @@ the code layout is in [development.md](development.md).
 - [Modes](#modes)
 - [Ranked](#ranked)
 - [Leagues](#leagues)
+- [The daily challenge](#the-daily-challenge)
 - [Solo and endless](#solo-and-endless)
 - [Credits, upgrades and looks](#credits-upgrades-and-looks)
 - [Cores and daily rewards](#cores-and-daily-rewards)
@@ -33,7 +34,8 @@ the code layout is in [development.md](development.md).
 | Retry | Tap | Space or Enter |
 
 The boost button is a dial whose ring fills with the meter. It sits bottom
-right by default; settings move it to the left or the middle. Double-tap and
+right by default; settings move it to the left or the middle (and the
+left-handed layout swaps right and left, with pause and the level). Double-tap and
 hold: a quick tap, then a press within 250 ms near the same spot, boosts for
 as long as you hold it and still steers. A drag isn't a tap, and taps on
 opposite sides (tap-sides steering) don't count, so it never gets in the way.
@@ -237,8 +239,9 @@ Events change the look and sound only, never the course.
 
 The title screen leads with **ranked**, a big button showing your best on
 this week's run, with **solo** and **endless** under it. Above it, **live
-cards** show the season pass (your tier and the XP to the next), today's goals,
-and a daily reward when one is waiting. Along the bottom, a bar of five:
+cards** show a daily reward when one is waiting, the free gift, the **daily
+challenge** (your streak, today's best and the time left; tap it to fly),
+today's goals and the season pass (your tier and the XP to the next). Along the bottom, a bar of five:
 **hangar**, **shop**, **goals**, **leaderboard** and **service record**, each
 with a dot when something there needs you. Settings is the gear top left;
 credits and cores sit top right (tapping them opens the shop).
@@ -273,9 +276,9 @@ still the generated one (the name screen stays until one is saved).
 
 New players see the game in stages (`src/progression/reveal.ts`), so the first screen isn't
 a wall of buttons: at first the big button flies endless and the bar has the
-hangar and goals; solo, the shop, the service record, ranked, leagues and the
-leaderboard open after 5 valid runs (a run scoring 1,000 or more) and the
-tutorial. Each stage is
+hangar and goals; solo, the shop and the service record open after 5 valid
+runs (a run scoring 1,000 or more); ranked, the daily challenge, leagues and the
+leaderboard after 5 and the tutorial. Each stage is
 announced once, and a line under the menu says what opens next.
 
 | | Ranked | Solo | Endless |
@@ -299,9 +302,19 @@ with about the same upgrades. Every ranked run is kept with its score, date,
 week and seed, and its path (the ship's sideways position every 4 units).
 Your best run of the week is flown as a faint **ghost** ship next to you, and
 with the server on, runs go to the **weekly leaderboard** for your league
-(on the league screen). After a ranked run, **share** makes a picture of it
-for the share sheet. Looks are allowed
+(on the league screen). Looks are allowed
 everywhere, because every hull shares one hitbox.
+
+**Share.** After any ranked run, and after a new personal best in any mode
+(endless, solo, a set level, the daily challenge), the end screen has
+**share**: a picture (1080 x 1350, `src/platform/share.ts`) in the store
+art's dusk, with a ringed planet, the lane glowing towards your own ship as
+you have it on (`src/ship/portrait.ts`, drawn big), the score, "new best",
+the mode or board, a line or two (rank and league, or the streak) and a small
+"endless space" wordmark. It goes to the phone's share sheet (the Web Share
+API) where there is one; on the web without one it's saved as a picture. The
+Android app's web view has no Web Share API (and no share plugin is added),
+so the app hides the button for now (`shareAvailable()`).
 
 ## Ranked
 
@@ -398,6 +411,43 @@ power. Every upgrade tier you own is one **upgrade point** (30 at most).
   LP won and lost over your last 20 runs; this week's par; and every league.
   Moving up a division or a league gets the same full-screen moment as a
   rank.
+
+## The daily challenge
+
+Since 1.0.8. One short course a day, the same for everyone, new at midnight
+UTC. It opens with ranked (after 5 valid runs and the tutorial).
+
+- **The course** (`dailyRun` in `src/world/courses.ts`) is built like the
+  weekly run, from a seed that belongs to the day (`endless-day-<date>`), but
+  laid out as a set level with a finish line: three sections, 3,600 units
+  (about a minute and a quarter), from the plains, the ice field, the volcanic
+  plain, the canyon or the asteroid belt: one area all the way, open ground
+  on into another, or out there and into the ship to finish. It gets harder
+  towards the line (`CONFIG.daily`), with a set piece in the middle now and
+  then and the area's event near the end. The day is the server's
+  (`backend.now()`), so a phone with its clock moved flies the same course.
+- **Fair for everyone:** the standard ship whatever you own (upgrades don't
+  count), no assist mode and no revive. A crash ends the try; fly it as often
+  as you like and your best counts.
+- **Its board** is on the leaderboard screen as **today**: everyone together,
+  for the day. Runs are checked like ranked runs (the path), and one still
+  waiting for a signal at midnight is dropped rather than put on the next
+  day's board.
+- **The streak** (`src/progression/challenge.ts`): fly the daily on days in a
+  row (a run of 8 seconds or more, or one that finishes). The first run of
+  each new day in the streak pays the next step of the ladder, shown as a
+  card with tomorrow's step under it:
+
+  | Day | 1 | 2 | 3 | 4 | 5 | 6 | 7 and on |
+  |---|---|---|---|---|---|---|---|
+  | Credits | 100 | 150 | 200 | 250 | 300 | 350 | 500 |
+  | Cores | - | - | 1 | - | 2 | - | 3 |
+
+  A missed day starts again at 1. The cores go through the server
+  (`earn_cores`, `daily:<date>`, 3 a day at most). The service record shows
+  today's best and the streak (and the longest).
+- Daily runs count for everything else as solo runs do: XP, credits at half
+  rate, goals and pass XP.
 
 ## Solo and endless
 
@@ -598,14 +648,17 @@ level, best chain, near misses, pickups, and where you crash most. Every run has
 Settings are under `settings` on the title screen or the pause menu, and
 are saved on the device.
 
-- **Sound:** sound on/off, music level, effects level.
+- **Sound:** sound on/off, and music and effects each at their own level (off, low, medium or full).
 - **Controls:**
   - tilt to steer, and tilt sensitivity
   - touch steering: drag, or tap sides
   - drag sensitivity
   - where the boost button sits: right, left or middle
+  - **left-handed layout:** the boost button swaps sides (right and left;
+    the middle stays), and so do pause and the level at the top
   - double-tap and hold to boost, on or off
-  - vibration
+  - vibration: off, light (shorter, softer pulses in the same rhythm) or
+    full; older saves' on/off became full or off
   - ask before closing (the Android app only, on by default): back on the
     title screen asks before it closes the game
   - **quick retry** (off by default): after a crash outside ranked and the
@@ -616,10 +669,28 @@ are saved on the device.
     offer's answer. Stats, credits, bests, XP and goals are granted exactly as
     without it; the end screen's double-credits offer isn't shown
     (`src/core/retry.ts`).
+- **Reminders** (the Android app only, off by default;
+  `src/platform/reminders.ts`): a local notification at the time picked
+  (8:00 to 21:00, 18:00 unless changed), once a day at most: "new ranked run"
+  on a Monday (the game's week, UTC), otherwise "today's challenge is up" (or,
+  before the daily challenge opens, "your daily reward is ready"). They're
+  planned a week ahead and again whenever the game is opened, sent to the
+  background or the setting changes; today's is left out once today's
+  challenge is flown, and a player who stops playing hears nothing after that
+  week. Android 13+ asks for permission only when reminders are turned on,
+  never at start-up; a refusal turns them back off. After the 5th valid run
+  the game offers them once ("a daily reminder?", remind me / no thanks), on
+  the title with nothing else up. No push server: nothing is sent.
 - **Display:**
   - reduce motion: no shake, roll or speed lines
   - text size
   - high contrast
+  - **colour-blind mode** (`src/world/itemColours.ts`): blue against orange.
+    Boost pickups turn blue; the power-ups blues and white, each its own
+    shape (the shield a tall gem, the magnet a flat disc, slow-mo round),
+    the same in the pickup cards; everything that ends a run (lava, molten
+    metal, lava bombs and where they land, laser beams and warning lights)
+    one orange
   - ghost of your weekly best, on or off
   - performance mode: a lower render scale and lighter snow and ash, for
     older phones
@@ -719,4 +790,9 @@ fall check finds nothing under the ship.
 
 **Offline.** The production build registers a service worker and a web
 manifest, so the game installs to a home screen and works offline. Each
-new build drops the old build's cached scripts and styles.
+new build drops the old build's cached scripts and styles. With a server
+that can't be reached (no signal, or it's down), a quiet **offline** sits by
+the wallet on the title screen, the boards say so (with your own best),
+and everything on the device carries on: runs wait in the outbox, days
+follow the phone's clock, and the game picks everything up again once the
+server answers.

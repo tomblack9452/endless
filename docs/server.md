@@ -9,8 +9,10 @@ and [store.md](store.md) (purchases, ads and the app builds).
 
 - [Overview](#overview)
 - [Supabase settings](#supabase-settings)
+- [The daily challenge](#the-daily-challenge)
 - [Reports and moderation](#reports-and-moderation)
 - [Error reports](#error-reports)
+- [When the server can't be reached](#when-the-server-cant-be-reached)
 
 ## Overview
 
@@ -26,7 +28,8 @@ Without keys, everything lives on the device. With them:
   days, weeks and seasons (`server_now`, so moving the phone's clock doesn't
   turn the day),
   credits mirrored there (so balances can be changed from the dashboard),
-  and **leaderboards**: this week's ranked run per league, endless, and one
+  and **leaderboards**: this week's ranked run per league, **today's daily
+  challenge** (everyone on one board, since 1.0.8, `0019`), endless, and one
   for each solo environment, with pilot names and each pilot's ship drawn next
   to their name from the looks they have on. Tap a pilot to see their ship
   bigger, what's on it, and their **service record**: rank, XP, runs, time,
@@ -36,9 +39,10 @@ Without keys, everything lives on the device. With them:
   The server keeps each player's **league** (`players.league`, `0015`), so a
   ranked run counts in the league the server holds, not the one the game
   sends. Players can **report** a pilot from their card (`reports`,
-  `report_pilot`, `0017`), and the game sends **error reports**
-  (`client_errors`, `log_errors`, `0018`); both are read only in the
-  dashboard (below).
+  `report_pilot`, `0017`; only pilots with 5 runs or 3 days behind them count
+  towards resetting a name, `0020`), and the game sends **error reports**
+  (`client_errors`, `log_errors`, `0018`; cleared after 60 days, `0021`);
+  both are read only in the dashboard (below).
   Setup is two keys and `npm run db:apply` (or `npm run db:setup` and pasting the small SQL parts it makes in `supabase/parts/`): [leaderboards.md](leaderboards.md).
 - **RevenueCat** (`src/store/`) in the iOS and Android apps: core packs
   (100, 550, 1,200, 2,500), a one-time starter pack (500 cores and the nova
@@ -118,7 +122,7 @@ afterwards are flown with a maxed ship.
 
 After every update that adds a file to `supabase/migrations/`, run
 `npm run db:apply` (it only applies what's new), then `npm run check-server`
-to see it's all there. There are 18 so far; recent ones: `0010` (cores only
+to see it's all there. There are 21 so far; recent ones: `0010` (cores only
 from real rewards), `0011` (purchases and refunds in one call), `0012` (the
 trusted clock), `0013` (service records on the boards), `0014` (a purchase
 keeps RevenueCat's purchase time, and cores rewards are paid one at a time),
@@ -127,10 +131,16 @@ keeps RevenueCat's purchase time, and cores rewards are paid one at a time),
 takes back the cores its premium tiers paid: `pass_season()`,
 `pass_refunded()`, `store_refund` and `earn_cores` again), `0017` (reporting a
 pilot: the `reports` table, `report_pilot()`, `players.name_reset_at`),
-`0018` (error reports: the `client_errors` table, `log_errors()`).
+`0018` (error reports: the `client_errors` table, `log_errors()`), `0019`
+(the daily challenge: the `daily` board in `check_run` and `submit_run`,
+`daily_period()`, and `earn_cores` paying the streak's cores), `0020` (name
+reports count only from trusted reporters: `trusted_reporter()`,
+`report_pilot()` again), `0021` (error reports clear themselves:
+`prune_client_errors()`, `log_errors()` again).
 Apply `0014` and `0016` before deploying the webhook again; 1.0.7's webhook
 (a constant-time secret check) wants a redeploy after `db:apply`:
-`supabase functions deploy revenuecat-webhook --no-verify-jwt`.
+`supabase functions deploy revenuecat-webhook --no-verify-jwt`. 1.0.8 doesn't
+change the webhook.
 
 **A refunded season pass.** The webhook's refund (`store_refund`) renames the
 purchase `refunded:season_pass`. Since `0016`, for a pass bought with money it
@@ -158,6 +168,52 @@ list catches wrongly, add it to `ALLOW` in `scripts/name-filter/build.mjs`, run
 `npm run names:build`, and put the change in a new migration (delete the word
 from `name_words`).
 
+## The daily challenge
+
+Since 1.0.8 (`0019`). One short course a day, the same for everyone: the
+game builds it from the UTC date it gets from `server_now` (the trusted
+clock), so a phone with its clock moved gets the same course as everyone
+else. The server never builds courses; it only keeps the board and pays the
+streak.
+
+- **The board** is `daily`: `bests.period` is the server's UTC date
+  (`daily_period(now())`), league 0, so everyone is on one board. A run is
+  checked like a ranked run (the path every 4 units must match the distance
+  and never jump) and can't be longer than the course
+  (`c_daily_length`, a little over `CONFIG.daily.length`). It's filed under
+  the day the server is on when it arrives; the game drops a daily run still
+  waiting in its outbox once its day is over.
+- **The streak** lives on the device (and in the cloud save): days in a row
+  with a daily run. Each new day in the streak pays credits (on the device,
+  like every run's credits) and, on some days, cores through `earn_cores`
+  as `daily:<date>`: today's date (a day either side), once a day, 3 at
+  most.
+
+**Today's board:**
+
+```sql
+select p.name, b.score, b.seconds, b.achieved_at
+from public.bests b join public.players p on p.user_id = b.user_id
+where b.board = 'daily' and b.period = public.daily_period(now())
+order by b.score desc limit 50;
+```
+
+**Who's on a streak** (cores paid in the last week):
+
+```sql
+select p.name, count(*) as days, sum(l.delta) as cores
+from public.core_log l join public.players p on p.user_id = l.user_id
+where l.reason like 'daily:%' and l.at > now() - interval '7 days'
+group by p.name order by days desc;
+```
+
+Old daily bests stay in `bests` (one row per player per day played). To clear
+out last year's:
+
+```sql
+delete from public.bests where board = 'daily' and period < (current_date - 365)::text;
+```
+
 ## Reports and moderation
 
 Players report a pilot from their card on the boards: `name` (offensive name),
@@ -166,8 +222,11 @@ Players report a pilot from their card on the boards: `name` (offensive name),
 reporter per pilot a week and 20 a day per reporter. Players can't read the
 table; there's no app screen for it. Three different pilots reporting a name
 (since it was last set) reset it to a generated `pilot-xxxx`, which the game
-asks them to change; scores are never taken down on their own. In the SQL
-editor:
+asks them to change; scores are never taken down on their own. Since `0020`
+only reporters with at least 5 runs on the server, or an account at least 3
+days old (`trusted_reporter()`), count towards those three, so a handful of
+fresh anonymous accounts can't reset anyone's name; their reports are still
+kept and show in the query below. In the SQL editor:
 
 **Recent reports, most reported first:**
 
@@ -222,8 +281,10 @@ purchases, ads, the cloud save) through `log_errors`, which only inserts into
 `client_errors`: a short message and stack, the app version, platform, device
 model, the screen, when it happened (the phone's clock, kept within the last
 week) and when it arrived, with the account id. Emails, tokens and ids are taken
-out on the phone first. At most 20 a session and 50 a day per player. In the
-SQL editor:
+out on the phone first. At most 20 a session and 50 a day per player. Since
+`0021` they clear themselves: each `log_errors` call deletes the caller's
+reports older than 60 days and up to 50 of anyone's (`prune_client_errors()`),
+so the table stays small with nobody clearing it. In the SQL editor:
 
 **The last week, grouped by message and version:**
 
@@ -246,11 +307,22 @@ where message like 'purchase%'
 order by received_at desc limit 20;
 ```
 
-**Clearing out old ones** (nothing does it on its own):
+**Clearing out old ones by hand** (the game does it as it goes; this catches
+up all at once, say after a quiet spell):
 
 ```sql
-delete from public.client_errors where received_at < now() - interval '90 days';
+delete from public.client_errors where received_at < now() - interval '60 days';
 ```
+
+## When the server can't be reached
+
+Since 1.0.8 the game notices when a request finds no way through (no signal,
+or the server answering 5xx) and shows a quiet **offline** by the wallet on
+the title screen. The boards say "you're offline" with your own best, names
+wait for a connection, runs wait in the outbox, and everything on the device
+carries on. While it's offline the game asks `server_now` every 20 seconds or
+so (it needs no sign-in); when it answers, the game signs in if it hadn't,
+sends the waiting runs and error reports and takes the server's balances.
 
 Still to do on the server: a full re-fly of submitted runs with the game's
 own code (it needs the run simulation pulled out of `game.ts` first), and
