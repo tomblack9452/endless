@@ -20,6 +20,7 @@ interface Span {
 const DEFAULT_BIOME: Record<ThemeId, Biome> = { land: 'alien', canyon: 'canyon', interior: 'interior' };
 import { Decor, decorate, Light, pickRoom, ROOM_IDS, ROOMS, roomLength, type RoomAPI, type RoomId, type RoomPlan } from './interior';
 import { fxMaterial, Liquid, LIQUID_COLOURS, Sparks } from './fx';
+import { SAFE, SAFE_SHAPES } from './itemColours';
 import { type Block, type Parsed, parse, type Piece, routeX } from './pieces/format';
 import { FAMILIES, pickPiece, pieceById } from './pieces';
 import { ceilingFan } from './props';
@@ -72,6 +73,8 @@ interface ElevationConfig {
 
 const F = CONFIG.field;
 const TH = CONFIG.themes;
+/** Lava and molten metal's own colour, for turning colour-blind mode off again. */
+const MOLTEN = LIQUID_COLOURS[Liquid.Molten].clone();
 const LPT = TH.levelsPerTheme;
 const STEP = F.rowSpacing;
 const W = F.halfWidth;
@@ -428,12 +431,12 @@ export class World {
     this.iceSheets.setColorTable([new Color(CONFIG.biomes.iceLake)]);
     this.lavaBombs = new InstancedField(scene, rock, new MeshBasicMaterial({ color: CONFIG.biomes.lavaBomb, fog: false }), F.maxLavaBombs);
     this.marks = new InstancedField(scene, new RingGeometry(0.75, 1, 24).rotateX(-Math.PI / 2), fxMaterial('blink'), F.maxMarks);
-    this.marks.setColorTable([new Color(TH.interior.lights.red)]);
+    this.marks.setColorTable([this.markColour]);
     this.arches = new InstancedField(scene, rockArch(), this.propMat, F.maxArches);
     this.stripMat = new MeshBasicMaterial();
     this.strips = new InstancedField(scene, box, this.stripMat, F.maxStrips);
     const L = TH.interior.lights;
-    this.strips.setColorTable([new Color(1, 1, 1), new Color(L.amber), new Color(L.teal), new Color(L.red), new Color(L.dark), new Color(L.green)]);
+    this.strips.setColorTable([new Color(1, 1, 1), new Color(L.amber), new Color(L.teal), this.redLight, new Color(L.dark), new Color(L.green)]);
     // Wall dressing: shaded geometry tinted per instance from the decor table (Decor order).
     const D = TH.interior.decor;
     const decorTable = [D.steel, D.copper, D.teal, D.red, D.dark, D.yellow, D.panel, D.green, D.wood, D.woodDark, D.rope, D.glass, D.cliff].map((h) => new Color(h));
@@ -471,7 +474,7 @@ export class World {
     this.pickups = new InstancedField(scene, new OctahedronGeometry(p.size, 0), this.pickupMat, F.maxPickups);
     const pw = CONFIG.powers;
     this.powers = new InstancedField(scene, powerGem(pw.size), new MeshBasicMaterial({ vertexColors: true }), F.maxPowers);
-    this.powers.setColorTable([pw.shield.color, pw.magnet.color, pw.slow.color].map((c) => new Color(c)));
+    this.powers.setColorTable(this.powerColours);
     this.solids = [
       this.blocks,
       this.hull,
@@ -499,6 +502,28 @@ export class World {
   }
 
   // --- palette -------------------------------------------------------------
+
+  /** Where a lava bomb lands, and the red of laser beams and warning lights (colour-blind mode turns both orange). */
+  private readonly markColour = new Color(TH.interior.lights.red);
+  private readonly redLight = new Color(TH.interior.lights.red);
+  /** The power-ups' colours (the field's table: changed in place by colour-blind mode). */
+  private readonly powerColours = [CONFIG.powers.shield.color, CONFIG.powers.magnet.color, CONFIG.powers.slow.color].map((c) => new Color(c));
+
+  /**
+   * Colour-blind mode (itemColours.ts): power-ups in blues and white with a
+   * shape each, and every hazard (lava, molten metal, lava bombs and their
+   * marks, laser beams) one orange. The boost pickups follow the palette's
+   * pickup colour (game.ts sets it). Off puts the usual colours back.
+   */
+  setColourBlind(on: boolean): void {
+    const P = CONFIG.powers;
+    [P.shield.color, P.magnet.color, P.slow.color].forEach((c, i) => this.powerColours[i].set(on ? [SAFE.shield, SAFE.magnet, SAFE.slow][i] : c));
+    this.powers.shapeTable = on ? SAFE_SHAPES : null;
+    LIQUID_COLOURS[Liquid.Molten].set(on ? SAFE.hazard : MOLTEN);
+    (this.lavaBombs.mesh.material as MeshBasicMaterial).color.set(on ? SAFE.hazard : CONFIG.biomes.lavaBomb);
+    this.markColour.set(on ? SAFE.mark : TH.interior.lights.red);
+    this.redLight.set(on ? SAFE.hazard : TH.interior.lights.red);
+  }
 
   applyPalette(): void {
     this.faceColor(this.matLight.color, this.palette.cubeLight);

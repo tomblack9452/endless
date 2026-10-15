@@ -837,6 +837,21 @@ body {
   text-align: right;
 }
 
+/* Left-handed: the HUD's corners swap (pause top left, the level top right); the boost button's side is swapped in game.ts. */
+.left-handed .hud-top > .hud-side:first-child {
+  order: 3;
+  text-align: right;
+}
+
+.left-handed .hud-top > .hud-centre {
+  order: 2;
+}
+
+.left-handed .hud-top > .hud-side.right {
+  order: 1;
+  text-align: left;
+}
+
 /* Screens */
 
 .screen-center {

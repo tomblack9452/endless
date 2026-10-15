@@ -1,14 +1,24 @@
 // Vibration feedback. Uses the browser Vibration API (Android; iPhones ignore
-// it in the browser). The native app build will swap this for Capacitor's
-// Haptics plugin behind the same methods.
+// it in the browser), at the strength the settings pick.
 
 const can = typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function';
 
+/** A pattern at a strength (settings: 0 off, 1 light, 2 full): light keeps the rhythm with shorter, softer pulses. */
+export function scaled(pattern: number | number[], level: number): number[] {
+  const p = typeof pattern === 'number' ? [pattern] : pattern;
+  if (level <= 0) return [];
+  if (level >= 2) return p;
+  // Even entries buzz, odd ones are the gaps between.
+  return p.map((ms, i) => (i % 2 === 0 ? Math.max(4, Math.round(ms * 0.4)) : ms));
+}
+
 export class Haptics {
-  enabled = true;
+  /** Strength: 0 off, 1 light, 2 full (the vibration setting). */
+  strength = 2;
 
   private buzz(pattern: number | number[]): void {
-    if (this.enabled && can) navigator.vibrate(pattern);
+    const p = scaled(pattern, this.strength);
+    if (p.length > 0 && can) navigator.vibrate(p);
   }
 
   nearMiss(): void {

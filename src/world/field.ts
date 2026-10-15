@@ -103,6 +103,13 @@ export class InstancedField {
   }
 
   /** Enable per-instance colours from `table` (colours are read live each sync). */
+  /**
+   * Optional per-instance shapes from the same table index as the colour:
+   * [across, up, along] multiplied onto each instance's scale (colour-blind
+   * mode gives each power-up its own shape). Null: as spawned.
+   */
+  shapeTable: readonly (readonly [number, number, number])[] | null = null;
+
   setColorTable(table: Color[]): void {
     this.colorTable = table;
     this.colorAttr = new InstancedBufferAttribute(new Float32Array(this.max * 3), 3);
@@ -356,13 +363,14 @@ export class InstancedField {
       const o = n * 16;
       const c = this.cos[i];
       const s = this.sin[i];
-      const sx = this.sx[i];
-      const sz = this.sz[i];
+      const shape = this.shapeTable ? this.shapeTable[this.colorIdx[i]] : undefined;
+      const sx = this.sx[i] * (shape ? shape[0] : 1);
+      const sz = this.sz[i] * (shape ? shape[2] : 1);
       a[o] = c * sx;
       a[o + 1] = 0;
       a[o + 2] = -s * sx;
       a[o + 4] = 0;
-      a[o + 5] = this.sy[i];
+      a[o + 5] = this.sy[i] * (shape ? shape[1] : 1);
       a[o + 6] = 0;
       a[o + 8] = s * sz;
       a[o + 9] = 0;

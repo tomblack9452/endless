@@ -18,6 +18,7 @@ import { Weather } from '../world/weather';
 import { Ghost } from '../ship/ghost';
 import { decalArt } from '../ship/decals';
 import { Haptics } from '../platform/haptics';
+import { SAFE, setSafeColours } from '../world/itemColours';
 import { Capacitor } from '@capacitor/core';
 import { exitChoice } from '../platform/exit';
 import { sendFeedback } from '../platform/feedback';
@@ -2823,7 +2824,7 @@ export class Game {
     const p = this.practice;
     if (!p) return;
     // Steering is worded for the controls chosen (keys only if the keys were); boost for the device.
-    const keys = { keys: !hasTouch(), doubleTap: this.settings.doubleTapBoost, side: BOOST_SIDES[this.settings.boostSide] };
+    const keys = { keys: !hasTouch(), doubleTap: this.settings.doubleTapBoost, side: this.boostSide() };
     const steerHow = { ...keys, keys: false };
     if (p.kind === 'trial') {
       this.teach.setStep(`trying ${CONTROL_CARDS[p.control].name} · ${Math.max(0, Math.ceil(TRIAL_SECONDS - p.s.t))} s`, 0, 0);
@@ -3414,17 +3415,28 @@ export class Game {
     this.input.tiltSensitivity = TILT_GAIN[s.tiltSensitivity];
     this.input.sidesMode = s.touch === 1;
     this.input.doubleTapBoost = s.doubleTapBoost;
-    this.haptics.enabled = s.haptics;
+    this.haptics.strength = s.haptics;
     this.stage.setPerformance(s.performance);
     this.weather.lite = s.performance;
     if (!s.ghost) this.ghost.stop();
     this.world.assist = this.assistOn();
     if (this.assistOn() && this.state !== 'title') this.assisted = true;
-    this.ui.setDisplay(TEXT_SCALE[s.textSize], (['right', 'left', 'middle'] as const)[s.boostSide] ?? 'right', s.reduceMotion);
+    this.ui.setDisplay(TEXT_SCALE[s.textSize], this.boostSide(), s.reduceMotion, s.leftHanded);
+    // Colour-blind mode: the safe palette for hazards, pickups and power-ups, and a shape for each power-up.
+    setSafeColours(s.colourBlind);
+    this.world.setColourBlind(s.colourBlind);
+    for (const p of [this.basePalette, this.palette]) p.pickup.set(s.colourBlind ? SAFE.pickup : CONFIG.boost.pickup.color);
     this.applyLook(this.distanceScore / CONFIG.score.levelLength);
     this.ui.setDark(s.dark);
     this.refreshTitle(); // the rank colour has a light and a dark version
     this.ui.renderSettings(s);
+  }
+
+  /** Where the boost button sits: the setting, mirrored for the left hand (right and left swap; the middle stays). */
+  private boostSide(): (typeof BOOST_SIDES)[number] {
+    const side = BOOST_SIDES[this.settings.boostSide] ?? 'right';
+    if (!this.settings.leftHanded || side === 'middle') return side;
+    return side === 'right' ? 'left' : 'right';
   }
 
   /** Where "send feedback" was pressed, for the mail: settings (over the title or a paused run), or the pause screen. */
@@ -3894,7 +3906,7 @@ export class Game {
   /** Offer hint `id`, worded for the steering in use. Not during the practice run, which has its own prompts. */
   private tip(id: HintId): void {
     if (this.practice) return;
-    this.hints.offer(id, tipText(id, this.controlsNow(), { keys: id === 'boost' && !hasTouch(), doubleTap: this.settings.doubleTapBoost, side: BOOST_SIDES[this.settings.boostSide] }));
+    this.hints.offer(id, tipText(id, this.controlsNow(), { keys: id === 'boost' && !hasTouch(), doubleTap: this.settings.doubleTapBoost, side: this.boostSide() }));
   }
 
   /** Fill or drain the meter and ease the boost amount in and out. */

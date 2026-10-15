@@ -300,9 +300,10 @@ export class UI {
       if (value) value.textContent = label(s, el.dataset.setting as SettingKey);
     }
   }
-  /** Display settings that live on the page: text size, boost side, reduce motion. */
-  setDisplay(textScale: number, boostSide: 'right' | 'left' | 'middle', reduceMotion: boolean): void {
+  /** Display settings that live on the page: text size, boost side, reduce motion, the HUD mirrored for the left hand. */
+  setDisplay(textScale: number, boostSide: 'right' | 'left' | 'middle', reduceMotion: boolean, leftHanded = false): void {
     document.documentElement.style.setProperty('--ui-scale', String(textScale));
+    document.body.classList.toggle('left-handed', leftHanded);
     document.body.classList.toggle('boost-left', boostSide === 'left');
     document.body.classList.toggle('boost-middle', boostSide === 'middle');
     document.body.classList.toggle('reduce-motion', reduceMotion);

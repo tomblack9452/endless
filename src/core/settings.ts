@@ -15,7 +15,7 @@ export interface Settings {
   touch: number; // TOUCH: drag anywhere, or hold the left/right side
   boostSide: number; // SIDES: where along the bottom the boost button sits
   doubleTapBoost: boolean; // double-tap and hold anywhere to boost
-  haptics: boolean;
+  haptics: number; // HAPTICS: vibration strength (older saves had on/off)
   reduceMotion: boolean;
   textSize: number; // TEXT
   contrast: boolean; // high-contrast obstacles
@@ -25,6 +25,10 @@ export interface Settings {
   dark: boolean; // menus on dark panels with light text
   confirmExit: boolean; // Android: back on the title screen asks before closing the app
   quickRetry: boolean; // after a crash (not ranked), one tap flies again, with no game-over screen
+  leftHanded: boolean; // the boost button and the HUD's corners mirrored for the left thumb
+  colourBlind: boolean; // hazards, pickups and power-ups in a blue and orange palette, with shapes to tell them apart
+  reminders: boolean; // a local notification once a day at most (the Android app; off until the player turns it on)
+  reminderTime: number; // REMINDER_TIMES: when, on the phone's own clock
 }
 
 export type SettingKey = keyof Settings;
@@ -41,6 +45,18 @@ const TOUCH = ['drag', 'tap sides'];
 const SIDES = ['right', 'left', 'middle'];
 const TEXT = ['normal', 'large', 'larger'];
 export const TEXT_SCALE = [1, 1.2, 1.4];
+const HAPTICS = ['off', 'light', 'full'];
+/** Reminder times to pick from, [hour, minute] on the phone's clock; 18:00 by default. */
+export const REMINDER_TIMES: readonly [number, number][] = [
+  [8, 0],
+  [12, 0],
+  [17, 0],
+  [18, 0],
+  [19, 0],
+  [20, 0],
+  [21, 0],
+];
+const REMINDER_LABELS = REMINDER_TIMES.map(([h, m]) => `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`);
 
 /** Option lists for the numbered settings (booleans show on/off). */
 const OPTIONS: Partial<Record<SettingKey, string[]>> = {
@@ -51,6 +67,8 @@ const OPTIONS: Partial<Record<SettingKey, string[]>> = {
   touch: TOUCH,
   boostSide: SIDES,
   textSize: TEXT,
+  haptics: HAPTICS,
+  reminderTime: REMINDER_LABELS,
 };
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -63,7 +81,7 @@ export const DEFAULT_SETTINGS: Settings = {
   touch: 0,
   boostSide: 0,
   doubleTapBoost: true,
-  haptics: true,
+  haptics: 2,
   reduceMotion: false,
   textSize: 0,
   contrast: false,
@@ -73,16 +91,40 @@ export const DEFAULT_SETTINGS: Settings = {
   dark: false,
   confirmExit: true,
   quickRetry: false,
+  leftHanded: false,
+  colourBlind: false,
+  reminders: false,
+  reminderTime: 3,
 };
 
 const KEY = 'endless.settings';
 
-export async function loadSettings(): Promise<Settings> {
+/**
+ * Settings as saved, brought up to date: anything missing (a setting newer
+ * than the save) or of the wrong kind takes its default, and older forms are
+ * carried over (vibration was on/off: on is full strength now).
+ */
+export function migrateSettings(saved: unknown): Settings {
   const s = { ...DEFAULT_SETTINGS };
+  if (!saved || typeof saved !== 'object') return s;
+  const o = saved as Record<string, unknown>;
+  if (typeof o.haptics === 'boolean') o.haptics = o.haptics ? 2 : 0;
+  for (const key of Object.keys(DEFAULT_SETTINGS) as SettingKey[]) {
+    const v = o[key];
+    const def = DEFAULT_SETTINGS[key];
+    if (typeof v !== typeof def) continue;
+    if (typeof v === 'number' && (!Number.isInteger(v) || v < 0 || v >= (OPTIONS[key]?.length ?? 1))) continue;
+    (s as Record<SettingKey, unknown>)[key] = v;
+  }
+  return s;
+}
+
+export async function loadSettings(): Promise<Settings> {
+  let s = { ...DEFAULT_SETTINGS };
   const raw = await storage.get(KEY);
   if (raw) {
     try {
-      Object.assign(s, JSON.parse(raw) as Partial<Settings>);
+      s = migrateSettings(JSON.parse(raw));
     } catch {
       // Corrupt value: keep defaults.
     }
