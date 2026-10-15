@@ -13,6 +13,10 @@ public class MainActivity extends BridgeActivity {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        // The game's own theme first, as BridgeActivity does, but before the window is
+        // touched: EdgeToEdge reads the window, and on the launch (splash) theme that
+        // fixed an action bar on top of the game.
+        setTheme(R.style.AppTheme_NoActionBar);
         // Draw behind the status and navigation bars on every Android version, not
         // only 15+; the game keeps clear of them with the safe-area insets.
         EdgeToEdge.enable(this);
