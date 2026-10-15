@@ -36,8 +36,8 @@ describe("what's new", () => {
     expect(whatsNewOnLaunch(null, '1.0.7', true)).toBeNull();
     expect(whatsNewOnLaunch('1.0.7', '1.0.7', false)).toBeNull();
     expect(whatsNewOnLaunch('1.0.8', '1.0.7', false)).toBeNull(); // an older build after a newer one
-    expect(latestNotes('1.0.8')?.version).toBe('1.0.7'); // a later build without lines of its own...
-    expect(whatsNewOnLaunch('1.0.7', '1.0.8', false)).toBeNull(); // ...shows nothing to someone who saw 1.0.7's
+    expect(latestNotes('1.0.9')?.version).toBe('1.0.8'); // a later build without lines of its own...
+    expect(whatsNewOnLaunch('1.0.8', '1.0.9', false)).toBeNull(); // ...shows nothing to someone who saw 1.0.8's
     expect(latestNotes('1.0.6')).toBeNull();
   });
 });

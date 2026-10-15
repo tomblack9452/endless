@@ -4,6 +4,13 @@
 // The lines for each version live here, newest first.
 
 export const WHATS_NEW: Readonly<Record<string, readonly string[]>> = {
+  '1.0.8': [
+    'a daily challenge: one short course for all',
+    'fly it days in a row for credits and cores',
+    'share any new best as a picture',
+    'comfort: vibration, left hand, colour-blind',
+    'reminders if you want them; an offline mark',
+  ],
   '1.0.7': [
     'report a pilot from their card on the boards',
     'quick retry: one tap after a crash flies again',
