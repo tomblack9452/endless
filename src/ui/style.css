@@ -1073,6 +1073,7 @@ body {
   font-weight: 400;
   letter-spacing: 0.1em;
   opacity: 0.75;
+  text-wrap: balance; /* two even lines on a narrow phone, never one word left alone */
 }
 
 .title-ranked-sub:empty {
