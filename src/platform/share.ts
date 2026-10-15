@@ -1,11 +1,15 @@
 import { Capacitor } from '@capacitor/core';
+import { Directory, Filesystem } from '@capacitor/filesystem';
+import { Share } from '@capacitor/share';
 
 // The share card: a picture of a new best (or a ranked run) in the store art's
 // dusk: a deep sky warming to amber at the horizon, a ringed planet, dark
 // ridges, the lane glowing towards the ship, and the pilot's own ship on it,
 // with the score, the mode or board, and a small "endless space" wordmark.
-// Sent through the phone's share sheet where there is one (the Web Share API),
-// otherwise saved as a picture on the web.
+// In the Android app it's written to the cache directory and sent through the
+// share sheet (@capacitor/filesystem and @capacitor/share), with a line and the
+// Play listing; on the web through the Web Share API where there is one,
+// otherwise saved as a picture.
 
 export interface ShareCard {
   score: string;
@@ -234,26 +238,54 @@ function spaced(g: CanvasRenderingContext2D, text: string, x: number, y: number,
   }
 }
 
-/**
- * Can this device share the card? The web always can (the share sheet, or
- * saving the picture); the app only where its web view has the Web Share API
- * (Android's doesn't yet, and no share plugin is added), so there the button
- * stays hidden rather than offering something that can't work.
- */
+/** The game on Google Play: shared with the card from the app. */
+export const PLAY_LINK = 'https://play.google.com/store/apps/details?id=com.tomblack.endlessspace';
+
+/** The picture's name in the app's cache directory (written over each time). */
+export const CACHE_FILE = 'endless-space-share.png';
+
+/** Can this device share the card? The web always can (the share sheet, or saving the picture), and so can the app (its share plugin). */
 export function shareAvailable(): boolean {
-  return !Capacitor.isNativePlatform() || (typeof navigator !== 'undefined' && typeof navigator.share === 'function');
+  return true;
 }
 
 /** What happened: shared, saved as a picture (the web), or neither works here. */
 export type ShareOutcome = 'shared' | 'saved' | 'cancelled' | 'unavailable';
+
+/** The words that go with the card: the score and mode, and where to get the game. */
+export function shareText(c: Pick<ShareCard, 'score' | 'mode'>): string {
+  return `${c.score} · ${c.mode} · endless space`;
+}
+
+/** The PNG's bytes as base64 (what the filesystem plugin writes). */
+async function base64(blob: Blob): Promise<string> {
+  const bytes = new Uint8Array(await blob.arrayBuffer());
+  let bin = '';
+  for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  return btoa(bin);
+}
+
+/** The app: write the card to the cache directory and hand it to the share sheet, with a line and the Play listing. */
+export async function shareNative(blob: Blob, c: Pick<ShareCard, 'score' | 'mode'>): Promise<ShareOutcome> {
+  try {
+    const { uri } = await Filesystem.writeFile({ path: CACHE_FILE, data: await base64(blob), directory: Directory.Cache });
+    await Share.share({ title: 'Endless Space', text: shareText(c), url: PLAY_LINK, files: [uri], dialogTitle: 'share your run' });
+    return 'shared';
+  } catch (e) {
+    // Closing the share sheet without picking anything rejects with "Share canceled".
+    if (/cancel/i.test(String((e as Error)?.message ?? e))) return 'cancelled';
+    return 'unavailable';
+  }
+}
 
 /** Share the card through the share sheet, or save it where the device can't share pictures. */
 export async function shareCard(c: ShareCard): Promise<ShareOutcome> {
   const canvas = await drawShareCard(c);
   const blob = await new Promise<Blob | null>((r) => canvas.toBlob(r, 'image/png'));
   if (!blob) return 'unavailable';
+  if (Capacitor.isNativePlatform()) return shareNative(blob, c);
   const file = new File([blob], 'endless-space.png', { type: 'image/png' });
-  const data = { files: [file], title: 'Endless Space', text: `${c.score} · ${c.mode}` };
+  const data = { files: [file], title: 'Endless Space', text: shareText(c) };
   if (navigator.canShare?.(data)) {
     try {
       await navigator.share(data);
@@ -263,8 +295,6 @@ export async function shareCard(c: ShareCard): Promise<ShareOutcome> {
       // Not allowed: fall through to saving it.
     }
   }
-  // The app's web view can't save a download; only the web can.
-  if (Capacitor.isNativePlatform()) return 'unavailable';
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
   a.download = 'endless-space.png';
