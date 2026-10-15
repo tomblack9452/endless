@@ -4,21 +4,22 @@ import SETUP from '../supabase/setup.sql?raw';
 import { CONFIG } from '../src/core/config';
 import { ALLOWED, REFUSED } from './nameCases';
 import { applyMigrations } from '../scripts/apply-db-lib.mjs';
-import { parts as splitParts, statements } from '../scripts/sql-split.mjs';
+import { PART_LIMIT, partFiles, statements } from '../scripts/sql-split.mjs';
 
 // The database, run for real: PGlite is Postgres in WASM, with a stand-in for
 // the bits of Supabase the schema leans on (the auth schema and its roles).
 // This is how the leaderboard is tested without a Supabase project.
 
 const files = import.meta.glob<string>('../supabase/migrations/*.sql', { query: '?raw', import: 'default', eager: true });
-const partFiles = import.meta.glob<string>('../supabase/parts/*.sql', { query: '?raw', import: 'default', eager: true });
-/** The small parts, in order. */
-const PARTS: string[] = Object.entries(partFiles).sort((a, b) => a[0].localeCompare(b[0])).map(([, sql]) => sql);
 
 /** Every migration in order: [file name, sql]. */
 const migrations: [string, string][] = Object.entries(files)
   .map(([path, sql]): [string, string] => [path.split('/').pop() as string, sql])
   .sort((a, b) => a[0].localeCompare(b[0]));
+
+/** The small parts `npm run db:setup` writes to supabase/parts/ (not committed), made here in memory, in order. */
+const PART_FILES = partFiles(migrations.map(([, sql]) => sql.trim()).join('\n\n'), PART_LIMIT);
+const PARTS: string[] = PART_FILES.map((p) => p.text);
 
 const SUPABASE_STANDIN = `
   create role anon nologin;
@@ -145,12 +146,12 @@ describe('supabase/parts (for pasting a little at a time)', () => {
 
   it('say which part they are, in order, with none missing', () => {
     PARTS.forEach((p, i) => expect(p.split('\n')[0]).toContain(`part ${i + 1} of ${PARTS.length}`));
+    expect(PART_FILES.map((p) => p.name)).toEqual([...PART_FILES.map((p) => p.name)].sort());
   });
 
-  it('are the migrations, split between statements (run `npm run db:setup` if this fails)', () => {
-    const body = PARTS.map((p) => p.split('\n').slice(2).join('\n').trim());
-    const expected = splitParts(migrations.map(([, sql]) => sql.trim()).join('\n\n'), 3500);
-    expect(body).toEqual(expected);
+  it('are the migrations, in order, with nothing added or lost', () => {
+    const body = PARTS.map((p) => p.split('\n').slice(2).join('\n').trim()).join('\n\n');
+    expect(statements(body)).toEqual(statements(migrations.map(([, sql]) => sql.trim()).join('\n\n')));
   });
 
   it('never cut a statement: every part is whole statements', () => {

@@ -15,3 +15,5 @@ keystore.properties
 local.properties
 google-services.json
 android/app/release/
+# Made on demand by `npm run db:setup` (for pasting into the SQL editor); setup.sql is the committed copy.
+supabase/parts/

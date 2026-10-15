@@ -1,6 +1,6 @@
 // Splits SQL into statements (aware of comments, quotes and $$ bodies) and packs
 // them into parts that each stay under a size. Used by build-setup-sql.mjs, and
-// tested in tests/sql.test.ts.
+// tested in tests/sql.test.ts (which splits in memory: supabase/parts/ is not committed).
 
 /** The statements in `sql`, each with the comments in front of it, trimmed. */
 export function statements(sql) {
@@ -51,4 +51,16 @@ export function parts(sql, limit) {
   }
   if (current) result.push(current);
   return result;
+}
+
+export const PART_LIMIT = 3500; // bytes of SQL per part, well under the 4 KB where pastes have been cut off
+
+/** The files of supabase/parts/: `sql` in parts, each starting with a line saying which it is, so a missed one is obvious. */
+export function partFiles(sql, limit = PART_LIMIT) {
+  const pieces = parts(sql, limit);
+  const pad = (n) => String(n).padStart(2, '0');
+  return pieces.map((body, i) => ({
+    name: `${pad(i + 1)}-of-${pad(pieces.length)}.sql`,
+    text: `-- Endless Space database: part ${i + 1} of ${pieces.length}. Run the parts in order, 01 first.\n\n${body}\n`,
+  }));
 }
