@@ -757,6 +757,19 @@ describe('reporting a pilot', () => {
     await as(from);
     return (await db.query<{ report_pilot: string }>('select public.report_pilot($1, $2)', [pid, reason])).rows[0].report_pilot;
   };
+  /** A pilot whose name reports count (0020): an account this many days old. */
+  const pilotFor = async (days: number) => {
+    const u = await newUser();
+    await admin();
+    await db.query(`update public.players set created_at = now() - interval '${days} days' where user_id = $1`, [u]);
+    return u;
+  };
+  const trusted = () => pilotFor(4);
+  /** Give a player `n` runs on the server. */
+  const runsFor = async (u: string, n: number) => {
+    await admin();
+    for (let i = 0; i < n; i++) await db.query("insert into public.runs (user_id, week, league, score, seconds, distance, finished, path, board, at) values ($1, current_date, 0, 1200, 40, 2000, false, '{}', 'endless', now() - interval '1 hour')", [u]);
+  };
 
   it('keeps one report per reporter per pilot a week, never about yourself', async () => {
     const [a, b] = [await newUser(), await newUser()];
@@ -785,7 +798,7 @@ describe('reporting a pilot', () => {
     await as(target);
     await db.query("select public.set_pilot_name('Rude Name')");
     const pid = await pidOf(target);
-    const [a, b, c, d] = [await newUser(), await newUser(), await newUser(), await newUser()];
+    const [a, b, c, d] = [await trusted(), await trusted(), await trusted(), await trusted()];
     await report(a, pid, 'name');
     await report(a, pid, 'name'); // the same reporter twice counts once
     await report(b, pid, 'name');
@@ -799,6 +812,32 @@ describe('reporting a pilot', () => {
     await db.query("update public.reports set week = week - 7 where target = $1", [target]);
     await report(a, pid, 'name');
     expect(await nameOf(target)).toBe('Fresh Name');
+  });
+
+  it("doesn't let throwaway accounts reset a name: only pilots with 5 runs or 3 days count", async () => {
+    const target = await newUser();
+    await as(target);
+    await db.query("select public.set_pilot_name('Fair Name')");
+    const pid = await pidOf(target);
+    // Five brand new accounts: kept, but not counted.
+    for (let i = 0; i < 5; i++) expect(await report(await newUser(), pid, 'name')).toBe('reported');
+    expect(await nameOf(target)).toBe('Fair Name');
+    await admin();
+    expect((await db.query<{ n: number }>("select count(*)::int as n from public.reports where target = $1 and reason = 'name'", [target])).rows[0].n).toBe(5);
+    // Two days old, or four runs: still not.
+    await report(await pilotFor(2), pid, 'name');
+    const fewRuns = await newUser();
+    await runsFor(fewRuns, 4);
+    await report(fewRuns, pid, 'name');
+    expect(await nameOf(target)).toBe('Fair Name');
+    // Five runs counts; so does three days.
+    const played = await newUser();
+    await runsFor(played, 5);
+    await report(played, pid, 'name');
+    await report(await pilotFor(3), pid, 'name');
+    expect(await nameOf(target)).toBe('Fair Name'); // two that count so far
+    await report(await trusted(), pid, 'name');
+    expect(await nameOf(target)).toMatch(/^pilot-[0-9a-f]{4}$/);
   });
 
   it('never hides a score on its own', async () => {
@@ -837,6 +876,42 @@ describe('error reports', () => {
     expect(await log(many)).toBe(20);
     expect(await log(many)).toBe(10);
     expect(await log(many)).toBe(0);
+  });
+
+  it('clear themselves after 60 days: the sender\'s own, and a few of anyone\'s on each call', async () => {
+    const [a, b, c] = [await newUser(), await newUser(), await newUser()];
+    for (const u of [a, b]) {
+      await as(u);
+      await log([one({ message: 'old' }), one({ message: 'recent' })]);
+    }
+    await admin();
+    await db.query("update public.client_errors set received_at = now() - interval '61 days' where message = 'old'");
+    await db.query("update public.client_errors set received_at = now() - interval '59 days' where message = 'recent'");
+    const left = async (u: string) => {
+      await admin();
+      return (await db.query<{ message: string }>('select message from public.client_errors where user_id = $1 order by id', [u])).rows.map((r) => r.message);
+    };
+    // b has stopped playing; c's call clears b's old one too.
+    await as(c);
+    await log([one({ message: 'new' })]);
+    expect(await left(b)).toEqual(['recent']);
+    expect(await left(c)).toEqual(['new']);
+    await as(a);
+    await log([one({ message: 'another' })]);
+    expect(await left(a)).toEqual(['recent', 'another']);
+  });
+
+  it('prune a bounded number at a time, oldest first', async () => {
+    const a = await newUser();
+    await as(a);
+    await log(Array.from({ length: 12 }, (_, i) => one({ message: `p${i}` })));
+    await admin();
+    await db.query("update public.client_errors set received_at = now() - interval '90 days' - (substr(message, 2)::int * interval '1 hour') where user_id = $1 and message ~ '^p[0-9]+$'", [a]);
+    expect((await db.query<{ n: number }>('select public.prune_client_errors(5) as n')).rows[0].n).toBe(5);
+    const rest = (await db.query<{ message: string }>('select message from public.client_errors where user_id = $1 order by received_at', [a])).rows.map((r) => r.message);
+    expect(rest).toEqual(['p6', 'p5', 'p4', 'p3', 'p2', 'p1', 'p0']); // the oldest five went
+    await as(a);
+    await rejects(db.query('select public.prune_client_errors(5)'), /permission denied/);
   });
 
   it("can't be read back, written straight, or sent signed out", async () => {
