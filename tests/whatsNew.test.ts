@@ -10,7 +10,7 @@ describe("what's new", () => {
       expect(lines.length).toBeGreaterThanOrEqual(3);
       expect(lines.length).toBeLessThanOrEqual(5);
       for (const l of lines) {
-        expect(l.length).toBeLessThanOrEqual(70);
+        expect(l.length).toBeLessThanOrEqual(46); // one line each on a 360 wide phone
         expect(l).toBe(l.toLowerCase()); // the game's voice
       }
     }

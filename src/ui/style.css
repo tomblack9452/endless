@@ -4368,8 +4368,8 @@ body.dark #screen-title .title-word.sub {
   color: inherit;
   background: none;
   border: 0;
-  padding: 8px 14px;
-  margin: 0 0 -6px;
+  padding: 6px 14px;
+  margin: -2px 0 -6px;
 }
 
 @keyframes quick-retry {

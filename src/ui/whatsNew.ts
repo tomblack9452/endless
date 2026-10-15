@@ -6,10 +6,10 @@
 export const WHATS_NEW: Readonly<Record<string, readonly string[]>> = {
   '1.0.7': [
     'report a pilot from their card on the boards',
-    'quick retry in settings: one tap after a crash and you fly again',
-    'fairer ranked: the server checks your league',
-    "new season looks arrive on time, whatever the phone's clock says",
-    'bug fixes, and quiet error reports to find the next ones',
+    'quick retry: one tap after a crash flies again',
+    'fairer ranked: the server checks leagues',
+    'new season looks arrive on time',
+    'fixes, and quiet error reports for the rest',
   ],
 };
 
