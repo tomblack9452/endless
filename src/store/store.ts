@@ -1,5 +1,6 @@
 import { Capacitor } from '@capacitor/core';
 import { CONFIG } from '../core/config';
+import { reportError } from '../platform/errors';
 
 // Real-money purchases. In the iOS and Android apps, RevenueCat handles the
 // App Store and Google Play; on the web nothing is sold (the shop points to
@@ -61,7 +62,8 @@ class AppStore implements Store {
       this.rc = await import('@revenuecat/purchases-capacitor');
       await this.rc.Purchases.configure({ apiKey: this.key, appUserID: userId ?? undefined });
       this.user = userId;
-    } catch {
+    } catch (e) {
+      reportError('store start', e);
       this.rc = null;
     }
   }
@@ -97,7 +99,9 @@ class AppStore implements Store {
       await this.rc.Purchases.purchaseStoreProduct({ product: product as Parameters<RevenueCat['Purchases']['purchaseStoreProduct']>[0]['product'] });
       return 'ok';
     } catch (e) {
-      return (e as { userCancelled?: boolean }).userCancelled ? 'cancelled' : 'failed';
+      if ((e as { userCancelled?: boolean }).userCancelled) return 'cancelled';
+      reportError(`purchase ${id}`, e);
+      return 'failed';
     }
   }
 

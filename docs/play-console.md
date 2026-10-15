@@ -265,13 +265,22 @@ match what the app and its libraries actually do; Google checks.
 | App activity > **Other user-generated content** (the pilot name) | Yes | No | No | Required | App functionality |
 | Device or other IDs | Yes | **Yes** (AdMob) | No | Required | Advertising or marketing |
 | Location > **Approximate location** | Yes | Yes (AdMob, from the IP address) | No | Required | Advertising or marketing |
-| App info and performance > **Crash logs**, **Diagnostics** | Yes | Yes (AdMob) | No | Required | Advertising or marketing, Analytics |
+| App info and performance > **Crash logs**, **Diagnostics** | Yes | Yes (AdMob only) | No | Required | App functionality, Analytics (the game's own error reports); Advertising or marketing (AdMob) |
 
 Notes:
 - The pilot name, ship and service record summary (rank, XP, runs, time
   played, distance, furthest level, chains, near misses, pickups and bests)
   are shown to other players on the leaderboards. Check the form's own
   wording for data other users can see when you fill it in.
+- Since 1.0.7 the game sends its own error reports (crashes, and failed
+  sign-ins, purchases, ads and cloud saves) to Supabase: a short message and
+  stack, the version, platform, device model, screen and time, tied only to
+  the anonymous account id, with emails, names and tokens taken out. That's
+  crash logs and diagnostics collected, **not shared** (Supabase works for
+  you), for app functionality and analytics. It isn't linked to identity
+  beyond the account id; if the form asks whether the data is linked to the
+  user, the account id makes it **yes**. Reports about other pilots (from the
+  boards) are app interactions, already ticked.
 - "Shared" means sent to a **third party for its own use**. Supabase and
   RevenueCat work for you (service providers), so what goes to them isn't
   "shared". AdMob uses data for Google's advertising, so it is.

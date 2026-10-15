@@ -72,6 +72,10 @@ export class LocalBackend implements Backend {
     return null;
   }
 
+  async logErrors(): Promise<'retry'> {
+    return 'retry'; // no server: they wait on the device
+  }
+
   async reportPilot(): Promise<ReportResult> {
     return { ok: false, message: 'reports need the server' };
   }

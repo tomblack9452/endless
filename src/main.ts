@@ -9,6 +9,10 @@ import '@fontsource/geist-mono/latin-500.css';
 import './ui/style.css';
 import { Capacitor } from '@capacitor/core';
 import { Game } from './core/game';
+import { errorLog } from './platform/errors';
+
+// Errors nothing else catches go to the error log (sent to the server when there is one).
+errorLog.install(window);
 
 // Block browser gestures that fight the game.
 const block = (e: Event) => e.preventDefault();

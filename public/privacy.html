@@ -14,7 +14,7 @@
 </head>
 <body>
 <h1>Endless Space</h1>
-<p>Privacy policy · last updated 8 October 2026</p>
+<p>Privacy policy · last updated 15 October 2026</p>
 
 <p>Endless Space is a game made by Tom Black. This page says what the game
 keeps about you, why, and how to have it deleted. Short version: no names,
@@ -46,11 +46,23 @@ inside the game.</p>
   started. Your account id, Google account and email are never shown.</li>
   <li><b>Purchases.</b> If you buy something, Apple or Google handle the
   payment. The game sees what was bought, not your payment details.</li>
+  <li><b>Error reports.</b> When something goes wrong in the game (a crash,
+  or a sign-in, purchase, ad or cloud save that fails), it sends a short
+  report: what went wrong, where in the code, the game's version, the
+  platform, your phone's model, the screen you were on and when, tied to the
+  anonymous account id. Emails, names and sign-in tokens are taken out first.
+  At most a few a day; they're only used to fix bugs and are never
+  shared.</li>
+  <li><b>Reports about other pilots.</b> If you report a pilot from the
+  leaderboards (for an offensive name or an impossible score), the report,
+  your account id and theirs, and their name at the time are kept so it can be
+  looked at. Nobody else sees who reported whom.</li>
 </ul>
 
 <h2>Who else is involved</h2>
 <ul>
-  <li><b>Supabase</b> stores the account, cloud save, runs and leaderboards.</li>
+  <li><b>Supabase</b> stores the account, cloud save, runs, leaderboards,
+  reports and error reports.</li>
   <li><b>Google</b> confirms who you are when you sign in with Google (only if
   you choose to).</li>
   <li><b>RevenueCat</b> checks purchases with Apple and Google, using the
@@ -66,7 +78,8 @@ inside the game.</p>
 
 <h2>How long it's kept</h2>
 <p>For as long as you play. Delete your account and it's gone: your
-account, cloud save, runs, scores and name are deleted at once. Records of
+account, cloud save, runs, scores, name, error reports and the reports you
+sent are deleted at once. Records of
 purchases are kept, without the account, as stores and tax rules need.</p>
 
 <h2>Deleting your data</h2>

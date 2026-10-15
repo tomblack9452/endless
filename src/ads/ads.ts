@@ -1,5 +1,6 @@
 import { Capacitor } from '@capacitor/core';
 import { CONFIG } from '../core/config';
+import { reportError } from '../platform/errors';
 
 // Ads, behind one interface like the store. Rewarded ads are the free way to a
 // little convenience (a revive, doubled run credits, a daily gift, a new daily
@@ -70,7 +71,8 @@ class AdMobAds implements AdNetwork {
       if (consent.isConsentFormAvailable && consent.status === AdmobConsentStatus.REQUIRED) consent = await AdMob.showConsentForm();
       this.npa = !(allowed && (consent.status === AdmobConsentStatus.OBTAINED || consent.status === AdmobConsentStatus.NOT_REQUIRED));
       this.privacyRequired = String(consent.privacyOptionsRequirementStatus) === 'REQUIRED';
-    } catch {
+    } catch (e) {
+      reportError('ads start', e);
       this.m = null;
     }
   }
@@ -80,7 +82,8 @@ class AdMobAds implements AdNetwork {
     try {
       await this.m.AdMob.prepareRewardVideoAd({ adId: this.ids.rewarded, npa: this.npa });
       return true;
-    } catch {
+    } catch (e) {
+      reportError('ad load', e);
       return false;
     }
   }
@@ -104,7 +107,12 @@ class AdMobAds implements AdNetwork {
         handles.push(AdMob.addListener(E.Rewarded, () => void (earned = true)));
         // The reward can arrive just after the close (some ad networks): a moment's grace before calling it skipped.
         handles.push(AdMob.addListener(E.Dismissed, () => (earned ? finish('rewarded') : void setTimeout(() => finish(earned ? 'rewarded' : 'skipped'), 600))));
-        handles.push(AdMob.addListener(E.FailedToShow, () => finish('unavailable')));
+        handles.push(
+          AdMob.addListener(E.FailedToShow, (info) => {
+            reportError('ad show', info);
+            finish('unavailable');
+          }),
+        );
         void Promise.all(handles)
           .then(() => AdMob.showRewardVideoAd())
           .then(

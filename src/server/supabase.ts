@@ -1,6 +1,7 @@
 import { storage } from '../core/storage';
+import { reportError } from '../platform/errors';
 import type { ShipLook } from '../ship/portrait';
-import type { Backend, BoardQuery, BoardRow, LinkResult, PilotRecord, PilotStats, Purchase, ReportReason, ReportResult, RunSubmission, SubmitResult } from './backend';
+import type { Backend, BoardQuery, BoardRow, ClientError, LinkResult, PilotRecord, PilotStats, Purchase, ReportReason, ReportResult, RunSubmission, SubmitResult } from './backend';
 
 // Supabase over plain fetch (no SDK, to keep the bundle small):
 //   auth      anonymous sign-in, refreshed as it expires; a Google login can be
@@ -199,18 +200,21 @@ export class SupabaseBackend implements Backend {
   }
 
   async loadSave(): Promise<{ data: Record<string, string>; savedAt: number } | null | undefined> {
-    const rows = await this.call<{ data: Record<string, string>; saved_at: number }[]>(`/rest/v1/saves?select=data,saved_at&user_id=eq.${this.session?.user}`);
+    const { status, body } = await this.request(`/rest/v1/saves?select=data,saved_at&user_id=eq.${this.session?.user}`);
+    const rows = status >= 200 && status < 300 ? (body as { data: Record<string, string>; saved_at: number }[]) : null;
+    if (status > 0 && !Array.isArray(rows)) reportError('save load', `http ${status} ${SupabaseBackend.reason(body)}`); // the server said no (not just no signal)
     if (!Array.isArray(rows)) return undefined; // no answer: not the same as no save
     const row = rows[0];
     return row ? { data: row.data, savedAt: row.saved_at } : null;
   }
 
   async pushSave(data: Record<string, string>, savedAt: number): Promise<void> {
-    await this.call('/rest/v1/saves', {
+    const { status, body } = await this.request('/rest/v1/saves', {
       method: 'POST',
       headers: { Prefer: 'resolution=merge-duplicates' },
       body: JSON.stringify({ user_id: this.session?.user, data, saved_at: savedAt }),
     });
+    if (status >= 300) reportError('save push', `http ${status} ${SupabaseBackend.reason(body)}`);
   }
 
   async cores(): Promise<number | null> {
@@ -296,6 +300,12 @@ export class SupabaseBackend implements Backend {
     });
     if (!r) return null;
     return { name: r.name, premium: r.premium === true, ship: r.ship ?? null, stats: r.record ?? {}, bests: r.bests ?? {}, since: Number(r.since) || 0 };
+  }
+
+  async logErrors(errors: ClientError[]): Promise<'ok' | 'retry' | 'rejected'> {
+    const { status } = await this.request('/rest/v1/rpc/log_errors', { method: 'POST', body: JSON.stringify({ p_errors: errors }) });
+    if (status >= 200 && status < 300) return 'ok';
+    return status === 0 || status >= 500 || status === 401 || status === 403 || status === 429 ? 'retry' : 'rejected';
   }
 
   async reportPilot(pid: string, reason: ReportReason): Promise<ReportResult> {

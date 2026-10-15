@@ -75,6 +75,19 @@ export interface PilotRecord {
 
 export type LinkResult = 'linked' | 'taken' | 'failed';
 
+/** An error from the game, as log_errors keeps it (src/platform/errors.ts takes anything personal out first). */
+export interface ClientError {
+  message: string;
+  stack: string;
+  version: string;
+  platform: string;
+  device: string;
+  /** The screen or state the game was on. */
+  screen: string;
+  /** When it happened (ms). */
+  at: number;
+}
+
 /** Why a pilot is reported from their card on a board. */
 export type ReportReason = 'name' | 'score' | 'other';
 
@@ -128,6 +141,8 @@ export interface Backend {
   pilotRecord(pid: string): Promise<PilotRecord | null>;
   /** Report a pilot by the public id a board row gave (one report per pilot a week). */
   reportPilot(pid: string, reason: ReportReason): Promise<ReportResult>;
+  /** Send error reports: 'retry' when they couldn't go now (no signal), 'ok' or 'rejected' (don't send them again). */
+  logErrors(errors: ClientError[]): Promise<'ok' | 'retry' | 'rejected'>;
   /** True once if the account was marked to be maxed out from the SQL editor (players.max_out); clears the mark. */
   takeMaxOut(): Promise<boolean>;
   /** The Google account this account is kept with (its email), '' if none, or null if unknown. */

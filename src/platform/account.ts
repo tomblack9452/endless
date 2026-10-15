@@ -1,4 +1,5 @@
 import { Capacitor } from '@capacitor/core';
+import { reportError } from './errors';
 
 // Keeping an account: every player starts on an anonymous account, kept only
 // by a session on the device. Signing in with Google links a Google login to
@@ -67,6 +68,7 @@ export async function googleSignIn(): Promise<GoogleToken | GoogleFailure> {
     const err = e as { code?: string; message?: string };
     console.warn('google sign-in failed', err.code, err.message); // shows in Logcat (Capacitor/Console)
     if (err.code === 'USER_CANCELLED' || /cancelled by user/i.test(err.message ?? '')) return { error: 'cancelled' };
+    reportError('google sign-in', e);
     // Google's own codes ([16], [28444]...) say what's wrong; keep the start of the message.
     return { error: (err.message || String(e)).replace(/^Google Sign-In failed: /, '').slice(0, 160) };
   }

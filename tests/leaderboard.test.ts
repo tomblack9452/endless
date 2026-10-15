@@ -52,7 +52,8 @@ async function fakeFetch(input: RequestInfo | URL, init?: RequestInit): Promise<
     if (rpc) {
       const args = JSON.parse(String(init?.body ?? '{}')) as Record<string, unknown>;
       const names = Object.keys(args);
-      const values = names.map((k) => (Array.isArray(args[k]) ? `{${(args[k] as number[]).join(',')}}` : args[k]));
+      // A list of numbers is a Postgres array (the ghost's path); a list of anything else is JSON.
+      const values = names.map((k) => (Array.isArray(args[k]) ? (args[k].every((x) => typeof x === 'number') ? `{${(args[k] as number[]).join(',')}}` : JSON.stringify(args[k])) : args[k]));
       const call = `public.${rpc[1]}(${names.map((k, i) => `${k} => $${i + 1}`).join(', ')})`;
       if (rpc[1] === 'leaderboard') return json(200, (await db.query(`select * from ${call}`, values)).rows.map((r) => ({ ...(r as object) })));
       const r = await db.query<{ v: unknown }>(`select ${call} as v`, values);
@@ -152,6 +153,15 @@ describe('the game talking to the database', () => {
     expect(await a.reportPilot(row!.pid!, 'score')).toEqual({ ok: false, message: "that's you" });
     offline = true;
     expect(await b.reportPilot(row!.pid!, 'name')).toEqual({ ok: false, message: 'no connection' });
+    offline = false;
+  });
+
+  it('sends error reports, and keeps them for later with no signal', async () => {
+    const b = await player();
+    const e = { message: 'ad show: 3 No fill', stack: '', version: '1.0.7', platform: 'android', device: 'android 14', screen: 'title', at: Date.now() };
+    expect(await b.logErrors([e])).toBe('ok');
+    offline = true;
+    expect(await b.logErrors([e])).toBe('retry');
     offline = false;
   });
 

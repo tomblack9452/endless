@@ -121,7 +121,7 @@ describe('supabase/setup.sql', () => {
     await fresh.exec(SUPABASE_STANDIN);
     await fresh.exec(SETUP);
     const t = await fresh.query<{ table_name: string }>("select table_name from information_schema.tables where table_schema = 'public' order by 1");
-    expect(t.rows.map((r) => r.table_name)).toEqual(['bests', 'core_log', 'name_words', 'players', 'reports', 'runs', 'saves', 'store_events', 'wallets']);
+    expect(t.rows.map((r) => r.table_name)).toEqual(['bests', 'client_errors', 'core_log', 'name_words', 'players', 'reports', 'runs', 'saves', 'store_events', 'wallets']);
   });
 
   it('can run again over a database it already set up, as the Supabase GitHub integration does', async () => {
@@ -195,7 +195,7 @@ describe('db:apply (the migrations from a terminal)', () => {
     const second = await applyMigrations(asClient(d), migrations);
     expect(second).toEqual({ applied: [], recorded: [] });
     const t = await d.query<{ n: string }>("select table_name n from information_schema.tables where table_schema = 'public' order by 1");
-    expect(t.rows.map((r) => r.n)).toEqual(['bests', 'core_log', 'endless_migrations', 'name_words', 'players', 'reports', 'runs', 'saves', 'store_events', 'wallets']);
+    expect(t.rows.map((r) => r.n)).toEqual(['bests', 'client_errors', 'core_log', 'endless_migrations', 'name_words', 'players', 'reports', 'runs', 'saves', 'store_events', 'wallets']);
     // Every table has row-level security on (Supabase's advisor flags any that don't).
     const open = await d.query<{ n: string }>("select relname n from pg_class c join pg_namespace s on s.oid = c.relnamespace where s.nspname = 'public' and c.relkind = 'r' and not c.relrowsecurity");
     expect(open.rows).toEqual([]);
@@ -755,6 +755,42 @@ describe('reporting a pilot', () => {
     await admin();
     expect((await db.query<{ hidden: boolean }>('select hidden from public.players where user_id = $1', [target])).rows[0].hidden).toBe(false);
     expect((await db.query('select 1 from public.bests where user_id = $1', [target])).rows).toHaveLength(1);
+  });
+});
+
+describe('error reports', () => {
+  const log = async (errors: unknown) => (await db.query<{ log_errors: number }>('select public.log_errors($1::jsonb)', [JSON.stringify(errors)])).rows[0].log_errors;
+  const one = (over: Record<string, unknown> = {}) => ({ message: 'TypeError: x', stack: 'at f index.js:1:2', version: '1.0.7', platform: 'android', device: 'Pixel 7 · android 14', screen: 'over', at: Date.now(), ...over });
+
+  it('are kept, trimmed, and dated within the last week', async () => {
+    const a = await newUser();
+    await as(a);
+    expect(await log([one(), one({ message: 'm'.repeat(900), at: Date.now() + 86_400_000 }), one({ message: '' }), 'nonsense'])).toBe(2);
+    await admin();
+    const rows = await db.query<{ message: string; device: string; at: Date; user_id: string }>('select message, device, at, user_id from public.client_errors where user_id = $1 order by id', [a]);
+    expect(rows.rows).toHaveLength(2);
+    expect(rows.rows[0]).toMatchObject({ message: 'TypeError: x', device: 'Pixel 7 · android 14' });
+    expect(rows.rows[1].message).toHaveLength(300);
+    expect(rows.rows[1].at.getTime()).toBeLessThanOrEqual(Date.now() + 1000); // never in the future
+  });
+
+  it('take at most 20 a call and 50 a day per player', async () => {
+    const a = await newUser();
+    await as(a);
+    const many = Array.from({ length: 30 }, (_, i) => one({ message: `e${i}` }));
+    expect(await log(many)).toBe(20);
+    expect(await log(many)).toBe(20);
+    expect(await log(many)).toBe(10);
+    expect(await log(many)).toBe(0);
+  });
+
+  it("can't be read back, written straight, or sent signed out", async () => {
+    const a = await newUser();
+    await as(a);
+    await rejects(db.query('select * from public.client_errors'), /permission denied/);
+    await rejects(db.query("insert into public.client_errors (message, at) values ('x', now())"), /permission denied/);
+    await as(null);
+    await rejects(log([one()]), /permission denied/);
   });
 });
 

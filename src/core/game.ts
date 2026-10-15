@@ -21,6 +21,7 @@ import { Haptics } from '../platform/haptics';
 import { Capacitor } from '@capacitor/core';
 import { exitChoice } from '../platform/exit';
 import { sendFeedback } from '../platform/feedback';
+import { errorLog, reportError } from '../platform/errors';
 import { type HintId, Hints, tipText } from '../ui/hints';
 import { migrateMissionLooks, migrateTickets } from '../progression/legacy';
 import { type Feature, isOpen, nextStageText, STAGES, stageFor } from '../progression/reveal';
@@ -1388,7 +1389,9 @@ export class Game {
   private async connect(): Promise<void> {
     // The server's clock may have come after start-up stopped waiting: check today by it (asking again if need be).
     if (this.backend.clockKnown || (await this.backend.syncClock())) this.retime();
+    errorLog.attach(this.backend, () => this.errorScreen());
     if (await this.backend.signIn()) {
+      void errorLog.send(); // anything noted before signing in
       if (await this.cloud.start()) {
         location.reload(); // the cloud save is newer: start again from it
         return;
@@ -2011,6 +2014,7 @@ export class Game {
         return;
       }
       if (res === 'failed') {
+        reportError('google link', this.backend.authError || 'unknown error');
         this.ui.showNotice(`couldn't sign in: ${this.backend.authError || 'unknown error'}`);
         return;
       }
@@ -2030,6 +2034,7 @@ export class Game {
       this.googleArmed = false;
       const before = this.backend.userId;
       if (!(await this.backend.signInGoogle(token.idToken, token.nonce))) {
+        reportError('google switch', this.backend.authError || 'unknown error');
         this.ui.showNotice(`couldn't switch accounts: ${this.backend.authError || 'unknown error'}`);
         return;
       }
@@ -3269,6 +3274,13 @@ export class Game {
   }
 
   /** Where "send feedback" was pressed, for the mail: settings (over the title or a paused run), or the pause screen. */
+  /** What was up when an error happened, for the error log. */
+  private errorScreen(): string {
+    if (this.settingsOpen) return 'settings';
+    if (this.infoOpen) return String(this.infoOpen);
+    return this.state === 'playing' || this.state === 'paused' || this.state === 'crashed' ? `${this.state} (${this.mode}, level ${this.level})` : this.state;
+  }
+
   private feedbackScreen(): string {
     const run = `${this.mode} run, level ${this.level}`;
     if (this.settingsOpen) return this.state === 'paused' ? `settings (paused ${run})` : 'settings';
