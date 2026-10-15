@@ -63,19 +63,23 @@ secrets unless a CI build is added. `npm run check-server` says what's missing.
 ## Server
 
 Supabase. New migrations in `supabase/migrations/` (now up to
-`0014_purchase_time_and_earn_lock.sql`) only reach the live database with
+`0018_client_errors.sql`) only reach the live database with
 `npm run db:apply`. Never edit one that has shipped: add the next number, add its
 marker to `MADE` in `scripts/apply-db-lib.mjs`, then `npm run db:setup`. After
 adding one, remind Tom to run `db:apply`. `0012` is the trusted clock
 (`server_now`: days, weeks and seasons follow the server, not the phone), `0013`
 the service records on the boards (public ids, `pilot_record`), `0014` the
-purchase time and one-at-a-time `earn_cores`.
+purchase time and one-at-a-time `earn_cores`, `0015` leagues on the server
+(`players.league`, checked in `submit_run`), `0016` refunded season passes,
+`0017` reports (`report_pilot`), `0018` error reports (`log_errors`).
 
 RevenueCat purchases arrive through the `revenuecat-webhook` edge function,
 which calls `store_purchase_at` (0014; apply it before redeploying the webhook)
 and writes `store_events` with RevenueCat's purchase time. A refund renames the
-row's product to `refunded:<product>`. A refunded season pass doesn't take back
-its tier rewards.
+row's product to `refunded:<product>`. A refunded season pass (bought with
+money) takes back the cores its premium tiers paid and closes the premium track
+(`0016`); one unlocked with cores is never touched. After `db:apply`, redeploy
+the webhook when its code changes (1.0.7: a constant-time secret check).
 
 ## Google sign-in (`src/platform/account.ts`)
 
@@ -97,7 +101,9 @@ its tier rewards.
 - `identity_already_exists` means that Google account already keeps another
   player. The game switches to it.
 - Debug from the phone: Android Studio > Logcat, filter `Capacitor/Console`.
-  The game logs `google sign-in failed <code> <message>`.
+  The game logs `google sign-in failed <code> <message>`. Since 1.0.7 the
+  same failures (and crashes, purchases, ads, cloud saves) also land in the
+  `client_errors` table: `docs/server.md`, "Error reports".
 
 ## Ads (AdMob, `@capacitor-community/admob`)
 

@@ -20,5 +20,5 @@ Kept for the record; the current docs above win wherever they differ.
 
 - [archive/assessment.md](archive/assessment.md): a code and launch-readiness assessment of 7 October 2026.
 - [archive/design.md](archive/design.md): the design review of progression and paid features that the October 2026 work built.
-- [archive/launch-audit.md](archive/launch-audit.md): the four pre-launch audit passes, up to 1.0.6.
+- [archive/launch-audit.md](archive/launch-audit.md): the pre-launch audit passes, up to 1.0.7.
 - [archive/roadmap.md](archive/roadmap.md): the October 2026 plan of what came next.

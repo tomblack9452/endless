@@ -23,6 +23,7 @@ The folder map is in the [README](../README.md#project-layout). File by file:
 | `src/core/dev.ts` | Dev-only panel |
 | `src/core/game.ts` | State machine, main loop, scoring, boost, power-ups, menus |
 | `src/core/rng.ts` | Seeded random numbers (mulberry32) |
+| `src/core/retry.ts` | When a tap after a crash flies again (the retry lock, quick retry) |
 | `src/core/settings.ts` | Settings table and storage |
 | `src/core/storage.ts` | The async key/value store every save goes through |
 | `src/world/atmosphere.ts` | Day/night and theme colour blending |
@@ -65,11 +66,13 @@ The folder map is in the [README](../README.md#project-layout). File by file:
 | `src/ui/goalsView.ts` | The goals screen: daily, weekly and achievements, with claiming |
 | `src/ui/guide.ts`, `src/ui/controlArt.ts`, `src/ui/tutorialView.ts` | The pickup and power-up cards (from `CONFIG`), the control diagrams, the tutorial's indicators and recap |
 | `src/ui/hints.ts`, `src/platform/haptics.ts` | The first-run tips (walkthrough), vibration |
+| `src/ui/report.ts`, `src/ui/whatsNew.ts` | The report link on a pilot's card; the "what's new" lines for each version |
 | `src/ui/onboarding.ts` | First launch: the steps, the control cards, the practice run's lessons, the starter set |
 | `src/ui/scrollHint.ts`, `src/ui/systemBars.ts` | The always-visible scroll bar under sideways rows; Android's status and gesture bar icon colours per screen |
 | `src/ui/ui.ts`, `src/ui/style.css`, `index.html` | HUD and screens |
 | `src/platform/account.ts` | Keeping an account: Google sign-in and linking it to the anonymous player |
 | `src/platform/exit.ts`, `src/platform/feedback.ts` | Android back on the title screen (ask before closing); the feedback mail |
+| `src/platform/errors.ts` | Error reports: caught on the device, scrubbed, kept and sent a batch at a time (`log_errors`) |
 | `src/platform/input.ts` | Drag, side taps, tilt, keyboard, boost control |
 | `src/platform/nameFilter.ts`, `src/platform/nameWords.json` | The pilot-name profanity check and its word list (`npm run names:build`) |
 | `src/platform/share.ts` | The share card |

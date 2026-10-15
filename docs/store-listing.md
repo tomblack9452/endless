@@ -74,6 +74,12 @@ where these names may differ slightly):
 
 The first five are the best fit.
 
+## Release notes for 1.0.7
+
+<en-GB>
+Quick retry: turn it on in settings and one tap after a crash flies again. Report a pilot from their card on the leaderboards. Fairer ranked: the server now checks which league a run belongs to. New season looks arrive on time, whatever your phone's clock says. A short "what's new" card after each update. Plus fixes, and error reports to help find the next ones.
+</en-GB>
+
 ## Release notes for 1.0.6
 
 > A new tutorial: pick how you steer from cards that show each way in motion, then a practice run with an indicator for every lesson and a card for each pickup and power-up, with its real numbers. Afterwards, switch controls and try them for 15 seconds. Pickups & power-ups is now in settings > help.

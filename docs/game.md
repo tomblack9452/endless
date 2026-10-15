@@ -381,6 +381,12 @@ power. Every upgrade tier you own is one **upgrade point** (30 at most).
 - Divisions can drop; leagues never do. Finishing division 3 without the next
   league's points leaves you "promotion ready" until you buy them (buying the
   last one promotes you straight away).
+- **The server keeps your league** (since 1.0.7, `0015`), so a ranked run
+  can't be sent to a lower league's board. A run sent for a lower league
+  counts on your own league's board; a promotion is one league at a time, and
+  only after 12 ranked runs in the league below (the fewest that can fill its
+  three divisions). Players from before this start from the league of their
+  latest ranked run.
 - **Weekly reward:** credits for the highest division you reach each week
   (150 in Bronze 1 up to 2,250 in Grand Champion), paid when the next week
   starts.
@@ -496,7 +502,10 @@ wheel) and makes nine looks: a paint, an engine colour, a wing decal and a
 two-tone paint on the pass's premium track, a paint on the free track at tier
 25, and two paints and two engine colours for 2,000 to 20,000 credits, one of
 which the daily shop features each day of the season. Season 1's pass keeps its
-hand-made looks, so it only adds the shop four. Colours keep clear of the
+hand-made looks, so it only adds the shop four. The catalogue follows the
+server's clock once it's known (and a season turning mid-session), so a phone
+set behind still gets a new season's looks; one set ahead loses next season's
+looks again, except any it owns or wears. Colours keep clear of the
 hand-made paints, decals are built from an outline, a mark and pips, and a look
 stays in the catalogue for good once its season has come.
 `CONFIG.seasons.overrides` renames, recolours or vetoes any of them.
@@ -571,6 +580,12 @@ they follow the phone's.
   the apps) pays more, with the frost and ember paints, the solar engine and
   the raptor hull. Rewards are paid as you reach each tier, and unlocking
   premium pays every premium tier already reached.
+- **A refunded pass** (since 1.0.7, `0016`): the pass remembers whether
+  premium was unlocked with cores or bought. When a bought pass is refunded,
+  the server takes back the cores its premium tiers paid that season and pays
+  no more of them, and the game closes the premium track when it next reads
+  the purchase records (tiers already paid keep their looks and credits). A
+  track unlocked with cores is never touched.
 - After a run, the end screen lists any goals finished (to claim) and the pass
   XP earned, and the counters in the top bar bump as things land.
 
@@ -593,6 +608,14 @@ are saved on the device.
   - vibration
   - ask before closing (the Android app only, on by default): back on the
     title screen asks before it closes the game
+  - **quick retry** (off by default): after a crash outside ranked and the
+    tutorial, once any revive offer is settled, the game-over screen is left
+    out. A small panel shows the score and best ("tap to fly again", and a
+    main menu link), and one tap restarts. The retry lock (0.9 s,
+    `CONFIG.crash.retryLockMs`) still holds, and runs again from the revive
+    offer's answer. Stats, credits, bests, XP and goals are granted exactly as
+    without it; the end screen's double-credits offer isn't shown
+    (`src/core/retry.ts`).
 - **Display:**
   - reduce motion: no shake, roll or speed lines
   - text size
@@ -603,7 +626,7 @@ are saved on the device.
 - **Assist mode:** 80% speed and teal markers along the safe line. Assisted
   runs never count as a best score.
 - **Help:** replay the tutorial, replay tips, **pickups & power-ups** (the
-  tutorial's recap), **send feedback** (also on the
+  tutorial's recap), **what's new** (this version's card again), **send feedback** (also on the
   pause screen: a mail to tomblackdev@proton.me with the subject "Endless Space
   feedback", room to write, and the version and build, the device and Android
   version, and the screen it was sent from; `src/platform/feedback.ts`), help and
@@ -626,6 +649,24 @@ Everything is synthesised with the Web Audio API on the first tap.
 - Tempo follows speed, density follows level and boost, and brightness
   follows the time of day.
 - Near-miss chimes climb the current scale.
+
+**What's new.** The first launch after an update shows a card (the
+celebration card) with a few lines about the version, from
+`src/ui/whatsNew.ts`. Never on a fresh install (the tutorial covers that) and
+never twice: the last version seen is kept on the device, outside the cloud
+save. Settings > help > what's new shows it again.
+
+**Reporting a pilot.** Tap a pilot on a board, and under their service record
+is a small "report" link (never on your own row): offensive name, impossible
+score or other. One report per pilot a week. Three different pilots reporting
+a name resets it to a generated "pilot-xxxx" (the game then asks them for a
+new one); scores are only ever taken down by hand ([server.md](server.md)).
+
+**Error reports.** Uncaught errors, unhandled rejections and the key failures
+(Google sign-in, purchases, ads, the cloud save) are noted with the version,
+platform, device model and screen, with emails, tokens and ids taken out
+(`src/platform/errors.ts`). They wait on the device like runs in the outbox
+and go to the server a batch at a time: 20 a session at most, each once.
 
 ## How it works
 

@@ -85,7 +85,9 @@ and rank under a gap.
 
 Every submission, in `supabase/migrations/0003_leaderboards.sql`:
 
-- the board exists, the league is 0-6, the week is the server's own week (the
+- the board exists, the league is 0-6 and the player's own (the server keeps
+  each player's league since `0015`: a lower one counts on their own board, a
+  promotion is one league at a time after 12 ranked runs), the week is the server's own week (the
   game reads the week's board by the server's clock too, `server_now` in 0012)
 - the score can come from the distance (distance points plus the most the
   bonuses could add) and the time (no faster than a full-boost flight)
@@ -113,7 +115,7 @@ the run. If that starts to matter, the next steps in order of effort:
 
 ## Changing the database
 
-Add a new file in `supabase/migrations/` (the next number: `0015_...sql`; never
+Add a new file in `supabase/migrations/` (the next number: `0019_...sql`; never
 edit one that has been applied), add a table or function it creates to `MADE` in
 `scripts/apply-db-lib.mjs` (how a hand-pasted database is recognised), run
 `npm run db:setup` to rebuild `supabase/setup.sql` (and the paste-sized `supabase/parts/`, which

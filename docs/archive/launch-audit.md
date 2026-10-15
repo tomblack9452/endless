@@ -70,7 +70,9 @@ practice run starts.
 ## Nice to have
 
 16. Crash reporting (Sentry or similar). Left out: it needs an account and
-    changes the privacy policy. Easy to add later.
+    changes the privacy policy. Easy to add later. **Done in 1.0.7** without a
+    new service: the game's own error reports (`client_errors`, `0018`), with
+    the privacy policy updated.
 17. Store screenshots and a short trailer. Something only you can make from
     a phone build.
 18. A "rate the game" prompt after a good run. Better added once there are
@@ -124,13 +126,17 @@ turned on in the game's settings).
   pass card's line was cut off on a 360 wide phone, and a long set name was cut
   off in the shop.
 
-**Open** (needs a decision or more work):
+**Open** (needs a decision or more work), all **closed in 1.0.7**:
 
-- A refunded season pass keeps its premium track and the rewards it paid.
-- The ranked board trusts the league the game sends (leagues live on the
-  device), so a run can be sent to a lower league's board.
-- The season looks in the catalogue are fixed at start-up by the phone's clock;
-  a phone set weeks behind misses a new season's looks until it restarts.
+- ~~A refunded season pass keeps its premium track and the rewards it paid.~~
+  Closed: `0016` takes back the cores its premium tiers paid, and the game
+  closes the track (a pass unlocked with cores is never touched).
+- ~~The ranked board trusts the league the game sends (leagues live on the
+  device), so a run can be sent to a lower league's board.~~ Closed: the
+  server keeps each player's league (`0015`).
+- ~~The season looks in the catalogue are fixed at start-up by the phone's clock;
+  a phone set weeks behind misses a new season's looks until it restarts.~~
+  Closed: they follow the server's clock once it's known.
 
 ## Third pass (1.0.5, 14 October 2026)
 
@@ -186,3 +192,15 @@ replayed; skipping the tutorial keeps every first-run tip; skipping part way
 keeps the tips for the lessons not reached; nothing in the practice run or a
 trial counts (no stats, bests, boards or unlocks); the level banner and the
 in-run tips stay out of the practice run. Tilt needs checking on a real phone.
+
+## Fifth pass (1.0.7, 15 October 2026)
+
+**Fixed** (the second audit's open items): leagues on the server (`0015`), a
+refunded season pass takes back what it gave (`0016`), season looks follow
+the trusted clock, and the store webhook checks its secret in constant time.
+
+**Added:** reporting a pilot from their card on the boards, with a name reset
+after three reporters and SQL snippets for the rest (`0017`); the game's own
+error reports (`0018`); a "what's new" card after an update; quick retry (a
+setting); and the title's ranked line wraps in two even lines on a 360 wide
+phone.

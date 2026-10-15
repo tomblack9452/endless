@@ -9,6 +9,8 @@ and [store.md](store.md) (purchases, ads and the app builds).
 
 - [Overview](#overview)
 - [Supabase settings](#supabase-settings)
+- [Reports and moderation](#reports-and-moderation)
+- [Error reports](#error-reports)
 
 ## Overview
 
@@ -31,6 +33,12 @@ Without keys, everything lives on the device. With them:
   distance, furthest level, best chain, near misses, pickups and their best on
   each board (shared through a public id, never the account id). Runs are checked in the database (the score has to fit the distance
   and time, and the path the distance), kept and retried if there's no signal.
+  The server keeps each player's **league** (`players.league`, `0015`), so a
+  ranked run counts in the league the server holds, not the one the game
+  sends. Players can **report** a pilot from their card (`reports`,
+  `report_pilot`, `0017`), and the game sends **error reports**
+  (`client_errors`, `log_errors`, `0018`); both are read only in the
+  dashboard (below).
   Setup is two keys and `npm run db:apply` (or `npm run db:setup` and pasting the small SQL parts it makes in `supabase/parts/`): [leaderboards.md](leaderboards.md).
 - **RevenueCat** (`src/store/`) in the iOS and Android apps: core packs
   (100, 550, 1,200, 2,500), a one-time starter pack (500 cores and the nova
@@ -110,11 +118,36 @@ afterwards are flown with a maxed ship.
 
 After every update that adds a file to `supabase/migrations/`, run
 `npm run db:apply` (it only applies what's new), then `npm run check-server`
-to see it's all there. There are 14 so far; recent ones: `0010` (cores only
+to see it's all there. There are 18 so far; recent ones: `0010` (cores only
 from real rewards), `0011` (purchases and refunds in one call), `0012` (the
 trusted clock), `0013` (service records on the boards), `0014` (a purchase
-keeps RevenueCat's purchase time, and cores rewards are paid one at a time).
-`0014` has to be applied before the webhook is deployed again.
+keeps RevenueCat's purchase time, and cores rewards are paid one at a time),
+`0015` (leagues on the server: `players.league`, `ranked_league()`, and
+`submit_run` checking a ranked run's league), `0016` (a refunded season pass
+takes back the cores its premium tiers paid: `pass_season()`,
+`pass_refunded()`, `store_refund` and `earn_cores` again), `0017` (reporting a
+pilot: the `reports` table, `report_pilot()`, `players.name_reset_at`),
+`0018` (error reports: the `client_errors` table, `log_errors()`).
+Apply `0014` and `0016` before deploying the webhook again; 1.0.7's webhook
+(a constant-time secret check) wants a redeploy after `db:apply`:
+`supabase functions deploy revenuecat-webhook --no-verify-jwt`.
+
+**A refunded season pass.** The webhook's refund (`store_refund`) renames the
+purchase `refunded:season_pass`. Since `0016`, for a pass bought with money it
+also takes back the cores that season's premium tiers paid (the
+`pass:<season>:p<tier>` rows in `core_log`), as one `refund:pass:<season>` row,
+never below zero, and `earn_cores` pays no more premium tiers that season
+unless the pass is bought again. A pass unlocked with cores (spent as
+`pass-premium:<season>`) is never touched. The game closes the premium track
+when it next reads the purchase records.
+
+**Leagues.** `players.league` is the league the server holds a player in
+(null until their first ranked run since `0015`, then seeded from their latest
+ranked run). To move a player by hand (e.g. after a mistake), in the SQL editor:
+
+```sql
+update public.players set league = 2 where name = 'Ace Pilot';
+```
 
 **Bad names.** Names are checked against a profanity list
 ([zautumnz/profane-words](https://github.com/zautumnz/profane-words), WTFPL)
@@ -124,6 +157,100 @@ in the game and again in the database (`src/platform/nameFilter.ts`,
 list catches wrongly, add it to `ALLOW` in `scripts/name-filter/build.mjs`, run
 `npm run names:build`, and put the change in a new migration (delete the word
 from `name_words`).
+
+## Reports and moderation
+
+Players report a pilot from their card on the boards: `name` (offensive name),
+`score` (impossible score) or `other`. Each report is a row in `reports`
+(reporter, target, reason, the name they had then, the week, the time), one per
+reporter per pilot a week and 20 a day per reporter. Players can't read the
+table; there's no app screen for it. Three different pilots reporting a name
+(since it was last set) reset it to a generated `pilot-xxxx`, which the game
+asks them to change; scores are never taken down on their own. In the SQL
+editor:
+
+**Recent reports, most reported first:**
+
+```sql
+select p.name, p.public_id, r.reason, count(distinct r.reporter) as reporters,
+       max(r.at) as latest, array_agg(distinct r.name) as names_reported
+from public.reports r join public.players p on p.user_id = r.target
+where r.at > now() - interval '30 days'
+group by p.name, p.public_id, r.reason
+order by reporters desc, latest desc;
+```
+
+**Take a player off the boards** (and back with `false`):
+
+```sql
+update public.players set hidden = true where name = 'Rude Name';
+```
+
+**Clear a name** (back to a generated one, which the game asks them to change):
+
+```sql
+update public.players
+set name = 'pilot-' || substr(md5(random()::text), 1, 4), name_reset_at = now()
+where name = 'Rude Name';
+```
+
+**Remove a run or a best** (an impossible score). Their bests by board:
+
+```sql
+select b.board, b.period, b.league, b.score, b.achieved_at
+from public.bests b join public.players p on p.user_id = b.user_id
+where p.name = 'Ace Pilot' order by b.achieved_at desc;
+```
+
+Then delete the best (the board reads `bests`), and the run behind it if you
+like (`runs` keeps every run):
+
+```sql
+delete from public.bests
+where user_id = (select user_id from public.players where name = 'Ace Pilot')
+  and board = 'endless' and period = 'all';
+
+delete from public.runs
+where user_id = (select user_id from public.players where name = 'Ace Pilot')
+  and board = 'endless' and score = 123456;
+```
+
+## Error reports
+
+The game sends uncaught errors and the key failures (Google sign-in,
+purchases, ads, the cloud save) through `log_errors`, which only inserts into
+`client_errors`: a short message and stack, the app version, platform, device
+model, the screen, when it happened (the phone's clock, kept within the last
+week) and when it arrived, with the account id. Emails, tokens and ids are taken
+out on the phone first. At most 20 a session and 50 a day per player. In the
+SQL editor:
+
+**The last week, grouped by message and version:**
+
+```sql
+select message, version, count(*) as times, count(distinct user_id) as players,
+       max(received_at) as latest, min(screen) as a_screen, min(device) as a_device
+from public.client_errors
+where received_at > now() - interval '7 days'
+group by message, version
+order by times desc
+limit 50;
+```
+
+**One message in full** (the stacks):
+
+```sql
+select received_at, version, platform, device, screen, stack
+from public.client_errors
+where message like 'purchase%'
+order by received_at desc limit 20;
+```
+
+**Clearing out old ones** (nothing does it on its own):
+
+```sql
+delete from public.client_errors where received_at < now() - interval '90 days';
+```
 
 Still to do on the server: a full re-fly of submitted runs with the game's
 own code (it needs the run simulation pulled out of `game.ts` first), and
