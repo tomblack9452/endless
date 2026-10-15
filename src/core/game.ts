@@ -23,6 +23,7 @@ import { exitChoice } from '../platform/exit';
 import { sendFeedback } from '../platform/feedback';
 import { errorLog, reportError } from '../platform/errors';
 import { latestNotes, SEEN_KEY, whatsNewOnLaunch } from '../ui/whatsNew';
+import { quickRetryOn, tapRetries } from './retry';
 import { type HintId, Hints, tipText } from '../ui/hints';
 import { migrateMissionLooks, migrateTickets } from '../progression/legacy';
 import { type Feature, isOpen, nextStageText, STAGES, stageFor } from '../progression/reveal';
@@ -343,6 +344,12 @@ export class Game {
   private shattered = false;
   private fell = false;
   private overShown = false;
+  /** This crash skips the game-over screen (the quick retry setting, outside ranked). */
+  private quick = false;
+  /** crashMs when the crashed run was settled (after any revive offer). */
+  private settledMs = 0;
+  /** The best line for quick retry's panel. */
+  private quickLine = '';
 
   private lastTime = 0;
   private titleTime = 0;
@@ -570,6 +577,7 @@ export class Game {
     this.crashMs = 0;
     this.shattered = false;
     this.overShown = false;
+    this.ui.showQuickRetry(null);
     this.boostMeter = this.dev.fullBoost ? 1 : 0;
     this.boosting = false;
     this.boostLevel = 0;
@@ -632,13 +640,17 @@ export class Game {
     this.ui.setPower('');
     this.revivePending = this.canRevive();
     this.reviveAsked = false;
+    this.quick = quickRetryOn(this.settings.quickRetry, this.mode, this.practice !== null);
+    this.settledMs = 0;
     if (!this.revivePending) this.settleCrash();
   }
 
   /** Record a crashed run and fill the game-over screen (after any revive offer is turned down). */
   private settleCrash(): void {
     this.revivePending = false;
+    this.settledMs = this.crashMs;
     const { best, isNew } = this.recordBest(false);
+    this.quickLine = isNew ? `${formatScore(this.score)} · new best` : `${formatScore(this.score)} · best ${formatScore(best)}`;
     this.ui.setGameOver(this.score, best, isNew, this.nearMissCount, this.bestChain, this.seed);
     const where = themeForLevel(this.level) === 'interior' ? this.world.roomName || 'corridor' : this.areaName(this.level);
     const extra = this.finishRun(where);
@@ -3147,7 +3159,7 @@ export class Game {
       case 'title':
         break; // pick a mode with the buttons
       case 'crashed':
-        if (this.crashMs >= CONFIG.crash.retryLockMs && !this.revivePending && !this.econ.offerOpen) this.retry();
+        if (tapRetries({ crashMs: this.crashMs, settledMs: this.settledMs, revivePending: this.revivePending, offerOpen: this.econ.offerOpen, quick: this.quick, lockMs: CONFIG.crash.retryLockMs })) this.retry();
         break;
       case 'finished':
         if (this.overShown && !this.econ.offerOpen) this.retry();
@@ -3324,6 +3336,7 @@ export class Game {
 
   /** Abandon the run and go back to the live title scene. Best score still counts. */
   private toMainMenu(): void {
+    this.ui.showQuickRetry(null);
     if (this.state === 'paused' && !this.recorded) {
       // Abandoned mid-run: it still counts, for its best and the stats.
       this.recordBest(false);
@@ -4036,6 +4049,11 @@ export class Game {
         return;
       }
       this.overShown = true;
+      // Quick retry: a small line over the frozen scene instead of the game-over screen.
+      if (this.quick) {
+        this.ui.showQuickRetry(this.quickLine);
+        return;
+      }
       this.ui.showHud(false);
       this.ui.hideBanner();
       this.ui.show('over');

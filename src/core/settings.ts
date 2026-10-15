@@ -24,6 +24,7 @@ export interface Settings {
   performance: boolean; // lower resolution and lighter weather, for older phones
   dark: boolean; // menus on dark panels with light text
   confirmExit: boolean; // Android: back on the title screen asks before closing the app
+  quickRetry: boolean; // after a crash (not ranked), one tap flies again, with no game-over screen
 }
 
 export type SettingKey = keyof Settings;
@@ -71,6 +72,7 @@ export const DEFAULT_SETTINGS: Settings = {
   performance: false,
   dark: false,
   confirmExit: true,
+  quickRetry: false,
 };
 
 const KEY = 'endless.settings';

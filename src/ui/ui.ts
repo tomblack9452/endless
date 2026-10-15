@@ -1118,6 +1118,13 @@ export class UI {
     this.banner.classList.remove('show');
   }
 
+  /** Quick retry's small panel in place of the game-over screen (null hides it). */
+  showQuickRetry(line: string | null): void {
+    const box = $('quick-retry');
+    box.hidden = line === null;
+    if (line !== null) $('quick-retry-best').textContent = line;
+  }
+
   setGameOver(score: number, best: number, isNewBest: boolean, nearMisses: number, bestCombo: number, seed: number): void {
     this.overStats.textContent =
       (nearMisses > 0 ? `near misses ${nearMisses}, best chain x${bestCombo}` : 'no near misses') +

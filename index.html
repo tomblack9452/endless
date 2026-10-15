@@ -46,6 +46,11 @@
       </div>
 
       <div id="notice" class="label notice"></div>
+      <div id="quick-retry" class="label quick-retry" hidden>
+        <div id="quick-retry-best" class="dim"></div>
+        <div>tap to fly again</div>
+        <button class="label link dim quick-retry-menu" type="button" data-action="menu">main menu</button>
+      </div>
       <div id="hint" class="label hint" aria-live="polite"><div id="hint-text"></div><button id="hint-skip" class="label link hint-skip" type="button" hidden>skip tips</button></div>
 
       <div id="combo" class="combo">
@@ -234,6 +239,8 @@
           <button class="setting-row" type="button" data-setting="boostSide"><span class="label">boost button</span><span class="value"></span></button>
           <button class="setting-row" type="button" data-setting="doubleTapBoost"><span class="label">double-tap and hold to boost</span><span class="value"></span></button>
           <button class="setting-row" type="button" data-setting="haptics"><span class="label">vibration</span><span class="value"></span></button>
+          <button class="setting-row" type="button" data-setting="quickRetry"><span class="label">quick retry</span><span class="value"></span></button>
+          <div class="label dim setting-note">quick retry: after a crash, one tap flies again, without the game-over screen. not in ranked</div>
           <button id="confirm-exit-row" class="setting-row" type="button" data-setting="confirmExit" hidden><span class="label">ask before closing</span><span class="value"></span></button>
           <div class="settings-group">display</div>
           <button class="setting-row" type="button" data-setting="reduceMotion"><span class="label">reduce motion</span><span class="value"></span></button>
