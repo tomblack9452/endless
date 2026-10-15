@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import pkg from '../package.json';
 import { compareVersions, latestNotes, WHATS_NEW, whatsNewOnLaunch } from '../src/ui/whatsNew';
 
 // The "what's new" card: the first launch after an update only.
@@ -13,6 +14,11 @@ describe("what's new", () => {
         expect(l).toBe(l.toLowerCase()); // the game's voice
       }
     }
+  });
+
+  it("has this version's lines", () => {
+    expect(WHATS_NEW[pkg.version]).toBeDefined();
+    expect(latestNotes(pkg.version)?.version).toBe(pkg.version);
   });
 
   it('compares versions as numbers', () => {
