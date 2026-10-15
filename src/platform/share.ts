@@ -234,6 +234,16 @@ function spaced(g: CanvasRenderingContext2D, text: string, x: number, y: number,
   }
 }
 
+/**
+ * Can this device share the card? The web always can (the share sheet, or
+ * saving the picture); the app only where its web view has the Web Share API
+ * (Android's doesn't yet, and no share plugin is added), so there the button
+ * stays hidden rather than offering something that can't work.
+ */
+export function shareAvailable(): boolean {
+  return !Capacitor.isNativePlatform() || (typeof navigator !== 'undefined' && typeof navigator.share === 'function');
+}
+
 /** What happened: shared, saved as a picture (the web), or neither works here. */
 export type ShareOutcome = 'shared' | 'saved' | 'cancelled' | 'unavailable';
 

@@ -66,7 +66,7 @@ import { type BoardId, createBackend, type PilotStats, type Purchase, type Repor
 import { BOARD_TABS, boardCaption, boardForRun, boardName, boardQuery } from '../server/boards';
 import { Outbox } from '../server/outbox';
 import { CloudSave } from '../server/sync';
-import { shareCard } from '../platform/share';
+import { shareAvailable, shareCard } from '../platform/share';
 import { createStore, type ProductId, type StoreProduct } from '../store/store';
 import { storage } from './storage';
 import { SESSION_KEY } from '../server/supabase';
@@ -1644,7 +1644,7 @@ export class Game {
   /** The end screen's share button: for a new personal best in any mode, and every ranked run. */
   private offerShare(isNew: boolean): void {
     this.shareNew = isNew && !this.assisted && this.score > 0;
-    this.ui.showShare(this.shareNew || this.mode === 'ranked');
+    this.ui.showShare((this.shareNew || this.mode === 'ranked') && shareAvailable());
   }
 
   /** A picture of this run for the share sheet: the score, the mode or board, and your ship, in the store art's dusk. */

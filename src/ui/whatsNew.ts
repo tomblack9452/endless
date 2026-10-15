@@ -7,7 +7,7 @@ export const WHATS_NEW: Readonly<Record<string, readonly string[]>> = {
   '1.0.8': [
     'a daily challenge: one short course for all',
     'fly it days in a row for credits and cores',
-    'share any new best as a picture',
+    'a today tab on the leaderboards',
     'comfort: vibration, left hand, colour-blind',
     'reminders if you want them; an offline mark',
   ],
