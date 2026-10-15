@@ -22,6 +22,7 @@ import { Capacitor } from '@capacitor/core';
 import { exitChoice } from '../platform/exit';
 import { sendFeedback } from '../platform/feedback';
 import { errorLog, reportError } from '../platform/errors';
+import { latestNotes, SEEN_KEY, whatsNewOnLaunch } from '../ui/whatsNew';
 import { type HintId, Hints, tipText } from '../ui/hints';
 import { migrateMissionLooks, migrateTickets } from '../progression/legacy';
 import { type Feature, isOpen, nextStageText, STAGES, stageFor } from '../progression/reveal';
@@ -144,6 +145,9 @@ const GIFT_ICON =
 /** A goal badge: a star in a ring. */
 const GOAL_ICON =
   '<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round"><circle cx="32" cy="32" r="26"/><path d="M32 14l5.4 11.4 12.1 1.6-8.9 8.4 2.3 12.3L32 41.7l-10.9 6 2.3-12.3-8.9-8.4 12.1-1.6z"/></svg>';
+/** What's new: a four-point sparkle. */
+const NEW_ICON =
+  '<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round"><path d="M32 6c2 14 6 20 20 22-14 2-18 8-20 22-2-14-6-20-20-22 14-2 18-8 20-22z"/><path d="M50 40c1 5 2 7 7 8-5 1-6 3-7 8-1-5-2-7-7-8 5-1 6-3 7-8z"/></svg>';
 /** A season pass badge. */
 const PASS_ICON =
   '<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round"><path d="M32 6l22 10v16c0 13-9 22-22 26C19 54 10 45 10 32V16z"/><path d="M32 20l4 8 9 1-7 6 2 9-8-5-8 5 2-9-7-6 9-1z"/></svg>';
@@ -459,6 +463,7 @@ export class Game {
       // A new player starts with the welcome; the first daily reward waits for the end of it.
       if (this.onboarding.done) this.claimLogin();
       else this.openWelcome();
+      void this.checkWhatsNew();
       void this.connect();
     });
     this.econ.bindShop(this.onShopOffer, this.onShopBuy, this.onShopTab, this.onShopSet);
@@ -3192,6 +3197,7 @@ export class Game {
       this.openWelcome();
     }
     else if (action === 'guide') this.ui.showGuide('got it');
+    else if (action === 'whats-new') this.showWhatsNew();
     else if (action === 'menu') {
       const practising = this.practice;
       this.toMainMenu();
@@ -3274,6 +3280,22 @@ export class Game {
   }
 
   /** Where "send feedback" was pressed, for the mail: settings (over the title or a paused run), or the pause screen. */
+  /** The first launch after an update: a few lines about it (never on a fresh install, never twice). */
+  private async checkWhatsNew(): Promise<void> {
+    const seen = await storage.get(SEEN_KEY);
+    if (seen === __APP_VERSION__) return;
+    await storage.set(SEEN_KEY, __APP_VERSION__);
+    const lines = whatsNewOnLaunch(seen, __APP_VERSION__, !this.onboarding.done);
+    if (lines) this.showWhatsNew();
+  }
+
+  /** The card for this version (settings > help > what's new shows it again). */
+  private showWhatsNew(): void {
+    const notes = latestNotes(__APP_VERSION__);
+    if (!notes) return;
+    this.ui.celebrate([{ kicker: "what's new", icon: NEW_ICON, name: `version ${notes.version}`, lines: [...notes.lines] }]);
+  }
+
   /** What was up when an error happened, for the error log. */
   private errorScreen(): string {
     if (this.settingsOpen) return 'settings';
