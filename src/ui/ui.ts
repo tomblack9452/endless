@@ -75,6 +75,8 @@ export interface TitleCard {
   kicker: string;
   title: string;
   fraction?: number;
+  /** A small line under the title (the daily challenge's time left). */
+  sub?: string;
   /** Something to claim or do now. */
   hot?: boolean;
 }
@@ -349,6 +351,12 @@ export class UI {
         t.className = 'title label';
         t.textContent = c.title;
         b.append(k, t);
+        if (c.sub) {
+          const sub = document.createElement('span');
+          sub.className = 'sub label';
+          sub.textContent = c.sub;
+          b.append(sub);
+        }
         if (c.fraction !== undefined) {
           const track = document.createElement('span');
           track.className = 'xp-track';

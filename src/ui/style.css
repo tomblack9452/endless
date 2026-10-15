@@ -1196,6 +1196,15 @@ body {
   margin-top: 6px;
 }
 
+.live-card .sub {
+  font-size: calc(10px * var(--ui-scale));
+  letter-spacing: 0.08em;
+  opacity: 0.65;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 /* What opens next, for new players. */
 .title-next {
   margin-top: 10px;

@@ -2031,7 +2031,8 @@ export class Game {
     void this.backend.pilotName().then((name) => {
       // The name is asked for here, when it's first needed: a generated one ("pilot-3fa2") invites a real one.
       const generated = !name || GENERATED_NAME.test(name);
-      if (this.infoOpen === 'boards') this.ui.setPilotName(name ?? '', this.backend.online ? (generated ? 'pick your pilot name: 3 to 16 letters, numbers, spaces, - or _' : '3 to 16 letters, numbers, spaces, - or _. once an hour') : 'names come with the server');
+      const note = !this.backend.online ? 'names come with the server' : this.offline() ? 'names can be changed with a connection' : generated ? 'pick your pilot name: 3 to 16 letters, numbers, spaces, - or _' : '3 to 16 letters, numbers, spaces, - or _. once an hour';
+      if (this.infoOpen === 'boards') this.ui.setPilotName(name ?? '', note);
     });
   }
 
@@ -2047,7 +2048,7 @@ export class Game {
       this.ui.renderLeaderboard(caption, own, 'global boards need the server. this is your best on this device.');
       return;
     }
-    const offlineNote = "you're offline. the boards come back when you're connected. this is your best on this device.";
+    const offlineNote = `you're offline. the boards come back when you're connected.${own.length > 0 ? ' this is your best on this device.' : ''}`;
     if (this.offline()) {
       this.ui.renderLeaderboard(caption, own, offlineNote);
       void this.recheck();
@@ -3134,14 +3135,14 @@ export class Game {
     if (due >= 0) cards.push({ id: 'claim', kicker: 'daily reward', title: `day ${due + 1} ready to claim`, hot: true });
     if (this.daily.giftReady(day) && this.ads.offers('dailyGift')) cards.push({ id: 'gift', kicker: 'free gift', title: this.ads.label(), hot: true });
     if (this.open('daily')) {
-      // Today's challenge: your best and the time left, the streak in the kicker.
+      // Today's challenge: your best (or a new course), the time left, the streak in the kicker.
       const best = this.challenge.bestOn(this.today.day);
       const streak = this.challenge.streakOn(this.today.day);
-      const left = formatWait(untilTomorrow(now));
       cards.push({
         id: 'challenge',
-        kicker: streak > 0 ? `daily · ${streak} day streak` : 'daily challenge',
-        title: best > 0 ? `best ${formatScore(best)} · ${left} left` : `new course · ${left} left`,
+        kicker: streak > 0 ? `daily · ${streak} day${streak === 1 ? '' : 's'}` : 'daily challenge',
+        title: best > 0 ? `best ${formatScore(best)}` : 'new course',
+        sub: `${formatWait(untilTomorrow(now))} left`,
         hot: !this.challenge.playedOn(this.today.day),
       });
     }
@@ -4111,7 +4112,7 @@ export class Game {
     this.ui.setGameOver(this.score, best, isNew, this.nearMissCount, this.bestChain, this.seed);
     const extra = this.finishRun(null);
     this.offerShare(isNew);
-    this.ui.setGameOverExtra([`${formatTime(this.runTime)} · the daily challenge`, this.dailyLine, extra].filter(Boolean).join(' · '));
+    this.ui.setGameOverExtra([formatTime(this.runTime), this.dailyLine, extra].filter(Boolean).join(' · '));
     this.refreshTitle();
   }
 
@@ -4123,8 +4124,7 @@ export class Game {
     void this.planReminders(); // today's done: no reminder today
     this.dailyLine = r.streak > 0 ? `${r.streak} day streak` : '';
     if (r.reward) {
-      const lines = this.grant(r.reward);
-      this.dailyLine += ` · ${rewardText(r.reward)}`;
+      const lines = this.grant(r.reward); // on the card that follows, not the end screen as well
       this.ui.celebrate([{ kicker: `${r.streak} day${r.streak === 1 ? '' : 's'} in a row`, icon: FLAG_ICON, name: 'daily streak', lines: [...lines, r.streak < CONFIG.daily.streak.length ? `tomorrow: ${rewardText(streakReward(r.streak + 1))}` : 'the top of the ladder: keep it going'] }]);
     }
     return { best: r.best, isNew: r.isNew };
