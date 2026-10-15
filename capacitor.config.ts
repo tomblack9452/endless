@@ -21,6 +21,11 @@ const config: CapacitorConfig = {
       initialViewportFitValueHint: 'cover', // index.html's viewport-fit, known up front: no jump
       style: 'LIGHT',
     },
+    // Reminders (src/platform/reminders.ts): the dart ship in the status bar, in the store art's amber.
+    LocalNotifications: {
+      smallIcon: 'ic_stat_endless',
+      iconColor: '#e8a265',
+    },
     // Keeping an account (src/account.ts): Google on Android, Google and Apple on iOS.
     SocialLogin: {
       providers: { google: true, apple: true, facebook: false, twitter: false },

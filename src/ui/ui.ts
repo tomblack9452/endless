@@ -1083,8 +1083,14 @@ export class UI {
   }
 
   /** Settings that only mean something in the Android app ("ask before closing"). */
-  setNative(native: boolean): void {
+  setNative(native: boolean, reminders = native): void {
     $('confirm-exit-row').hidden = !native;
+    $('reminder-group').hidden = !reminders;
+  }
+
+  /** A celebration card is up (or waiting): offers wait until it's gone. */
+  get celebrating(): boolean {
+    return this.promo.classList.contains('show') || this.promoQueue.length > 0;
   }
 
   /** The pause button also answers a click and Enter (keyboard and screen readers), not just a press. */

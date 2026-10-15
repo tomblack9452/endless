@@ -304,6 +304,24 @@ Notes:
 - **COVID-19 apps:** "My app is not a publicly available COVID-19 contact tracing or status app."
 - **Data deletion** may also appear here as its own section: same URL as in 4f.
 - **Photo and video permissions / Foreground service / Exact alarms / Full-screen intents:** won't appear; the game uses none of them.
+  The notifications plugin (1.0.8) asks for `SCHEDULE_EXACT_ALARM`; the app's
+  manifest removes it (`tools:node="remove"`), so no exact alarm declaration is
+  needed. If Play ever says the bundle has it, check the merged manifest
+  (Android Studio > AndroidManifest.xml > Merged Manifest).
+
+### 4i. Notifications (since 1.0.8)
+The daily reminder (settings > reminders, off by default) is a **local**
+notification: the phone schedules and shows it, nothing is sent or collected,
+and there's no push server or Firebase. The bundle declares
+`POST_NOTIFICATIONS` (Android 13+ asks the player when they turn reminders on,
+never at start-up) and, through the plugin, `RECEIVE_BOOT_COMPLETED` and
+`WAKE_LOCK` (so a reminder survives a restart).
+- **Data safety (4f):** nothing changes. A permission isn't data collected;
+  no row is added.
+- **Privacy policy:** says so under "Notifications" (`public/privacy.html`).
+- No form asks about `POST_NOTIFICATIONS`. If a review asks why, the answer
+  is "an optional daily reminder the player turns on in settings, once a day
+  at most".
 
 ---
 

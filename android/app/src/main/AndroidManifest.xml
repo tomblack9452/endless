@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <application
         android:allowBackup="true"
@@ -44,4 +45,10 @@
     <!-- Permissions -->
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Reminders (settings, off until the player turns them on; src/platform/reminders.ts): local
+         notifications only. Android 13+ asks the player when they turn reminders on, never at start-up. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- The notifications plugin also asks for exact alarms; a reminder only needs to come about on
+         time, so that permission is left out (Play's exact alarm policy). -->
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" tools:node="remove" />
 </manifest>

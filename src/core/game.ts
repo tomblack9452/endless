@@ -12,13 +12,14 @@ import { Stage } from '../world/renderer';
 import { Sky } from '../world/sky';
 import { SpeedLines } from '../world/speedLines';
 import { Trail } from '../ship/trail';
-import { cycle, DEFAULT_SETTINGS, LEVEL_GAIN, loadSettings, saveSettings, type SettingKey, STEERING_RANGE, TEXT_SCALE, TILT_GAIN } from './settings';
+import { cycle, DEFAULT_SETTINGS, LEVEL_GAIN, loadSettings, REMINDER_TIMES, saveSettings, type SettingKey, STEERING_RANGE, TEXT_SCALE, TILT_GAIN } from './settings';
 import { EVENT_NOTICE, Events } from '../world/events';
 import { Weather } from '../world/weather';
 import { Ghost } from '../ship/ghost';
 import { decalArt } from '../ship/decals';
 import { Haptics } from '../platform/haptics';
 import { SAFE, setSafeColours } from '../world/itemColours';
+import { askPermission, planReminders, remindersAvailable, scheduleReminders } from '../platform/reminders';
 import { Capacitor } from '@capacitor/core';
 import { exitChoice } from '../platform/exit';
 import { sendFeedback } from '../platform/feedback';
@@ -98,6 +99,8 @@ const DEG = Math.PI / 180;
 const PATH_STEP = 4;
 const FIRST_PLAYED_KEY = 'endless.firstPlayed';
 const REVEAL_KEY = 'endless.reveal';
+/** The reminders were offered once (after the 5th valid run): kept on this device only. */
+const REMINDERS_OFFERED_KEY = 'endless.remindersOffered';
 
 /** The shop's tabs: looks as cards (today, the set, the vault), then lists (the pass, cores, premium). */
 type ShopTab = 'today' | 'set' | 'vault';
@@ -290,6 +293,10 @@ export class Game {
   private pathTimes: number[] = [];
   private pathNext = 0;
   private economyTimer = 0;
+  /** The saved settings have been read (until then they're the defaults). */
+  private settingsLoaded = false;
+  /** The reminders offer was looked at this session (it's made once, ever). */
+  private reminderOfferChecked = false;
   /** Asking the server whether it's back, and when it was last asked (the device's clock). */
   private rechecking = false;
   private lastRecheck = 0;
@@ -436,6 +443,7 @@ export class Game {
       if (document.hidden) {
         this.pause();
         this.sound.suspend(); // no music or engine from the background, whatever screen was up
+        void this.planReminders(); // what's done today is known now
       }
       // Back to the front: pick up any change to the balances made on the server (the dashboard),
       // and the server's clock again (the device's may have been moved meanwhile).
@@ -497,6 +505,7 @@ export class Game {
       else this.openWelcome();
       void this.checkWhatsNew();
       void this.connect();
+      void this.planReminders();
     });
     this.econ.bindShop(this.onShopOffer, this.onShopBuy, this.onShopTab, this.onShopSet);
     this.bindShowroomDrag();
@@ -528,7 +537,9 @@ export class Game {
     void looksReady.then(() => this.applyLooks());
     void loadSettings().then((s) => {
       this.settings = s;
+      this.settingsLoaded = true;
       this.applySettings();
+      void this.planReminders();
     });
     // Before modes were split, ranked and solo were endless runs: carry their bests over.
     void Promise.all([loadNumber(CONFIG.storageKeys.best, 0), loadNumber('endless.soloBest', 0), this.progress.load()]).then(([a, b]) => {
@@ -1403,6 +1414,7 @@ export class Game {
     this.weeklyGoals.turn(weekKey(now));
     this.pass.turn(now);
     this.turnWeek(now);
+    void this.offerReminders();
     if (Date.now() - this.lastRecheck > 20_000) {
       // Offline: is the server back?
       this.lastRecheck = Date.now();
@@ -3404,7 +3416,69 @@ export class Game {
     cycle(this.settings, key);
     this.applySettings();
     void saveSettings(this.settings);
+    if (key === 'reminders' && this.settings.reminders) void this.turnOnReminders();
+    else if (key === 'reminders' || key === 'reminderTime') void this.planReminders();
   };
+
+  /** Turn reminders on: Android asks for the permission now (and only now). Off again if it's refused. */
+  private async turnOnReminders(): Promise<void> {
+    void storage.set(REMINDERS_OFFERED_KEY, '1'); // never offered after this
+    if (!(await askPermission())) {
+      this.settings.reminders = false;
+      this.ui.renderSettings(this.settings);
+      void saveSettings(this.settings);
+      this.ui.showNotice('notifications are off for endless space. turn them on in android settings first');
+      return;
+    }
+    this.settings.reminders = true;
+    this.ui.renderSettings(this.settings);
+    void saveSettings(this.settings);
+    const [h, m] = REMINDER_TIMES[this.settings.reminderTime];
+    this.ui.showNotice(`reminders on: ${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}, once a day at most`);
+    await this.planReminders();
+  }
+
+  /** Plan the week's reminders again (or cancel them all, when they're off). */
+  private async planReminders(): Promise<void> {
+    if (!remindersAvailable() || !this.economyLoaded || !this.settingsLoaded) return;
+    if (!this.settings.reminders) return scheduleReminders([]);
+    const day = dayKey(this.now());
+    const dailyOpen = this.open('daily');
+    const [h, m] = REMINDER_TIMES[this.settings.reminderTime] ?? REMINDER_TIMES[3];
+    await scheduleReminders(
+      planReminders(Date.now(), h, m, {
+        rankedOpen: this.open('ranked'),
+        dailyOpen,
+        doneToday: dailyOpen ? this.challenge.playedOn(day) : this.daily.loginDue(day) < 0,
+      }),
+    );
+  }
+
+  /** Once, gently, after the 5th valid run: would they like a daily reminder? On the title, with nothing else up. */
+  private async offerReminders(): Promise<void> {
+    if (this.reminderOfferChecked || !this.settingsLoaded || !remindersAvailable() || this.settings.reminders || this.progress.stats.validRuns < 5) return;
+    if (this.state !== 'title' || this.infoOpen || this.settingsOpen || this.econ.offerOpen || this.ui.celebrating || this.exitAsking) return;
+    this.reminderOfferChecked = true;
+    if ((await storage.get(REMINDERS_OFFERED_KEY)) !== null) return;
+    void storage.set(REMINDERS_OFFERED_KEY, '1');
+    const [h, m] = REMINDER_TIMES[this.settings.reminderTime];
+    this.econ.offer(
+      {
+        kicker: '',
+        name: 'a daily reminder?',
+        lines: [`a nudge at ${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')} when there's something new to fly. once a day at most`, 'settings can change the time or turn it off'],
+        yes: 'remind me',
+        yesEnabled: true,
+        no: 'no thanks',
+        seconds: 0,
+      },
+      () => {
+        this.settings.reminders = true;
+        void this.turnOnReminders();
+      },
+      () => undefined,
+    );
+  }
 
   private applySettings(): void {
     const s = this.settings;
@@ -3471,7 +3545,7 @@ export class Game {
 
   private openSettings(): void {
     this.settingsOpen = true;
-    this.ui.setNative(this.native);
+    this.ui.setNative(this.native, remindersAvailable());
     this.ui.show('settings');
     this.refreshAccount();
     void this.backend.pilotName().then((name) => this.ui.setPilotName(name ?? '', this.backend.online ? '3 to 16 letters, numbers, spaces, - or _' : 'names come with the server', 'settings'));
@@ -4046,6 +4120,7 @@ export class Game {
     const d = this.dailyRunNow!;
     const counts = finished || this.runTime >= CONFIG.daily.countsAfter;
     const r = this.challenge.record(d.day, this.score, counts);
+    void this.planReminders(); // today's done: no reminder today
     this.dailyLine = r.streak > 0 ? `${r.streak} day streak` : '';
     if (r.reward) {
       const lines = this.grant(r.reward);
