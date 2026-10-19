@@ -973,6 +973,77 @@ describe('pilot name filter', () => {
   });
 });
 
+describe('ghost rivals (rival_path)', () => {
+  // League 6 (grand champion) on this week's board: no other test flies there.
+  const L = 6;
+  type Rival = { name: string; score: number; seconds: number; distance: number; path: number[] };
+  const rival = async (): Promise<Rival[]> => (await db.query<Rival>('select * from public.rival_path()')).rows;
+  const ranked = async (score: number) => {
+    await age();
+    return submit({ board: 'ranked', league: L, score, distance: 4000, seconds: 60 });
+  };
+  const pilot = async (name: string): Promise<string> => {
+    const u = await newUser();
+    await admin();
+    await db.query('update public.players set name = $2 where user_id = $1', [u, name]);
+    return u;
+  };
+  let low: string, mid: string, top: string;
+
+  beforeAll(async () => {
+    low = await pilot('rival low');
+    mid = await pilot('rival mid');
+    top = await pilot('rival top');
+    await as(low);
+    await ranked(4000);
+    await as(mid);
+    await ranked(5000);
+    await ranked(5600); // their best: this run's path is the one sent
+    await as(top);
+    await ranked(7000);
+  });
+
+  it("gives the run of the pilot just above you on your league's board, with only their pilot name", async () => {
+    await as(low);
+    const r = await rival();
+    expect(r).toHaveLength(1);
+    expect(r[0].name).toBe('rival mid');
+    expect(r[0].score).toBe(5600);
+    expect(r[0].path.length).toBe(Math.ceil(4000 / 4));
+    expect(Object.keys(r[0]).sort()).toEqual(['distance', 'name', 'path', 'score', 'seconds']); // no ids
+    await as(mid);
+    expect((await rival())[0].name).toBe('rival top');
+  });
+
+  it('gives the top pilot nothing, and a pilot with no run this week the bottom of the board', async () => {
+    await as(top);
+    expect(await rival()).toEqual([]);
+    const fresh = await newUser();
+    await admin();
+    await db.query('update public.players set league = $2 where user_id = $1', [fresh, L]);
+    await as(fresh);
+    expect((await rival())[0].name).toBe('rival low');
+  });
+
+  it('never picks a hidden pilot, or one in another league', async () => {
+    await admin();
+    await db.query('update public.players set hidden = true where user_id = $1', [mid]);
+    await as(low);
+    expect((await rival())[0].name).toBe('rival top');
+    await admin();
+    await db.query('update public.players set hidden = false where user_id = $1', [mid]);
+    const other = await newUser();
+    await as(other);
+    await submit({ board: 'ranked', league: 5, score: 4100, distance: 3000, seconds: 50 });
+    expect((await rival()).map((r) => r.name)).not.toContain('rival mid');
+  });
+
+  it("can't be called signed out", async () => {
+    await as(null);
+    await rejects(rival(), /permission denied|sign in/);
+  });
+});
+
 describe('the checks match the game', () => {
   const sql = migrations.map(([, text]) => text).join('\n');
   const constant = (name: string): number => {
@@ -985,5 +1056,16 @@ describe('the checks match the game', () => {
     expect(constant('c_points_per_unit')).toBe(CONFIG.score.pointsPerUnit);
     expect(constant('c_top_speed')).toBeGreaterThan(CONFIG.speed.max * CONFIG.boost.speedMultiplier);
     expect(constant('c_path_step')).toBe(4);
+  });
+
+  it('leave room for double points (1.0.9): a run boosting all the way, doubled for its share of power-ups, stays under the score limit', () => {
+    const P = CONFIG.powers;
+    const w = P.weights;
+    const share = w.double / (w.shield + w.magnet + w.slow + w.phase + w.double);
+    // The most often power-ups come (the scanner at tier 5: 40% more often), and the furthest 8 s can fly.
+    const unitsPerDouble = P.spacing[0] / 1.4 / share;
+    const doubled = Math.min(1, (P.double.seconds * CONFIG.speed.max * CONFIG.boost.speedMultiplier) / unitsPerDouble);
+    const perUnit = CONFIG.score.pointsPerUnit * (1 + CONFIG.score.boostBonus) * (1 + doubled * (P.double.factor - 1));
+    expect(perUnit).toBeLessThan(constant('c_points_per_unit') * (1 + constant('c_bonus_share')));
   });
 });

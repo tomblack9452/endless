@@ -1,7 +1,7 @@
 import { storage } from '../core/storage';
 import { reportError } from '../platform/errors';
 import type { ShipLook } from '../ship/portrait';
-import type { Backend, BoardQuery, BoardRow, ClientError, LinkResult, PilotRecord, PilotStats, Purchase, ReportReason, ReportResult, RunSubmission, SubmitResult } from './backend';
+import type { Backend, BoardQuery, BoardRow, ClientError, LinkResult, PilotRecord, PilotStats, Purchase, ReportReason, ReportResult, RivalRun, RunSubmission, SubmitResult } from './backend';
 
 // Supabase over plain fetch (no SDK, to keep the bundle small):
 //   auth      anonymous sign-in, refreshed as it expires; a Google login can be
@@ -313,6 +313,13 @@ export class SupabaseBackend implements Backend {
     });
     if (!r) return null;
     return { name: r.name, premium: r.premium === true, ship: r.ship ?? null, stats: r.record ?? {}, bests: r.bests ?? {}, since: Number(r.since) || 0 };
+  }
+
+  async rivalRun(): Promise<RivalRun | null> {
+    const rows = await this.call<{ name: string; score: number; seconds: number; distance: number; path: number[] | null }[]>('/rest/v1/rpc/rival_path', { method: 'POST', body: '{}' });
+    const r = rows?.[0];
+    if (!r || !Array.isArray(r.path) || r.path.length < 2) return null;
+    return { name: r.name, score: Number(r.score) || 0, seconds: Number(r.seconds) || 0, distance: Number(r.distance) || 0, path: r.path.map(Number) };
   }
 
   async logErrors(errors: ClientError[]): Promise<'ok' | 'retry' | 'rejected'> {

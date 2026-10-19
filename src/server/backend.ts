@@ -75,6 +75,16 @@ export interface PilotRecord {
   since: number;
 }
 
+/** The run of the pilot just above you on your league's ranked board this week (rival_path, 0022): their pilot name and nothing else about them. */
+export interface RivalRun {
+  name: string;
+  score: number;
+  seconds: number;
+  distance: number;
+  /** The ship's sideways position every 4 units. */
+  path: number[];
+}
+
 export type LinkResult = 'linked' | 'taken' | 'failed';
 
 /** An error from the game, as log_errors keeps it (src/platform/errors.ts takes anything personal out first). */
@@ -143,6 +153,8 @@ export interface Backend {
   setRecord(stats: PilotStats): Promise<boolean>;
   /** A pilot's service record by the public id a board row gave, or null if it couldn't be read. */
   pilotRecord(pid: string): Promise<PilotRecord | null>;
+  /** Ranked: the run of the pilot just above you on your league's board this week (ghost rivals), or null if there's none or it couldn't be read. */
+  rivalRun(): Promise<RivalRun | null>;
   /** Report a pilot by the public id a board row gave (one report per pilot a week). */
   reportPilot(pid: string, reason: ReportReason): Promise<ReportResult>;
   /** Send error reports: 'retry' when they couldn't go now (no signal), 'ok' or 'rejected' (don't send them again). */

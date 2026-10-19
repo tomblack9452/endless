@@ -73,6 +73,10 @@ export class LocalBackend implements Backend {
     return null;
   }
 
+  async rivalRun(): Promise<null> {
+    return null;
+  }
+
   async logErrors(): Promise<'retry'> {
     return 'retry'; // no server: they wait on the device
   }
