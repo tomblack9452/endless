@@ -827,7 +827,7 @@ export const CONFIG = {
     magnet: { color: '#b48ad8', seconds: 9, reach: 28, pull: 7 },
     slow: { color: '#7fc28e', seconds: 6, factor: 0.62 },
     // Phase: the ship ghosts through the next thing it hits (not walls, pits or lava) within `seconds`.
-    phase: { color: '#d3d7f2', seconds: 7, passSeconds: 0.45 },
+    phase: { color: '#8f95b2', seconds: 7, passSeconds: 0.45 },
     // Double points: everything scored for `seconds` counts `factor` times.
     double: { color: '#e88aa6', seconds: 8, factor: 2 },
     // How often each turns up when a power-up takes a boost pickup's place (shield, magnet, slow-mo, phase, double points).

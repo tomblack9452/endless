@@ -1,5 +1,5 @@
 // The run summary on the game-over screen (1.0.9): a small line of the ship's
-// speed over the run, where it ended (distance and level), near misses and the
+// speed over the run (its shape, not numbers), where it ended (distance and level), near misses and the
 // best chain. It folds away behind "details" so the screen stays clean.
 
 export interface RunSummary {
@@ -31,8 +31,9 @@ export function sparkPoints(values: readonly number[], w: number, h: number): st
     .join(' ');
 }
 
-/** "1.8 km" (one decimal under 10 km). */
+/** "640 m", "1.8 km" (one decimal under 10 km), "12 km". */
 export function distanceText(units: number): string {
+  if (units < 1000) return `${Math.max(0, Math.floor(units / 10) * 10)} m`;
   const km = units / 1000;
   return `${km < 10 ? km.toFixed(1) : Math.round(km)} km`;
 }
@@ -43,7 +44,6 @@ export function summaryRows(s: RunSummary): [string, string][] {
   const rows: [string, string][] = [[s.crashed ? 'crashed at' : 'finished at', where]];
   if (s.crashed && s.hit) rows.push(['hit', s.hit]);
   rows.push(['near misses', String(s.nearMisses)], ['best chain', s.bestChain > 0 ? `x${s.bestChain}` : '-']);
-  if (s.speeds.length > 1) rows.push(['top speed', `${Math.round(Math.max(...s.speeds))}`]);
   return rows;
 }
 

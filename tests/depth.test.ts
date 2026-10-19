@@ -176,13 +176,13 @@ describe('the run summary', () => {
   it('says where the run ended, what was hit, near misses and the best chain', () => {
     expect(distanceText(1840)).toBe('1.8 km');
     expect(distanceText(12400)).toBe('12 km');
+    expect(distanceText(648)).toBe('640 m');
     const rows = summaryRows({ speeds: [36, 52], distance: 1840, level: 2, nearMisses: 14, bestChain: 5, crashed: true, hit: 'a rock spire' });
     expect(rows).toEqual([
       ['crashed at', '1.8 km · level 2'],
       ['hit', 'a rock spire'],
       ['near misses', '14'],
       ['best chain', 'x5'],
-      ['top speed', '52'],
     ]);
     expect(summaryRows({ speeds: [], distance: 3600, level: 1, nearMisses: 0, bestChain: 0, crashed: false, hit: '' })[0][0]).toBe('finished at');
   });

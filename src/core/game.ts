@@ -420,7 +420,7 @@ export class Game {
     this.events = new Events(this.stage.scene);
     this.weather = new Weather(this.stage.scene);
     this.ghost = new Ghost(this.stage.scene, shipGeometry('dart'), this.palette);
-    this.rival = new Ghost(this.stage.scene, shipGeometry('dart'), this.palette, new Color('#e8a265'), 0.34);
+    this.rival = new Ghost(this.stage.scene, shipGeometry('dart'), this.palette, new Color('#e8a265'), 0.5);
     void this.ghost.load();
     this.sky = new Sky(this.stage.scene);
     this.input = new Input(document.body);
@@ -4048,7 +4048,7 @@ export class Game {
       if (this.chain > this.bestChain) this.bestChain = this.chain;
       this.chainTimer = nm.comboWindow;
       this.nudgeMs = nm.nudgeMs;
-      this.ui.showCombo(this.chain, points);
+      if (!this.zen) this.ui.showCombo(this.chain, points); // zen has no score to show
       this.tip('nearMiss');
       this.haptics.nearMiss();
       this.sound.pass(side, gap, this.chain);

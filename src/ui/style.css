@@ -4426,9 +4426,9 @@ body.dark #screen-title .title-word.sub {
   }
 }
 
-/* Distance milestones (1.0.9): a brief line under the level banner's place. */
+/* Distance milestones and gate runs (1.0.9): a brief line well under the level banner. */
 .banner.milestone {
-  top: 27%;
+  top: 38%;
 }
 
 .milestone-big {
@@ -4483,13 +4483,25 @@ body.dark #screen-title .title-word.sub {
 
 /* The run summary on the game-over screen, folded behind "details". */
 .over-details-toggle {
-  margin-top: 6px;
+  display: inline-block;
+  margin: 4px 0 0;
+  padding: 8px 14px;
+  font: inherit;
+  font-size: calc(12px * var(--ui-scale));
+  letter-spacing: 0.08em;
+  color: inherit;
+  background: none;
+  border: none;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  opacity: 0.8;
+  cursor: pointer;
 }
 
 .over-details {
   width: min(320px, 100%);
   margin: 8px auto 0;
-  padding: 10px 12px;
+  padding: 8px 12px;
   border: 1px solid color-mix(in srgb, currentColor 16%, transparent);
   border-radius: 12px;
 }
@@ -4501,7 +4513,7 @@ body.dark #screen-title .title-word.sub {
 .over-spark {
   display: block;
   width: 100%;
-  height: 44px;
+  height: 36px;
 }
 
 .over-spark-box:empty {
@@ -4509,5 +4521,21 @@ body.dark #screen-title .title-word.sub {
 }
 
 .over-detail-rows {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2px 14px;
   margin-top: 6px;
+}
+
+.over-detail-rows .stat-row {
+  min-height: 0;
+  padding: 3px 0;
+  border: 0;
+  gap: 8px;
+  font-size: calc(11px * var(--ui-scale));
+}
+
+/* The first row (where the run ended) takes the whole width. */
+.over-detail-rows .stat-row:first-child {
+  grid-column: 1 / -1;
 }

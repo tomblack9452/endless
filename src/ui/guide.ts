@@ -126,7 +126,7 @@ export function itemIcon(id: ItemId): string {
     id === 'phase'
       ? `<g transform="translate(3 -1)" opacity=".35">${gem.replace(/fill="[^"]*" fill-opacity="\.35"/, 'fill="none"')}</g>`
       : id === 'double'
-        ? `<text x="12" y="14.6" text-anchor="middle" font-size="7.5" font-family="ui-monospace, monospace" stroke="none" fill="currentColor">x2</text>`
+        ? `<text x="12" y="14.6" text-anchor="middle" font-size="7.5" font-family="ui-monospace, monospace" stroke="none" fill="${safeColours() ? '#ffffff' : 'currentColor'}">x2</text>`
         : '';
   // The safe palette has a white: outlined in the text colour, filled with its own.
   const art = (safeColours() ? shape.replace(/fill-opacity="\.35"/g, 'fill-opacity=".9"') : shape) + extra;
