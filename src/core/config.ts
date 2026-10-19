@@ -826,7 +826,59 @@ export const CONFIG = {
     shield: { color: '#6fb7d9', graceSeconds: 1.2 }, // lasts until you hit something
     magnet: { color: '#b48ad8', seconds: 9, reach: 28, pull: 7 },
     slow: { color: '#7fc28e', seconds: 6, factor: 0.62 },
+    // Phase: the ship ghosts through the next thing it hits (not walls, pits or lava) within `seconds`.
+    phase: { color: '#d3d7f2', seconds: 7, passSeconds: 0.45 },
+    // Double points: everything scored for `seconds` counts `factor` times.
+    double: { color: '#e88aa6', seconds: 8, factor: 2 },
+    // How often each turns up when a power-up takes a boost pickup's place (shield, magnet, slow-mo, phase, double points).
+    weights: { shield: 0.26, magnet: 0.22, slow: 0.2, phase: 0.16, double: 0.16 },
   },
+  // Risk lanes (world.ts): now and then on open ground, a narrow side path off
+  // the safe lane, a tighter gap between two lines of rocks with a cluster of
+  // pickups in it, that rejoins the lane. Optional: the lane stays open.
+  risk: {
+    firstAfter: 300, // none in the first stretch of a run
+    spacing: [600, 1000], // from the end of one to the start of the next
+    length: [70, 110], // the narrow stretch, between the ramps out and back
+    offset: [5.4, 6.6], // how far to the side of the lane it runs
+    half: 1.0, // its half-width (the lane keeps 1.3)
+    post: 0.42, // the rocks along it
+    pickups: 6,
+  },
+  // Gate runs (endless only): in the middle level of each outdoor area, a short
+  // sequence of tight gaps on the lane, marked on approach. Clear them all
+  // without a hit (a shield or phase save counts as one) for the credits.
+  gateRuns: {
+    at: 0.4, // how far into the level the first gate stands
+    gates: 5,
+    spacing: 26,
+    gap: 1.3, // from the lane to a rock's edge (the overlay gates leave 1.6)
+    credits: 40,
+    warnAhead: 90, // the notice, this far before the first gate
+  },
+  // Distance milestones (endless and solo; never ranked or the daily, so their
+  // scores stay comparable): a banner and a few credits at each.
+  milestones: {
+    km: [1, 2.5, 5, 10, 20],
+    credits: [10, 25, 50, 100, 200],
+  },
+  // Zen mode: endless flying with no score, no rewards and no boards.
+  zen: {
+    maxSpeed: 44, // a gentle cap (units/s)
+    fadeMs: 800, // a crash fades out and back in on the lane
+    clearAhead: 70, // obstacles cleared ahead of the respawn
+  },
+  // The crash moment: outside ranked, a second of slow motion on what you hit before the game-over screen.
+  crashMoment: {
+    ms: 1000,
+    timeScale: 0.2,
+  },
+  // The run summary on the game-over screen: speed sampled this often.
+  summary: {
+    sampleSeconds: 1,
+    maxSamples: 240,
+  },
+
   // Sound design. Everything is synthesised (no files) and everything is in D:
   // the engine is tuned to the root, the music changes mode per theme, and
   // near-miss chains climb the current scale. Levels below are gains.

@@ -1,7 +1,8 @@
 import { BoxGeometry, Color, CylinderGeometry, MeshBasicMaterial, PlaneGeometry, OctahedronGeometry, RingGeometry, Scene, type Texture } from 'three';
 import { patchBlockMaterial } from './blockTextures';
 import { CONFIG } from '../core/config';
-import { rand, seed as seedRandom } from '../core/rng';
+import { featureRand, rand, seed as seedRandom } from '../core/rng';
+import type { GateSpan } from '../core/runBonus';
 import { densityAt, lateralSpeedAt, speedAt } from './difficulty';
 import { InstancedField, wrap } from './field';
 import type { LivePalette } from './palette';
@@ -40,7 +41,27 @@ import { BOULDER_HEIGHT, boulder, MESA_RADIUS, canister, crystalCluster, greeble
 export type ThemeId = 'land' | 'canyon' | 'interior';
 
 /** Power-up kinds: 0 shield, 1 magnet, 2 slow-mo. */
-export type PowerKind = 0 | 1 | 2;
+export type PowerKind = 0 | 1 | 2 | 3 | 4;
+
+/** The power-ups by PowerKind, in the order of CONFIG.powers.weights. */
+export const POWER_KINDS = ['shield', 'magnet', 'slow', 'phase', 'double'] as const;
+
+/**
+ * Which power-up a draw `r` (0 <= r < 1) gives, by CONFIG.powers.weights. One
+ * draw per pickup whatever comes of it, so the course never depends on the
+ * scanner upgrade or on how the weights are tuned.
+ */
+export function pickPower(r: number): PowerKind {
+  const w = CONFIG.powers.weights;
+  let total = 0;
+  for (const k of POWER_KINDS) total += w[k];
+  let left = r * total;
+  for (let i = 0; i < POWER_KINDS.length; i++) {
+    left -= w[POWER_KINDS[i]];
+    if (left < 0) return i as PowerKind;
+  }
+  return (POWER_KINDS.length - 1) as PowerKind;
+}
 const THEMES: ThemeId[] = ['land', 'canyon', 'interior'];
 
 /** A lava river across the whole way, with a causeway `half` either side of the lane. */
@@ -80,6 +101,8 @@ const STEP = F.rowSpacing;
 const W = F.halfWidth;
 const SPAN = W * 2;
 const LANE = TH.lane.halfWidth;
+/** How far before a risk lane its approach is kept open. */
+const RISK_LEAD = 60;
 const FLOOR_ROWS = 512; // rows of floor history kept for fall checks
 const PIT_LIP = 0.3;
 const CHASM_INSET = 1.4; // the drop starts this far in from the bridge ends
@@ -265,6 +288,23 @@ export class World {
   altNow: number | null = null;
   /** Alternative routes generated so far (tests check they happen). */
   altRoutes = 0;
+  /** Gate runs (endless only; game.ts turns them on): tight gaps in the middle level of each outdoor area. */
+  gateRuns = false;
+  /** The gate runs built this run, newest last (the game pays a clean one). */
+  readonly gateLog: GateSpan[] = [];
+  private gateLevel = -1;
+  private gateNext = 0;
+  /** Risk lanes generated so far (tests check they happen). */
+  riskLanes = 0;
+  // Risk lanes (see planRisk): where the next may start, and the one being built.
+  private nextRiskAt = Infinity;
+  private riskStart = Infinity;
+  private riskEnd = -Infinity;
+  private riskSide = 1;
+  private riskOff = 0;
+  private riskRamp = 1;
+  private riskPickupsLeft = 0;
+  private riskPickupAt = 0;
   private rockFaceUntil = -Infinity;
   private rockFaceSide = 1;
   private nextArchAt = 0;
@@ -507,7 +547,7 @@ export class World {
   private readonly markColour = new Color(TH.interior.lights.red);
   private readonly redLight = new Color(TH.interior.lights.red);
   /** The power-ups' colours (the field's table: changed in place by colour-blind mode). */
-  private readonly powerColours = [CONFIG.powers.shield.color, CONFIG.powers.magnet.color, CONFIG.powers.slow.color].map((c) => new Color(c));
+  private readonly powerColours = POWER_KINDS.map((k) => new Color(CONFIG.powers[k].color));
 
   /**
    * Colour-blind mode (itemColours.ts): power-ups in blues and white with a
@@ -516,8 +556,7 @@ export class World {
    * pickup colour (game.ts sets it). Off puts the usual colours back.
    */
   setColourBlind(on: boolean): void {
-    const P = CONFIG.powers;
-    [P.shield.color, P.magnet.color, P.slow.color].forEach((c, i) => this.powerColours[i].set(on ? [SAFE.shield, SAFE.magnet, SAFE.slow][i] : c));
+    POWER_KINDS.forEach((k, i) => this.powerColours[i].set(on ? SAFE[k] : CONFIG.powers[k].color));
     this.powers.shapeTable = on ? SAFE_SHAPES : null;
     LIQUID_COLOURS[Liquid.Molten].set(on ? SAFE.hazard : MOLTEN);
     (this.lavaBombs.mesh.material as MeshBasicMaterial).color.set(on ? SAFE.hazard : CONFIG.biomes.lavaBomb);
@@ -605,6 +644,13 @@ export class World {
     this.liftPending = false;
     this.altNow = null;
     this.altRoutes = 0;
+    this.gateLog.length = 0;
+    this.gateLevel = -1;
+    this.gateNext = 0;
+    this.riskLanes = 0;
+    this.nextRiskAt = this.distance + clearance + CONFIG.risk.firstAfter;
+    this.riskStart = Infinity;
+    this.riskEnd = -Infinity;
     this.iceLakes = [];
     this.lavaLakes = [];
     this.rivers = [];
@@ -656,8 +702,22 @@ export class World {
   }
 
   hitTest(prevDistance: number): boolean {
-    for (const f of this.solids) if (f.hitTest(prevDistance, this.distance, this.lastDx, !this.bringingIn)) return true;
+    for (let i = 0; i < this.solids.length; i++) {
+      if (this.solids[i].hitTest(prevDistance, this.distance, this.lastDx, !this.bringingIn)) {
+        this.lastHit = i;
+        return true;
+      }
+    }
     return false;
+  }
+
+  private lastHit = -1;
+
+  /** What the last hit was, in words ("a rock spire"), for the crash moment. */
+  hitName(): string {
+    const names = ['a crate', 'the hull', 'a rock wall', 'a boulder', 'a mushroom tree', 'a spire tree', 'a crystal', 'a bush', 'a dead tree', 'a rock spire', 'a cactus', 'a basalt column', 'a tumbleweed', 'a mesa', 'a lava bomb', 'a shuttle', 'a laser beam', 'a falling curtain', this.biome === 'volcanic' ? 'a lava geyser' : 'a steam vent', 'a tank'];
+    if (this.asteroidMix > 0.5 && this.lastHit === 3) return 'an asteroid';
+    return names[this.lastHit] ?? '';
   }
 
   /**
@@ -1116,6 +1176,7 @@ export class World {
     else if (theme === 'canyon') this.canyon(d, sub, score, maxSlope);
     else this.interior(d, sub, score, maxSlope);
     if (section) this.overlay(d, section.overlay, maxSlope);
+    else if (!this.environment && theme !== 'interior') this.gateRow(d, level, sub, maxSlope);
 
     if (this.assist && this.runStart !== null && Math.round(d / STEP) % CONFIG.assist.markerEvery === 0) {
       this.light(this.lane, 0.012, d, 0.1, 0.01, 0.9, Light.Teal, false);
@@ -1127,7 +1188,7 @@ export class World {
       const x = this.lane - this.shipX;
       // Drawn every time, power-up or not, so the scanner upgrade (powerRate) can't
       // shift the random numbers and change the course for one player.
-      const kind = Math.floor(rand() * 3);
+      const kind = pickPower(rand());
       const spacing = range(CONFIG.powers.spacing);
       if (this.scripted) {
         // The practice run places its own (see place); the draws above keep the course the same.
@@ -1234,7 +1295,7 @@ export class World {
       }
     }
     // Tumbleweeds rolling across (not on the ice).
-    if (biome !== 'ice' && this.runStart !== null && rand() < lt.tumbleweedChance) this.rollTumbleweed(d, laneRel + this.shipX, 14, true);
+    if (biome !== 'ice' && this.runStart !== null && rand() < lt.tumbleweedChance) this.rollTumbleweed(d, laneRel + this.shipX, 14, true, this.riskNear(d));
     // Mesas on the horizon. Solid: on open ground you can fly out to them.
     if (rand() < lt.mesaChance) {
       const side = rand() < 0.5 ? -1 : 1;
@@ -1256,19 +1317,23 @@ export class World {
         const x = laneRel + this.rockFaceSide * (range(lt.rockFaceGap) + jitter + r + k * r * 1.2);
         const hit = r * ROCK_HIT;
         if (Math.abs(wrap(x - laneRel)) - hit < LANE + jitter + 1) continue;
-        this.rocks.spawn(wrap(x), 0, d + (rand() - 0.5) * STEP, r, height / BOULDER_HEIGHT, r, rand() * Math.PI * 2, true, true, hit, hit, false);
+        const at = d + (rand() - 0.5) * STEP;
+        const rot = rand() * Math.PI * 2;
+        if (this.inRisk(x + this.shipX, at, hit)) continue;
+        this.rocks.spawn(wrap(x), 0, at, r, height / BOULDER_HEIGHT, r, rot, true, true, hit, hit, false);
       }
     }
     // A natural arch over the path, pillars well clear of the lane.
     if (d >= this.nextArchAt && biome !== 'ice') {
       this.nextArchAt = d + range(lt.archSpacing);
-      this.placeArch(d, laneRel);
+      this.placeArch(d, laneRel, this.riskNear(d));
     }
   }
 
   /** A rock arch over the lane (ship-relative x), its pillars solid. */
-  private placeArch(d: number, laneRel: number): void {
+  private placeArch(d: number, laneRel: number, hidden = false): void {
     const s = 1 + rand() * 0.25;
+    if (hidden) return; // a risk lane's way: the same draw, no arch
     this.arches.spawn(wrap(laneRel), 0, d, s, s, s, 0, false, true, 0, 0, false);
     for (const side of [-1, 1]) {
       const px = laneRel + side * ARCH_PILLAR_X * s;
@@ -1289,8 +1354,10 @@ export class World {
     // On the ice (and its run-off) the ship turns slowly: the lane drifts more gently there.
     const iceSlope = this.onLake(this.iceLakes, this.lane, d, 2, CONFIG.hazards.ice.runoff) ? maxSlope * CONFIG.hazards.ice.laneSlope : maxSlope;
     this.lane += clamp(this.laneTarget - this.lane, -iceSlope * STEP, iceSlope * STEP);
+    this.altNow = null;
     if (this.quiet(d)) return; // clear runway out of the interior and into the canyon
 
+    this.planRisk(d, sub, maxSlope);
     const laneRel = this.lane - this.shipX;
     // Props are jittered half a row forwards/back, where the lane may have moved.
     const jitter = maxSlope * STEP * 0.5;
@@ -1302,6 +1369,7 @@ export class World {
       return;
     }
     this.landDressing(d, laneRel, jitter);
+    this.riskRow(d, jitter);
 
     if (sub === 2) {
       // Forest path: dense alien forest either side of a clear winding path
@@ -1332,9 +1400,160 @@ export class World {
         const x = centre + (rand() - 0.5) * 4;
         // Cluster rocks spread ±2 units along the run, where the lane may have moved.
         if (Math.abs(wrap(x - laneRel)) < LANE + maxSlope * 2 + r * ROCK_HIT) continue;
-        this.obstacle(x + this.shipX, d + (rand() - 0.5) * 4, r, 0.6 + rand() * 1.2, true);
+        const at = d + (rand() - 0.5) * 4;
+        this.obstacle(x + this.shipX, at, r, 0.6 + rand() * 1.2, true, this.inRisk(x + this.shipX, at, r * ROCK_HIT));
       }
     }
+  }
+
+  // --- risk lanes ----------------------------------------------------------------
+
+  /**
+   * Risk lanes: now and then on open ground (the plains, the first two levels
+   * of each visit), a narrow side path swings out from the lane,
+   * runs between two lines of rocks with a cluster of pickups, and swings back.
+   * Nothing is placed on the lane for it, so it's never forced, and its own way
+   * is kept clear too (the tests fly it): anything that would stand in it is
+   * drawn as before but not placed. The lane itself comes from the second
+   * random stream, so the rest of the course is laid out as it always was.
+   */
+  private planRisk(d: number, sub: number, maxSlope: number): void {
+    if (d < this.nextRiskAt || d <= this.riskEnd + STEP || this.runStart === null) return;
+    const R = CONFIG.risk;
+    const b = this.genBiome;
+    const section = this.sectionAt(d);
+    // Room for the longest one, with the ramps out and back within the steering budget.
+    const ramp = (1.5 * R.offset[1]) / (maxSlope * 0.8);
+    const start = d + RISK_LEAD; // planned a little ahead, so its approach is open from here
+    const longest = start + 2 * ramp + R.length[1];
+    const ok =
+      sub < 2 &&
+      b === 'alien' &&
+      !section?.overlay &&
+      d > this.rockFaceUntil &&
+      this.themeEnd - longest > TH.lane.beforeChange + 10 &&
+      !this.gateWindow(d - 20, longest + 40);
+    if (!ok) {
+      this.nextRiskAt = d + 20; // try again a little later
+      return;
+    }
+    this.riskOff = R.offset[0] + featureRand() * (R.offset[1] - R.offset[0]);
+    this.riskSide = featureRand() < 0.5 ? -1 : 1;
+    this.riskRamp = ramp;
+    this.riskStart = start;
+    this.riskEnd = start + 2 * ramp + R.length[0] + featureRand() * (R.length[1] - R.length[0]);
+    this.riskPickupsLeft = R.pickups;
+    this.riskPickupAt = start + ramp;
+    this.nextRiskAt = this.riskEnd + R.spacing[0] + featureRand() * (R.spacing[1] - R.spacing[0]);
+    this.riskLanes++;
+  }
+
+  /** How far to the side of the lane the risk lane runs at `d` (0 off it). */
+  private riskOffsetAt(d: number): number {
+    if (d < this.riskStart || d > this.riskEnd) return 0;
+    const s = (t: number) => {
+      const k = Math.max(0, Math.min(1, t));
+      return k * k * (3 - 2 * k);
+    };
+    return this.riskOff * s((d - this.riskStart) / this.riskRamp) * s((this.riskEnd - d) / this.riskRamp);
+  }
+
+  /** A risk lane is being built around `d`. */
+  private riskNear(d: number): boolean {
+    return d >= this.riskStart - RISK_LEAD && d <= this.riskEnd + STEP * 2;
+  }
+
+  /**
+   * World x, distance d, size r would stand in a risk lane's way. A pilot who
+   * sees one coming may cut across early, so before it the whole stretch
+   * between the lane and where it runs is kept open too.
+   */
+  private inRisk(x: number, d: number, r: number): boolean {
+    if (!this.riskNear(d)) return false;
+    const margin = CONFIG.risk.half + r + 0.9;
+    const rel = wrap(x - this.lane) * this.riskSide; // towards the risk side
+    if (d < this.riskStart) return rel > -margin && rel < this.riskOff + margin;
+    return Math.abs(rel - this.riskOffsetAt(Math.min(this.riskEnd, d))) < margin;
+  }
+
+  /** This row of a risk lane: a rock either side of its way along the narrow stretch (where that's clear of the lane), and its pickups. */
+  private riskRow(d: number, jitter: number): void {
+    if (d < this.riskStart || d > this.riskEnd) return;
+    const R = CONFIG.risk;
+    const o = this.riskOffsetAt(d);
+    const px = this.lane + this.riskSide * o;
+    if (o > 0.5) this.altNow = px;
+    const hit = R.post * ROCK_HIT;
+    // The rocks line the narrow stretch only: the swings out and back stay open.
+    if (o >= this.riskOff * 0.9) for (const out of [-1, 1]) {
+      const x = px + this.riskSide * out * (R.half + hit);
+      if (Math.abs(x - this.lane) - hit < LANE + jitter + 0.3) continue; // the lane stays open
+      const h = 0.7 + featureRand() * 0.9;
+      this.obstacleRocks.spawn(wrap(x - this.shipX), 0, d, R.post, h / BOULDER_HEIGHT, R.post, featureRand() * 6.28, true, true, hit, hit);
+    }
+    // The practice run places its own pickups; its risk lanes have none.
+    if (this.riskPickupsLeft > 0 && d >= this.riskPickupAt && o > this.riskOff * 0.95 && !this.scripted) {
+      this.riskPickupsLeft--;
+      this.riskPickupAt = d + STEP * 2;
+      this.pickups.spawn(wrap(px - this.shipX), CONFIG.boost.pickup.height, d, 1, 1, 1, 0, false, true, 0, 0);
+    }
+  }
+
+  // --- gate runs ----------------------------------------------------------------
+
+  /** Where a level's gate run starts. */
+  private gateFirst(level: number): number {
+    return this.levelStart(level) + (CONFIG.gateRuns.at * CONFIG.score.levelLength) / CONFIG.score.pointsPerUnit;
+  }
+
+  /** Would a gate run fall between `a` and `b`? */
+  private gateWindow(a: number, b: number): boolean {
+    if (!this.gateRuns || this.course || this.environment) return false;
+    const G = CONFIG.gateRuns;
+    for (const lv of [this.levelAt(a), this.levelAt(b)]) {
+      if ((lv - 1) % LPT !== 1 || themeForLevel(lv) === 'interior') continue;
+      const first = this.gateFirst(lv);
+      if (b >= first - 20 && a <= first + G.gates * G.spacing + 20) return true;
+    }
+    return false;
+  }
+
+  /**
+   * Gate runs (endless): in the middle level of each outdoor area, a short
+   * sequence of walls of rock across the way, each with one tight gap on the
+   * lane, its edges marked in amber. A gate that would stand on a chasm, the
+   * ice, a river or across a canyon split is left out.
+   */
+  private gateRow(d: number, level: number, sub: number, maxSlope: number): void {
+    if (!this.gateRuns || this.runStart === null || sub !== 1) return;
+    const G = CONFIG.gateRuns;
+    if (this.gateLevel !== level) {
+      this.gateLevel = level;
+      this.gateNext = 0;
+      this.gateLog.push({ start: Infinity, end: -Infinity, gates: 0 });
+      if (this.gateLog.length > 6) this.gateLog.shift();
+    }
+    if (this.gateNext >= G.gates || d < this.gateFirst(level) + this.gateNext * G.spacing) return;
+    this.gateNext++;
+    const canyon = this.theme === 'canyon';
+    if (this.quiet(d) || this.inChasm(d) || this.inChasm(d + 6) || this.riverAt(d) || this.onLake(this.iceLakes, this.lane, d, 2, CONFIG.hazards.ice.runoff)) return;
+    if (canyon && (this.splitStart !== Infinity || d >= this.splitAt - 40 || (this.genBiome !== 'asteroids' && d >= this.chasmAt - 20))) return;
+    const land = !canyon;
+    const gap = G.gap + maxSlope * STEP * 0.5;
+    const span = land ? 9 : 30;
+    for (let x = this.lane - span; x <= this.lane + span; x += 1.5) {
+      const r = 0.6 + featureRand() * 0.3;
+      const hit = r * ROCK_HIT;
+      if (Math.abs(x - this.lane) < gap + hit) continue;
+      const h = 0.9 + featureRand() * 1.4;
+      this.obstacleRocks.spawn(wrap(x - this.shipX), 0, d, r, h / BOULDER_HEIGHT, r, featureRand() * 6.28, true, land, hit, hit);
+    }
+    // The gap's edges, marked in amber on the ground.
+    for (const side of [-1, 1]) this.light(this.lane + side * (gap - 0.1), 0.012, d, 0.22, 0.01, 1.6, Light.Amber, false);
+    const log = this.gateLog[this.gateLog.length - 1];
+    log.start = Math.min(log.start, d);
+    log.end = Math.max(log.end, d);
+    log.gates++;
   }
 
   /** Random open-ground props at `density`, none closer than `clear` (+ their size) to the lane. */
@@ -1347,7 +1566,7 @@ export class World {
       this.pickProp();
       const x = wrap(laneRel + (rand() * 2 - 1) * W); // around the lane, not the ship: the course depends only on its seed
       if (Math.abs(wrap(x - laneRel)) < clear + this.propHit) continue;
-      this.placeProp(x, d + (rand() - 0.5) * STEP, true);
+      this.placeProp(x, d + (rand() - 0.5) * STEP, true, this.inRisk(x + this.shipX, d, this.propHit)); // a risk lane's way stays open
     }
   }
 
@@ -1563,17 +1782,20 @@ export class World {
   }
 
   /** Place the prop chosen by pickProp() at ship-relative `x`. Trees collide at the trunk only. */
-  private placeProp(x: number, d: number, wraps: boolean): void {
+  /** `hidden`: the same draws, nothing placed (a risk lane's way). */
+  private placeProp(x: number, d: number, wraps: boolean, hidden = false): void {
     if (this.onLake(this.iceLakes, x + this.shipX, d, this.propHit + 1, CONFIG.hazards.ice.runoff)) return; // the ice stays open
     if (this.onLake(this.lavaLakes, x + this.shipX, d, this.propHit, 0) || this.riverAt(d)) return;
     const s = this.propSize;
     const h = this.propHit;
     const rot = rand() * Math.PI * 2;
+    const tall = rand();
+    if (hidden) return;
     if (this.propKind === Prop.Rock) {
-      this.obstacleRocks.spawn(x, 0, d, s, (0.6 + rand()) / BOULDER_HEIGHT, s, rot, true, wraps, h, h);
+      this.obstacleRocks.spawn(x, 0, d, s, (0.6 + tall) / BOULDER_HEIGHT, s, rot, true, wraps, h, h);
     } else {
       const field = this.propField(this.propKind);
-      field.spawn(x, 0, d, s, s * (0.85 + rand() * 0.3), s, rot, true, wraps, h, h);
+      field.spawn(x, 0, d, s, s * (0.85 + tall * 0.3), s, rot, true, wraps, h, h);
     }
   }
   private propField(kind: Prop): InstancedField {
@@ -2296,7 +2518,8 @@ export class World {
   }
 
   /** A tumbleweed that rolls across ahead of you, `half` either side of world x `centre`. Scenery. */
-  private rollTumbleweed(d: number, centre: number, half: number, wraps: boolean): void {
+  /** `hidden`: make the same draws but place nothing (a risk lane's way). */
+  private rollTumbleweed(d: number, centre: number, half: number, wraps: boolean, hidden = false): void {
     const T = CONFIG.tumbleweed;
     const dir = rand() < 0.5 ? -1 : 1;
     const s = range(T.size);
@@ -2314,7 +2537,9 @@ export class World {
       from = centre - (way * travel) / 2;
       if (Math.abs(from + way * travel - this.lane) < clear) return;
     }
-    this.tumbleweeds.setNextRamp(way * travel, range(T.over), 0, false);
+    const over = range(T.over);
+    if (hidden) return;
+    this.tumbleweeds.setNextRamp(way * travel, over, 0, false);
     this.tumbleweeds.spawn(from - this.shipX, 0.5 * s, d, s, s, s, 0, true, wraps, hit, hit, false);
   }
 
@@ -3220,9 +3445,11 @@ export class World {
     this.strips.spawn(x - this.shipX, y, d, w / s, h / s, depth / s, 0, solid, false, w / 2, depth / 2, solid);
   }
 
-  private obstacle(x: number, d: number, r: number, height: number, wraps = false): void {
+  private obstacle(x: number, d: number, r: number, height: number, wraps = false, hidden = false): void {
     const hit = r * ROCK_HIT;
-    this.obstacleRocks.spawn(x - this.shipX, 0, d, r, height / BOULDER_HEIGHT, r, rand() * Math.PI * 2, true, wraps, hit, hit);
+    const rot = rand() * Math.PI * 2;
+    if (hidden) return; // the same draws, nothing placed
+    this.obstacleRocks.spawn(x - this.shipX, 0, d, r, height / BOULDER_HEIGHT, r, rot, true, wraps, hit, hit);
   }
 
   private rock(x: number, d: number, r: number, height: number): void {

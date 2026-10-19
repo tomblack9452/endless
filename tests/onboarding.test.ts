@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { LOOKS } from '../src/ship/catalogue';
 import { CONFIG } from '../src/core/config';
-import { chainNote, ITEMS, itemCard, itemIcon, POWER_ITEMS, powerItem } from '../src/ui/guide';
+import { chainNote, ITEMS, itemCard, itemIcon, POWER_ITEMS, powerItem, PRACTICE_ITEMS } from '../src/ui/guide';
 import { TIPS, tipText } from '../src/ui/hints';
 import {
   CONTROL_CARDS,
@@ -216,8 +216,10 @@ describe('lessons', () => {
 
 describe('pickup and power-up cards', () => {
   it('cover the boost pickup and every power-up, in the world order', () => {
-    expect(ITEMS).toEqual(['pickup', 'shield', 'magnet', 'slow']);
-    expect([0, 1, 2].map((k) => powerItem(k as 0 | 1 | 2))).toEqual(POWER_ITEMS);
+    expect(ITEMS).toEqual(['pickup', 'shield', 'magnet', 'slow', 'phase', 'double']);
+    expect([0, 1, 2, 3, 4].map((k) => powerItem(k as 0 | 1 | 2 | 3 | 4))).toEqual(POWER_ITEMS);
+    // The practice run teaches the first four; phase and double points are met in play (the recap has them all).
+    expect(PRACTICE_ITEMS).toEqual(['pickup', 'shield', 'magnet', 'slow']);
   });
 
   it('take their numbers from CONFIG', () => {
@@ -230,6 +232,10 @@ describe('pickup and power-up cards', () => {
     expect(itemCard('magnet').does).toContain(`${P.magnet.seconds} s`);
     expect(itemCard('slow').does).toContain(`${Math.round(P.slow.factor * 100)}%`);
     expect(itemCard('slow').does).toContain(`${P.slow.seconds} s`);
+    expect(itemCard('phase').does).toContain(`${P.phase.seconds} s`);
+    expect(itemCard('phase').does).toContain('next thing it hits');
+    expect(itemCard('double').does).toContain(`x${P.double.factor}`);
+    expect(itemCard('double').does).toContain(`${P.double.seconds} s`);
     expect(chainNote()).toContain(`+${CONFIG.score.nearMiss.points}`);
     expect(chainNote()).toContain(`x${CONFIG.score.nearMiss.maxCombo}`);
   });
@@ -251,6 +257,8 @@ describe('pickup and power-up cards', () => {
     expect(itemCard('shield').color).toBe(CONFIG.powers.shield.color);
     expect(itemCard('magnet').color).toBe(CONFIG.powers.magnet.color);
     expect(itemCard('slow').color).toBe(CONFIG.powers.slow.color);
+    expect(itemCard('phase').color).toBe(CONFIG.powers.phase.color);
+    expect(itemCard('double').color).toBe(CONFIG.powers.double.color);
     for (const id of ITEMS) {
       const c = itemCard(id);
       expect(c.on.length).toBeGreaterThan(4);

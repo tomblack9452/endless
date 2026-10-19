@@ -26,9 +26,10 @@ interface Hooked {
   shipX: number;
 }
 
-function drive(seed: number, level: number, autopilot = true, room: RoomId | null = null, seconds = SECONDS): { crashed: boolean; at: number; room: string; hazards: number } {
+function drive(seed: number, level: number, autopilot = true, room: RoomId | null = null, seconds = SECONDS, gates = false): { crashed: boolean; at: number; room: string; hazards: number; gates: number; risks: number } {
   const world = new World(new Scene(), new LivePalette());
   world.devRoom = room;
+  world.gateRuns = gates;
   const hooked = world as unknown as Hooked;
   // Record the lane at each generated row.
   const lanes: [number, number][] = [];
@@ -64,10 +65,11 @@ function drive(seed: number, level: number, autopilot = true, room: RoomId | nul
     const prev = world.distance;
     eased += (steer - eased) * (1 - Math.exp(-CONFIG.steering.response * (world.onIce() ? CONFIG.hazards.ice.grip : 1) * DT));
     world.advance(DT, speed, eased * lateralSpeedAt(speed));
-    if (world.overPit() || world.inLava() || world.hitTest(prev)) return { crashed: true, at: Math.round(score), room: world.roomName, hazards: 0 };
+    if (world.overPit() || world.inLava() || world.hitTest(prev)) return { crashed: true, at: Math.round(score), room: world.roomName, hazards: 0, gates: 0, risks: 0 };
   }
   const w = world as unknown as { iceLakes: unknown[]; lavaLakes: unknown[]; lavaBombs: { count: number } };
-  return { crashed: false, at: 0, room: '', hazards: w.iceLakes.length + w.lavaLakes.length + w.lavaBombs.count };
+  const gateCount = world.gateLog.reduce((n, g) => n + g.gates, 0);
+  return { crashed: false, at: 0, room: '', hazards: w.iceLakes.length + w.lavaLakes.length + w.lavaBombs.count, gates: gateCount, risks: world.riskLanes };
 }
 
 describe('course fairness', () => {
@@ -109,8 +111,10 @@ interface SplitHooked extends Hooked {
   chasmStart: number;
 }
 
-function driveAlt(seed: number, level: number): { crashed: boolean; at: number; splits: number; chasms: number } {
+function driveAlt(seed: number, level: number, gates = false): { crashed: boolean; at: number; splits: number; chasms: number; risks: number; pickups: number } {
   const world = new World(new Scene(), new LivePalette());
+  world.gateRuns = gates;
+  let pickups = 0;
   const hooked = world as unknown as SplitHooked;
   const lanes: [number, number][] = [];
   const alts: [number, number][] = [];
@@ -159,9 +163,10 @@ function driveAlt(seed: number, level: number): { crashed: boolean; at: number; 
     const prev = world.distance;
     eased += (steer - eased) * (1 - Math.exp(-CONFIG.steering.response * (world.onIce() ? CONFIG.hazards.ice.grip : 1) * DT));
     world.advance(DT, speed, eased * lateralSpeedAt(speed));
-    if (world.overPit() || world.inLava() || world.hitTest(prev)) return { crashed: true, at: Math.round(score), splits: hooked.altRoutes, chasms: chasms.size };
+    pickups += world.collect(prev);
+    if (world.overPit() || world.inLava() || world.hitTest(prev)) return { crashed: true, at: Math.round(score), splits: hooked.altRoutes, chasms: chasms.size, risks: world.riskLanes, pickups };
   }
-  return { crashed: false, at: 0, splits: hooked.altRoutes, chasms: chasms.size };
+  return { crashed: false, at: 0, splits: hooked.altRoutes, chasms: chasms.size, risks: world.riskLanes, pickups };
 }
 
 describe('other routes', () => {
@@ -254,5 +259,76 @@ describe('wide of the canyon mouth', () => {
       if (steering) expect(world.hitTest(prev), `hit something at score ${Math.round(score)}`).toBe(false);
     }
     expect(farOff).toBeGreaterThan(CONFIG.themes.canyon.mouthHalfWidth); // it really did come in wide
+  });
+});
+
+// Risk lanes (1.0.9): a narrow side path off the lane on open ground. The
+// safe-lane pilot above flies past every one (the lane is never blocked); this
+// one takes each risk lane, so its own way through is fair too, and collects
+// its pickups.
+describe('risk lanes', () => {
+  for (const level of [1, 2, 28, 29]) {
+    it(`taking every risk lane at level ${level} is survivable for every seed`, () => {
+      let risks = 0;
+      let pickups = 0;
+      for (const seed of SEEDS.slice(0, 5)) {
+        const r = driveAlt(seed, level);
+        expect(r.crashed, `seed ${seed} crashed at score ${r.at} taking a risk lane`).toBe(false);
+        risks += r.risks;
+        pickups += r.pickups;
+      }
+      expect(risks).toBeGreaterThan(0); // they really happen
+      expect(pickups).toBeGreaterThan(risks); // and pay out
+    });
+  }
+
+  it('bring no pickups of their own in the practice run (it places its own; the course is the same)', () => {
+    const world = new World(new Scene(), new LivePalette());
+    world.scripted = true;
+    world.reset(CONFIG.field.startClearance, true, 0, 42);
+    for (let t = 0; t < 40; t += DT) {
+      world.advance(DT, 45, 0);
+      expect(world.pickupAhead(-5, CONFIG.field.spawnDepth)).toBe(false);
+    }
+    expect(world.riskLanes).toBeGreaterThan(0);
+  });
+
+  it('are the same for a seed however the run goes', () => {
+    const lay = (): number[] => {
+      const world = new World(new Scene(), new LivePalette());
+      const hooked = world as unknown as { row(d: number): void; altNow: number | null };
+      const out: number[] = [];
+      const row = hooked.row.bind(world);
+      hooked.row = (d: number) => {
+        row(d);
+        if (hooked.altNow !== null) out.push(Math.round(hooked.altNow * 100));
+      };
+      world.reset(CONFIG.field.startClearance, true, 0, 2024);
+      for (let t = 0; t < 40; t += DT) world.advance(DT, 45, 0);
+      return out;
+    };
+    const a = lay();
+    expect(a.length).toBeGreaterThan(0);
+    expect(lay()).toEqual(a);
+  });
+});
+
+// Gate runs (1.0.9, endless): tight gaps on the lane in the middle level of each
+// outdoor area. The safe-lane pilot must get through every one.
+describe('gate runs', () => {
+  for (const level of [2, 5, 11, 14, 20, 23]) {
+    it(`the gate run at level ${level} is survivable for every seed`, () => {
+      let gates = 0;
+      for (const seed of SEEDS) {
+        const r = drive(seed, level, true, null, SECONDS, true);
+        expect(r.crashed, `seed ${seed} crashed at score ${r.at} in a gate run`).toBe(false);
+        gates += r.gates;
+      }
+      expect(gates).toBeGreaterThan(SEEDS.length * 2); // they really stand
+    });
+  }
+
+  it('only stand when the world is told to (endless), so other modes keep their courses', () => {
+    expect(drive(7, 2).gates).toBe(0);
   });
 });
