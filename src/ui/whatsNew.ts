@@ -4,6 +4,13 @@
 // The lines for each version live here, newest first.
 
 export const WHATS_NEW: Readonly<Record<string, readonly string[]>> = {
+  '1.0.9': [
+    'new power-ups: phase and double points',
+    'risk lanes, gate runs and km milestones',
+    'zen: fly with no score, crashes just fade',
+    "run details, a crash moment, a rival's ghost",
+    'share your best from the app',
+  ],
   '1.0.8': [
     'a daily challenge: one short course for all',
     'fly it days in a row for credits and cores',
