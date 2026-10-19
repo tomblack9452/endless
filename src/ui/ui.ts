@@ -1139,6 +1139,55 @@ export class UI {
     this.banner.classList.remove('show');
   }
 
+  /** A distance milestone (or a gate run): a brief line, `big` over `sub`. */
+  showMilestone(big: string, sub: string): void {
+    const b = $('milestone');
+    $('milestone-big').textContent = big;
+    $('milestone-sub').textContent = sub;
+    b.classList.remove('show');
+    void b.offsetWidth; // restart the animation
+    b.classList.add('show');
+  }
+
+  /** Zen: the HUD shows a quiet distance in place of the score, level and progress. */
+  setZen(on: boolean): void {
+    this.hud.classList.toggle('zen', on);
+    $('hud-zen').hidden = !on;
+  }
+
+  setZenDistance(text: string): void {
+    const z = $('hud-zen');
+    if (z.textContent !== text) z.textContent = text;
+  }
+
+  /** Zen's respawn: fade to the sky and back over `ms`. */
+  fadeRespawn(ms: number): void {
+    const f = $('fade');
+    f.style.setProperty('--fade-ms', `${ms}ms`);
+    f.classList.remove('show');
+    void f.offsetWidth;
+    f.classList.add('show');
+  }
+
+  /** The run summary behind "details" on the game-over screen (folded each time). */
+  setRunSummary(spark: string, rows: [string, string][]): void {
+    $('over-spark').innerHTML = spark;
+    this.fillRows($('over-detail-rows'), rows);
+    this.showDetails(false);
+  }
+
+  /** Open or fold the run summary. */
+  showDetails(open: boolean): void {
+    $('over-details').hidden = !open;
+    const t = $('over-details-toggle');
+    t.setAttribute('aria-expanded', String(open));
+    t.textContent = open ? 'hide details' : 'details';
+  }
+
+  get detailsOpen(): boolean {
+    return !$('over-details').hidden;
+  }
+
   /** Quick retry's small panel in place of the game-over screen (null hides it). */
   showQuickRetry(line: string | null): void {
     const box = $('quick-retry');

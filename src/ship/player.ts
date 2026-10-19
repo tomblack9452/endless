@@ -465,6 +465,30 @@ export class Player {
     this.body.visible = blink <= 0 || Math.floor(blink * 14) % 2 === 0;
   }
 
+  private phase = 0;
+
+  /**
+   * Phase (the power-up): the hull turns see-through, `k` 0 (solid) to 1
+   * (passing through something), with a slow shimmer at time `t` (none with
+   * reduce motion).
+   */
+  setPhase(k: number, t: number, still: boolean): void {
+    if (k === 0 && this.phase === 0) return;
+    const was = this.phase > 0;
+    this.phase = k;
+    const mats = [this.matTop, this.matShade, this.matFin, this.matDecal];
+    if (was !== k > 0) {
+      for (const m of mats) {
+        m.transparent = k > 0 || m === this.matDecal;
+        m.depthWrite = k === 0 && m !== this.matDecal;
+        m.needsUpdate = true;
+      }
+    }
+    const shimmer = still ? 0 : 0.08 * Math.sin(t * 9);
+    const opacity = k > 0 ? Math.max(0.15, 1 - 0.45 * k - 0.25 * k * k + shimmer) : 1;
+    for (const m of mats) m.opacity = opacity;
+  }
+
   /** Paint colours (top, shade), or null for the palette's own. */
   setPaint(colors: [string, string] | null): void {
     this.paint = colors ? [new Color(colors[0]), new Color(colors[1])] : null;

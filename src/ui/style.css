@@ -1060,7 +1060,8 @@ body {
 
 .title-modes {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
   gap: 8px;
   margin-top: 10px;
 }
@@ -4423,4 +4424,90 @@ body.dark #screen-title .title-word.sub {
   from {
     opacity: 0;
   }
+}
+
+/* Distance milestones (1.0.9): a brief line under the level banner's place. */
+.banner.milestone {
+  top: 27%;
+}
+
+.milestone-big {
+  font-size: calc(30px * var(--ui-scale));
+  font-weight: 300;
+  letter-spacing: 0.02em;
+  margin-bottom: 6px;
+}
+
+.menu-open .banner.milestone {
+  display: none;
+}
+
+/* Zen: the score, level and progress step aside for a quiet distance. */
+#hud.zen #hud-score,
+#hud.zen .progress,
+#hud.zen .hud-side:first-child > :not(.hud-mode) {
+  visibility: hidden;
+}
+
+.hud-zen {
+  margin-top: -1.6em;
+  letter-spacing: 0.06em;
+}
+
+/* Zen's respawn: a short fade to the sky and back. */
+.fade {
+  position: absolute;
+  inset: 0;
+  z-index: 50;
+  background: var(--sky, #000);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.fade.show {
+  animation: fade-respawn var(--fade-ms, 800ms) ease-in-out both;
+}
+
+@keyframes fade-respawn {
+  0% {
+    opacity: 0;
+  }
+  40%,
+  55% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+/* The run summary on the game-over screen, folded behind "details". */
+.over-details-toggle {
+  margin-top: 6px;
+}
+
+.over-details {
+  width: min(320px, 100%);
+  margin: 8px auto 0;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, currentColor 16%, transparent);
+  border-radius: 12px;
+}
+
+.over-details[hidden] {
+  display: none;
+}
+
+.over-spark {
+  display: block;
+  width: 100%;
+  height: 44px;
+}
+
+.over-spark-box:empty {
+  display: none;
+}
+
+.over-detail-rows {
+  margin-top: 6px;
 }

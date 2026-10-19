@@ -15,7 +15,7 @@ import { Trail } from '../ship/trail';
 import { cycle, DEFAULT_SETTINGS, LEVEL_GAIN, loadSettings, REMINDER_TIMES, saveSettings, type SettingKey, STEERING_RANGE, TEXT_SCALE, TILT_GAIN } from './settings';
 import { EVENT_NOTICE, Events } from '../world/events';
 import { Weather } from '../world/weather';
-import { Ghost } from '../ship/ghost';
+import { Ghost, rivalGhost } from '../ship/ghost';
 import { decalArt } from '../ship/decals';
 import { Haptics } from '../platform/haptics';
 import { SAFE, setSafeColours } from '../world/itemColours';
@@ -26,6 +26,9 @@ import { sendFeedback } from '../platform/feedback';
 import { errorLog, reportError } from '../platform/errors';
 import { latestNotes, SEEN_KEY, whatsNewOnLaunch } from '../ui/whatsNew';
 import { quickRetryOn, tapRetries } from './retry';
+import { GateTracker, kmText, Milestones, milestonesCount } from './runBonus';
+import { crashMomentOn, crashOverReady, crashTimeScale } from './crashMoment';
+import { distanceText, sparkSvg, summaryRows } from '../ui/runSummary';
 import { type HintId, Hints, tipText } from '../ui/hints';
 import { migrateMissionLooks, migrateTickets } from '../progression/legacy';
 import { type Feature, isOpen, nextStageText, STAGES, stageFor } from '../progression/reveal';
@@ -48,7 +51,7 @@ import {
 } from '../ui/onboarding';
 import { itemCard, powerItem } from '../ui/guide';
 import { type Mark, TeachView } from '../ui/tutorialView';
-import { Vector3 } from 'three';
+import { Color, Vector3 } from 'three';
 import { Ads, createAdNetwork, type RewardedPlacement } from '../ads/ads';
 import { entitlementFor, Entitlements } from '../store/entitlements';
 import { Progress } from '../progression/progress';
@@ -176,6 +179,20 @@ export class Game {
   private readonly events: Events;
   private readonly weather: Weather;
   private readonly ghost: Ghost;
+  /** Ranked: the ghost of the pilot just above you (settings > rival's ghost). */
+  private readonly rival: Ghost;
+  /** Counts runs, so an answer from the server for an earlier run is ignored. */
+  private runSerial = 0;
+  /** Zen mode: no score, rewards or boards; a crash respawns (and the next run is one). */
+  private zen = false;
+  private zenNext = false;
+  /** The run's speed, sampled for the summary on the game-over screen. */
+  private speeds: number[] = [];
+  private sampleT = 0;
+  /** This crash plays its slow-motion moment, and how long ago it happened (real ms). */
+  private moment = false;
+  private crashRealMs = 0;
+  private hitWhat = '';
   private onIce = false;
   /** This run counts towards opening solo environments: ranked or endless, from the start (not solo, set levels or dev starts). */
   private unlockable = false;
@@ -362,6 +379,14 @@ export class Game {
   private magnetT = 0;
   private slowT = 0;
   private slowLevel = 0; // eased 0..1
+  private phaseT = 0; // phase armed: seconds left to pass through the next thing hit
+  private passT = 0; // seconds of passing through it (phase used)
+  private doubleT = 0; // double points: seconds left
+  /** Gate runs ahead (endless) and the distance milestones passed (endless and solo). */
+  private readonly gates = new GateTracker();
+  private readonly milestones = new Milestones();
+  /** Credits from milestones and gate runs this run (paid with the run's credits). */
+  private bonusCredits = 0;
 
   private crashMs = 0;
   private shattered = false;
@@ -395,6 +420,7 @@ export class Game {
     this.events = new Events(this.stage.scene);
     this.weather = new Weather(this.stage.scene);
     this.ghost = new Ghost(this.stage.scene, shipGeometry('dart'), this.palette);
+    this.rival = new Ghost(this.stage.scene, shipGeometry('dart'), this.palette, new Color('#e8a265'), 0.34);
     void this.ghost.load();
     this.sky = new Sky(this.stage.scene);
     this.input = new Input(document.body);
@@ -570,6 +596,18 @@ export class Game {
     this.pathTimes = [];
     this.pathNext = 0;
     this.ghost.start(mode === 'ranked' ? this.weekly.id : null, this.settings.ghost);
+    this.rival.stop();
+    const serial = ++this.runSerial;
+    if (mode === 'ranked' && this.settings.rivalGhost) void this.loadRival(serial);
+    this.zen = this.zenNext && mode === 'endless' && !course && !env && !daily;
+    this.zenNext = false;
+    this.ui.setZen(this.zen);
+    this.gates.reset();
+    this.milestones.reset();
+    this.bonusCredits = 0;
+    this.speeds = [];
+    this.sampleT = 0;
+    this.hitWhat = '';
     this.ui.showShare(false);
     this.ui.showDouble(null);
     this.preview = null;
@@ -577,12 +615,13 @@ export class Game {
     this.mode = mode;
     this.dailyRunNow = daily;
     this.dailyLine = '';
-    this.unlockable = (mode === 'ranked' || mode === 'endless') && startScore === 0;
+    this.unlockable = (mode === 'ranked' || mode === 'endless') && startScore === 0 && !this.zen;
     this.course = course;
     this.environment = env;
     this.world.setCourse(course);
     this.world.setEnvironment(env);
     this.world.scripted = this.practiceNext; // the practice course places its own pickups and power-ups
+    this.world.gateRuns = mode === 'endless' && !course && !env && !this.zen && !this.practiceNext; // gate runs: endless only
     this.practiceNext = false;
     this.passCount = 0;
     this.sectionIdx = -1;
@@ -596,7 +635,7 @@ export class Game {
     this.world.powerRate = this.ship.powerRate;
     this.ui.setMode(this.modeLabel());
     this.pickupCount = 0;
-    this.recorded = false;
+    this.recorded = this.zen; // zen keeps nothing: no stats, bests, credits or boards
     this.assisted = this.assistOn();
     this.boostSeconds = this.roomsEntered = 0;
     this.infoOpen = null;
@@ -651,7 +690,8 @@ export class Game {
       this.ui.setLevel(n);
       this.ui.setProgress(0);
       this.ui.announceLevel(n, course.name);
-    } else this.ui.announceLevel(level, this.areaName(level));
+    } else if (this.zen) this.ui.showRoom(`zen · ${this.areaName(level)}`);
+    else this.ui.announceLevel(level, this.areaName(level));
     this.ui.setOverHeading('crashed');
     this.ui.show(null);
     this.ui.showHud(true);
@@ -663,9 +703,14 @@ export class Game {
   private crash(fell = false): void {
     if (this.state === 'crashed') return;
     this.ghost.stop();
+    this.rival.stop();
     this.fell = fell;
     this.state = 'crashed';
     this.crashMs = 0;
+    this.crashRealMs = 0;
+    this.hitWhat = fell ? '' : this.world.hitName();
+    this.moment = crashMomentOn({ setting: this.settings.crashMoment, reduceMotion: this.settings.reduceMotion, ranked: this.mode === 'ranked', practice: this.practice !== null, zen: this.zen });
+    if (this.moment) this.ui.showRoom(fell ? 'fell' : this.hitWhat ? `hit ${this.hitWhat}` : 'hit');
     this.input.enabled = false;
     this.speedLines.update(0, 0, 0);
     if (fell) {
@@ -695,6 +740,7 @@ export class Game {
     const { best, isNew } = this.recordBest(false);
     this.quickLine = isNew ? `${formatScore(this.score)} · new best` : `${formatScore(this.score)} · best ${formatScore(best)}`;
     this.ui.setGameOver(this.score, best, isNew, this.nearMissCount, this.bestChain, this.seed);
+    this.fillSummary(true);
     const where = themeForLevel(this.level) === 'interior' ? this.world.roomName || 'corridor' : this.areaName(this.level);
     const extra = this.finishRun(where);
     this.offerShare(isNew);
@@ -749,7 +795,7 @@ export class Game {
     // Ranked pays full rate; solo, set levels and endless half.
     const score = this.assisted ? 0 : this.score;
     const fromPickups = this.assisted ? 0 : this.pickupCount * CONFIG.economy.runCredits.pickupCredits;
-    let credits = creditsFor(score, this.mode === 'ranked') + fromPickups;
+    let credits = creditsFor(score, this.mode === 'ranked') + fromPickups + this.bonusCredits;
     credits += this.recordRank(this.state === 'finished');
     if (this.assisted) lines.push('assist mode. not counted as a best');
     this.wallet.add(credits);
@@ -757,7 +803,8 @@ export class Game {
     this.ui.showDouble(credits > 0 && this.ads.offers('doubleCredits') ? `double +${formatScore(credits)} credits · ${this.ads.label()}` : null);
     this.ads.afterRun(Date.now(), false); // the device clock, like the first-played time it is measured from
     this.ads.preload(); // an ad ready for the offers after a run (none for premium)
-    lines.push(`+${formatScore(credits)} credits${fromPickups > 0 ? ` (${formatScore(fromPickups)} from pickups)` : ''}`);
+    const from = [fromPickups > 0 ? `${formatScore(fromPickups)} from pickups` : '', this.bonusCredits > 0 ? `${formatScore(this.bonusCredits)} from milestones and gate runs` : ''].filter(Boolean).join(', ');
+    lines.push(`+${formatScore(credits)} credits${from ? ` (${from})` : ''}`);
     const board = boardForRun(this.mode, this.environment?.id ?? null, this.course !== null, this.dailyRunNow !== null);
     if (board && board !== 'ranked') this.submitToBoard(board, this.state === 'finished');
     if (this.unlockable) {
@@ -2281,7 +2328,7 @@ export class Game {
     if (this.dailyRunNow) return `daily · ${this.dailyRunNow.name}`;
     if (this.course) return `level ${COURSES.indexOf(this.course) + 1} · ${this.course.name}`;
     if (this.environment) return `solo · ${this.environment.name}`;
-    return 'endless';
+    return this.zen ? 'zen' : 'endless';
   }
 
   /** The area's name, biome and music at `level` (solo stays in its environment). */
@@ -2703,6 +2750,20 @@ export class Game {
     this.beginRun(0, newSeed(), 'endless');
   }
 
+  /** Zen: endless at a gentle, capped speed; a crash fades and carries on. No score, rewards or boards. */
+  private startZen(): void {
+    this.zenNext = true;
+    this.beginRun(0, newSeed(), 'endless');
+  }
+
+  /** Ranked with the rival's ghost on: ask the server for the run just above yours, and fly it if it's still this run. */
+  private async loadRival(serial: number): Promise<void> {
+    const r = await this.backend.rivalRun().catch(() => null);
+    if (!r || serial !== this.runSerial || this.mode !== 'ranked' || (this.state !== 'playing' && this.state !== 'countdown' && this.state !== 'paused')) return;
+    this.rival.fly(rivalGhost(r.path, r.seconds, this.weekly.id, PATH_STEP));
+    this.ui.showNotice(`racing ${r.name}'s ghost · ${formatScore(r.score)}`);
+  }
+
   /** The daily challenge: today's course (by the trusted clock), the standard ship, one board for everyone. */
   private startDaily(): void {
     this.turnDay(this.now());
@@ -2715,6 +2776,7 @@ export class Game {
     else if (this.dailyRunNow) this.startDaily();
     else if (this.course) this.startCourse(COURSES.indexOf(this.course));
     else if (this.environment) this.startSolo(ENVIRONMENTS.indexOf(this.environment));
+    else if (this.zen) this.startZen();
     else this.startEndless();
   }
 
@@ -2727,6 +2789,7 @@ export class Game {
       return;
     }
     if (name === 'endless') this.startEndless();
+    else if (name === 'zen') this.startZen();
     else if (name === 'challenge') this.startDaily();
     else if (name === 'solo') this.openSolo();
     else if (name === 'record') this.openRecord();
@@ -3176,7 +3239,7 @@ export class Game {
     const runs = this.progress.stats.validRuns;
     if (this.open('ranked')) this.ui.setPrimary('ranked', wb > 0 ? `your best this week ${formatScore(wb)}` : 'the same run for everyone, all week');
     else this.ui.setPrimary('fly', this.progress.endlessBest > 0 ? `endless · best ${formatScore(this.progress.endlessBest)}` : 'endless: every area in turn');
-    this.ui.setFeatures((f) => (f === 'endless' || f === 'league' ? this.open('ranked') : f === 'boards' ? this.open('leaderboard') : f === 'solo' || f === 'shop' || f === 'record' ? this.open(f) : true));
+    this.ui.setFeatures((f) => (f === 'endless' || f === 'zen' || f === 'league' ? this.open('ranked') : f === 'boards' ? this.open('leaderboard') : f === 'solo' || f === 'shop' || f === 'record' ? this.open(f) : true));
     this.ui.setTitleNext(this.allOpen ? '' : nextStageText(runs, this.onboarding.done));
     this.ui.renderTitleCards(this.titleCards(now));
     this.refreshBar(now);
@@ -3371,6 +3434,7 @@ export class Game {
       }
     }
     else if (action === 'share') void this.share();
+    else if (action === 'details') this.ui.showDetails(!this.ui.detailsOpen);
     else if (action === 'double') void this.doubleCredits();
     else if (action === 'back') {
       if (this.infoOpen) this.closeInfo();
@@ -3574,6 +3638,9 @@ export class Game {
     this.econ.setCountdown(0);
     this.econ.dismissOffer();
     this.ghost.stop();
+    this.rival.stop();
+    this.zen = false;
+    this.ui.setZen(false);
 
     this.state = 'title';
     this.input.enabled = false;
@@ -3800,6 +3867,7 @@ export class Game {
   private updatePlaying(dt: number): void {
     this.input.update(dt);
     this.runTime += dt;
+    const before = this.distanceScore + this.bonus; // what this frame scores (double points)
     // Swing back from the showroom orbit to the chase view (a run started from the welcome screen).
     this.stage.showroom *= Math.exp(-CONFIG.camera.showroom.ease * 2 * dt);
     if (this.stage.showroom < 0.001) this.stage.showroom = 0;
@@ -3809,7 +3877,8 @@ export class Game {
     const section = this.course ? this.world.sectionAt(this.world.distance) : null;
     // On ice you slow down a little (and slide: see the steering below).
     this.onIce = this.world.onIce();
-    const target = speedAt(section ? section.difficulty : this.distanceScore) * (this.onIce ? CONFIG.hazards.ice.slow : 1);
+    const pace = speedAt(section ? section.difficulty : this.distanceScore);
+    const target = (this.zen ? Math.min(pace, CONFIG.zen.maxSpeed) : pace) * (this.onIce ? CONFIG.hazards.ice.slow : 1);
     this.speed += (target - this.speed) * (1 - Math.exp(-CONFIG.speed.ease * dt));
     this.updateBoost(dt);
     const speed = this.currentSpeed();
@@ -3839,7 +3908,14 @@ export class Game {
     }
     if (this.mode === 'ranked') {
       this.ghost.update(this.runTime, this.world.distance - this.runStart, this.runStart, this.world.lateral);
+      this.rival.update(this.runTime, this.world.distance - this.runStart, this.runStart, this.world.lateral);
     }
+    this.sampleT -= dt;
+    if (this.sampleT <= 0 && this.speeds.length < CONFIG.summary.maxSamples) {
+      this.sampleT = CONFIG.summary.sampleSeconds;
+      this.speeds.push(Math.round(speed * 10) / 10);
+    }
+    this.runBonuses();
     this.world.spinPickups(dt);
     const got = this.world.collect(prev);
     if (got > 0) {
@@ -3870,7 +3946,9 @@ export class Game {
       this.level = level;
       this.ui.setLevel(level);
       if (this.unlockable) this.noteReached(level);
-      if (!this.practice) this.ui.announceLevel(level, this.areaName(level)); // in practice the lesson card has the top band
+      if (this.zen) {
+        if (themeChange) this.ui.showRoom(this.areaName(level)); // zen: only the area's name, quietly
+      } else if (!this.practice) this.ui.announceLevel(level, this.areaName(level)); // in practice the lesson card has the top band
       this.sound.level(themeChange, this.areaMusic(level));
       this.haptics.level(themeChange);
       this.maybeStartEvent(level);
@@ -3886,6 +3964,7 @@ export class Game {
 
     // Lava: the run ends, whatever shield you have.
     if (this.world.inLava() && !this.invincible()) {
+      if (this.zen) return this.zenRespawn();
       this.crash(false);
       this.world.sync();
       return;
@@ -3894,19 +3973,33 @@ export class Game {
     // Shielded (or just saved by a shield), the walls still hold you in: steer
     // into one and you slide along it instead of out of the course. Touching
     // one with a shield up uses the shield, like any other hit.
+    // Phase works the same way: through the next obstacle, never out through a wall.
     let scraped = false;
-    if (!fell && (this.shield || this.graceT > 0) && !this.invincible()) scraped = this.world.clampToWalls(CONFIG.ship.hitHalfWidth + 0.15);
-    const hit = !fell && this.graceT <= 0 && (scraped || this.world.hitTest(prev));
-    if (hit && this.shield && !this.invincible()) {
+    const guarded = this.shield || this.graceT > 0 || this.phaseT > 0 || this.passT > 0;
+    if (!fell && guarded && !this.invincible()) scraped = this.world.clampToWalls(CONFIG.ship.hitHalfWidth + 0.15);
+    const passing = this.graceT > 0 || this.passT > 0;
+    const struck = !fell && !passing && this.world.hitTest(prev);
+    const hit = struck || (!fell && !passing && scraped && this.shield);
+    if (struck && this.phaseT > 0 && !this.invincible()) {
+      // Phase takes it before the shield: the ship ghosts through, and the shield stays.
+      this.phaseT = 0;
+      this.passT = CONFIG.powers.phase.passSeconds;
+      this.hitThisRun = true;
+      this.gates.hit();
+      this.sound.power();
+      this.haptics.nearMiss();
+    } else if (hit && this.shield && !this.invincible()) {
       // The shield takes the hit; pass through for a moment.
       this.shield = false;
       this.player.setShield(false);
       this.graceT = CONFIG.powers.shield.graceSeconds + this.ship.graceExtra;
       this.hitThisRun = true;
+      this.gates.hit();
       this.sound.shieldHit();
       this.haptics.crash();
       this.nudgeMs = CONFIG.score.nearMiss.nudgeMs * 2;
     } else if ((fell || hit) && !this.invincible()) {
+      if (this.zen) return this.zenRespawn();
       this.crash(fell);
       this.world.sync();
       return;
@@ -3921,8 +4014,12 @@ export class Game {
       if (this.world.interiorMix > 0.5) this.sound.door();
       this.shownRoom = this.world.roomName;
     }
+    // Double points: everything scored this frame counts again (and again, for a bigger factor).
+    const gained = this.distanceScore + this.bonus - before;
+    if (this.doubleT > 0 && gained > 0) this.bonus += gained * (CONFIG.powers.double.factor - 1);
     this.score = this.distanceScore - this.scoreBase + this.bonus;
     this.ui.setScore(this.score);
+    if (this.zen) this.ui.setZenDistance(distanceText(this.world.distance - this.runStart));
 
     this.updateCamera(dt);
     this.sky.update(dt);
@@ -4085,6 +4182,7 @@ export class Game {
     const best = this.progress.course(c.id);
     this.ui.setOverHeading('level complete');
     this.ui.setGameOver(this.score, best.score, this.score >= best.score, this.nearMissCount, this.bestChain, this.seed);
+    this.fillSummary(false);
     const extra = this.finishRun(null);
     this.offerShare(this.score > before);
     this.wallet.add(starCredits);
@@ -4110,6 +4208,7 @@ export class Game {
     const { best, isNew } = this.recordBest(true);
     this.ui.setOverHeading('finished');
     this.ui.setGameOver(this.score, best, isNew, this.nearMissCount, this.bestChain, this.seed);
+    this.fillSummary(false);
     const extra = this.finishRun(null);
     this.offerShare(isNew);
     this.ui.setGameOverExtra([formatTime(this.runTime), this.dailyLine, extra].filter(Boolean).join(' · '));
@@ -4214,13 +4313,65 @@ export class Game {
     this.sound.setWind(ev.kind === 'sandstorm' ? ev.amount : 0);
   }
 
+  /** Distance milestones (endless and solo) and gate runs (endless), each frame. */
+  private runBonuses(): void {
+    if (this.practice) return;
+    const run = this.world.distance - this.runStart;
+    if (milestonesCount(this.mode, this.dailyRunNow !== null, this.zen) && !this.assisted) {
+      for (const m of this.milestones.pass(run)) {
+        this.bonusCredits += m.credits;
+        this.ui.showMilestone(kmText(m.km), `+${m.credits} credits`);
+        this.sound.level(false, this.areaMusic(this.level));
+        this.haptics.pickup();
+      }
+    }
+    if (!this.world.gateRuns) return;
+    for (const e of this.gates.update(this.world.distance, this.world.gateLog)) {
+      if (e.kind === 'ahead') this.ui.showMilestone('gate run', `clear it clean for +${CONFIG.gateRuns.credits} credits`);
+      else if (e.kind === 'clear') {
+        this.bonusCredits += e.credits;
+        this.ui.showMilestone('gate run clear', `+${e.credits} credits`);
+        this.sound.power();
+        this.haptics.pickup();
+      } else this.ui.showNotice('gate run: hit one. no bonus this time');
+    }
+  }
+
+  /** Zen: a crash fades out and back in on the safe lane, with the way ahead cleared. Nothing is lost. */
+  private zenRespawn(): void {
+    const Z = CONFIG.zen;
+    this.ui.fadeRespawn(Z.fadeMs);
+    this.sound.shieldHit();
+    this.haptics.nearMiss();
+    this.world.revive(Z.clearAhead);
+    this.world.sync();
+    this.player.reset();
+    this.player.setVisible(true);
+    this.trail.setVisible(true);
+    this.endPowers();
+    this.graceT = Z.fadeMs / 1000; // a moment to find the line again
+    this.boosting = false;
+    this.boostLevel = 0;
+    this.chain = 0;
+    this.ui.hideCombo();
+    this.speed = Math.min(this.speed, CONFIG.zen.maxSpeed) * 0.7;
+  }
+
+  /** The run summary behind "details" on the end screen. */
+  private fillSummary(crashed: boolean): void {
+    const view = { speeds: this.speeds, distance: this.world.distance - this.runStart, level: this.level, nearMisses: this.nearMissCount, bestChain: this.bestChain, crashed, hit: crashed && !this.fell ? this.hitWhat : '' };
+    this.ui.setRunSummary(sparkSvg(this.speeds), summaryRows(view));
+  }
+
   private gainPower(kind: PowerKind): void {
     const p = CONFIG.powers;
     if (kind === 0) {
       this.shield = true;
       this.player.setShield(true);
     } else if (kind === 1) this.magnetT = p.magnet.seconds + this.ship.magnetExtra;
-    else this.slowT = p.slow.seconds;
+    else if (kind === 2) this.slowT = p.slow.seconds;
+    else if (kind === 3) this.phaseT = p.phase.seconds;
+    else this.doubleT = p.double.seconds;
     this.pickupCount++;
     if (this.practice) this.practiceGot(kind); // the lesson card says it
     else this.ui.showNotice(itemCard(powerItem(kind)).on);
@@ -4230,7 +4381,12 @@ export class Game {
 
   private updatePowers(dt: number): void {
     this.graceT = Math.max(0, this.graceT - dt);
+    this.phaseT = Math.max(0, this.phaseT - dt);
+    this.passT = Math.max(0, this.passT - dt);
+    this.doubleT = Math.max(0, this.doubleT - dt);
     this.player.updateShield(dt, this.graceT);
+    // Phase: the ship ghosts while it's armed, and most of all while it passes through.
+    this.player.setPhase(this.passT > 0 ? 1 : this.phaseT > 0 ? 0.6 : 0, this.runTime, this.settings.reduceMotion);
     if (this.magnetT > 0) {
       this.magnetT = Math.max(0, this.magnetT - dt);
       this.world.attractPickups(dt);
@@ -4242,12 +4398,16 @@ export class Game {
     if (this.shield) parts.push('shield');
     if (this.magnetT > 0) parts.push(`magnet ${Math.ceil(this.magnetT)}`);
     if (this.slowT > 0) parts.push(`slow-mo ${Math.ceil(this.slowT)}`);
+    if (this.phaseT > 0) parts.push(`phase ${Math.ceil(this.phaseT)}`);
+    if (this.doubleT > 0) parts.push(`x${CONFIG.powers.double.factor} ${Math.ceil(this.doubleT)}`);
     this.ui.setPower(parts.join('  '));
   }
 
   private endPowers(): void {
     this.shield = false;
     this.graceT = this.magnetT = this.slowT = this.slowLevel = 0;
+    this.phaseT = this.passT = this.doubleT = 0;
+    this.player.setPhase(0, 0, true);
     this.player.setShield(false);
     this.player.updateShield(0, 0);
     this.ui.setPower('');
@@ -4278,7 +4438,11 @@ export class Game {
 
   private updateCrashed(dt: number): void {
     const c = CONFIG.crash;
-    this.crashMs += dt * 1000;
+    // The crash moment: the crash plays slowed for its first second (real time), then at speed.
+    const scale = crashTimeScale(this.crashRealMs, this.moment);
+    this.crashRealMs += dt * 1000;
+    this.crashMs += dt * 1000 * scale;
+    dt *= scale;
     this.feedAudio(dt, false, 0); // music keeps going, muffled, under the game-over text
     if (this.crashMs < c.freezeMs) return;
 
@@ -4303,7 +4467,7 @@ export class Game {
     // Ease the roll back to level over the frozen scene.
     this.stage.roll *= 1 - Math.min(1, dt * 3);
 
-    if (!this.overShown && this.crashMs >= c.overDelayMs) {
+    if (!this.overShown && crashOverReady(this.crashRealMs, this.crashMs, this.moment)) {
       if (this.revivePending) {
         if (!this.reviveAsked) {
           this.reviveAsked = true;

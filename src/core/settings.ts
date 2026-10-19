@@ -29,6 +29,8 @@ export interface Settings {
   colourBlind: boolean; // hazards, pickups and power-ups in a blue and orange palette, with shapes to tell them apart
   reminders: boolean; // a local notification once a day at most (the Android app; off until the player turns it on)
   reminderTime: number; // REMINDER_TIMES: when, on the phone's own clock
+  crashMoment: boolean; // a second of slow motion on what you hit, before the game-over screen (not ranked)
+  rivalGhost: boolean; // ranked: also race the ghost of the pilot just above you (off until turned on)
 }
 
 export type SettingKey = keyof Settings;
@@ -95,6 +97,8 @@ export const DEFAULT_SETTINGS: Settings = {
   colourBlind: false,
   reminders: false,
   reminderTime: 3,
+  crashMoment: true,
+  rivalGhost: false,
 };
 
 const KEY = 'endless.settings';

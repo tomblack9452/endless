@@ -30,6 +30,7 @@
           <div class="hud-centre">
             <div id="hud-score" class="score">0</div>
             <div class="progress"><div id="hud-progress" class="progress-fill"></div></div>
+            <div id="hud-zen" class="label dim hud-zen" hidden></div>
             <div id="room-label" class="label dim room-label"></div>
           </div>
           <div class="hud-side right"><span id="hud-pause" class="label link" role="button" aria-label="pause" tabindex="0">pause</span></div>
@@ -63,6 +64,12 @@
         <div id="banner-num" class="banner-num">1</div>
         <div id="banner-theme" class="label dim banner-theme"></div>
       </div>
+
+      <div id="milestone" class="banner milestone" aria-live="polite">
+        <div id="milestone-big" class="milestone-big"></div>
+        <div id="milestone-sub" class="label dim"></div>
+      </div>
+      <div id="fade" class="fade" aria-hidden="true"></div>
 
       <div id="screen-title" class="layer screen">
         <button id="title-settings" class="gear-btn" type="button" aria-label="settings">
@@ -108,6 +115,7 @@
           <div class="title-modes">
             <button class="pill" type="button" data-title="solo" data-feature="solo">solo</button>
             <button class="pill" type="button" data-title="endless" data-feature="endless">endless</button>
+            <button class="pill" type="button" data-title="zen" data-feature="zen">zen</button>
           </div>
           <div id="title-next" class="label dim title-next"></div>
           <nav class="title-bar" aria-label="menu">
@@ -244,6 +252,8 @@
           <button class="setting-row" type="button" data-setting="haptics"><span class="label">vibration</span><span class="value"></span></button>
           <button class="setting-row" type="button" data-setting="quickRetry"><span class="label">quick retry</span><span class="value"></span></button>
           <div class="label dim setting-note">quick retry: after a crash, one tap flies again, without the game-over screen. not in ranked</div>
+          <button class="setting-row" type="button" data-setting="crashMoment"><span class="label">crash moment</span><span class="value"></span></button>
+          <div class="label dim setting-note">crash moment: a second of slow motion on what you hit. not in ranked, never with reduce motion</div>
           <button id="confirm-exit-row" class="setting-row" type="button" data-setting="confirmExit" hidden><span class="label">ask before closing</span><span class="value"></span></button>
           <div id="reminder-group" hidden>
             <div class="settings-group">reminders</div>
@@ -259,6 +269,8 @@
           <button class="setting-row" type="button" data-setting="colourBlind"><span class="label">colour-blind mode</span><span class="value"></span></button>
           <div class="label dim setting-note">colour-blind mode: pickups blue, danger orange, and each power-up its own shape</div>
           <button class="setting-row" type="button" data-setting="ghost"><span class="label">ghost of your weekly best</span><span class="value"></span></button>
+          <button class="setting-row" type="button" data-setting="rivalGhost"><span class="label">rival's ghost</span><span class="value"></span></button>
+          <div class="label dim setting-note">rival's ghost: in ranked, also race the pilot just above you on your league's board</div>
           <button class="setting-row" type="button" data-setting="performance"><span class="label">performance mode</span><span class="value"></span></button>
           <div class="label dim setting-note">performance mode: lower resolution and lighter snow and ash, for older phones</div>
           <div class="settings-group">assist</div>
@@ -540,6 +552,11 @@
           <div id="over-score" class="score big">0</div>
           <div id="over-best" class="label"></div>
           <div id="over-stats" class="label dim"></div>
+          <button id="over-details-toggle" class="label link over-details-toggle" type="button" data-action="details" aria-expanded="false" aria-controls="over-details">details</button>
+          <div id="over-details" class="over-details" hidden>
+            <div id="over-spark" class="over-spark-box"></div>
+            <div id="over-detail-rows" class="over-detail-rows"></div>
+          </div>
           <div id="over-extra" class="label dim"></div>
           <div id="over-rank" class="over-rank"></div>
           <div id="over-rewards" class="label over-rewards"></div>
