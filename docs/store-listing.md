@@ -1,8 +1,8 @@
 # Store listing (Google Play)
 
 The text for Play Console > Grow users > Store presence > Main store listing,
-for 1.0.8 (the daily challenge, sharing and the comfort settings added to
-1.0.6's text). Every claim was checked against the code (the notes at the end say
+for 1.0.9 (phase and double points, risk lanes, gate runs, milestones, zen,
+the rival's ghost and sharing from the app added to 1.0.8's text). Every claim was checked against the code (the notes at the end say
 what changed from the live text and why). Paste the text between the rules;
 Play counts every character, line breaks included.
 
@@ -18,7 +18,7 @@ One-thumb space runner: fly close, top the daily challenge and the weekly run.
 
 ## Full description
 
-4,000 characters at most. This one is about 3,500.
+4,000 characters at most. This one is about 3,830.
 
 ---
 
@@ -27,7 +27,7 @@ Steer a small ship through canyons, ice fields, volcanic plains, asteroid belts 
 Endless Space is a calm, quick arcade space game: an endless runner (an endless flyer, really) that comes down to reflexes and nerve. Drag, tap or tilt to steer, slip past rocks by a hair, and see how far you get.
 
 A NEW RANKED RUN EVERY WEEK
-Every Monday brings a new ranked course, the same for every pilot. Fly it as often as you like; your best counts. Race the ghost of your best run this week, climb your league's weekly leaderboard, and move up seven leagues, from bronze to grand champion. Leagues group pilots by their ship's upgrades, so you always race ships like yours. Tap a pilot on a leaderboard to see their service record: rank, runs and bests.
+Every Monday brings a new ranked course, the same for every pilot. Fly it as often as you like; your best counts. Race the ghost of your best run this week (and, if you like, the pilot just above you), climb your league's weekly leaderboard, and move up seven leagues, from bronze to grand champion. Leagues group pilots by their ship's upgrades, so you always race ships like yours. Tap a pilot on a leaderboard to see their service record: rank, runs and bests.
 
 A DAILY CHALLENGE
 One short course a day, the same for every pilot, new at midnight. Everyone flies the same standard ship, so it's down to you. Climb the day's leaderboard, and fly it days in a row to keep your streak, earning credits and cores as it grows.
@@ -39,7 +39,10 @@ SET LEVELS
 Nine hand-built levels with a finish line, from first light to core breach. Each has three stars to win: finish it, fly it without a hit, and beat its score target.
 
 FLY CLOSE
-Near misses score more, and chaining them scores more still, up to ten times. Grab the glowing pickups to fill your boost, hold to go faster, and catch power-ups: a shield, a magnet and slow-mo. There is always a way through, so every crash is one you can learn from. Crashed? One revive a day is free.
+Near misses score more, and chaining them scores more still, up to ten times. Grab the glowing pickups to fill your boost, hold to go faster, and catch power-ups: a shield, a magnet, slow-mo, phase (ghost through the next thing you hit) and double points. Take a narrow risk lane for its pickups, thread the tight gaps of a gate run in endless for a bonus, and pass distance milestones. There is always a way through, so every crash is one you can learn from. Crashed? One revive a day is free.
+
+ZEN
+Just fly: a gentle speed, no score, and a crash simply fades and carries on.
 
 MAKE IT YOURS
 Over 160 looks for your ship: hulls, paints, markings, fins, engine colours, wing decals and flames, with new looks every season. Drag to spin your ship round in the hangar and the shop to see it from every side. Upgrade your thrusters, deflector, tractor beam and more with the credits you earn by flying.
@@ -53,6 +56,7 @@ PLAY YOUR WAY
 - Reduce motion, larger text, high contrast, a colour-blind mode (with shapes as well as colours), dark mode, separate music and effects volume, light or full vibration, and an assist mode that slows the game and marks a safe line
 - An optional daily reminder, once a day at most
 - A hands-on tutorial (try each way to steer, then a practice run that shows every pickup and power-up) and short tips on your first runs, all skippable and replayable
+- Share a new best as a picture, straight from the game
 - Plays offline; leaderboards need a connection
 - Made for phones and tablets: on a tablet, play upright or on its side
 - Keep your progress with Google sign-in, and take it to a new phone
@@ -78,6 +82,14 @@ where these names may differ slightly):
 8. Stylized
 
 The first five are the best fit.
+
+## Release notes for 1.0.9
+
+410 characters (500 at most):
+
+<en-GB>
+Two new power-ups: phase lets you ghost through one hit, and double points. Risk lanes: a narrow side path with bonus pickups. Gate runs in endless: clear the tight gaps without a hit for credits. Distance milestones in endless and solo. Zen mode: just fly, crashes fade. Run details on the end screen, a slow-motion crash moment, and an optional rival's ghost in ranked. Share your best straight from the app.
+</en-GB>
 
 ## Release notes for 1.0.8
 
@@ -146,7 +158,11 @@ no leaderboard is shown and no other pilots appear anywhere.
 | Offline | The whole game runs on the device; the boards, sign-in, ads and purchases need the server | "plays offline; leaderboards need a connection" |
 | Accessibility | reduce motion, text size (three), high contrast, colour-blind mode (1.0.8: blue and orange, shapes for the power-ups), dark mode, music and effects levels, vibration off/light/full, left-handed layout, assist mode, tap-sides steering, boost button position | listed as they are. There is no screen-reader support in a run, so none is claimed |
 | Daily challenge | `dailyRun` in `src/world/courses.ts` (the day's seed, the server's day), the standard ship (`STANDARD`), the `daily` board (0019), the streak ladder in `CONFIG.daily` | "one short course a day, the same for every pilot", "the same standard ship", streak credits and cores |
-| Share a new best | `offerShare` and `shareCard` (`src/platform/share.ts`): any new personal best, and every ranked run, through the Web Share API. Android's web view has no Web Share API and no share plugin is added, so the app hides the button | not claimed on Play (it works on the web) |
+| Share a new best | `offerShare` and `shareCard` (`src/platform/share.ts`): any new personal best, and every ranked run. Since 1.0.9 the app writes the picture to its cache and opens the share sheet (`@capacitor/share`, `@capacitor/filesystem`) with the Play link | "share a new best as a picture" |
+| Power-ups | `CONFIG.powers`: shield, magnet, slow-mo, phase and double points (1.0.9), by weight | five, named |
+| Risk lanes, gate runs, milestones | `planRisk`, `gateRow` in `world.ts` (gate runs in endless only), `src/core/runBonus.ts` (milestones in endless and solo) | as listed |
+| Zen | `startZen` in `game.ts`: a capped speed, no score, no rewards or boards, a crash respawns | "a gentle speed, no score, and a crash simply fades" |
+| Rival's ghost | `rival_path` (0022), off by default | "if you like, the pilot just above you" |
 | Reminders | `src/platform/reminders.ts`: off until turned on, once a day at most, the Android app | "an optional daily reminder, once a day at most" |
 | Ads | Rewarded only; interstitials are off (`CONFIG.ads.interstitial`) | "optional rewarded ads" |
 | "Free" | Play's rules (`docs/play-console.md`) rule out "free" as a selling point | only the free daily revive, which is a feature; no "free to play" |

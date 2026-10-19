@@ -117,7 +117,7 @@ the run. If that starts to matter, the next steps in order of effort:
 
 ## Changing the database
 
-Add a new file in `supabase/migrations/` (the next number: `0022_...sql`; never
+Add a new file in `supabase/migrations/` (the next number: `0023_...sql`; never
 edit one that has been applied), add a table or function it creates to `MADE` in
 `scripts/apply-db-lib.mjs` (how a hand-pasted database is recognised), run
 `npm run db:setup` to rebuild `supabase/setup.sql` (and the paste-sized `supabase/parts/`, which

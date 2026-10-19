@@ -38,7 +38,7 @@ npx cap open android       # Android Studio
   installed from Play.
 - **Release** (an upload to a Play track):
   1. Raise `versionCode` (and `versionName`) in `android/app/build.gradle`.
-     Play refuses a versionCode it has seen before. (1.0.8 is versionCode 9.)
+     Play refuses a versionCode it has seen before. (1.0.9 is versionCode 10.)
   2. Set `VITE_ADMOB_LIVE=1` in `.env` for this build only, then
      `npm run build && npx cap sync android`.
   3. Android Studio > Build > Generate Signed App Bundle > Android App Bundle,
@@ -63,7 +63,7 @@ secrets unless a CI build is added. `npm run check-server` says what's missing.
 ## Server
 
 Supabase. New migrations in `supabase/migrations/` (now up to
-`0021_client_errors_upkeep.sql`) only reach the live database with
+`0022_rival_ghost.sql`) only reach the live database with
 `npm run db:apply`. Never edit one that has shipped: add the next number, add its
 marker to `MADE` in `scripts/apply-db-lib.mjs`, then `npm run db:setup`. After
 adding one, remind Tom to run `db:apply`. `0012` is the trusted clock
@@ -75,7 +75,8 @@ purchase time and one-at-a-time `earn_cores`, `0015` leagues on the server
 the daily challenge (the `daily` board, `daily_period`, the streak's cores in
 `earn_cores`), `0020` name reports only from trusted reporters
 (`trusted_reporter`), `0021` error reports clearing themselves after 60 days
-(`prune_client_errors`).
+(`prune_client_errors`), `0022` ghost rivals (`rival_path`: the run just above
+you on your ranked board, with only the pilot name).
 
 RevenueCat purchases arrive through the `revenuecat-webhook` edge function,
 which calls `store_purchase_at` (0014; apply it before redeploying the webhook)
@@ -84,7 +85,7 @@ row's product to `refunded:<product>`. A refunded season pass (bought with
 money) takes back the cores its premium tiers paid and closes the premium track
 (`0016`); one unlocked with cores is never touched. After `db:apply`, redeploy
 the webhook when its code changes (1.0.7: a constant-time secret check; 1.0.8
-leaves it alone).
+and 1.0.9 leave it alone).
 
 ## Google sign-in (`src/platform/account.ts`)
 
@@ -134,10 +135,23 @@ No push server and no Firebase.
   project (`capacitor.settings.gradle` and `app/capacitor.build.gradle` are
   already updated in the repo).
 
-Sharing a new best (1.0.8) uses the Web Share API; Android's web view doesn't
-have it and no share plugin is added, so the app hides the share button for
-now. `@capacitor/share` (with `@capacitor/filesystem` for the picture) would
-bring it to the app.
+## Sharing (`@capacitor/share` 8.0.3 and `@capacitor/filesystem` 8.1.5, since 1.0.9)
+
+`src/platform/share.ts`: the share card (a PNG of a new best) is written to
+the app's cache directory (`endless-space-share.png`, written over each time)
+and handed to Android's share sheet with "score · mode · endless space" and
+the Play listing (`https://play.google.com/store/apps/details?id=com.tomblack.endlessspace`).
+The web keeps the Web Share API (or saves the picture).
+
+- No permissions: the cache needs none, and the share plugin brings its own
+  FileProvider in its manifest.
+- After `npm install`, `npx cap sync android` adds both plugins
+  (`capacitor.settings.gradle` and `app/capacitor.build.gradle` are already
+  updated in the repo by `npx cap update android`).
+- Testing on a phone: finish a run with a new best (or any ranked run), tap
+  share; the sheet should offer the picture to messaging apps. Closing the
+  sheet is quiet; a failure shows "sharing isn't available here". Logcat
+  (filter `Capacitor`) shows the plugin calls.
 
 ## Ads (AdMob, `@capacitor-community/admob`)
 

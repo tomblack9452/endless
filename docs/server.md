@@ -10,6 +10,7 @@ and [store.md](store.md) (purchases, ads and the app builds).
 - [Overview](#overview)
 - [Supabase settings](#supabase-settings)
 - [The daily challenge](#the-daily-challenge)
+- [Ghost rivals](#ghost-rivals)
 - [Reports and moderation](#reports-and-moderation)
 - [Error reports](#error-reports)
 - [When the server can't be reached](#when-the-server-cant-be-reached)
@@ -42,7 +43,9 @@ Without keys, everything lives on the device. With them:
   `report_pilot`, `0017`; only pilots with 5 runs or 3 days behind them count
   towards resetting a name, `0020`), and the game sends **error reports**
   (`client_errors`, `log_errors`, `0018`; cleared after 60 days, `0021`);
-  both are read only in the dashboard (below).
+  both are read only in the dashboard (below). In ranked, the game can ask
+  for the run of the pilot just above you to race as a ghost (`rival_path`,
+  `0022`, since 1.0.9).
   Setup is two keys and `npm run db:apply` (or `npm run db:setup` and pasting the small SQL parts it makes in `supabase/parts/`): [leaderboards.md](leaderboards.md).
 - **RevenueCat** (`src/store/`) in the iOS and Android apps: core packs
   (100, 550, 1,200, 2,500), a one-time starter pack (500 cores and the nova
@@ -136,11 +139,12 @@ pilot: the `reports` table, `report_pilot()`, `players.name_reset_at`),
 `daily_period()`, and `earn_cores` paying the streak's cores), `0020` (name
 reports count only from trusted reporters: `trusted_reporter()`,
 `report_pilot()` again), `0021` (error reports clear themselves:
-`prune_client_errors()`, `log_errors()` again).
+`prune_client_errors()`, `log_errors()` again), `0022` (ghost rivals:
+`rival_path()`).
 Apply `0014` and `0016` before deploying the webhook again; 1.0.7's webhook
 (a constant-time secret check) wants a redeploy after `db:apply`:
-`supabase functions deploy revenuecat-webhook --no-verify-jwt`. 1.0.8 doesn't
-change the webhook.
+`supabase functions deploy revenuecat-webhook --no-verify-jwt`. 1.0.8 and
+1.0.9 don't change the webhook.
 
 **A refunded season pass.** The webhook's refund (`store_refund`) renames the
 purchase `refunded:season_pass`. Since `0016`, for a pass bought with money it
@@ -213,6 +217,32 @@ out last year's:
 ```sql
 delete from public.bests where board = 'daily' and period < (current_date - 365)::text;
 ```
+
+## Ghost rivals
+
+Since 1.0.9 (`0022`). In ranked, with **rival's ghost** on in settings (off by
+default), the game flies the ghost of the pilot ranked just above you on your
+league's board this week, as well as your own weekly best.
+
+- `rival_path()` (security definer, signed in only) returns one row: that
+  pilot's **public pilot name**, the score, seconds, distance and **path** of
+  their best run this week (the ship's sideways position every 4 units, which
+  every ranked run carries since `0003`). No account id or public id.
+- The board is the caller's league (`players.league`, `0015`; from their
+  latest ranked run before that, else bronze) on the server's week. "Just
+  above" follows the board's own order (score, then who got there first).
+  A caller with no run this week gets the pilot at the bottom of the board,
+  the first to beat; the top pilot gets nothing. Hidden pilots are never a
+  rival.
+- The path has no times, so the game rebuilds them from how the course
+  speeds up, scaled to the run's length (`rivalGhost` in
+  `src/ship/ghost.ts`). Ranked courses are the same for everyone all week
+  (and 1.0.9's risk lanes come from the seed too), so a path flown before
+  1.0.9 still lines up.
+
+Nothing new is stored: it reads `bests`, `runs` and `players`. It works from
+the caller's `auth.uid()`, so it can't be run for someone else in the SQL
+editor; read `bests` for their board instead.
 
 ## Reports and moderation
 

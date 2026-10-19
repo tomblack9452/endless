@@ -234,11 +234,44 @@ Events change the look and sound only, never the course.
     you slide along it). It doesn't save you from falling into a pit.
   - **Magnet** (purple): pulls boost pickups ahead towards you for 9 s.
   - **Slow-mo** (green): drops you to 62% speed for 6 s.
+  - **Phase** (slate, since 1.0.9): for up to 7 s, the ship ghosts through
+    the next thing it hits (the hull turns see-through while it's armed, more
+    so as it passes through). Walls still hold you in, and drops and lava
+    still end the run. It goes before a shield, so the shield stays.
+  - **Double points** (rose, since 1.0.9): everything scored for 8 s counts
+    twice (distance, boost, pickups, near misses).
+
+  Which one comes is weighted (`CONFIG.powers.weights`: shield 26, magnet 22,
+  slow-mo 20, phase 16, double points 16), from the same single draw as
+  before, so the scanner upgrade or a change of weights never moves the rest
+  of a course. The practice run still teaches the first three; the pickups &
+  power-ups recap (and settings > help) has all five.
+- **Risk lanes** (since 1.0.9): now and then on the plains (the first two
+  levels of an open-ground visit), a narrow side path swings out from the
+  lane, runs between two lines of rocks (a 2-unit gap where the lane keeps
+  2.6) with six boost pickups in it, and swings back. It's optional: the lane
+  beside it stays open. Anything that would stand in its way, or across the
+  way to it, is left out. Every mode has them (the practice run's carry no
+  pickups); they come from the course seed.
+- **Gate runs** (endless only, since 1.0.9): in the middle level of each
+  outdoor area (levels 2, 5, 11, 14, 20, 23...), five walls of rock 26 units
+  apart, each with one tight gap on the lane (its edges marked in amber; the
+  set levels' stone gates leave 1.6 either side, these 1.3, the lane's own
+  clearance). "gate run" shows on approach. Clear all of them without a hit
+  (a shield or phase save counts as one) for 40 credits. A gate that would
+  stand on a chasm, the ice, a river or across a canyon split is left out, and
+  a run with fewer than three gates doesn't count.
+- **Distance milestones** (since 1.0.9): 1, 2.5, 5, 10 and 20 km in a run
+  (1 km is 1,000 units, as the stats count it) each show a brief line and pay
+  10, 25, 50, 100 and 200 credits. Endless and solo (environments and set
+  levels) only: never ranked or the daily challenge, so their scores stay
+  comparable, never zen, and not with assist mode. Milestone and gate run
+  credits are paid with the run's credits, on the end screen.
 
 ## Modes
 
 The title screen leads with **ranked**, a big button showing your best on
-this week's run, with **solo** and **endless** under it. Above it, **live
+this week's run, with **solo**, **endless** and **zen** under it. Above it, **live
 cards** show a daily reward when one is waiting, the free gift, the **daily
 challenge** (your streak, today's best and the time left; tap it to fly),
 today's goals and the season pass (your tier and the XP to the next). Along the bottom, a bar of five:
@@ -300,7 +333,15 @@ counts.
 Ranked is played in leagues (below), so everyone in a league flies a ship
 with about the same upgrades. Every ranked run is kept with its score, date,
 week and seed, and its path (the ship's sideways position every 4 units).
-Your best run of the week is flown as a faint **ghost** ship next to you, and
+Your best run of the week is flown as a faint **ghost** ship next to you.
+With **rival's ghost** on (settings > display, off by default; since 1.0.9),
+an amber ghost of the pilot just above you on your league's board this week
+flies too, named in a notice as the run starts ("racing nova-7's ghost ·
+9,800"). The server keeps a ranked run's path but not its times, so the
+rival's times are rebuilt from how the course speeds up, scaled to their
+run's length (`rivalGhost` in `src/ship/ghost.ts`). It needs the server
+(`rival_path`, [server.md](server.md#ghost-rivals)); with no rival (the top
+of the board, or offline) there's none. And
 with the server on, runs go to the **weekly leaderboard** for your league
 (on the league screen). Looks are allowed
 everywhere, because every hull shares one hitbox.
@@ -311,10 +352,11 @@ everywhere, because every hull shares one hitbox.
 art's dusk, with a ringed planet, the lane glowing towards your own ship as
 you have it on (`src/ship/portrait.ts`, drawn big), the score, "new best",
 the mode or board, a line or two (rank and league, or the streak) and a small
-"endless space" wordmark. It goes to the phone's share sheet (the Web Share
-API) where there is one; on the web without one it's saved as a picture. The
-Android app's web view has no Web Share API (and no share plugin is added),
-so the app hides the button for now (`shareAvailable()`).
+"endless space" wordmark. In the Android app (since 1.0.9) the picture is
+written to the app's cache (`@capacitor/filesystem`) and handed to the share
+sheet (`@capacitor/share`) with "score · mode · endless space" and the Play
+listing's link. On the web it goes to the Web Share API where there is one,
+otherwise it's saved as a picture.
 
 ## Ranked
 
@@ -486,7 +528,18 @@ and score are kept. Finishing a level opens the next (a locked level says which 
 stars are worth 50 credits each.
 
 **Endless** runs through every area in turn, forever: open ground, canyon,
-ship, then the next loop's biomes. It has its own high score.
+ship, then the next loop's biomes. It has its own high score, and its own
+gate runs.
+
+**Zen** (since 1.0.9; on the title with endless, at the same reveal stage) is
+endless flying with nothing to win: every area in turn on a fresh seed, at a
+gentle speed that never goes over 44 (endless climbs to 75). Obstacles are
+still there, but a crash, a fall or lava just fades to the sky and back
+(0.8 s) with the ship on the lane, the way ahead cleared and a moment to find
+the line. No score, chains, rewards, XP, goals, milestones, gate runs or
+boards: the HUD has only a quiet distance ("640 m", "2.4 km") and "zen", and
+a new area's name shows quietly. Pause has settings and main menu as usual;
+leaving keeps nothing.
 
 ## Credits, upgrades and looks
 
@@ -579,7 +632,8 @@ they follow the phone's.
   ticket a try; it's unlimited now, and older saves were paid 30 cores for each
   ticket they had beyond the week's 5.
 - **Revive:** outside ranked, once a run, a crash offers to carry on (with a
-  6 s timer). The first each day is free (two with premium), then
+  6 s timer; with the crash moment on, the offer comes when the moment ends
+  and its timer starts then). The first each day is free (two with premium), then
   an ad or 50 cores, the player's pick (with premium the ad is skipped). The
   ship goes back onto the safe lane, obstacles near the lane just ahead are
   cleared, it gets a shield and a moment of grace, and a 3-2-1 starts it
@@ -639,6 +693,11 @@ they follow the phone's.
 - After a run, the end screen lists any goals finished (to claim) and the pass
   XP earned, and the counters in the top bar bump as things land.
 
+**The end screen** (since 1.0.9) has **details** under the near misses: a
+compact strip with a small line of your speed over the run, where it ended
+(distance and level), what you hit, near misses and the best chain
+(`src/ui/runSummary.ts`). It's folded each time, so the screen stays clean.
+
 **Stats** (the service record's second tab) show runs, time played, distance, your best this
 week, your endless best and your best in each solo environment, furthest
 level, best chain, near misses, pickups, and where you crash most. Every run has a seed, and the same seed always builds the same course.
@@ -661,6 +720,11 @@ are saved on the device.
     full; older saves' on/off became full or off
   - ask before closing (the Android app only, on by default): back on the
     title screen asks before it closes the game
+  - **crash moment** (on by default, since 1.0.9; `src/core/crashMoment.ts`):
+    outside ranked, a crash plays at a fifth of its speed for a second, with
+    what you hit under the score ("hit a boulder", "fell"), before the revive
+    offer or the end screen. Never with reduce motion, in the practice run or
+    zen.
   - **quick retry** (off by default): after a crash outside ranked and the
     tutorial, once any revive offer is settled, the game-over screen is left
     out. A small panel shows the score and best ("tap to fly again", and a
@@ -687,11 +751,13 @@ are saved on the device.
   - high contrast
   - **colour-blind mode** (`src/world/itemColours.ts`): blue against orange.
     Boost pickups turn blue; the power-ups blues and white, each its own
-    shape (the shield a tall gem, the magnet a flat disc, slow-mo round),
+    shape (the shield a tall gem, the magnet a flat disc, slow-mo round,
+    phase long, double points wide and low with "x2" on its card),
     the same in the pickup cards; everything that ends a run (lava, molten
     metal, lava bombs and where they land, laser beams and warning lights)
     one orange
   - ghost of your weekly best, on or off
+  - rival's ghost (off by default): in ranked, the pilot just above you too
   - performance mode: a lower render scale and lighter snow and ash, for
     older phones
 - **Assist mode:** 80% speed and teal markers along the safe line. Assisted
@@ -765,7 +831,10 @@ baked into vertex colours, so there's no lighting cost. Colours come from
 one live palette. Time of day, theme blends, biome tints and events all write
 into it each frame.
 
-**A course is its seed.** Generation only uses the seeded `rand()`, never
+**A course is its seed.** Generation only uses the seeded `rand()` (and,
+since 1.0.9, `featureRand()`, a second stream from the same seed for risk
+lanes and gate runs, so their draws never move the first stream's and every
+older part of a course is laid out as it was), never
 `Math.random`, the clock or frame timing, and nothing is placed relative to
 where the ship is: canyon mouths, scatter and props all follow the lane. So
 the week's ranked run is the same for everyone however they fly, and a server

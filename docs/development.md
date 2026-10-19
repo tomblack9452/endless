@@ -22,7 +22,9 @@ The folder map is in the [README](../README.md#project-layout). File by file:
 | `src/core/config.ts` | Every tunable value |
 | `src/core/dev.ts` | Dev-only panel |
 | `src/core/game.ts` | State machine, main loop, scoring, boost, power-ups, menus |
-| `src/core/rng.ts` | Seeded random numbers (mulberry32) |
+| `src/core/rng.ts` | Seeded random numbers (mulberry32): `rand()`, and `featureRand()`, a second stream from the same seed for risk lanes and gate runs |
+| `src/core/runBonus.ts` | Distance milestones and gate run bookkeeping (when one is ahead, clean or spoilt) |
+| `src/core/crashMoment.ts` | The crash moment: when it plays, its slowed clock, and when the revive offer or end screen may come |
 | `src/core/retry.ts` | When a tap after a crash flies again (the retry lock, quick retry) |
 | `src/core/settings.ts` | Settings table and storage |
 | `src/core/storage.ts` | The async key/value store every save goes through |
@@ -44,10 +46,10 @@ The folder map is in the [README](../README.md#project-layout). File by file:
 | `src/world/speedLines.ts` | Boost streaks |
 | `src/world/terrain.ts` | Hills, ramps, split heights and chasms (JS and GLSL) |
 | `src/world/weather.ts` | Snow and ash: particles, fog and tint |
-| `src/world/world.ts` | Pools, theme generators, safe lane, pits, rooms |
+| `src/world/world.ts` | Pools, theme generators, safe lane, pits, rooms, the power-up pool (`pickPower`), risk lanes and gate runs |
 | `src/ship/catalogue.ts` | Every hand-made look, how to get each, the sets and the vault (plus the season looks) |
 | `src/ship/decals.ts` | Wing decal pictures |
-| `src/ship/ghost.ts` | The ghost of your weekly best |
+| `src/ship/ghost.ts` | The ghost of your weekly best, and a rival's (`rivalGhost`: times rebuilt for a path from the server) |
 | `src/ship/hangar.ts`, `src/ui/hangarView.ts` | The hangar's model and its screen (looks and the upgrades chip) |
 | `src/ship/looks.ts` | What you own and what's on; how an unlock reads |
 | `src/ship/player.ts` | Ship shapes, shield, banking, crash and fall |
@@ -68,6 +70,7 @@ The folder map is in the [README](../README.md#project-layout). File by file:
 | `src/ui/goalsView.ts` | The goals screen: daily, weekly and achievements, with claiming |
 | `src/ui/guide.ts`, `src/ui/controlArt.ts`, `src/ui/tutorialView.ts` | The pickup and power-up cards (from `CONFIG`), the control diagrams, the tutorial's indicators and recap |
 | `src/ui/hints.ts` | The first-run tips (walkthrough) |
+| `src/ui/runSummary.ts` | The end screen's details: the speed line, where the run ended, near misses, best chain |
 | `src/ui/report.ts`, `src/ui/whatsNew.ts` | The report link on a pilot's card; the "what's new" lines for each version |
 | `src/ui/onboarding.ts` | First launch: the steps, the control cards, the practice run's lessons, the starter set |
 | `src/ui/scrollHint.ts`, `src/ui/systemBars.ts` | The always-visible scroll bar under sideways rows; Android's status and gesture bar icon colours per screen |
@@ -78,7 +81,7 @@ The folder map is in the [README](../README.md#project-layout). File by file:
 | `src/platform/input.ts` | Drag, side taps, tilt, keyboard, boost control |
 | `src/platform/haptics.ts` | Vibration at the strength the settings pick (off, light, full) |
 | `src/platform/nameFilter.ts`, `src/platform/nameWords.json` | The pilot-name profanity check and its word list (`npm run names:build`) |
-| `src/platform/share.ts` | The share card: a picture of a new best with your ship, in the store art's dusk |
+| `src/platform/share.ts` | The share card: a picture of a new best with your ship, in the store art's dusk; in the app written to the cache and shared with `@capacitor/share` |
 | `src/platform/reminders.ts` | Reminders: local notifications, planned a week ahead, once a day at most (`@capacitor/local-notifications`) |
 | `src/audio/` | Sound engine, synth helpers, generative music |
 | `src/server/` | The server behind one interface: Supabase, or the device alone; cloud save, the run outbox (a daily run that waited past midnight is dropped), the leaderboard boards, and whether the server can be reached (the offline marker) |
@@ -86,12 +89,14 @@ The folder map is in the [README](../README.md#project-layout). File by file:
 | `src/ads/` | Ads (AdMob in the apps, nothing on the web) and their rules |
 | `tests/fairness.test.ts` | Headless survivability test |
 | `tests/pieces.test.ts`, `tests/pieces-pairs.test.ts` | Every ship section on paper, every route flown, every pair back to back |
-| `tests/determinism.test.ts` | No unseeded randomness or clock in course generation |
+| `tests/determinism.test.ts` | No unseeded randomness or clock in course generation; risk lanes and gate runs the same however a run is flown |
+| `tests/depth.test.ts` | 1.0.9: the power-up weights, the second random stream, milestones, gate run bookkeeping, the crash moment's timing, the run summary, the rival's ghost |
+| `tests/share.test.ts` | Sharing from the app: the cache file and the share sheet with the Play link |
 | `tests/economy.test.ts` | The calendar, quests, the shop, the pass and the revive |
 | `tests/server.test.ts` | Offline fallback and the store webhook |
 | `tests/clock.test.ts` | The trusted clock: the server's time, the Date header, the device's offline; whether the server can be reached |
 | `tests/account.test.ts`, `tests/session.test.ts` | Keeping an account with Google; signing in again without losing the player, and the cloud save never pushed before it's compared |
-| `tests/sql.test.ts`, `tests/leaderboard.test.ts` | The database run for real (PGlite): checks, boards (the daily one too), names, reports (trusted reporters), error reports (and their upkeep), row security, and the game's server code against it |
+| `tests/sql.test.ts`, `tests/leaderboard.test.ts` | The database run for real (PGlite): checks (with room for double points), boards (the daily one too), names, reports (trusted reporters), error reports (and their upkeep), ghost rivals (`rival_path`), row security, and the game's server code against it |
 | `tests/collisions.test.ts` | Every solid pool checked against its mesh across every area |
 | `tests/unlocks.test.ts` | Solo environment unlocks |
 | `tests/ranks.test.ts` | Rank ladder, XP and credit maths |
@@ -113,7 +118,12 @@ Nearly every number lives in `src/core/config.ts`, grouped by system:
 - `field`: spawn depth and pool sizes
 - `themes`: lane rules, open ground, canyon (ramps, chasms, bridges,
   upper and lower routes), every interior room and the ship's ramps
-- `boost` and `powers`: pickups and power-ups
+- `boost` and `powers`: pickups and power-ups (phase, double points and the
+  pool's `weights`)
+- `risk`, `gateRuns`, `milestones`: risk lanes, gate runs (endless) and the
+  distance milestones; `zen`, `crashMoment` and `summary`: zen's speed cap
+  and fade, the crash moment's length and slow-down, the end screen's speed
+  samples
 - `events`, `biomes`, `terrain`: weather, biome looks, hills
 - `assist`: assist mode
 - `courses`: credits per set level star (rank, upgrade and look tables live in
@@ -165,7 +175,11 @@ harness can't pass by accident. A second pilot takes the other way at every
 fork, both canyon splits (the upper or lower branch) and forked bridges over
 chasms, looking well ahead as a player would; it also checks that splits and
 chasms really happen. Every ship room is flown on its own, back to back, for
-four seeds.
+four seeds. Since 1.0.9 a pilot takes every **risk lane** on the plains
+(levels 1, 2, 28, 29) and must get through and collect its pickups, and the
+safe-lane pilot flies the **gate runs** of levels 2, 5, 11, 14, 20 and 23 for
+every seed (checking enough gates stand). The practice run's risk lanes bring
+no pickups.
 
 `tests/courses.test.ts` flies every set level from start to finish at each
 section's speed and checks each runs 100-260 seconds, flies twelve weeks of
