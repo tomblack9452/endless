@@ -193,7 +193,7 @@ Dashboard). Each section has **Start** (or **Manage**). All of these must be
 done before the closed test can be sent for review.
 
 ### 4a. Privacy policy
-- **Privacy policy URL:** `https://tomblack9452.github.io/endless/privacy.html`
+- **Privacy policy URL:** `https://apps.tomblack.online/endless/privacy.html`
 - **Save**. The page must be public and load without signing in (it does).
 
 ### 4b. App access
@@ -250,7 +250,7 @@ match what the app and its libraries actually do; Google checks.
 - **Which of the following methods of account creation does your app support?**
   - Tick **OAuth** (Sign in with Google).
   - If there's an option like "Other", the automatic anonymous account fits it; if you can only pick from a fixed list, OAuth is enough.
-- **Delete account URL:** `https://tomblack9452.github.io/endless/support.html`
+- **Delete account URL:** `https://apps.tomblack.online/endless/support.html`
   (it explains deleting in the game, settings > delete my account and data, or by email). Google requires a web address for this whenever an app has accounts.
 - **Do you provide a way for users to request that some or all of their data is deleted, without requiring them to delete their account?** **No.**
 
@@ -334,7 +334,7 @@ never at start-up) and, through the plugin, `RECEIVE_BOOT_COMPLETED` and
 - **Store listing contact details:**
   - **Email:** `tomblackdev@proton.me` (shown publicly on the store).
   - **Phone:** leave empty.
-  - **Website:** `https://tomblack9452.github.io/endless/`. **Important for AdMob later:** `app-ads.txt` must live at the root of this site's domain (see part 10).
+  - **Website:** `https://tomblack.online`. **Important for AdMob:** `app-ads.txt` must live at the root of this domain, so it is served by the Vercel site (`tomblack-website` repo, `public/app-ads.txt`; see part 10).
 - **External marketing:** leave on (lets Google advertise the game outside Play).
 - **Save**.
 
@@ -556,11 +556,11 @@ why; the usual fix is a longer test or more detailed answers, then apply again.
   - **Apps > Endless Space > App settings > link to the store listing**, once
     the game is findable on Play (can take a day after release).
   - **app-ads.txt:** AdMob reads it from the root of the website in your
-    listing: `https://tomblack9452.github.io/app-ads.txt` (not under
-    `/endless/`). That root is served from a separate GitHub repository named
-    exactly **`tomblack9452.github.io`**: create it, add a file `app-ads.txt`
-    with the line AdMob gives you (**Apps > View all apps > app-ads.txt**), and
-    turn on Pages for it (Settings > Pages > deploy from the main branch).
+    listing, `https://tomblack.online/app-ads.txt`. That site is the Vercel
+    one (repository `tomblack-website`): the file is `public/app-ads.txt`,
+    with the line AdMob gives you (**Apps > View all apps > app-ads.txt**).
+    A copy also sits at `https://apps.tomblack.online/app-ads.txt` (the
+    `tomblack9452.github.io` repository, served on that subdomain).
     AdMob checks it within a day or so.
 - **Play Console > Monitor and improve > Android vitals:** watch for crashes
   and "app not responding" in the first days.

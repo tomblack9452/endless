@@ -225,7 +225,7 @@ export async function drawShareCard(c: ShareCard): Promise<HTMLCanvasElement> {
   g.globalAlpha = 0.55;
   g.font = font(24);
   g.textAlign = 'center';
-  g.fillText('tomblack9452.github.io/endless', W / 2, H - 28);
+  g.fillText('apps.tomblack.online/endless', W / 2, H - 28);
   g.globalAlpha = 1;
   return canvas;
 }

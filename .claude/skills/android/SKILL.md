@@ -162,8 +162,13 @@ The web keeps the Web Share API (or saves the picture).
   cores), doubling credits, the daily gift and swapping a daily goal.
 - Test ads show until `VITE_ADMOB_LIVE=1`. Never tap live ads on your own phone.
 - GDPR and US consent messages are set up in AdMob > Privacy & messaging.
-- `app-ads.txt` is served from the root of the `tomblack9452.github.io` user
-  site repo, not this repo's Pages site.
+- `app-ads.txt` is served from the root of `https://tomblack.online` (the
+  Vercel site, repo `tomblack-website`, `public/app-ads.txt`), the website in
+  the Play listing.
+- Web pages live on `apps.tomblack.online`: the `tomblack9452.github.io` repo
+  (home page, Search Console file) with a custom domain, and this repo's Pages
+  under `/endless/` (game, privacy, support). Google needs the home page and
+  privacy policy on a domain we own; `github.io` doesn't count.
 
 ## Purchases (RevenueCat, `@revenuecat/purchases-capacitor`)
 

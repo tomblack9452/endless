@@ -16,7 +16,7 @@ plug in behind it when their keys are set (see [docs/server.md](docs/server.md))
 Ranked groups pilots into leagues by ship power (upgrade points), so a ship
 only races ships like it. Premium itself never makes a ship faster.
 
-Play it at https://tomblack9452.github.io/endless/.
+Play it at https://apps.tomblack.online/endless/.
 
 How it plays, mode by mode and system by system, is in
 [docs/game.md](docs/game.md).

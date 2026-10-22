@@ -77,7 +77,7 @@ step-by-step first setup is in [leaderboards.md](leaderboards.md).
 | Authentication > Sign In / Providers > Google | Enabled, with the **web** OAuth client id and secret; skip nonce checks off | Google sign-in in the Android app ([store.md](store.md), "Google sign-in") |
 | Authentication > Attack Protection | CAPTCHA: **off** | The game signs in silently and can't show a CAPTCHA |
 | Authentication > Rate Limits | Anonymous sign-ins: 30 an hour per IP (the default) is fine | Raise it if many players share one network (a school, an event) |
-| Authentication > URL Configuration | Site URL: `https://tomblack9452.github.io/endless/` | Not used by anonymous sign-in, but keeps the defaults pointing at the game |
+| Authentication > URL Configuration | Site URL: `https://apps.tomblack.online/endless/` | Not used by anonymous sign-in, but keeps the defaults pointing at the game |
 | Project Settings > Data API | Exposed schemas: `public` (the default) | The game calls the database functions through it |
 | Project Settings > API Keys | The project URL and the **publishable** key (`sb_publishable_...`, or the legacy `anon` key) | Go in `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`. **Never** the secret or `service_role` key: anything `VITE_` is in the public build |
 | Connect > Session pooler | The connection string, with your database password | Goes in `SUPABASE_DB_URL` in `.env` for `npm run db:apply`. A secret: never a `VITE_` variable, never in GitHub |
