@@ -4,6 +4,11 @@
 // The lines for each version live here, newest first.
 
 export const WHATS_NEW: Readonly<Record<string, readonly string[]>> = {
+  '1.0.10': [
+    'smoother on mid-range phones',
+    'graphics: auto, high or low in settings',
+    'auto turns to low by itself if needed',
+  ],
   '1.0.9': [
     'new power-ups: phase and double points',
     'risk lanes, gate runs and km milestones',
