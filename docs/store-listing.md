@@ -83,6 +83,14 @@ where these names may differ slightly):
 
 The first five are the best fit.
 
+## Release notes for 1.0.10
+
+376 characters (500 at most):
+
+<en-GB>
+Smoother on mid-range phones: the game draws far less ground it never shows, with the same picture. A new graphics setting: auto, high or low. Low uses a lower resolution, lighter snow and ash and no speed lines, for older phones. Auto starts on high and switches to low by itself, once, if a run keeps going slow, and tells you. If you had performance mode on, you're on low.
+</en-GB>
+
 ## Release notes for 1.0.9
 
 410 characters (500 at most):

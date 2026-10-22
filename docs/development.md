@@ -91,6 +91,7 @@ The folder map is in the [README](../README.md#project-layout). File by file:
 | `tests/pieces.test.ts`, `tests/pieces-pairs.test.ts` | Every ship section on paper, every route flown, every pair back to back |
 | `tests/determinism.test.ts` | No unseeded randomness or clock in course generation; risk lanes and gate runs the same however a run is flown |
 | `tests/depth.test.ts` | 1.0.9: the power-up weights, the second random stream, milestones, gate run bookkeeping, the crash moment's timing, the run summary, the rival's ghost |
+| `tests/graphics.test.ts` | 1.0.10: the graphics setting (auto, high, low), performance mode carried over, and auto dropping to low once on sustained slow frames, never on stalls |
 | `tests/share.test.ts` | Sharing from the app: the cache file and the share sheet with the Play link |
 | `tests/economy.test.ts` | The calendar, quests, the shop, the pass and the revive |
 | `tests/server.test.ts` | Offline fallback and the store webhook |
@@ -135,7 +136,7 @@ Nearly every number lives in `src/core/config.ts`, grouped by system:
 - `hazards`, `weather`: ice and lava lakes, lava bombs, snow and ash
 - `economy`: run credits, revives, the login calendar, quests, the shop, the
   pass and the store's products
-- `render`: pixel ratio, adaptive-resolution thresholds and performance mode
+- `render`: pixel ratio, adaptive-resolution thresholds, low graphics' pixel ratio and auto graphics' thresholds (`render.auto`)
 
 After changing anything in `themes`, run `npm test`.
 
@@ -159,7 +160,35 @@ that opens a panel. It isn't in production builds.
   league, every look, every upgrade, every solo environment and set level,
   and 100,000 credits (saved in that browser)
 - **Reset all progress:** clears everything but settings
-- an FPS readout with the pixel ratio and draw calls
+- a profiling readout (top right): fps, the average and 95th-percentile frame
+  time over the last half second, the pixel ratio (and "low" when graphics
+  are low), draw calls, triangles, textures and geometries, and a graph of
+  the last 120 frame times (lines at 16.7 and 33 ms; green, amber, red)
+
+### Measuring performance
+
+In dev, `window.__frameStats()` returns every frame time since the page
+opened plus the renderer's numbers, so a script can profile a run. The 1.0.10
+numbers came from Playwright at 360x640 (device scale 2) with the CPU
+throttled 4x (`Emulation.setCPUThrottlingRate` over CDP): open the page, skip
+the welcome, set `game.settings.graphics` (1 high, 2 low) and
+`applySettings()`, turn on `game.dev.invincible` and `autopilot`, call
+`game.devStartAt(1)`, wait 4 s, then read frame times for 20 s. Startup is
+the time from `goto` to `#screen-welcome.on` or `#screen-title.on` on
+`npm run build` + `vite preview`. In the container Chromium renders with
+SwiftShader (software), so absolute numbers are far slower than a phone;
+compare before and after on the same machine. A CPU profile there showed the
+main thread mostly idle: the cost was the GPU side (vertices through the
+ground's hill shader, then pixels), which is why the ground now stops at what
+the camera can see.
+
+| 360x640, 4x CPU, SwiftShader | avg frame | p95 frame | triangles | draw calls |
+| --- | --- | --- | --- | --- |
+| before (1.0.9's ground) | 314 ms | 633 ms | 160k | 22 |
+| 1.0.10 high | 256 ms | 500 ms | 114k | 22 |
+| 1.0.10 low | 217 ms | 433 ms | 112k | 23 |
+
+Startup to the first screen (production build, the same set-up): 2.3 to 4.3 s.
 
 The store has a free "+500" and a premium on/off toggle in dev. `window.game` is
 exposed in dev for poking at state from the console.

@@ -38,7 +38,7 @@ npx cap open android       # Android Studio
   installed from Play.
 - **Release** (an upload to a Play track):
   1. Raise `versionCode` (and `versionName`) in `android/app/build.gradle`.
-     Play refuses a versionCode it has seen before. (1.0.9 is versionCode 10.)
+     Play refuses a versionCode it has seen before. (1.0.10 is versionCode 11.)
   2. Set `VITE_ADMOB_LIVE=1` in `.env` for this build only, then
      `npm run build && npx cap sync android`.
   3. Android Studio > Build > Generate Signed App Bundle > Android App Bundle,
@@ -85,7 +85,7 @@ row's product to `refunded:<product>`. A refunded season pass (bought with
 money) takes back the cores its premium tiers paid and closes the premium track
 (`0016`); one unlocked with cores is never touched. After `db:apply`, redeploy
 the webhook when its code changes (1.0.7: a constant-time secret check; 1.0.8
-and 1.0.9 leave it alone).
+and 1.0.9 leave it alone, and so does 1.0.10).
 
 ## Google sign-in (`src/platform/account.ts`)
 

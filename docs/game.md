@@ -758,8 +758,15 @@ are saved on the device.
     one orange
   - ghost of your weekly best, on or off
   - rival's ghost (off by default): in ranked, the pilot just above you too
-  - performance mode: a lower render scale and lighter snow and ash, for
-    older phones
+  - graphics (1.0.10; `graphics` in `src/core/settings.ts`): **auto**
+    (the default), **high** or **low**. High is the game as it always looked.
+    Low caps the render scale at `CONFIG.render.performancePixelRatio`, thins
+    snow and ash and turns the speed lines off. Auto starts on high and, if
+    frames average over `CONFIG.render.auto.slowFrameMs` for
+    `slowForMs` of play (`src/core/autoGraphics.ts`), switches to low once per
+    session with a quiet notice ("graphics on low to keep things smooth"); it
+    goes back to high on the next launch. 1.0.9's performance mode carries
+    over: on is low, off is auto (`tests/graphics.test.ts`)
 - **Assist mode:** 80% speed and teal markers along the safe line. Assisted
   runs never count as a best score.
 - **Help:** replay the tutorial, replay tips, **pickups & power-ups** (the
