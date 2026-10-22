@@ -557,6 +557,8 @@ body {
 /* Dev panel (dev server only). */
 .dev-fps {
   position: absolute;
+  text-align: right;
+  white-space: pre;
   right: calc(var(--safe-right) + 22px);
   top: calc(var(--safe-top) + 64px);
   opacity: 0.6;

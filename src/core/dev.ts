@@ -216,7 +216,7 @@ function installFps(game: Game): void {
       const p95 = sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * 0.95))];
       const s = game.devStats();
       text.textContent =
-        `${fps} fps  ${avg.toFixed(1)}/${p95.toFixed(1)} ms  x${s.ratio.toFixed(2)}${s.low ? ' low' : ''}  ` +
+        `${fps} fps  ${avg.toFixed(1)}/${p95.toFixed(1)} ms  x${s.ratio.toFixed(2)}${s.low ? ' low' : ''}\n` +
         `${s.calls} calls  ${(s.triangles / 1000).toFixed(1)}k tris  ${s.textures} tex  ${s.geometries} geo`;
       recent = [];
       last = now;
