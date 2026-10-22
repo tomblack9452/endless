@@ -28,6 +28,7 @@ import { errorLog, reportError } from '../platform/errors';
 import { latestNotes, SEEN_KEY, whatsNewOnLaunch } from '../ui/whatsNew';
 import { quickRetryOn, tapRetries } from './retry';
 import { GateTracker, kmText, Milestones, milestonesCount } from './runBonus';
+import { type BoostState, chainLink, PATH_STEP, PathRecorder, stepBoost } from './runRules';
 import { crashMomentOn, crashOverReady, crashTimeScale } from './crashMoment';
 import { distanceText, sparkSvg, summaryRows } from '../ui/runSummary';
 import { type HintId, Hints, tipText } from '../ui/hints';
@@ -100,7 +101,6 @@ import { ShowroomSpin } from '../ship/showroom';
 type State = 'title' | 'playing' | 'paused' | 'countdown' | 'crashed' | 'finished';
 
 const DEG = Math.PI / 180;
-const PATH_STEP = 4;
 const FIRST_PLAYED_KEY = 'endless.firstPlayed';
 const REVEAL_KEY = 'endless.reveal';
 /** The reminders were offered once (after the 5th valid run): kept on this device only. */
@@ -309,9 +309,7 @@ export class Game {
   private hangarUpgrades = false; // the upgrades chip is open, not a slot of looks
   private hangarFrom: 'shop' | null = null; // where Back goes
   // Ranked: the ship's sideways position every PATH_STEP units (the leaderboard check, and later the ghost).
-  private path: number[] = [];
-  private pathTimes: number[] = [];
-  private pathNext = 0;
+  private readonly path = new PathRecorder();
   private economyTimer = 0;
   /** The saved settings have been read (until then they're the defaults). */
   private settingsLoaded = false;
@@ -595,9 +593,7 @@ export class Game {
     this.econ.setOverRewards([]);
     this.revived = this.revivePending = this.reviveAsked = false;
     this.preRevive = null;
-    this.path = [];
-    this.pathTimes = [];
-    this.pathNext = 0;
+    this.path.reset();
     this.ghost.start(mode === 'ranked' ? this.weekly.id : null, this.settings.ghost);
     this.rival.stop();
     const serial = ++this.runSerial;
@@ -763,7 +759,7 @@ export class Game {
     const score = this.assisted ? 0 : this.score;
     if (this.mode === 'ranked') {
       const isNew = p.recordWeekly(this.weekly.id, score, finished);
-      if (isNew && this.path.length > 1) this.ghost.save({ week: this.weekly.id, step: PATH_STEP, xs: [...this.path], ts: [...this.pathTimes] });
+      if (isNew && this.path.xs.length > 1) this.ghost.save({ week: this.weekly.id, step: PATH_STEP, xs: [...this.path.xs], ts: [...this.path.ts] });
       return { best: p.weeklyBest(this.weekly.id), isNew };
     }
     if (this.dailyRunNow) return this.recordDaily(this.state === 'finished');
@@ -1961,7 +1957,7 @@ export class Game {
         seconds: run.seconds,
         distance: run.distance,
         finished,
-        path: board === 'ranked' || board === 'daily' ? [...this.path] : [],
+        path: board === 'ranked' || board === 'daily' ? [...this.path.xs] : [],
         ...(board === 'daily' && this.dailyRunNow ? { day: this.dailyRunNow.day } : {}),
       })
       .then((res) => {
@@ -3931,11 +3927,7 @@ export class Game {
     const prev = this.world.distance;
     this.world.advance(dt, speed, this.player.lateral);
     if (this.mode === 'ranked' || this.dailyRunNow) {
-      while (this.world.distance - this.runStart >= this.pathNext) {
-        this.path.push(Math.round(this.world.lateral * 100) / 100);
-        this.pathTimes.push(Math.round(this.runTime * 1000) / 1000);
-        this.pathNext += PATH_STEP;
-      }
+      this.path.record(this.world.distance - this.runStart, this.world.lateral, this.runTime);
     }
     if (this.mode === 'ranked') {
       this.ghost.update(this.runTime, this.world.distance - this.runStart, this.runStart, this.world.lateral);
@@ -4071,8 +4063,9 @@ export class Game {
         this.sound.pass(side, gap, 0); // close, but not a near miss
         continue;
       }
-      this.chain = Math.min(this.chain + 1, nm.maxCombo);
-      const points = nm.points * this.chain;
+      const link = chainLink(this.chain);
+      this.chain = link.chain;
+      const points = link.points;
       this.bonus += points;
       this.nearMissCount++;
       if (this.practice) this.practice.s.nearMisses++;
@@ -4114,24 +4107,22 @@ export class Game {
 
   /** Fill or drain the meter and ease the boost amount in and out. */
   private updateBoost(dt: number): void {
-    const b = CONFIG.boost;
-    const want = this.input.boostHeld();
-    if (this.boosting) {
-      if (!want || this.boostMeter <= 0) {
-        this.boosting = false;
-        this.sound.boostEnd(this.boostMeter <= 0);
-      }
-    } else if (want && this.boostMeter >= b.minToStart) {
-      this.boosting = true;
+    // The rules are shared with the server's re-fly (runRules.ts); this keeps the game's own fields.
+    const s = this.boostState;
+    s.meter = this.boostMeter;
+    s.boosting = this.boosting;
+    s.level = this.boostLevel;
+    const event = stepBoost(s, dt, this.input.boostHeld(), this.ship.boostFill, this.ship.boostDrain);
+    this.boostMeter = s.meter;
+    this.boosting = s.boosting;
+    this.boostLevel = s.level;
+    if (event === 'start') {
       this.sound.boostStart();
       this.haptics.boost();
-    }
-    if (this.boosting) this.boostMeter = Math.max(0, this.boostMeter - dt / (b.drainSeconds * this.ship.boostDrain));
-    else this.boostMeter = Math.min(1, this.boostMeter + (dt * this.ship.boostFill) / b.fillSeconds);
-    const goal = this.boosting ? 1 : 0;
-    const rate = this.boosting ? b.easeIn : b.easeOut;
-    this.boostLevel += (goal - this.boostLevel) * (1 - Math.exp(-rate * dt));
+    } else if (event) this.sound.boostEnd(event === 'empty');
   }
+
+  private readonly boostState: BoostState = { meter: 0, boosting: false, level: 0 };
 
   /** Hand the frame's state to the sound engine (reused object, no allocation). */
   private feedAudio(dt: number, playing: boolean, speed: number): void {

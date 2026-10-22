@@ -40,7 +40,20 @@ import { BOULDER_HEIGHT, boulder, MESA_RADIUS, canister, crystalCluster, greeble
 
 export type ThemeId = 'land' | 'canyon' | 'interior';
 
-/** Power-up kinds: 0 shield, 1 magnet, 2 slow-mo. */
+/** A boost pickup's place as laid (World.itemLog): its distance, its world x, the power-up drawn for it and the spacing drawn after it. */
+export interface ItemSlot {
+  d: number;
+  x: number;
+  /** The power-up drawn for a main slot; -1 for the other pickups (risk lanes, routes, bridges), which are always pickups. */
+  kind: PowerKind | -1;
+  spacing: number;
+  /** A main slot: a boost pickup, or a power-up in its place, depending on the scanner upgrade. */
+  main: boolean;
+  /** On open ground's lateral loop (see field.ts). */
+  wraps?: boolean;
+}
+
+/** Power-up kinds: 0 shield, 1 magnet, 2 slow-mo, 3 phase, 4 double points. */
 export type PowerKind = 0 | 1 | 2 | 3 | 4;
 
 /** The power-ups by PowerKind, in the order of CONFIG.powers.weights. */
@@ -201,6 +214,10 @@ export class World {
   private generatedTo = 0;
   private lastDx = 0; // sideways movement this frame, for swept collision
   private bringingIn = false; // the ship is outside the walls and being brought in (see bringIn)
+  /** True while the ship is being slid back inside the walls (bringIn): the server's re-fly allows the sideways jump. */
+  get bringing(): boolean {
+    return this.bringingIn;
+  }
   // Inner edges of the previous row's walls (world x), so each wall segment can
   // reach back over any step and leave no gap between rows.
   private prevWallL = NaN;
@@ -417,6 +434,22 @@ export class World {
   private readonly api: RoomAPI = this.makeApi();
   private nextPickupAt = Infinity;
   private nextPowerAt = Infinity;
+  /**
+   * The server's re-fly (src/server/replay.ts): when set, every boost pickup's
+   * place is written here as it's laid (where, the power-up drawn for it and the
+   * spacing drawn after it), so which of them are power-ups can be worked out
+   * for any scanner upgrade. Null in the game. Draws nothing of its own.
+   */
+  itemLog: ItemSlot[] | null = null;
+
+  /** Start writing every pickup's place to itemLog (the server's re-fly). Call before reset. */
+  logPickups(): void {
+    this.itemLog = [];
+    const p = this.pickups;
+    p.onSpawn = (i) => this.itemLog?.push({ d: p.d[i], x: p.x[i] + this.shipX, kind: -1, spacing: 0, main: false, wraps: p.wraps[i] === 1 });
+  }
+  /** The power-up spacing drawn at the last reset (the first power-up's place, with powerRate). */
+  firstPowerDraw = 0;
 
   constructor(scene: Scene, private readonly palette: LivePalette, textures?: { side: Texture; top: Texture }) {
     const s = F.cubeSize;
@@ -678,7 +711,9 @@ export class World {
     this.laneRetargetAt = this.distance + clearance + 20;
     this.nextFeatureAt = this.distance + clearance;
     this.nextPickupAt = this.distance + clearance + 40;
-    this.nextPowerAt = this.distance + CONFIG.powers.firstAfter + (range(CONFIG.powers.spacing) * 0.5) / this.powerRate;
+    this.firstPowerDraw = range(CONFIG.powers.spacing);
+    this.nextPowerAt = this.distance + CONFIG.powers.firstAfter + (this.firstPowerDraw * 0.5) / this.powerRate;
+    if (this.itemLog) this.itemLog.length = 0;
     this.generatedTo = this.distance + clearance;
     this.fill();
   }
@@ -701,9 +736,10 @@ export class World {
     this.updateMix(dt);
   }
 
-  hitTest(prevDistance: number): boolean {
+  /** `slack` narrows the ship's hitbox (the server's re-fly allows for a path sampled every few units; play uses 0). */
+  hitTest(prevDistance: number, slack = 0): boolean {
     for (let i = 0; i < this.solids.length; i++) {
-      if (this.solids[i].hitTest(prevDistance, this.distance, this.lastDx, !this.bringingIn)) {
+      if (this.solids[i].hitTest(prevDistance, this.distance, this.lastDx, !this.bringingIn, slack)) {
         this.lastHit = i;
         return true;
       }
@@ -1190,7 +1226,11 @@ export class World {
       // shift the random numbers and change the course for one player.
       const kind = pickPower(rand());
       const spacing = range(CONFIG.powers.spacing);
-      if (this.scripted) {
+      if (this.itemLog) {
+        // The re-fly: write the place down instead (logPickups); it works out what stood here.
+        this.itemLog.push({ d, x: this.lane, kind, spacing, main: true, wraps: this.theme === 'land' });
+        if (d >= this.nextPowerAt) this.nextPowerAt = d + spacing / this.powerRate;
+      } else if (this.scripted) {
         // The practice run places its own (see place); the draws above keep the course the same.
         if (d >= this.nextPowerAt) this.nextPowerAt = d + spacing / this.powerRate;
       } else if (d >= this.nextPowerAt) {
@@ -1726,26 +1766,26 @@ export class World {
   }
 
   /** The ship is on an ice lake (it slides). */
-  onIce(): boolean {
-    return this.lakeAtShip(this.iceLakes, 0.95);
+  onIce(offset = 0): boolean {
+    return this.lakeAtShip(this.iceLakes, 0.95, offset);
   }
 
   /** The ship is over lava (the run ends, shield or not). */
-  inLava(): boolean {
-    return this.lakeAtShip(this.lavaLakes, 0.8) || this.offCauseway();
+  inLava(offset = 0): boolean {
+    return this.lakeAtShip(this.lavaLakes, 0.8, offset) || this.offCauseway(offset);
   }
 
   /** The ship is over a lava river, off its causeway. */
-  private offCauseway(): boolean {
+  private offCauseway(offset = 0): boolean {
     const r = this.riverAt(this.distance);
     if (!r) return false;
     const lane = this.laneAt(this.distance);
-    return lane !== null && Math.abs(this.shipX - lane) > r.half;
+    return lane !== null && Math.abs(this.shipX + offset - lane) > r.half;
   }
 
-  private lakeAtShip(lakes: Lake[], inside: number): boolean {
+  private lakeAtShip(lakes: Lake[], inside: number, offset = 0): boolean {
     for (const l of lakes) {
-      const dx = wrap(this.shipX - l.x) / l.rx;
+      const dx = wrap(this.shipX + offset - l.x) / l.rx;
       const dz = (this.distance - l.d) / l.rd;
       if (dx * dx + dz * dz < inside) return true;
     }
@@ -3204,12 +3244,12 @@ export class World {
   }
 
   /** True if the ship is over a pit (no floor under it). */
-  overPit(): boolean {
+  overPit(offset = 0): boolean {
     const slot = (((Math.round(this.distance / STEP) % FLOOR_ROWS) + FLOOR_ROWS) % FLOOR_ROWS);
     if (Math.abs(this.floorD[slot] - this.distance) > STEP * 0.6) return false;
     const n = this.floorCount[slot];
     if (n < 0) return false;
-    const x = this.shipX;
+    const x = this.shipX + offset;
     for (let i = 0; i < n; i++) {
       if (x >= this.floorRows[slot * 12 + i * 2] - 0.1 && x <= this.floorRows[slot * 12 + i * 2 + 1] + 0.1) return false;
     }

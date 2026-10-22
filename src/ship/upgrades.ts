@@ -58,7 +58,8 @@ export const STANDARD: ShipStats = {
   powerRate: 1,
 };
 
-function statsFor(tiers: Partial<Record<SystemId, number>>): ShipStats {
+/** The stats of a ship with these tiers (the server's re-fly works out the most a league allows). */
+export function statsFor(tiers: Partial<Record<SystemId, number>>): ShipStats {
   const t = (id: SystemId) => tiers[id] ?? 0;
   return {
     boostDrain: 1 + 0.08 * t('thrusters'),

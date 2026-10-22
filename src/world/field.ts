@@ -231,7 +231,11 @@ export class InstancedField {
       this.moving[i] = 0;
     }
     this.count++;
+    this.onSpawn?.(i);
   }
+
+  /** Told each new instance's index as it's placed (the server's re-fly logs pickups with it). Null in the game. */
+  onSpawn: ((i: number) => void) | null = null;
 
   private release(i: number): void {
     this.active[i] = 0;
@@ -309,8 +313,8 @@ export class InstancedField {
    * carry the ship through a thin wall.
    */
   /** `walls` false leaves out solids that don't score (walls), for a ship being brought inside them. */
-  hitTest(prevDistance: number, distance: number, dx: number, walls = true): boolean {
-    const shipX = CONFIG.ship.hitHalfWidth;
+  hitTest(prevDistance: number, distance: number, dx: number, walls = true, slack = 0): boolean {
+    const shipX = CONFIG.ship.hitHalfWidth - slack;
     const shipZ = CONFIG.ship.hitHalfDepth;
     for (let i = 0; i < this.top; i++) {
       if (!this.active[i] || !this.solid[i] || (!walls && !this.scores[i])) continue;
