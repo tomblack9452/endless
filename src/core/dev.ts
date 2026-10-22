@@ -162,22 +162,66 @@ function install(game: Game, title: HTMLElement): void {
   });
 }
 
-/** Small FPS / render scale / draw call readout, bottom-left above the boost text. */
+/**
+ * Dev profiling readout: fps, average and 95th-percentile frame time over the
+ * last half second, render scale, draw calls, triangles, textures and
+ * geometries, and a graph of the last 120 frame times (the lines are 16.7 ms
+ * and 33 ms). `window.__frameStats()` returns every frame time so far plus the
+ * renderer numbers, for scripted profiling (see docs/development.md).
+ */
 function installFps(game: Game): void {
-  const el = document.createElement('div');
-  el.className = 'label dev-fps';
-  document.getElementById('ui')?.appendChild(el);
-  let frames = 0;
-  let last = performance.now();
+  const box = document.createElement('div');
+  box.className = 'label dev-fps';
+  const text = document.createElement('div');
+  const graph = document.createElement('canvas');
+  const W = 120;
+  const H = 36;
+  graph.width = W;
+  graph.height = H;
+  graph.style.cssText = `display:block;width:${W}px;height:${H}px;margin-top:2px;margin-left:auto;background:rgba(0,0,0,0.25)`;
+  box.append(text, graph);
+  document.getElementById('ui')?.appendChild(box);
+  const g = graph.getContext('2d');
+  const times = new Float32Array(W);
+  let head = 0;
+  let recent: number[] = [];
+  let lastFrame = performance.now();
+  let last = lastFrame;
+  const all: number[] = [];
+  (window as unknown as { __frameStats: () => unknown }).__frameStats = () => ({ frames: all.slice(), ...game.devStats() });
+  const y = (ms: number) => H - Math.min(H, (ms / 50) * H);
+  const draw = () => {
+    if (!g) return;
+    g.clearRect(0, 0, W, H);
+    g.fillStyle = 'rgba(255,255,255,0.35)';
+    g.fillRect(0, y(16.7), W, 1);
+    g.fillRect(0, y(33.3), W, 1);
+    for (let i = 0; i < W; i++) {
+      const ms = times[(head + i) % W];
+      g.fillStyle = ms > 33.3 ? '#e0533c' : ms > 16.7 ? '#e8b23a' : '#7ccf6a';
+      g.fillRect(i, y(ms), 1, H - y(ms));
+    }
+  };
   const tick = (now: number) => {
-    frames++;
+    const ms = now - lastFrame;
+    lastFrame = now;
+    times[head] = ms;
+    head = (head + 1) % W;
+    recent.push(ms);
+    all.push(ms);
     if (now - last >= 500) {
-      const fps = Math.round((frames * 1000) / (now - last));
+      const fps = Math.round((recent.length * 1000) / (now - last));
+      const sorted = recent.slice().sort((a, b) => a - b);
+      const avg = sorted.reduce((t, v) => t + v, 0) / sorted.length;
+      const p95 = sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * 0.95))];
       const s = game.devStats();
-      el.textContent = `${fps} fps  x${s.ratio.toFixed(2)}  ${s.calls} calls`;
-      frames = 0;
+      text.textContent =
+        `${fps} fps  ${avg.toFixed(1)}/${p95.toFixed(1)} ms  x${s.ratio.toFixed(2)}${s.low ? ' low' : ''}  ` +
+        `${s.calls} calls  ${(s.triangles / 1000).toFixed(1)}k tris  ${s.textures} tex  ${s.geometries} geo`;
+      recent = [];
       last = now;
     }
+    draw();
     requestAnimationFrame(tick);
   };
   requestAnimationFrame(tick);

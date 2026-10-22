@@ -2,6 +2,7 @@ import { applyAtmosphere } from '../world/atmosphere';
 import { type AudioState, Sound } from '../audio/sound';
 import type { MusicId } from '../audio/music';
 import { createBlockTextures } from '../world/blockTextures';
+import { AutoGraphics } from './autoGraphics';
 import { BASE_PALETTE, CONFIG } from './config';
 import { lateralSpeedAt, speedAt } from '../world/difficulty';
 import { Input } from '../platform/input';
@@ -174,6 +175,8 @@ export class Game {
   private readonly player: Player;
   private readonly input: Input;
   private readonly speedLines: SpeedLines;
+  /** Graphics on auto: drops to low once per session if runs keep going slow. */
+  private readonly autoGraphics = new AutoGraphics();
   private readonly sky: Sky;
   private readonly trail: Trail;
   private readonly events: Events;
@@ -3555,8 +3558,9 @@ export class Game {
     this.input.sidesMode = s.touch === 1;
     this.input.doubleTapBoost = s.doubleTapBoost;
     this.haptics.strength = s.haptics;
-    this.stage.setPerformance(s.performance);
-    this.weather.lite = s.performance;
+    const low = this.lowGraphics();
+    this.stage.setPerformance(low);
+    this.weather.lite = low;
     if (!s.ghost) this.ghost.stop();
     this.world.assist = this.assistOn();
     if (this.assistOn() && this.state !== 'title') this.assisted = true;
@@ -3673,8 +3677,34 @@ export class Game {
   }
 
   /** Dev: renderer stats for the FPS readout. */
-  devStats(): { ratio: number; calls: number } {
-    return { ratio: this.stage.pixelRatio, calls: this.stage.renderer.info.render.calls };
+  devStats(): { ratio: number; calls: number; triangles: number; textures: number; geometries: number; low: boolean } {
+    const info = this.stage.renderer.info;
+    return {
+      ratio: this.stage.pixelRatio,
+      calls: info.render.calls,
+      triangles: info.render.triangles,
+      textures: info.memory.textures,
+      geometries: info.memory.geometries,
+      low: this.lowGraphics(),
+    };
+  }
+
+  /** Low graphics: chosen in settings, or auto after it dropped this session. */
+  private lowGraphics(): boolean {
+    const g = this.settings.graphics;
+    return g === 2 || (g === 0 && this.autoGraphics.dropped);
+  }
+
+  /** Graphics on auto: during play, drop to low once if frames stay slow, with a quiet notice. */
+  private watchGraphics(frameMs: number): void {
+    if (this.settings.graphics !== 0 || this.autoGraphics.dropped) return;
+    if (this.state !== 'playing') {
+      this.autoGraphics.reset();
+      return;
+    }
+    if (!this.autoGraphics.feed(frameMs)) return;
+    this.applySettings();
+    this.ui.showNotice('graphics on low to keep things smooth. settings can change it');
   }
 
   /** Dev: force every interior room to be `id` (null = random). */
@@ -3768,6 +3798,7 @@ export class Game {
     const [grass, grain, strata] = this.groundStyle();
     this.stage.setGroundStyle(grass, grain, this.world.lateral, this.world.distance, strata);
     if (this.state === 'playing' || this.state === 'title') this.stage.adapt(now - this.lastTime);
+    this.watchGraphics(now - this.lastTime);
     const dt = Math.max(0, Math.min((now - this.lastTime) / 1000, 1 / 20));
     this.lastTime = now;
 
@@ -3891,7 +3922,7 @@ export class Game {
     this.player.update(dt, this.dev.autopilot ? this.autopilot() : this.input.steering(), lateralSpeedAt(speed) * this.ship.steer, pitch, this.onIce ? CONFIG.hazards.ice.grip : 1);
     this.weather.update(dt, speed);
     // No streaks inside the ship: they'd run through its walls and ceiling like loose wires.
-    this.speedLines.update(dt, speed, this.settings.reduceMotion ? 0 : this.boostLevel * (1 - this.world.insideMix));
+    this.speedLines.update(dt, speed, this.settings.reduceMotion || this.lowGraphics() ? 0 : this.boostLevel * (1 - this.world.insideMix));
     this.trail.update(dt, this.boostLevel, this.player.engineHalfSpan);
     if (this.boosting) {
       this.boostSeconds += dt;

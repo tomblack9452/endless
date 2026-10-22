@@ -40,6 +40,13 @@ export const CONFIG = {
     fastFrameMs: 14.5, // ...and as comfortable (~69 fps)
     slowForMs: 1200, // struggling this long: step down
     fastForMs: 6000, // comfortable this long: step up
+    // Graphics on auto: starts on high, and drops to low (once per session)
+    // when frames average above this for a few seconds of play.
+    auto: {
+      slowFrameMs: 24, // ~42 fps
+      slowForMs: 4000,
+      stallMs: 250, // longer frames are stalls (a tab switch), not slowness
+    },
     // Widest play area as width / height. Wider screens (desktop, landscape)
     // get a centred column so the game plays the same as on a phone.
     maxAspect: 0.75,

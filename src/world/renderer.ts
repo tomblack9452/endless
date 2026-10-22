@@ -380,12 +380,28 @@ const X_AXIS = new Vector3(1, 0, 0);
  * and across it near the middle only (the two sides of a split rise and fall
  * separately), with a few wide columns out to the edges.
  */
+/**
+ * The ground's grid of rows and columns. Every vertex runs the hill shader
+ * each frame, so it only reaches as far as the camera can see: the far plane
+ * behind (the showroom camera can look back along the run) and half as far
+ * again ahead (the showroom's turned camera sees a little past it). It used to
+ * run 1600 ahead, and those rows were half the scene's triangles and never
+ * drawn. The rows sit on the same grid as ever (every GROUND_ROW from the
+ * mesh's origin), so the picture is the same pixel for pixel.
+ */
 function groundGeometry(): PlaneGeometry {
   const xs: number[] = [];
   for (let x = -36; x <= 36; x += GROUND_COL) xs.push(x);
   const outer = [48, 80, 150, 300, 600, 1000];
   const cols = [...outer.map((x) => -x).reverse(), ...xs, ...outer];
-  const g = new PlaneGeometry(1, 2000, cols.length - 1, 2000 / GROUND_ROW);
+  // Local y runs the other way to world z (the plane is turned flat): world z = GROUND_Z - y.
+  const reach = CONFIG.camera.far * 1.5;
+  const yFrom = GROUND_Z - CONFIG.camera.far; // the end behind the camera (local y)
+  const yTo = GROUND_Z + reach; // ...and ahead
+  const rows = Math.ceil((yTo - yFrom) / GROUND_ROW);
+  const length = rows * GROUND_ROW;
+  const g = new PlaneGeometry(1, length, cols.length - 1, rows);
+  g.translate(0, yFrom + length / 2, 0);
   const pos = g.attributes.position;
   for (let i = 0; i < pos.count; i++) pos.setX(i, cols[i % cols.length]);
   pos.needsUpdate = true;

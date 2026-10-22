@@ -21,7 +21,7 @@ export interface Settings {
   contrast: boolean; // high-contrast obstacles
   assist: boolean; // slower, with the safe line marked; scores don't count as bests
   ghost: boolean; // ranked: fly against your week's best
-  performance: boolean; // lower resolution and lighter weather, for older phones
+  graphics: number; // GRAPHICS: auto (high, dropping to low once if frames run slow), high, or low for older phones
   dark: boolean; // menus on dark panels with light text
   confirmExit: boolean; // Android: back on the title screen asks before closing the app
   quickRetry: boolean; // after a crash (not ranked), one tap flies again, with no game-over screen
@@ -48,6 +48,8 @@ const SIDES = ['right', 'left', 'middle'];
 const TEXT = ['normal', 'large', 'larger'];
 export const TEXT_SCALE = [1, 1.2, 1.4];
 const HAPTICS = ['off', 'light', 'full'];
+// Saved as an index, so the order stays: 0 auto, 1 high, 2 low.
+export const GRAPHICS = ['auto', 'high', 'low'];
 /** Reminder times to pick from, [hour, minute] on the phone's clock; 18:00 by default. */
 export const REMINDER_TIMES: readonly [number, number][] = [
   [8, 0],
@@ -71,6 +73,7 @@ const OPTIONS: Partial<Record<SettingKey, string[]>> = {
   textSize: TEXT,
   haptics: HAPTICS,
   reminderTime: REMINDER_LABELS,
+  graphics: GRAPHICS,
 };
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -89,7 +92,7 @@ export const DEFAULT_SETTINGS: Settings = {
   contrast: false,
   assist: false,
   ghost: true,
-  performance: false,
+  graphics: 0,
   dark: false,
   confirmExit: true,
   quickRetry: false,
@@ -106,13 +109,15 @@ const KEY = 'endless.settings';
 /**
  * Settings as saved, brought up to date: anything missing (a setting newer
  * than the save) or of the wrong kind takes its default, and older forms are
- * carried over (vibration was on/off: on is full strength now).
+ * carried over (vibration was on/off: on is full strength now; performance mode on is low graphics).
  */
 export function migrateSettings(saved: unknown): Settings {
   const s = { ...DEFAULT_SETTINGS };
   if (!saved || typeof saved !== 'object') return s;
   const o = saved as Record<string, unknown>;
   if (typeof o.haptics === 'boolean') o.haptics = o.haptics ? 2 : 0;
+  // 1.0.9 and older had performance mode on/off: on is low graphics, off is auto.
+  if (typeof o.performance === 'boolean' && o.graphics === undefined) o.graphics = o.performance ? 2 : 0;
   for (const key of Object.keys(DEFAULT_SETTINGS) as SettingKey[]) {
     const v = o[key];
     const def = DEFAULT_SETTINGS[key];
