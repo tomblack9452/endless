@@ -27,8 +27,13 @@ export interface ReminderState {
   rankedOpen: boolean;
   /** The daily challenge is open. */
   dailyOpen: boolean;
-  /** Today's thing is done (the daily flown, or with it closed, the daily reward claimed): no reminder today. */
-  doneToday: boolean;
+  /**
+   * The day (UTC, the game's day) whose thing is done (the daily flown, or with it
+   * closed, the daily reward claimed), or null: no reminder rings during that day.
+   * By the game's day, not the phone's: away from UTC a reminder can fall in the
+   * next game day, when there's a new challenge to fly.
+   */
+  doneDay: string | null;
 }
 
 export interface Reminder {
@@ -48,7 +53,7 @@ export function planReminders(now: number, hour: number, minute: number, st: Rem
   for (let i = 0; i < REMINDER_IDS.length; i++) {
     const at = new Date(today.getFullYear(), today.getMonth(), today.getDate() + i, hour, minute, 0, 0);
     if (at.getTime() <= now + 60_000) continue; // already past (or about to be)
-    if (i === 0 && st.doneToday) continue;
+    if (st.doneDay !== null && dayKey(at.getTime()) === st.doneDay) continue;
     // The game's week turns on Monday, UTC: say so on the day it does.
     const monday = new Date(Date.parse(`${dayKey(at.getTime())}T00:00:00Z`)).getUTCDay() === 1;
     const body =

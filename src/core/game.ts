@@ -3528,7 +3528,7 @@ export class Game {
       planReminders(Date.now(), h, m, {
         rankedOpen: this.open('ranked'),
         dailyOpen,
-        doneToday: dailyOpen ? this.challenge.playedOn(day) : this.daily.loginDue(day) < 0,
+        doneDay: (dailyOpen ? this.challenge.playedOn(day) : this.daily.loginDue(day) < 0) ? day : null,
       }),
     );
   }
