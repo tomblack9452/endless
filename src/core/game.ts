@@ -255,6 +255,7 @@ export class Game {
   private recordSent = ''; // the service record summary last sent (JSON)
   private shipTimer = 0;
   private nameOk = false; // the player has a pilot name of their own
+  private nameLater = false; // the name screen was put off for this session
   private googleEmail: string | null = null; // the Google account this account is kept with ('' none, null unknown)
   private googleBusy = false;
   private googleArmed = false; // asked once to switch to the account a Google login keeps
@@ -3125,7 +3126,7 @@ export class Game {
    * stays until a name is saved. Only with the server (names live there).
    */
   private async askName(): Promise<void> {
-    if (this.nameOk || !this.backend.online || !this.onboarding.done || !this.open('leaderboard')) return;
+    if (this.nameOk || this.nameLater || !this.backend.online || !this.onboarding.done || !this.open('leaderboard')) return;
     const name = await this.backend.pilotName();
     if (name === null) return; // no answer (no signal): ask another time
     if (!GENERATED_NAME.test(name)) {
@@ -3417,6 +3418,7 @@ export class Game {
     else if (action === 'google-welcome') void this.keepWithGoogle(true);
     else if (action === 'privacy-choices') void this.ads.privacyChoices();
     else if (action === 'feedback') void sendFeedback(this.feedbackScreen());
+    else if (action === 'name-later' && this.infoOpen === 'name') this.closeInfo();
     else if (action === 'tips') {
       this.hints.replay();
       this.ui.showNotice('tips are back for your next runs');
@@ -3473,7 +3475,10 @@ export class Game {
       this.preview = null;
       this.applyLooks();
     }
-    if (this.infoOpen === 'welcome' || this.infoOpen === 'name') return; // these end by their own buttons
+    if (this.infoOpen === 'name') {
+      // Later (no signal, or no name in mind): asked again next time the game starts, not after every run.
+      this.nameLater = true;
+    } else if (this.infoOpen === 'welcome') return; // it ends by its own buttons
     if (this.infoOpen === 'boards') this.portraits.release(); // its pictures stay cached; the renderer goes
     if (this.state === 'title') {
       // The ship only shows on the screens that show it off (hangar, shop, welcome).
