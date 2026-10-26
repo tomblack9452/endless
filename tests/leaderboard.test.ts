@@ -7,6 +7,7 @@ import { Outbox } from '../src/server/outbox';
 import { SupabaseBackend } from '../src/server/supabase';
 import { ENVIRONMENTS } from '../src/world/courses';
 import { dayBefore, dayKey } from '../src/economy/time';
+import { weekKey } from '../src/progression/leagues';
 
 // The game's real server code (SupabaseBackend, Outbox) talking to the real
 // database schema. A stand-in for fetch answers the few Supabase calls the game
@@ -272,6 +273,23 @@ describe('the outbox', () => {
     expect(box.waiting).toBe(0);
     expect(calls.filter((c) => c.includes('submit_run'))).toEqual([]);
     expect((await b.board(boardQuery(tab, 0, b.now())))?.find((r) => r.you)?.score).toBe(2100);
+  });
+
+  it("lets a ranked run go that waited past the end of its week (1.0.11): last week's course, not this week's board", async () => {
+    const b = await player();
+    const box = new Outbox(b);
+    const path = Array.from({ length: 500 }, (_, i) => Math.sin(i / 7));
+    const lastWeek = weekKey(b.now() - 7 * 86_400_000);
+    offline = true;
+    await box.send(run({ board: 'ranked', score: 9000, path, week: lastWeek }));
+    offline = false;
+    await wait();
+    calls = [];
+    await box.flush();
+    expect(box.waiting).toBe(0);
+    expect(calls.filter((c) => c.includes('submit_run'))).toEqual([]);
+    // This week's is sent as before.
+    expect(await box.send(run({ board: 'ranked', score: 1200, path, week: weekKey(b.now()) }))).toMatchObject({ status: 'ok' });
   });
 
   it('does nothing without a server', async () => {

@@ -1965,6 +1965,7 @@ export class Game {
         finished,
         path: board === 'ranked' || board === 'daily' ? [...this.path] : [],
         ...(board === 'daily' && this.dailyRunNow ? { day: this.dailyRunNow.day } : {}),
+        ...(board === 'ranked' ? { week: this.weekly.id.replace(/^ranked-/, '') } : {}),
       })
       .then((res) => {
         if (!res) return; // waiting for a signal

@@ -23,6 +23,8 @@ export interface RunSubmission {
   path: number[];
   /** Daily: the day it was flown (the server files it under its own day, so one still waiting after midnight is dropped). */
   day?: string;
+  /** Ranked: the week's Monday it was flown in (likewise: one still waiting once the week has turned is dropped, as it was a different course). */
+  week?: string;
 }
 
 /** How a submission went: ok, worth retrying later (no signal, server busy), or turned down for good. */
