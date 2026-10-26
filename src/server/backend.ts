@@ -132,12 +132,12 @@ export interface Backend {
   pushSave(data: Record<string, string>, savedAt: number): Promise<void>;
   /** The server's cores balance, or null to keep the device's. */
   cores(): Promise<number | null>;
-  /** Cores earned in play (rewards, quests, the pass); the server caps them per day. */
-  earnCores(amount: number, reason: string): Promise<void>;
+  /** Cores earned in play (rewards, quests, the pass); the server caps them per day. Resolves with what it paid, or null if it couldn't be reached. */
+  earnCores(amount: number, reason: string): Promise<number | null>;
   /** Merge the device's credits with the server's (`last`: the server's answer last time, or null); the balance to keep, or null if unknown. */
   syncCredits(credits: number, last: number | null): Promise<number | null>;
-  /** Spend cores; resolves false if the server says there aren't enough. */
-  spendCores(amount: number, reason: string): Promise<boolean>;
+  /** Spend cores; resolves false if the server says there aren't enough, null if it couldn't be reached. */
+  spendCores(amount: number, reason: string): Promise<boolean | null>;
   submitRun(run: RunSubmission): Promise<SubmitResult>;
   /** A board, best first (your own row last if you're below the top), or null if it couldn't be read. */
   board(query: BoardQuery): Promise<BoardRow[] | null>;

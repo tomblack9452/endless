@@ -240,13 +240,21 @@ export class SupabaseBackend implements Backend {
     return typeof n === 'number' ? n : null;
   }
 
-  async earnCores(amount: number, reason: string): Promise<void> {
-    await this.call('/rest/v1/rpc/earn_cores', { method: 'POST', body: JSON.stringify({ amount, reason }) });
+  /** No answer worth keeping (no signal, a server error, a session being renewed): the wallet tries again later. */
+  private static unanswered(status: number): boolean {
+    return status === 0 || status >= 500 || status === 401 || status === 403 || status === 429;
   }
 
-  async spendCores(amount: number, reason: string): Promise<boolean> {
-    const ok = await this.call<boolean>('/rest/v1/rpc/spend_cores', { method: 'POST', body: JSON.stringify({ amount, reason }) });
-    return ok === true;
+  async earnCores(amount: number, reason: string): Promise<number | null> {
+    const { status, body } = await this.request('/rest/v1/rpc/earn_cores', { method: 'POST', body: JSON.stringify({ amount, reason }) });
+    if (SupabaseBackend.unanswered(status)) return null;
+    return status < 300 && typeof body === 'number' ? body : 0;
+  }
+
+  async spendCores(amount: number, reason: string): Promise<boolean | null> {
+    const { status, body } = await this.request('/rest/v1/rpc/spend_cores', { method: 'POST', body: JSON.stringify({ amount, reason }) });
+    if (SupabaseBackend.unanswered(status)) return null;
+    return status < 300 && body === true;
   }
 
   async submitRun(run: RunSubmission): Promise<SubmitResult> {

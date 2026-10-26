@@ -31,7 +31,9 @@ export class LocalBackend implements Backend {
     return null;
   }
 
-  async earnCores(): Promise<void> {}
+  async earnCores(amount: number): Promise<number> {
+    return amount;
+  }
 
   async spendCores(): Promise<boolean> {
     return true; // the device's wallet already checked
