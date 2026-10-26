@@ -5,8 +5,11 @@
 // new migration later is applied on its own. A database set up by pasting the SQL by
 // hand (no record yet) is recognised by a table each migration creates.
 
-/** A table, index or function each migration creates: how a hand-pasted database is recognised. */
-const MADE = { '0001_init.sql': 'players', '0002_store.sql': 'store_events', '0003_leaderboards.sql': 'bests', '0004_premium.sql': 'store_events_by_user', '0005_delete_account.sql': 'delete_my_account()', '0006_ship_looks.sql': 'set_ship(jsonb)', '0007_wallet_credits.sql': 'sync_credits(bigint,bigint)', '0008_max_out.sql': 'take_max_out()', '0009_name_filter.sql': 'name_words', '0010_secure_cores.sql': 'core_log_reason', '0011_store_purchases.sql': 'store_refund(text,uuid,text,text,integer)', '0012_trusted_clock.sql': 'server_now()', '0013_pilot_records.sql': 'pilot_record(uuid)', '0014_purchase_time_and_earn_lock.sql': 'store_purchase_at(text,uuid,text,text,text,integer,timestamp with time zone)', '0015_server_leagues.sql': 'ranked_league(uuid,smallint)', '0016_pass_refunds.sql': 'pass_refunded(uuid,integer)', '0017_reports.sql': 'reports', '0018_client_errors.sql': 'client_errors', '0019_daily_challenge.sql': 'daily_period(timestamp with time zone)', '0020_trusted_reporters.sql': 'trusted_reporter(uuid)', '0021_client_errors_upkeep.sql': 'prune_client_errors(integer)', '0022_rival_ghost.sql': 'rival_path()' };
+/**
+ * A table, index or function each migration creates: how a hand-pasted database is recognised.
+ * A migration that creates nothing has a query instead ("select ... as there").
+ */
+const MADE = { '0001_init.sql': 'players', '0002_store.sql': 'store_events', '0003_leaderboards.sql': 'bests', '0004_premium.sql': 'store_events_by_user', '0005_delete_account.sql': 'delete_my_account()', '0006_ship_looks.sql': 'set_ship(jsonb)', '0007_wallet_credits.sql': 'sync_credits(bigint,bigint)', '0008_max_out.sql': 'take_max_out()', '0009_name_filter.sql': 'name_words', '0010_secure_cores.sql': 'core_log_reason', '0011_store_purchases.sql': 'store_refund(text,uuid,text,text,integer)', '0012_trusted_clock.sql': 'server_now()', '0013_pilot_records.sql': 'pilot_record(uuid)', '0014_purchase_time_and_earn_lock.sql': 'store_purchase_at(text,uuid,text,text,text,integer,timestamp with time zone)', '0015_server_leagues.sql': 'ranked_league(uuid,smallint)', '0016_pass_refunds.sql': 'pass_refunded(uuid,integer)', '0017_reports.sql': 'reports', '0018_client_errors.sql': 'client_errors', '0019_daily_challenge.sql': 'daily_period(timestamp with time zone)', '0020_trusted_reporters.sql': 'trusted_reporter(uuid)', '0021_client_errors_upkeep.sql': 'prune_client_errors(integer)', '0022_rival_ghost.sql': 'rival_path()', '0023_function_hygiene.sql': "select not has_function_privilege('anon', 'public.on_new_user()', 'execute') as there" };
 
 /**
  * `db.query(sql, params?)` resolving `{ rows }`. `migrations`: [[file name, sql], ...] in order.
@@ -24,7 +27,9 @@ export async function applyMigrations(db, migrations, log = () => {}) {
     if (done.has(name)) continue;
     const probe = MADE[name];
     if (probe) {
-      const there = (await db.query(`select ${probe.endsWith(')') ? 'to_regprocedure' : 'to_regclass'}($1) is not null as there`, [`public.${probe}`])).rows[0].there;
+      const there = probe.startsWith('select ')
+        ? (await db.query(probe)).rows[0]?.there === true
+        : (await db.query(`select ${probe.endsWith(')') ? 'to_regprocedure' : 'to_regclass'}($1) is not null as there`, [`public.${probe}`])).rows[0].there;
       if (there) {
         // Already in the database (pasted by hand): note it, don't run it again.
         await db.query('insert into public.endless_migrations (name) values ($1)', [name]);

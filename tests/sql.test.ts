@@ -254,6 +254,45 @@ describe('accounts', () => {
   });
 });
 
+describe('the 1.0.11 audit', () => {
+  it('delete_my_account takes everything since 1.0.7 with it: reports either way, error reports, the league and daily bests', async () => {
+    const [a, b] = [await newUser(), await newUser()];
+    await admin();
+    const pid = async (u: string) => (await db.query<{ public_id: string }>('select public_id from public.players where user_id = $1', [u])).rows[0].public_id;
+    const [pa, pb] = [await pid(a), await pid(b)];
+    await as(a);
+    await db.query('select public.report_pilot($1, $2)', [pb, 'score']);
+    await db.query('select public.log_errors($1::jsonb)', [JSON.stringify([{ message: 'x', at: Date.now() }])]);
+    await submit({ board: 'daily', score: 2000, distance: 3000, seconds: 60 });
+    await age();
+    await as(a);
+    await submit({ board: 'ranked', league: 1, score: 1500 });
+    await as(b);
+    await db.query('select public.report_pilot($1, $2)', [pa, 'name']);
+    await admin();
+    expect((await db.query('select league from public.players where user_id = $1', [a])).rows).toEqual([{ league: 1 }]);
+    await as(a);
+    await db.query('select public.delete_my_account()');
+    await admin();
+    for (const [t, col] of [['reports', 'reporter'], ['reports', 'target'], ['client_errors', 'user_id'], ['players', 'user_id'], ['bests', 'user_id'], ['runs', 'user_id'], ['core_log', 'user_id']])
+      expect((await db.query(`select 1 from public.${t} where ${col} = $1`, [a])).rows.length, `${t}.${col}`).toBe(0);
+  });
+
+  it("lets signed-out callers run nothing but the server's clock (and the pure helpers), and no player run the account trigger", async () => {
+    await admin();
+    const fns = await db.query<{ sig: string; anon: boolean; auth: boolean; definer: boolean; config: string[] | null }>(
+      `select p.oid::regprocedure::text as sig, has_function_privilege('anon', p.oid, 'execute') as anon,
+              has_function_privilege('authenticated', p.oid, 'execute') as auth, p.prosecdef as definer, p.proconfig as config
+       from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public'`,
+    );
+    const anon = fns.rows.filter((f) => f.anon).map((f) => f.sig.replace(/\(.*/, '')).sort();
+    expect(anon).toEqual(['daily_period', 'pass_season', 'server_now']); // the clock, and two pure date helpers
+    expect(fns.rows.find((f) => f.sig === 'on_new_user()')).toMatchObject({ anon: false, auth: false });
+    // Every function has its own search_path (Supabase's linter), the security definer ones above all.
+    for (const f of fns.rows) expect(f.config ?? [], f.sig).toContain('search_path=public');
+  });
+});
+
 describe('submit_run', () => {
   it('keeps a plausible run and ranks it', async () => {
     const a = await newUser();
