@@ -23,6 +23,8 @@ export class Outbox {
   private loaded = false;
   private flushing: Promise<[RunSubmission, SubmitResult][]> | null = null;
   private again = 0;
+  /** How a run went that was sent again later by itself (the rate limit), for the notice its send() couldn't give. */
+  onLate: ((run: RunSubmission, result: SubmitResult) => void) | null = null;
 
   constructor(private readonly backend: Backend) {}
 
@@ -72,7 +74,9 @@ export class Outbox {
     if (this.again) return;
     this.again = setTimeout(() => {
       this.again = 0;
-      void this.flush();
+      void this.flush().then((sent) => {
+        for (const [run, res] of sent) if (res.status !== 'retry') this.onLate?.(run, res);
+      });
     }, RATE_GAP_MS) as unknown as number;
   }
 

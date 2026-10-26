@@ -41,6 +41,8 @@ describe('the outbox and the rate limit (1.0.11)', () => {
         },
       } as unknown as Backend;
       const box = new Outbox(backend);
+      const late: number[] = [];
+      box.onLate = (run, res) => res.status === 'ok' && late.push(run.score); // the notice its send() couldn't give
       const run = (score: number): RunSubmission => ({ board: 'endless', league: 0, score, seconds: 6, distance: 300, finished: false, path: [] });
       expect(await box.send(run(100))).toMatchObject({ status: 'ok' });
       await vi.advanceTimersByTimeAsync(6000); // a short run, quick retry
@@ -48,6 +50,7 @@ describe('the outbox and the rate limit (1.0.11)', () => {
       expect(box.waiting).toBe(1);
       await vi.advanceTimersByTimeAsync(RATE_GAP_MS); // nothing else happens: it goes by itself
       expect(taken).toEqual([100, 200]);
+      expect(late).toEqual([200]);
       expect(box.waiting).toBe(0);
     } finally {
       vi.useRealTimers();

@@ -67,7 +67,7 @@ import { type Reward, rewardLook, rewardParts, rewardText } from '../economy/rew
 import { asksBeforeSpending, DailyShop, setOffer, vaultAt } from '../economy/shop';
 import { dayKey, formatWait, untilTomorrow } from '../economy/time';
 import { EconomyView, type StoreButton, type StoreCard } from '../economy/view';
-import { type BoardId, createBackend, type PilotStats, type Purchase, type ReportReason } from '../server/backend';
+import { type BoardId, createBackend, type PilotStats, type Purchase, type ReportReason, type RunSubmission, type SubmitResult } from '../server/backend';
 import { BOARD_TABS, boardCaption, boardForRun, boardName, boardQuery } from '../server/boards';
 import { Outbox } from '../server/outbox';
 import { CloudSave } from '../server/sync';
@@ -249,12 +249,15 @@ export class Game {
   private readonly cloud = new CloudSave(this.backend);
   /** Finished runs on their way to the leaderboards (kept and retried when there's no signal). */
   private readonly outbox = new Outbox(this.backend);
+  /** The last run sent to a board: its notice still shows when the rate limit held it back a moment (not mid-run). */
+  private lastSent: RunSubmission | null = null;
   private boardTab = 'week';
   private boardSeq = 0;
   private readonly store = createStore();
   private storeProducts: StoreProduct[] = [];
   /** Shop rows for real-money products, in the order shown ('dev' adds cores in the dev build). */
   private deleteArmed = false;
+  private deleteTimer = 0;
   private portraits = new Portraits(this.palette);
   private shipSent = ''; // the looks last sent to the boards (JSON)
   private recordSent = ''; // the service record summary last sent (JSON)
@@ -544,6 +547,9 @@ export class Game {
       void this.connect();
       void this.planReminders();
     });
+    this.outbox.onLate = (run, res) => {
+      if (run === this.lastSent && this.state !== 'playing' && this.state !== 'countdown') this.boardNotice(run.board, res);
+    };
     this.econ.bindShop(this.onShopOffer, this.onShopBuy, this.onShopTab, this.onShopSet);
     this.bindShowroomDrag();
     this.econ.bindStore(this.onStoreAct);
@@ -2010,23 +2016,30 @@ export class Game {
     // A revived run counts as it stood at its first crash.
     const run = this.preRevive ?? { score: Math.floor(this.score), seconds: this.runTime, distance: this.world.distance - this.runStart };
     if (run.distance < 60 || run.seconds < 5 || run.score <= 0) return; // a crash at the start isn't a result
+    const sub: RunSubmission = {
+      board,
+      league: board === 'ranked' ? this.leagues.league : 0,
+      score: run.score,
+      seconds: run.seconds,
+      distance: run.distance,
+      finished,
+      path: board === 'ranked' || board === 'daily' ? [...this.path] : [],
+      ...(board === 'daily' && this.dailyRunNow ? { day: this.dailyRunNow.day } : {}),
+      ...(board === 'ranked' ? { week: this.weekly.id.replace(/^ranked-/, '') } : {}),
+    };
+    this.lastSent = sub;
     void this.outbox
-      .send({
-        board,
-        league: board === 'ranked' ? this.leagues.league : 0,
-        score: run.score,
-        seconds: run.seconds,
-        distance: run.distance,
-        finished,
-        path: board === 'ranked' || board === 'daily' ? [...this.path] : [],
-        ...(board === 'daily' && this.dailyRunNow ? { day: this.dailyRunNow.day } : {}),
-        ...(board === 'ranked' ? { week: this.weekly.id.replace(/^ranked-/, '') } : {}),
-      })
+      .send(sub)
       .then((res) => {
         if (!res) return; // waiting for a signal
-        if (res.status === 'ok' && res.rank) this.ui.showNotice(`${res.newBest ? 'new best: ' : ''}#${res.rank} on the ${boardName(board)} board`);
-        else if (res.status === 'rejected' && import.meta.env.DEV) console.warn(`leaderboard turned the run down: ${res.message}`);
+        this.boardNotice(board, res);
       });
+  }
+
+  /** "#4 on the endless board" once a run is on its board. */
+  private boardNotice(board: BoardId, res: SubmitResult): void {
+    if (res.status === 'ok' && res.rank) this.ui.showNotice(`${res.newBest ? 'new best: ' : ''}#${res.rank} on the ${boardName(board)} board`);
+    else if (res.status === 'rejected' && import.meta.env.DEV) console.warn(`leaderboard turned the run down: ${res.message}`);
   }
 
   /** Your own best on a tab, for when the board can't be read. */
@@ -2197,12 +2210,13 @@ export class Game {
       this.deleteArmed = true;
       if (value) value.textContent = 'tap again';
       this.ui.showNotice('tap again to delete everything. this can\'t be undone');
-      window.setTimeout(() => {
+      this.deleteTimer = window.setTimeout(() => {
         this.deleteArmed = false;
         if (value) value.textContent = 'delete';
       }, 5000);
       return;
     }
+    window.clearTimeout(this.deleteTimer); // a slow delete keeps saying "deleting"
     this.deleteArmed = false;
     if (value) value.textContent = 'deleting';
     if (!(await this.backend.deleteAccount())) {

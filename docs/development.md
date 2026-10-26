@@ -65,7 +65,7 @@ The folder map is in the [README](../README.md#project-layout). File by file:
 | `src/progression/reveal.ts` | What new players see, in stages |
 | `src/progression/season.ts`, `src/ship/seasonLooks.ts` | Season timing, and each season's generated looks |
 | `src/progression/unlocks.ts` | What opens solo environments and how far off it is |
-| `src/progression/wallet.ts` | Credits and cores |
+| `src/progression/wallet.ts` | Credits and cores (cores changes the server didn't hear about wait on the device and go first) |
 | `src/economy/` | Daily rewards and goals, weekly goals, the shop (today, the weekly set, the vault), the season pass, and their screens |
 | `src/ui/goalsView.ts` | The goals screen: daily, weekly and achievements, with claiming |
 | `src/ui/guide.ts`, `src/ui/controlArt.ts`, `src/ui/tutorialView.ts` | The pickup and power-up cards (from `CONFIG`), the control diagrams, the tutorial's indicators and recap |
@@ -94,10 +94,11 @@ The folder map is in the [README](../README.md#project-layout). File by file:
 | `tests/graphics.test.ts` | 1.0.10: the graphics setting (auto, high, low), performance mode carried over, and auto dropping to low once on sustained slow frames, never on stalls |
 | `tests/share.test.ts` | Sharing from the app: the cache file and the share sheet with the Play link |
 | `tests/economy.test.ts` | The calendar, quests, the shop, the pass and the revive |
-| `tests/server.test.ts` | Offline fallback and the store webhook |
+| `tests/server.test.ts` | Offline fallback, the store webhook, and the outbox sending a run the rate limit turned away again by itself |
 | `tests/clock.test.ts` | The trusted clock: the server's time, the Date header, the device's offline; whether the server can be reached |
 | `tests/account.test.ts`, `tests/session.test.ts` | Keeping an account with Google; signing in again without losing the player, and the cloud save never pushed before it's compared |
-| `tests/sql.test.ts`, `tests/leaderboard.test.ts` | The database run for real (PGlite): checks (with room for double points), boards (the daily one too), names, reports (trusted reporters), error reports (and their upkeep), ghost rivals (`rival_path`), row security, and the game's server code against it |
+| `tests/sql.test.ts`, `tests/leaderboard.test.ts` | The database run for real (PGlite): checks (with room for double points), boards (the daily one too), names, reports (trusted reporters), error reports (and their upkeep), ghost rivals (`rival_path`), row security, every function's grants and `search_path` (1.0.11), deleting an account taking everything with it, and the game's server code against it (the outbox letting go of a daily run after midnight and a ranked run after Monday) |
+| `tests/wallet.test.ts` | Credits merged with the server's; 1.0.11: cores earned or spent with no signal wait and go first, a login reward claimed while signing in reaches the server |
 | `tests/collisions.test.ts` | Every solid pool checked against its mesh across every area |
 | `tests/unlocks.test.ts` | Solo environment unlocks |
 | `tests/ranks.test.ts` | Rank ladder, XP and credit maths |

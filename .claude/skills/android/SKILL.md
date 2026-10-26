@@ -38,7 +38,7 @@ npx cap open android       # Android Studio
   installed from Play.
 - **Release** (an upload to a Play track):
   1. Raise `versionCode` (and `versionName`) in `android/app/build.gradle`.
-     Play refuses a versionCode it has seen before. (1.0.10 is versionCode 11.)
+     Play refuses a versionCode it has seen before. (1.0.11 is versionCode 12.)
   2. Set `VITE_ADMOB_LIVE=1` in `.env` for this build only, then
      `npm run build && npx cap sync android`.
   3. Android Studio > Build > Generate Signed App Bundle > Android App Bundle,
@@ -63,9 +63,10 @@ secrets unless a CI build is added. `npm run check-server` says what's missing.
 ## Server
 
 Supabase. New migrations in `supabase/migrations/` (now up to
-`0022_rival_ghost.sql`) only reach the live database with
+`0023_function_hygiene.sql`) only reach the live database with
 `npm run db:apply`. Never edit one that has shipped: add the next number, add its
-marker to `MADE` in `scripts/apply-db-lib.mjs`, then `npm run db:setup`. After
+marker to `MADE` in `scripts/apply-db-lib.mjs` (a table or function it makes, or a
+`select ... as there` query when it makes nothing, like `0023`), then `npm run db:setup`. After
 adding one, remind Tom to run `db:apply`. `0012` is the trusted clock
 (`server_now`: days, weeks and seasons follow the server, not the phone), `0013`
 the service records on the boards (public ids, `pilot_record`), `0014` the
@@ -76,7 +77,9 @@ the daily challenge (the `daily` board, `daily_period`, the streak's cores in
 `earn_cores`), `0020` name reports only from trusted reporters
 (`trusted_reporter`), `0021` error reports clearing themselves after 60 days
 (`prune_client_errors`), `0022` ghost rivals (`rival_path`: the run just above
-you on your ranked board, with only the pilot name).
+you on your ranked board, with only the pilot name), `0023` function hygiene
+(only the trigger runs `on_new_user`; every function has its own
+`search_path`; nothing changes for the game).
 
 RevenueCat purchases arrive through the `revenuecat-webhook` edge function,
 which calls `store_purchase_at` (0014; apply it before redeploying the webhook)
@@ -85,7 +88,7 @@ row's product to `refunded:<product>`. A refunded season pass (bought with
 money) takes back the cores its premium tiers paid and closes the premium track
 (`0016`); one unlocked with cores is never touched. After `db:apply`, redeploy
 the webhook when its code changes (1.0.7: a constant-time secret check; 1.0.8
-and 1.0.9 leave it alone, and so does 1.0.10).
+and 1.0.9 leave it alone, and so do 1.0.10 and 1.0.11).
 
 ## Google sign-in (`src/platform/account.ts`)
 

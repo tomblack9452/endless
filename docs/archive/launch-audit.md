@@ -204,3 +204,99 @@ after three reporters and SQL snippets for the rest (`0017`); the game's own
 error reports (`0018`); a "what's new" card after an update; quick retry (a
 setting); and the title's ranked line wraps in two even lines on a 360 wide
 phone.
+
+## Sixth pass (1.0.11, 26 October 2026)
+
+The first public release. A pass over everything added since 1.0.7 (server
+leagues, refunds, reports, error logging, what's new, quick retry, the daily
+challenge, reminders, share, offline, comfort settings, the new power-ups,
+milestones, risk lanes, gate runs, zen, run details, the crash moment, the
+rival's ghost and the graphics setting): the code read for flow bugs, the
+database run for real (PGlite) with every function's grants listed, every
+screen and dialog captured with Playwright at 360x640, 412x915 and 1280x800 in
+light and dark mode (checked by eye, and by a script for sideways overflow,
+clipped text and tap targets under 44 px), and the heap watched over ten
+rounds of opening every screen and eight runs.
+
+**Fixed:**
+
+- **Cores spent or earned with no signal** (high): the wallet took the
+  server's balance as soon as it could reach it again, so a look or revive
+  bought offline was refunded (and kept), and a reward earned offline was
+  lost. The same lost the day's login reward when it was claimed while
+  start-up was still signing in (it was never sent). Cores changes now wait
+  in a list on the phone and go to the server in order before its balance is
+  taken (`wallet.ts`, `tests/wallet.test.ts`).
+- **The outbox and the 8-second rate limit** (medium): a run turned away as
+  "too quickly" (a short run with quick retry, or a backlog after a spell
+  offline) waited for the next run to end, burning one of its 8 tries each
+  time, and every later run's rank notice was lost behind it. It's sent again
+  by itself 9 seconds later, without using a try, and its "#n on the board"
+  notice shows then (off a run) (`tests/server.test.ts`).
+- **A ranked run that waited past Monday** (medium) landed on the new week's
+  board with last week's course. It's let go, as a daily run after midnight
+  is (`tests/leaderboard.test.ts`).
+- **Android back** (medium) acted on the screen under a card or question: on
+  the what's-new card or a reward it asked to close the game; on the
+  reminders offer it put "close endless space?" over it and lost the offer.
+  Back now closes the card (one at a time), says no to the question, and
+  cancels a report's reasons on a pilot's card.
+- **The pilot name screen was a dead end** (medium) with no signal or no name
+  in mind: it had no way out and came back after every run. It has **later**
+  (and back), and asks again on the next start.
+- **Reminders away from UTC** (low): "today's challenge is flown" skipped the
+  phone's today, but in most time zones an evening reminder falls in the next
+  game day, with a new challenge. It now skips only reminders in the game day
+  that's done (`tests/reminders.test.ts`, run in Los Angeles time).
+- **A date-dependent test** (low): the decal check read the hand-made art
+  only, so it failed as soon as season 2's generated decal joined the
+  catalogue (today). The game already drew it; the test now does too.
+- **The end screen** said "solo: canyon opens at level 4" to a maxed-out
+  player with everything open; "delete my account" could go back to "delete"
+  while a slow delete was still going.
+- **0023** (low, nothing changes for the game): `on_new_user()` could be called
+  through the API (it refused, being a trigger function) and four functions
+  had no `search_path` of their own, both flagged by Supabase's linter. A
+  test now lists every function's grants: signed-out callers can run only
+  `server_now` and two pure date helpers, and every function has its
+  `search_path`. Another checks `delete_my_account` takes reports (both
+  ways), error reports, the league and daily bests with it.
+
+**UI:**
+
+- A hit area of at least 44 x 44 round every smaller button (tabs, the wallet
+  chips, small pills, claim and buy buttons, the shop's set tools, text links,
+  pause), with no change to how they look; the name boxes are 44 tall.
+- On a 360 x 640 phone the dress step's **ready** was half hidden under the
+  sheet's edge; the pass's "unlock premium · 550 cores" wrapped to two lines.
+- The service record's "xp a run" row was three lines of small print
+  right-aligned; it's three rows now.
+- Reduce motion: the promotion on the end screen fades in instead of popping,
+  and the showroom's ship turns only when dragged.
+
+**Added (small, from the list of ideas):**
+
+- Spending 100 cores or more asks first ("spend 550 cores?"): the set, the
+  vault, the pass, dearer looks and swaps. A revive never asks.
+- The first look at the shop or the store says what credits and cores are
+  and where each comes from.
+
+**Checked and fine:** revive (free, ad, 50 cores, refused, back), the crash
+moment never eating into the revive timer, rewards paid once (`recorded`,
+the server's reward names), the daily run across UTC midnight (the run keeps
+its day; the outbox drops its board entry), the league week paying out before
+a run in a new week, restore, the double-credits ad (the offer comes back if
+the ad doesn't pay), the gift and goal swap re-checking after the ad, pause
+and resume in the countdown, settings migration from 1.0.7 and 1.0.9 saves,
+colour-blind and left-handed modes in the HUD, guide and power-ups, no
+listeners added twice (361 before and after ten rounds of screens and eight
+runs), geometries steady (46 to 47) and textures at 2, and every security
+definer function with its `search_path`. The heap grew by about 0.1 MB a run
+in the dev build, with no growth in DOM nodes, listeners or GPU objects.
+
+**Open** (not fixed; small):
+
+- A cores spend whose answer was lost after the server took it (the signal
+  dropping at exactly that moment) is sent again and charged twice. A
+  fix: send each spend with an id and have `spend_cores` take each id once
+  (a new migration).

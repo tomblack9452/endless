@@ -125,7 +125,7 @@ afterwards are flown with a maxed ship.
 
 After every update that adds a file to `supabase/migrations/`, run
 `npm run db:apply` (it only applies what's new), then `npm run check-server`
-to see it's all there. There are 21 so far; recent ones: `0010` (cores only
+to see it's all there. There are 23 so far; recent ones: `0010` (cores only
 from real rewards), `0011` (purchases and refunds in one call), `0012` (the
 trusted clock), `0013` (service records on the boards), `0014` (a purchase
 keeps RevenueCat's purchase time, and cores rewards are paid one at a time),
@@ -140,11 +140,14 @@ pilot: the `reports` table, `report_pilot()`, `players.name_reset_at`),
 reports count only from trusted reporters: `trusted_reporter()`,
 `report_pilot()` again), `0021` (error reports clear themselves:
 `prune_client_errors()`, `log_errors()` again), `0022` (ghost rivals:
-`rival_path()`).
+`rival_path()`), `0023` (function hygiene, 1.0.11: only the trigger runs
+`on_new_user()`, and the functions that aren't security definer get their own
+`search_path`, which is what Supabase's linter asks for; nothing changes for
+the game).
 Apply `0014` and `0016` before deploying the webhook again; 1.0.7's webhook
 (a constant-time secret check) wants a redeploy after `db:apply`:
-`supabase functions deploy revenuecat-webhook --no-verify-jwt`. 1.0.8 and
-1.0.9 don't change the webhook.
+`supabase functions deploy revenuecat-webhook --no-verify-jwt`. 1.0.8 to
+1.0.11 don't change the webhook.
 
 **A refunded season pass.** The webhook's refund (`store_refund`) renames the
 purchase `refunded:season_pass`. Since `0016`, for a pass bought with money it
@@ -353,6 +356,27 @@ wait for a connection, runs wait in the outbox, and everything on the device
 carries on. While it's offline the game asks `server_now` every 20 seconds or
 so (it needs no sign-in); when it answers, the game signs in if it hadn't,
 sends the waiting runs and error reports and takes the server's balances.
+
+Since 1.0.11:
+
+- **Cores changes wait too** (`src/progression/wallet.ts`). A reward earned or
+  cores spent that the server didn't hear about (no signal, a 5xx, a session
+  being renewed) is kept in a list on the phone (`endless.coresPending`, never
+  in the cloud save) and sent in order, one at a time, before the server's
+  balance is taken again. Before, coming back online took the server's
+  balance straight away: a spend made offline was refunded (the look kept) and
+  a reward earned offline was lost, and so was a login reward claimed while
+  start-up was still signing in. The server still has the last word: a reward
+  it doesn't pay (a day too old, say) or a spend it refuses leaves its balance.
+  A spend whose answer was lost after the server took it could be sent twice;
+  that needs the signal to drop at exactly that moment.
+- **The outbox and the rate limit:** `submit_run` takes one run every 8
+  seconds from a player. A run turned away for that (a short run with quick
+  retry, or a backlog after a spell offline) is sent again by itself 9 seconds
+  later, and doesn't count as one of its 8 tries.
+- **A ranked run that waited past Monday** (00:00 UTC) is let go, as a daily
+  run is after midnight: it was flown on last week's course and the server
+  would file it on this week's board.
 
 Still to do on the server: a full re-fly of submitted runs with the game's
 own code (it needs the run simulation pulled out of `game.ts` first), and

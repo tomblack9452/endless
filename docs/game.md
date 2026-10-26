@@ -29,7 +29,7 @@ the code layout is in [development.md](development.md).
 | Steer | Drag anywhere, tap the sides, or tilt | Arrow keys or A / D |
 | Boost | Hold the boost button, or double-tap and hold anywhere | Shift, W, Up or Space |
 | Pause | `pause`, top right (a button for keyboards and screen readers too: Enter or a click), or Android's back button (play resumes after a 3-2-1; main menu ends the run, and it still counts) | Esc or P |
-| Back | Android's back button closes the open screen, pauses a run or leaves the end screen; on the title screen it asks "close endless space?" (**close** / **stay**; back again stays) unless "ask before closing" is off | Esc does the same, but never leaves the page |
+| Back | Android's back button closes the open screen, pauses a run or leaves the end screen; on the title screen it asks "close endless space?" (**close** / **stay**; back again stays) unless "ask before closing" is off. Since 1.0.11 it first closes a card (a reward, a promotion, what's new: one at a time, as a tap does), answers "no" to a question (the reminders offer, "spend N cores?"), cancels a report's reasons on a pilot's card, and puts off the pilot name screen | Esc does the same, but never leaves the page |
 | Start | `ranked`, `solo` or `endless` on the title screen | Space or Enter (ranked) |
 | Retry | Tap | Space or Enter |
 
@@ -305,7 +305,9 @@ be skipped, and can be replayed from settings; anyone who had already played
 skips it.
 The first real runs then carry the first-run tips (see [How it plays](#how-it-plays)). The
 pilot name is asked for when ranked and the leaderboards open, while it's
-still the generated one (the name screen stays until one is saved).
+still the generated one. Since 1.0.11 the name screen has **later** (and
+Android back does the same): it's asked again the next time the game starts,
+not after every run, so there's no dead end with no signal.
 
 New players see the game in stages (`src/progression/reveal.ts`), so the first screen isn't
 a wall of buttons: at first the big button flies endless and the bar has the
@@ -628,7 +630,15 @@ they follow the phone's.
 - **Cores** are the premium currency. They come slowly from play (login
   rewards, quests, the season pass) and, in the apps, from the store. They buy
   premium looks, revives and the pass's premium track, and swap for credits
-  in the store (1 core for 25 credits). Ranked used to take a
+  in the store (1 core for 25 credits). Since 1.0.11 spending 100 cores or
+  more at once asks first ("spend 550 cores?", **buy** or **not now**:
+  `CONFIG.economy.confirmCores`): the weekly set, the vault, the pass, dearer
+  looks and swaps; a revive (50) never asks, its offer being the question
+  already. The first time the shop or the store opens, a card says what
+  credits and cores are and where each comes from (once per save). Cores
+  earned or spent with no signal are kept on the phone and sent, in order,
+  when the server can be reached again, before its balance is taken (see
+  [server.md](server.md#when-the-server-cant-be-reached)). Ranked used to take a
   ticket a try; it's unlimited now, and older saves were paid 30 cores for each
   ticket they had beyond the week's 5.
 - **Revive:** outside ranked, once a run, a crash offers to carry on (with a
@@ -653,7 +663,8 @@ they follow the phone's.
   one daily goal a day for another (free on the web, where there are no ads).
 - **Shop:** a showroom, with the camera circling your ship above a sheet of
   cards; drag sideways over the ship to turn it yourself (a flick carries on,
-  and the slow spin comes back a few seconds after you let go). At the top of
+  and the slow spin comes back a few seconds after you let go; with reduce
+  motion, since 1.0.11, the ship turns only when dragged). At the top of
   the sheet, a **store card**: the season pass (time left, its hook, your
   tier) with a **buy cores** row under it, both opening the store. Then
   segmented tabs of looks (below), each with its timer, the same for everyone
@@ -746,7 +757,8 @@ are saved on the device.
   the game offers them once ("a daily reminder?", remind me / no thanks), on
   the title with nothing else up. No push server: nothing is sent.
 - **Display:**
-  - reduce motion: no shake, roll or speed lines
+  - reduce motion: no shake, roll or speed lines; the screens fade rather
+    than slide or pop, and the showroom's ship turns only when dragged
   - text size
   - high contrast
   - **colour-blind mode** (`src/world/itemColours.ts`): blue against orange.

@@ -83,6 +83,14 @@ where these names may differ slightly):
 
 The first five are the best fit.
 
+## Release notes for 1.0.11
+
+The first public release. 382 characters (500 at most):
+
+<en-GB>
+Welcome to Endless Space: steer a ship through an endless, ever-changing world, race the week's ranked course and the daily challenge, and dress your ship your way. This version is a careful check-up before launch: cores you earn or spend without a signal are kept, spending 100 cores or more asks first, bigger tap areas, the back button closes every card, and lots of small fixes.
+</en-GB>
+
 ## Release notes for 1.0.10
 
 376 characters (500 at most):
