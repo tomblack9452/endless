@@ -64,7 +64,7 @@ import { Weekly } from '../economy/weekly';
 import { type GoalsTab, GoalsScreen, type TaskRow } from '../ui/goalsView';
 import { Pass, passBought, passRefunded, premiumReward, freeReward, runXp, seasonAt } from '../economy/pass';
 import { type Reward, rewardLook, rewardParts, rewardText } from '../economy/reward';
-import { DailyShop, setOffer, vaultAt } from '../economy/shop';
+import { asksBeforeSpending, DailyShop, setOffer, vaultAt } from '../economy/shop';
 import { dayKey, formatWait, untilTomorrow } from '../economy/time';
 import { EconomyView, type StoreButton, type StoreCard } from '../economy/view';
 import { type BoardId, createBackend, type PilotStats, type Purchase, type ReportReason } from '../server/backend';
@@ -162,6 +162,11 @@ const NEW_ICON =
 /** The daily challenge: a flag at the finish line. */
 const FLAG_ICON =
   '<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round"><path d="M16 58V8"/><path d="M16 10h34l-7 10 7 10H16"/><path d="M27 10v20M38 10v20M16 20h34"/></svg>';
+/** Credits and cores side by side (the wallet's two chips), for the first look at the shop. */
+const WALLET_ICON =
+  '<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round"><circle cx="22" cy="34" r="15"/><path d="M27.5 28.5a8 8 0 1 0 0 11"/><path d="M44 16l13 7.5v15L44 46l-13-7.5v-15z"/><path d="M44 25l6 3.5v7L44 39l-6-3.5v-7z"/></svg>';
+/** The first look at the shop or the store says what credits and cores are for (once, on this save). */
+const WALLET_EXPLAINED_KEY = 'endless.walletExplained';
 /** A season pass badge. */
 const PASS_ICON =
   '<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round"><path d="M32 6l22 10v16c0 13-9 22-22 26C19 54 10 45 10 32V16z"/><path d="M32 20l4 8 9 1-7 6 2 9-8-5-8 5 2-9-7-6 9-1z"/></svg>';
@@ -256,6 +261,7 @@ export class Game {
   private shipTimer = 0;
   private nameOk = false; // the player has a pilot name of their own
   private nameLater = false; // the name screen was put off for this session
+  private walletExplained = false; // looked at this session whether the wallet card was shown
   private googleEmail: string | null = null; // the Google account this account is kept with ('' none, null unknown)
   private googleBusy = false;
   private googleArmed = false; // asked once to switch to the account a Google login keeps
@@ -1002,6 +1008,23 @@ export class Game {
     this.player.setVisible(true);
     this.trail.setVisible(true);
     this.openInfo('shop');
+    void this.explainWallet();
+  }
+
+  /** The first time the shop or the store opens: what credits and cores are, and where each comes from (once). */
+  private async explainWallet(): Promise<void> {
+    if (this.walletExplained) return;
+    this.walletExplained = true;
+    if ((await storage.get(WALLET_EXPLAINED_KEY)) !== null) return;
+    void storage.set(WALLET_EXPLAINED_KEY, '1');
+    this.ui.celebrate([
+      {
+        kicker: 'your wallet',
+        icon: WALLET_ICON,
+        name: 'credits and cores',
+        lines: ['credits: every run pays them. for looks and upgrades', 'cores: rarer. from daily rewards, goals, the pass and the store', 'for premium looks, the vault, revives and the pass'],
+      },
+    ]);
   }
 
   /** The store's ad on the shop: the season's countdown, the pass's hook, and the best pack of cores. */
@@ -1139,6 +1162,7 @@ export class Game {
       this.trail.setVisible(false);
     }
     this.openInfo('store');
+    void this.explainWallet();
   }
 
   /** Tap a look: it goes on the ship to try (owned ones are just put on). Tap again to take it off. */
@@ -1214,24 +1238,46 @@ export class Game {
     };
     if (this.shopTab === 'set') {
       const so = setOffer(weekKey(now), owned);
-      if (so.complete || !this.wallet.spendCores(so.price)) return;
-      for (const item of so.missing) this.looks.buy(item);
-      this.afterBuy(so.items, `${so.set.name} bought and on your ship`);
+      if (so.complete || this.wallet.cores < so.price) return;
+      this.confirmCores(so.price, `${so.set.name}: ${so.missing.length} look${so.missing.length === 1 ? '' : 's'}`, () => {
+        if (!this.wallet.spendCores(so.price)) return;
+        for (const item of so.missing) this.looks.buy(item);
+        this.afterBuy(so.items, `${so.set.name} bought and on your ship`);
+        this.openShop();
+      });
     } else if (this.shopTab === 'vault') {
       const v = vaultAt(now);
-      if (owned(keyOf(v.item)) || !this.wallet.spendCores(v.price)) return;
-      this.looks.buy(v.item);
-      this.afterBuy([v.item], `${v.item.name} from the vault is on your ship`);
+      if (owned(keyOf(v.item)) || this.wallet.cores < v.price) return;
+      this.confirmCores(v.price, `${v.item.name} from the vault`, () => {
+        if (!this.wallet.spendCores(v.price)) return;
+        this.looks.buy(v.item);
+        this.afterBuy([v.item], `${v.item.name} from the vault is on your ship`);
+        this.openShop();
+      });
     } else {
       const f = this.dailyShop.offers(dayKey(now), owned)[this.shopPick];
       if (!f || owned(keyOf(f.item))) return;
-      const paid = f.currency === 'cores' ? this.wallet.spendCores(f.price) : this.wallet.spend(f.price);
-      if (!paid) return;
-      this.looks.buy(f.item);
-      this.afterBuy([f.item], `${f.item.name} bought and on your ship`);
+      const buy = (): void => {
+        const paid = f.currency === 'cores' ? this.wallet.spendCores(f.price) : this.wallet.spend(f.price);
+        if (!paid) return;
+        this.looks.buy(f.item);
+        this.afterBuy([f.item], `${f.item.name} bought and on your ship`);
+        this.openShop();
+      };
+      if (f.currency === 'cores') this.confirmCores(f.price, f.item.name, buy);
+      else buy();
     }
-    this.openShop();
   };
+
+  /** Spend cores on `what`: straight away for small amounts, after a "spend N cores?" for larger ones (CONFIG.economy.confirmCores). */
+  private confirmCores(cost: number, what: string, go: () => void): void {
+    if (!asksBeforeSpending(cost)) return go();
+    this.econ.offer(
+      { kicker: '', name: `spend ${formatScore(cost)} cores?`, lines: [what, `you have ${formatScore(this.wallet.cores)} cores`], yes: `buy · ${formatScore(cost)} cores`, yesEnabled: this.wallet.cores >= cost, no: 'not now', seconds: 0 },
+      go,
+      () => undefined,
+    );
+  }
 
   /** A store button (its data-act): the pass, a real purchase, a swap, restore, or a dev stand-in. */
   private onStoreAct = (act: string): void => {
@@ -1250,15 +1296,18 @@ export class Game {
 
   /** Cores into credits, at the shop's rate. */
   private swapCores(n: number): void {
-    if (!this.wallet.spendCores(n, 'swap')) {
+    if (this.wallet.cores < n) {
       this.ui.showNotice('not enough cores');
       return;
     }
-    const lines = this.grant({ credits: n * CONFIG.economy.shop.creditsPerCore });
-    this.ui.showNotice(lines.join(' · '));
-    this.sound.pickup();
-    this.refreshTitle();
-    if (this.infoOpen === 'store') this.openStore();
+    this.confirmCores(n, `for ${formatScore(n * CONFIG.economy.shop.creditsPerCore)} credits`, () => {
+      if (!this.wallet.spendCores(n, 'swap')) return;
+      const lines = this.grant({ credits: n * CONFIG.economy.shop.creditsPerCore });
+      this.ui.showNotice(lines.join(' · '));
+      this.sound.pickup();
+      this.refreshTitle();
+      if (this.infoOpen === 'store') this.openStore();
+    });
   }
 
   /** The season pass's tiers. `from: 'store'` makes Back return to the store. */
@@ -1291,6 +1340,12 @@ export class Game {
   }
 
   private onPassPremium = (): void => {
+    const cost = CONFIG.economy.pass.premiumCores;
+    if (this.pass.premium || this.wallet.cores < cost) return;
+    this.confirmCores(cost, `season ${this.pass.season} pass: the premium track`, () => this.unlockPassWithCores());
+  };
+
+  private unlockPassWithCores(): void {
     // The reason tells the server this season's premium was paid in cores (a refund never touches it).
     if (this.pass.premium || !this.wallet.spendCores(CONFIG.economy.pass.premiumCores, `pass-premium:${this.pass.season}`)) return;
     const paid = this.pass.unlockPremium('cores');
@@ -1300,7 +1355,7 @@ export class Game {
     this.refreshTitle();
     if (this.infoOpen === 'store') this.openStore();
     else this.openPass();
-  };
+  }
 
   // --- revive ----------------------------------------------------------------
 
@@ -2484,10 +2539,15 @@ export class Game {
     const u = item.unlock;
     if (u.by === 'credits') {
       if (!this.wallet.spend(u.cost)) return;
-    } else if (u.by === 'cores') {
-      if (!this.wallet.spendCores(u.cost)) return;
-    } else if (u.by === 'vault') {
-      if (keyOf(item) !== keyOf(vaultAt(this.now()).item) || !this.wallet.spendCores(u.cost)) return;
+    } else if (u.by === 'cores' || u.by === 'vault') {
+      if (this.wallet.cores < u.cost || (u.by === 'vault' && keyOf(item) !== keyOf(vaultAt(this.now()).item))) return;
+      this.confirmCores(u.cost, item.name, () => {
+        if (!this.wallet.spendCores(u.cost)) return;
+        this.looks.buy(item);
+        this.afterBuy([item], `${item.name} bought and on your ship`);
+        this.renderHangar(true);
+      });
+      return;
     } else return;
     this.looks.buy(item);
     this.afterBuy([item], `${item.name} bought and on your ship`);

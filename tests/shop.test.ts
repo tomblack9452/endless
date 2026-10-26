@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { SETS, VAULT_ORDER } from '../src/ship/catalogue';
 import { CONFIG } from '../src/core/config';
-import { coresWorth, DailyShop, setOffer, setOfWeek, shopFor, vaultAt } from '../src/economy/shop';
+import { asksBeforeSpending, coresWorth, DailyShop, setOffer, setOfWeek, shopFor, vaultAt } from '../src/economy/shop';
 import { dayKey } from '../src/economy/time';
 import { keyOf, LOOKS } from '../src/ship/looks';
 import { weekKey } from '../src/progression/leagues';
@@ -133,5 +133,14 @@ describe('the vault', () => {
   it('counts down to the first of the next month, across a year end', () => {
     const v = vaultAt(Date.UTC(2026, 11, 31, 12));
     expect(v.leaves).toBe(12 * 3600_000);
+  });
+});
+
+describe('asking before spending cores (1.0.11)', () => {
+  it('asks for the set, the vault, the pass and swaps, never for a revive', () => {
+    expect(asksBeforeSpending(CONFIG.economy.revive.coreCost)).toBe(false);
+    expect(asksBeforeSpending(CONFIG.economy.pass.premiumCores)).toBe(true);
+    for (const n of CONFIG.economy.shop.swaps) expect(asksBeforeSpending(n), `swap ${n}`).toBe(true);
+    expect(asksBeforeSpending(CONFIG.economy.confirmCores - 1)).toBe(false);
   });
 });

@@ -664,6 +664,9 @@ export const CONFIG = {
     // Revive (not in ranked): once a run, free once a day, otherwise cores. The ship
     // moves onto the lane, the way ahead is cleared, and a countdown starts it again.
     revive: { coreCost: 50, clearAhead: 34, countdown: 3, graceSeconds: 2.5 },
+    // Spending this many cores or more asks first (1.0.11): the set, the vault, the pass,
+    // dearer looks and swaps. A revive (50) never asks: its offer is already the question.
+    confirmCores: 100,
     // The 7-day login calendar: one claim a day (UTC), looping after day 7. A
     // missed day just waits: the next claim is the next day on the calendar.
     login: [

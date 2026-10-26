@@ -183,3 +183,8 @@ export function vaultAt(ms: number): VaultOffer {
   const end = Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 1);
   return { item, price: (item.unlock as { cost: number }).cost, leaves: end - ms };
 }
+
+/** Does spending `cores` ask first ("spend 550 cores?")? Small amounts just go (CONFIG.economy.confirmCores). */
+export function asksBeforeSpending(cores: number): boolean {
+  return cores >= CONFIG.economy.confirmCores;
+}
