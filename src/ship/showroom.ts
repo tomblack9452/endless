@@ -22,6 +22,8 @@ export interface ShowroomSpinOptions {
 export class ShowroomSpin {
   /** Radians the camera turns for each pixel dragged (set from the screen width). */
   perPx: number;
+  /** The automatic spin is on (off with reduce motion: the ship only turns when dragged). */
+  auto = true;
   private readonly spin: number;
   private readonly resumeAfter: number;
   private readonly easeIn: number;
@@ -82,7 +84,7 @@ export class ShowroomSpin {
     this.velocity *= Math.exp(-this.friction * dt);
     if (Math.abs(this.velocity) < 1e-3) this.velocity = 0;
     this.idle += dt;
-    this.angle += this.spin * this.autoShare * dt;
+    if (this.auto) this.angle += this.spin * this.autoShare * dt;
     return this.angle;
   }
 }

@@ -17,6 +17,16 @@ describe('ShowroomSpin', () => {
     expect(step(s, 2)).toBeCloseTo(1, 5);
   });
 
+  it('holds still with reduce motion, and still turns with a drag (1.0.11)', () => {
+    const s = new ShowroomSpin({ spin: 0.5 });
+    s.auto = false;
+    expect(step(s, 5)).toBe(0);
+    s.perPx = 0.01;
+    s.drag(-100);
+    s.release();
+    expect(step(s, 5)).toBeGreaterThan(0.9);
+  });
+
   it('turns with a drag, the other way to the finger', () => {
     const s = new ShowroomSpin({ spin: 0.5, perPx: 0.01 });
     const before = s.update(1 / 60);

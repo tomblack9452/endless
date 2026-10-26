@@ -1627,6 +1627,10 @@ body {
   animation: promoted 900ms ease-out;
 }
 
+.reduce-motion .over-rank.promoted .over-rank-head {
+  animation-name: fade-only;
+}
+
 .promoted-label {
   font-size: calc(12px * var(--ui-scale));
   letter-spacing: 0.3em;

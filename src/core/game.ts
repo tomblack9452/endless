@@ -3576,6 +3576,7 @@ export class Game {
     this.world.assist = this.assistOn();
     if (this.assistOn() && this.state !== 'title') this.assisted = true;
     this.ui.setDisplay(TEXT_SCALE[s.textSize], this.boostSide(), s.reduceMotion, s.leftHanded);
+    this.showroomSpin.auto = !s.reduceMotion; // the showroom's ship turns only when dragged
     // Colour-blind mode: the safe palette for hazards, pickups and power-ups, and a shape for each power-up.
     setSafeColours(s.colourBlind);
     this.world.setColourBlind(s.colourBlind);
