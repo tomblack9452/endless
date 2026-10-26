@@ -812,7 +812,7 @@ export class Game {
     lines.push(`+${formatScore(credits)} credits${from ? ` (${from})` : ''}`);
     const board = boardForRun(this.mode, this.environment?.id ?? null, this.course !== null, this.dailyRunNow !== null);
     if (board && board !== 'ranked') this.submitToBoard(board, this.state === 'finished');
-    if (this.unlockable) {
+    if (this.unlockable && !this.allOpen) {
       const next = nextEnvironment(this.progress.furthest);
       if (next) lines.push(`solo: ${next.env.name} opens at level ${next.status.level} (${next.status.toGo} to go)`);
     }
@@ -2297,7 +2297,9 @@ export class Game {
         unit: 'xp',
       },
       rows: [
-        ['xp a run', `ranked 1 per ${CONFIG.rank.rankedPointsPerXp} points · others 1 per ${formatScore(CONFIG.rank.pointsPerXp)} · goals ${CONFIG.rank.goalXp}`],
+        ['xp in ranked', `1 per ${formatScore(CONFIG.rank.rankedPointsPerXp)} points`],
+        ['xp in other modes', `1 per ${formatScore(CONFIG.rank.pointsPerXp)} points`],
+        ['xp for a goal', String(CONFIG.rank.goalXp)],
         ['double xp runs left today', String(rk.bonusRunsLeft(this.now()))],
         ['best this week', formatScore(b.week)],
         ['best ever', formatScore(b.all)],

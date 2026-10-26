@@ -2659,6 +2659,14 @@ body {
 .pill.pass-premium {
   width: 100%;
   margin-top: 14px;
+  padding: 0 16px;
+}
+
+/* "unlock premium · 550 cores" on one line on a 360 wide phone. */
+@media (max-width: 400px) {
+  .pill.pass-premium {
+    letter-spacing: 0.08em;
+  }
 }
 
 .pass-head,
@@ -3499,6 +3507,13 @@ body:not(.dark) .store-hero-img {
 .welcome-sheet:has([data-welcome='controls']:not([hidden])),
 .welcome-sheet:has([data-welcome='feel']:not([hidden])) {
   max-height: 78%;
+}
+
+/* A short phone (360 x 640): dressing the ship needs its "ready" in view more than the ship above needs the room. */
+@media (max-height: 700px) {
+  .settings.welcome-sheet {
+    max-height: 68%;
+  }
 }
 
 .welcome-sheet .pill.sheet-buy + .pill.sheet-buy {
@@ -4554,4 +4569,38 @@ body.dark #screen-title .title-word.sub {
   border: none;
   text-decoration: underline;
   cursor: pointer;
+}
+
+/* 1.0.11: a hit area of at least 44 x 44 round the smaller buttons (tabs, the wallet
+   chips, small pills, text links, pause), with no change to how they look or sit. */
+.tab,
+.coin,
+.pill.small,
+.pill.claim-btn,
+.pill.shop-buy,
+.shop-tool,
+button.link,
+#hud-pause {
+  position: relative;
+}
+
+.tab::after,
+.coin::after,
+.pill.small::after,
+.pill.claim-btn::after,
+.pill.shop-buy::after,
+.shop-tool::after,
+button.link::after,
+#hud-pause::after {
+  content: '';
+  position: absolute;
+  top: min(0px, calc((100% - 44px) / 2));
+  bottom: min(0px, calc((100% - 44px) / 2));
+  left: min(0px, calc((100% - 44px) / 2));
+  right: min(0px, calc((100% - 44px) / 2));
+}
+
+.name-edit input,
+.name-edit .tab {
+  min-height: 44px;
 }
