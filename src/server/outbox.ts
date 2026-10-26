@@ -9,6 +9,8 @@ import type { Backend, RunSubmission, SubmitResult } from './backend';
 const OUTBOX_KEY = 'endless.outbox';
 const MAX_WAITING = 30; // a long offline spell keeps the best of what's left, not everything
 const MAX_TRIES = 8; // then it's not going to work: let it go
+/** submit_run takes one run every 8 seconds from a player: a run turned away for that is sent again after this (ms), and it isn't a failed try. */
+export const RATE_GAP_MS = 9000;
 
 interface Waiting {
   run: RunSubmission;
@@ -19,6 +21,7 @@ export class Outbox {
   private items: Waiting[] = [];
   private loaded = false;
   private flushing: Promise<[RunSubmission, SubmitResult][]> | null = null;
+  private again = 0;
 
   constructor(private readonly backend: Backend) {}
 
@@ -64,6 +67,14 @@ export class Outbox {
     return this.flushing;
   }
 
+  private sendAgainSoon(): void {
+    if (this.again) return;
+    this.again = setTimeout(() => {
+      this.again = 0;
+      void this.flush();
+    }, RATE_GAP_MS) as unknown as number;
+  }
+
   private async run(): Promise<[RunSubmission, SubmitResult][]> {
     await this.load();
     const results: [RunSubmission, SubmitResult][] = [];
@@ -79,8 +90,12 @@ export class Outbox {
       const res = await this.backend.submitRun(next.run);
       results.push([next.run, res]);
       if (res.status === 'retry') {
-        next.tries++;
-        if (next.tries >= MAX_TRIES) this.items.shift();
+        // Too soon after the last run (a backlog, or a quick retry): the server will take it in a moment.
+        if (/too quickly/.test(res.message ?? '')) this.sendAgainSoon();
+        else {
+          next.tries++;
+          if (next.tries >= MAX_TRIES) this.items.shift();
+        }
         this.save();
         break;
       }
