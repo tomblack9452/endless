@@ -411,6 +411,11 @@ export class EconomyView {
     run?.();
   }
 
+  /** Android back (or Escape) on the dialog: its "no". */
+  declineOffer(): void {
+    this.closeOffer(false);
+  }
+
   /** Close without answering (a run is starting). */
   dismissOffer(): void {
     this.offerEl.classList.remove('show');

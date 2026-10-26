@@ -952,6 +952,11 @@ export class UI {
     this.promoShownAt = performance.now();
   }
 
+  /** Android back (or Escape) on a card (a reward, a promotion, what's new): on to the next, as a tap does. */
+  skipCelebration(): void {
+    this.nextPromo();
+  }
+
   /** Drop any promotions still showing (a new run is starting). */
   clearCelebration(): void {
     this.promoQueue = [];

@@ -26,6 +26,7 @@ import { exitChoice } from '../platform/exit';
 import { sendFeedback } from '../platform/feedback';
 import { errorLog, reportError } from '../platform/errors';
 import { latestNotes, SEEN_KEY, whatsNewOnLaunch } from '../ui/whatsNew';
+import { cancelOpenReport } from '../ui/report';
 import { quickRetryOn, tapRetries } from './retry';
 import { GateTracker, kmText, Milestones, milestonesCount } from './runBonus';
 import { crashMomentOn, crashOverReady, crashTimeScale } from './crashMoment';
@@ -3278,6 +3279,9 @@ export class Game {
    */
   back(): boolean {
     if (this.exitAsking) this.closeExitAsk();
+    else if (this.ui.celebrating) this.ui.skipCelebration();
+    else if (this.econ.offerOpen && !(this.state === 'crashed' && this.revivePending)) this.econ.declineOffer(); // the reminders offer: no thanks
+    else if (cancelOpenReport()) return true;
     else if (this.ui.guideOpen) this.closeGuide();
     else if (this.settingsOpen) this.closeSettings();
     else if (this.infoOpen === 'welcome') return this.backAtTop();

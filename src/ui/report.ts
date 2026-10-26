@@ -28,6 +28,14 @@ function line(text: string): HTMLElement {
   return Object.assign(document.createElement('div'), { className: 'label dim', textContent: text });
 }
 
+/** Android back (or Escape) with a report's reasons open: cancel it, as its own button does. False if none is open. */
+export function cancelOpenReport(): boolean {
+  const cancel = document.querySelector<HTMLButtonElement>('.pilot-report-reasons ~ .pilot-report-link');
+  if (!cancel) return false;
+  cancel.click();
+  return true;
+}
+
 /** The report link, and the reasons it opens into. */
 export function reportLink(send: (reason: ReportReason) => Promise<ReportResult>): HTMLElement {
   const box = document.createElement('div');
