@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { LOOKS } from '../src/ship/catalogue';
 import { CONFIG } from '../src/core/config';
-import { DECAL_SVG } from '../src/ship/decals';
+import { DECAL_SVG, decalArt } from '../src/ship/decals';
 import { itemsIn } from '../src/ship/looks';
 import { MARKING_ID, shipGeometry } from '../src/ship/player';
 import { TRAIL_STYLES } from '../src/ship/trail';
@@ -63,8 +63,9 @@ describe('markings, decals and flames', () => {
   it('every decal that is a picture has one', () => {
     for (const item of itemsIn('decal')) {
       if (['none', 'rank', 'league'].includes(item.id)) continue;
-      const svg = DECAL_SVG[item.id];
-      expect(svg, item.id).toBeDefined();
+      // A season's own decal is drawn from its id (seasonLooks.ts), so this holds whichever season it is.
+      const svg = decalArt(item.id) as string;
+      expect(svg, item.id).toBeTruthy();
       expect(svg).toContain('<svg');
       expect(svg).toContain('currentColor');
       expect((svg.match(/</g) ?? []).length, item.id).toBe((svg.match(/>/g) ?? []).length); // balanced tags
