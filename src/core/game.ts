@@ -3860,6 +3860,11 @@ export class Game {
     this.refreshTitle();
   }
 
+  /** The launch splash has gone (main.ts). */
+  splashGone(): void {
+    this.ui.splashGone();
+  }
+
   /** Dev: replay the last run's course from where it started (same seed). */
   devReplay(): void {
     this.beginRun(this.devStart, this.seed);

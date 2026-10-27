@@ -10,6 +10,7 @@ import './ui/style.css';
 import { Capacitor } from '@capacitor/core';
 import { Game } from './core/game';
 import { errorLog } from './platform/errors';
+import { liftSplash } from './ui/splash';
 
 // Errors nothing else catches go to the error log (sent to the server when there is one).
 errorLog.install(window);
@@ -42,6 +43,7 @@ if (import.meta.env.PROD && 'serviceWorker' in navigator) {
 void document.fonts.ready.then(() => {
   const game = new Game(canvas);
   game.start();
+  liftSplash(() => game.splashGone());
   // Exposed for debugging from the console during development only.
   if (import.meta.env.DEV) (window as unknown as { game: Game }).game = game;
   // Android's back button steps back through the game, and leaves from the title screen.

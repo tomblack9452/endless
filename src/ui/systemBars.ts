@@ -1,4 +1,5 @@
 import { Capacitor, SystemBars, SystemBarsStyle, SystemBarType } from '@capacitor/core';
+import { splashUp } from './splash';
 import type { ScreenName } from './ui';
 
 // Android draws the game edge to edge, so the status bar and the gesture bar sit
@@ -38,15 +39,23 @@ export function barStyles(screen: ScreenName | null, dark: boolean, text: string
 export class Bars {
   private shown = { status: '', nav: '' };
   private readonly native = Capacitor.getPlatform() === 'android';
+  private last: [ScreenName | null, boolean, string] = [null, false, '#000'];
 
   sync(screen: ScreenName | null, dark: boolean, text: string): void {
+    this.last = [screen, dark, text];
     if (!this.native) return;
-    const want = barStyles(screen, dark, text);
+    // Over the launch splash's night sky: light icons, whatever the game has behind it.
+    const want = splashUp() ? ({ status: 'dark', nav: 'dark' } as const) : barStyles(screen, dark, text);
     const set = (bar: SystemBarType, style: BarStyle): void => {
       void SystemBars.setStyle({ bar, style: style === 'dark' ? SystemBarsStyle.Dark : SystemBarsStyle.Light }).catch(() => undefined);
     };
     if (want.status !== this.shown.status) set(SystemBarType.StatusBar, want.status);
     if (want.nav !== this.shown.nav) set(SystemBarType.NavigationBar, want.nav);
     this.shown = want;
+  }
+
+  /** Again for what's on screen now (once the splash has gone). */
+  resync(): void {
+    this.sync(...this.last);
   }
 }

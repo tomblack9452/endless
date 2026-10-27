@@ -296,6 +296,11 @@ export class UI {
     this.titleSettings.addEventListener('click', () => onAction('settings'));
   }
 
+  /** The launch splash has gone: the system bars follow the screen again. */
+  splashGone(): void {
+    this.bars.resync();
+  }
+
   renderSettings(s: Settings): void {
     for (const el of document.querySelectorAll<HTMLElement>('[data-setting]')) {
       const value = el.querySelector('.value');

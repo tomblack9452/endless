@@ -8,18 +8,19 @@ const config: CapacitorConfig = {
   appName: 'Endless Space',
   webDir: 'dist',
   android: {
-    // The game draws its own background; no white flash behind the webview.
-    backgroundColor: '#f1ede4',
+    // The launch splash's night sky (index.html), the same as Android's own
+    // splash colour (styles.xml): no flash between them.
+    backgroundColor: '#1d2031',
   },
   plugins: {
     // Edge to edge on Android (MainActivity): the safe-area insets reach the CSS
     // (env() on newer WebViews, --safe-area-inset-* on older ones; style.css).
-    // Dark icons to start with, over the light sky; the game sets them after
-    // that from what's behind them (src/systemBars.ts), not the phone's theme.
+    // Light icons to start with, over the launch splash's night sky; the game
+    // sets them after that from what's behind them (src/ui/systemBars.ts), not the phone's theme.
     SystemBars: {
       insetsHandling: 'css',
       initialViewportFitValueHint: 'cover', // index.html's viewport-fit, known up front: no jump
-      style: 'LIGHT',
+      style: 'DARK',
     },
     // Reminders (src/platform/reminders.ts): the dart ship in the status bar, in the store art's amber.
     LocalNotifications: {
