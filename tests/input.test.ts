@@ -81,6 +81,16 @@ describe('double-tap and hold to boost', () => {
     expect(input.boostHeld()).toBe(false);
   });
 
+  it('two quick taps on the same side (tap-sides steering) do not boost', () => {
+    const { input, h } = make();
+    input.sidesMode = true;
+    h.onDown(at(1, 0, 40));
+    h.onUp(at(1, 90, 40));
+    h.onDown(at(2, 200, 50));
+    expect(input.boostHeld()).toBe(false);
+    expect(input.steering()).toBeLessThanOrEqual(0); // still steering left
+  });
+
   it('still steers while boosting, and can be turned off', () => {
     const { input, h } = make();
     h.onDown(at(1, 0));

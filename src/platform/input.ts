@@ -162,9 +162,10 @@ export class Input {
   private onDown = (e: PointerEvent): void => {
     if (this.dragging) return;
     // The second press of a quick double-tap boosts while held; it steers as normal too.
+    // Not with tap-sides steering, where quick taps are steering and would boost by accident.
     const T = CONFIG.boost.doubleTap;
     const now = e.timeStamp;
-    if (this.doubleTapBoost && now - this.lastTapAt <= T.gapMs && Math.hypot(e.clientX - this.lastTapX, e.clientY - this.lastTapY) <= T.slopPx) {
+    if (this.doubleTapBoost && !this.sidesMode && now - this.lastTapAt <= T.gapMs && Math.hypot(e.clientX - this.lastTapX, e.clientY - this.lastTapY) <= T.slopPx) {
       this.tapBoostPointer = e.pointerId;
     }
     this.lastTapAt = -Infinity;

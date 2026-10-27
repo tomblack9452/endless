@@ -2897,6 +2897,11 @@ export class Game {
     return this.dev.invincible || this.practice !== null;
   }
 
+  /** Double-tap and hold boosts: the setting, and never with tap-sides steering (quick taps there are steering). */
+  private doubleTapOn(): boolean {
+    return this.settings.doubleTapBoost && this.settings.touch !== 1;
+  }
+
   /** How the player steers now (keys: a computer, with the keys chosen over the mouse). */
   private controlsNow(): ControlId {
     if (this.settings.tilt) return 'tilt';
@@ -2982,7 +2987,7 @@ export class Game {
     const p = this.practice;
     if (!p) return;
     // Steering is worded for the controls chosen (keys only if the keys were); boost for the device.
-    const keys = { keys: !hasTouch(), doubleTap: this.settings.doubleTapBoost, side: this.boostSide() };
+    const keys = { keys: !hasTouch(), doubleTap: this.doubleTapOn(), side: this.boostSide() };
     const steerHow = { ...keys, keys: false };
     if (p.kind === 'trial') {
       this.teach.setStep(`trying ${CONTROL_CARDS[p.control].name} · ${Math.max(0, Math.ceil(TRIAL_SECONDS - p.s.t))} s`, 0, 0);
@@ -4196,7 +4201,7 @@ export class Game {
   /** Offer hint `id`, worded for the steering in use. Not during the practice run, which has its own prompts. */
   private tip(id: HintId): void {
     if (this.practice) return;
-    this.hints.offer(id, tipText(id, this.controlsNow(), { keys: id === 'boost' && !hasTouch(), doubleTap: this.settings.doubleTapBoost, side: this.boostSide() }));
+    this.hints.offer(id, tipText(id, this.controlsNow(), { keys: id === 'boost' && !hasTouch(), doubleTap: this.doubleTapOn(), side: this.boostSide() }));
   }
 
   /** Fill or drain the meter and ease the boost amount in and out. */

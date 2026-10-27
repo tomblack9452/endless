@@ -301,6 +301,9 @@ export class UI {
       const value = el.querySelector('.value');
       if (value) value.textContent = label(s, el.dataset.setting as SettingKey);
     }
+    // Tap-sides steering never boosts on a double-tap, so the row only shows for drag (and tilt with drag).
+    const dbl = document.querySelector<HTMLElement>('[data-setting="doubleTapBoost"]');
+    if (dbl) dbl.hidden = s.touch === 1;
   }
   /** Display settings that live on the page: text size, boost side, reduce motion, the HUD mirrored for the left hand. */
   setDisplay(textScale: number, boostSide: 'right' | 'left' | 'middle', reduceMotion: boolean, leftHanded = false): void {
