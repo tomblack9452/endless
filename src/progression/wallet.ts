@@ -10,7 +10,8 @@ import { storage } from '../core/storage';
 // A cores change the server didn't hear about (no signal) waits in a list on
 // this device and is sent, in order, before the server's balance is taken
 // again: otherwise coming back online would undo it (a spend refunded, a
-// reward lost).
+// reward lost). Each spend has its own id, so one sent again after its answer
+// was lost isn't charged twice.
 
 const KEY = 'endless.wallet';
 /** Cores changes waiting for the server (this device only, never in the cloud save: see sync.ts). */
@@ -22,6 +23,15 @@ interface CoresChange {
   kind: 'earn' | 'spend';
   n: number;
   reason: string;
+  /** A spend's own id: sent again after a lost answer, the server knows it took it already. */
+  id?: string;
+}
+
+/** A fresh id for a spend (random; older webviews without randomUUID get one from Math.random). */
+function spendId(): string {
+  const c = globalThis.crypto as Crypto | undefined;
+  if (c?.randomUUID) return c.randomUUID();
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}-${Math.random().toString(36).slice(2, 12)}`;
 }
 
 export class Wallet {
@@ -102,7 +112,7 @@ export class Wallet {
     this.cores -= n;
     this.save();
     // The server has the last word: if it refuses, take its balance.
-    this.queueCores({ kind: 'spend', n, reason });
+    this.queueCores({ kind: 'spend', n, reason, id: spendId() });
     return true;
   }
 
@@ -129,7 +139,7 @@ export class Wallet {
       if (!remote) return;
       while (this.pending.length > 0) {
         const c = this.pending[0];
-        const answer = c.kind === 'earn' ? await remote.earnCores(c.n, c.reason).catch(() => null) : await remote.spendCores(c.n, c.reason).catch(() => null);
+        const answer = c.kind === 'earn' ? await remote.earnCores(c.n, c.reason).catch(() => null) : await remote.spendCores(c.n, c.reason, c.id).catch(() => null);
         if (answer === null) return; // no answer: keep it (and the device's balance) for the next try
         this.pending.shift();
         this.savePending();

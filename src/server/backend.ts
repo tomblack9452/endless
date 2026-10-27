@@ -139,7 +139,7 @@ export interface Backend {
   /** Merge the device's credits with the server's (`last`: the server's answer last time, or null); the balance to keep, or null if unknown. */
   syncCredits(credits: number, last: number | null): Promise<number | null>;
   /** Spend cores; resolves false if the server says there aren't enough, null if it couldn't be reached. */
-  spendCores(amount: number, reason: string): Promise<boolean | null>;
+  spendCores(amount: number, reason: string, id?: string): Promise<boolean | null>;
   submitRun(run: RunSubmission): Promise<SubmitResult>;
   /** A board, best first (your own row last if you're below the top), or null if it couldn't be read. */
   board(query: BoardQuery): Promise<BoardRow[] | null>;

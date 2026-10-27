@@ -652,6 +652,37 @@ describe('cores', () => {
     for (let t = 1; t <= 30; t++) for (const track of ['f', 'p']) total += await earn(50, `pass:${season()}:${track}${t}`);
     expect(total).toBe(300);
   });
+
+  it('take a spend sent again after a lost answer once (0024)', async () => {
+    const a = await newUser();
+    await admin();
+    await db.query('update public.wallets set cores = 100 where user_id = $1', [a]);
+    await as(a);
+    const spend = async (n: number, id: string | null) => (await db.query<{ spend_cores_once: boolean }>('select public.spend_cores_once($1, $2, $3)', [n, 'look', id])).rows[0].spend_cores_once;
+    const old = async (n: number) => (await db.query<{ spend_cores: boolean }>("select public.spend_cores($1, 'look')", [n])).rows[0].spend_cores;
+    expect(await spend(30, 'abc-1')).toBe(true);
+    expect(await spend(30, 'abc-1')).toBe(true); // the same spend again: "taken", no charge
+    expect(await spend(30, 'abc-2')).toBe(true); // a new spend charges
+    expect(await old(30)).toBe(true); // an older game, no id: as before
+    expect(await old(30)).toBe(false); // 10 left
+    expect(await spend(5, null)).toBe(false); // no id: not this function's
+    expect(await spend(5, 'x'.repeat(65))).toBe(false); // an id that long isn't one of the game's
+    expect(await spend(5, 'abc-3')).toBe(true);
+    await admin();
+    expect((await db.query<{ cores: number }>('select cores from public.wallets where user_id = $1', [a])).rows[0].cores).toBe(5);
+    // Another player's spend with the same id is theirs, not "taken".
+    const b = await newUser();
+    await db.query('update public.wallets set cores = 50 where user_id = $1', [b]);
+    await as(b);
+    expect(await spend(20, 'abc-1')).toBe(true);
+    await admin();
+    expect((await db.query<{ cores: number }>('select cores from public.wallets where user_id = $1', [b])).rows[0].cores).toBe(30);
+  });
+
+  it("can't be spent by someone signed out", async () => {
+    await as(null);
+    await rejects(db.query("select public.spend_cores_once(5, 'look', 'id')"), /permission denied/);
+  });
 });
 
 describe('store purchases (the webhook, with the service key)', () => {

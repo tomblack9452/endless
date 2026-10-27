@@ -251,7 +251,16 @@ export class SupabaseBackend implements Backend {
     return status < 300 && typeof body === 'number' ? body : 0;
   }
 
-  async spendCores(amount: number, reason: string): Promise<boolean | null> {
+  /** `id`: the spend's own id, so one sent again after a lost answer isn't charged twice (0024_spend_once.sql). */
+  async spendCores(amount: number, reason: string, id?: string): Promise<boolean | null> {
+    if (id) {
+      const once = await this.request('/rest/v1/rpc/spend_cores_once', { method: 'POST', body: JSON.stringify({ amount, reason, spend_id: id }) });
+      // 404: a database without 0024 yet; spend the old way rather than refuse.
+      if (once.status !== 404) {
+        if (SupabaseBackend.unanswered(once.status)) return null;
+        return once.status < 300 && once.body === true;
+      }
+    }
     const { status, body } = await this.request('/rest/v1/rpc/spend_cores', { method: 'POST', body: JSON.stringify({ amount, reason }) });
     if (SupabaseBackend.unanswered(status)) return null;
     return status < 300 && body === true;

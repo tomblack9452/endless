@@ -48,7 +48,7 @@ describe('wallet with a server', () => {
 
 /** A stand-in for earn_cores and spend_cores that can lose its signal (null: no answer). */
 function coresServer(cores: number) {
-  const s = { cores, up: true, log: [] as string[] };
+  const s = { cores, up: true, log: [] as string[], ids: [] as string[], loseAnswer: false };
   const backend = {
     online: true,
     async cores() {
@@ -64,12 +64,14 @@ function coresServer(cores: number) {
       s.cores += n;
       return n;
     },
-    async spendCores(n: number, reason: string) {
+    async spendCores(n: number, reason: string, id?: string) {
       if (!s.up) return null;
+      if (id && s.ids.includes(id)) return s.loseAnswer ? null : true; // taken already (0024_spend_once.sql)
       if (n > s.cores) return false;
       s.cores -= n;
       s.log.push(reason);
-      return true;
+      if (id) s.ids.push(id);
+      return s.loseAnswer ? null : true; // taken, but the answer can go missing on the way back
     },
   } as unknown as Backend;
   return { s, backend };
@@ -116,6 +118,19 @@ describe('cores without a signal (1.0.11)', () => {
     w.spendCores(40, 'look');
     await w.refresh();
     expect([w.cores, s.cores]).toEqual([5, 5]);
+  });
+
+  it('a spend whose answer was lost is sent again and charged once', async () => {
+    const { s, backend } = coresServer(100);
+    const w = new Wallet();
+    await w.link(backend);
+    s.loseAnswer = true; // the server takes it, the answer never arrives
+    w.spendCores(30, 'look');
+    await w.refresh(); // sent again: still no answer
+    expect([s.cores, w.coresWaiting]).toEqual([70, 1]);
+    s.loseAnswer = false;
+    await w.refresh(); // answered at last: "taken", not a second charge
+    expect([w.cores, s.cores, w.coresWaiting]).toEqual([70, 70, 0]);
   });
 
   it('keeps nothing waiting in a build without a server', async () => {
