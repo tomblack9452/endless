@@ -143,7 +143,11 @@ reports count only from trusted reporters: `trusted_reporter()`,
 `rival_path()`), `0023` (function hygiene, 1.0.11: only the trigger runs
 `on_new_user()`, and the functions that aren't security definer get their own
 `search_path`, which is what Supabase's linter asks for; nothing changes for
-the game).
+the game), `0024` (a cores spend is taken once, 1.0.12: `spend_cores_once()`
+takes a spend with the id the game gives it, and answers one sent again
+after a lost answer as taken without charging again; `spend_cores()` stays
+as it was for older versions, and the game falls back to it on a database
+without `0024`).
 Apply `0014` and `0016` before deploying the webhook again; 1.0.7's webhook
 (a constant-time secret check) wants a redeploy after `db:apply`:
 `supabase functions deploy revenuecat-webhook --no-verify-jwt`. 1.0.8 to

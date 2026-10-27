@@ -299,4 +299,4 @@ in the dev build, with no growth in DOM nodes, listeners or GPU objects.
 - A cores spend whose answer was lost after the server took it (the signal
   dropping at exactly that moment) is sent again and charged twice. A
   fix: send each spend with an id and have `spend_cores` take each id once
-  (a new migration).
+  (a new migration). Fixed in 1.0.12: `0024_spend_once.sql`.

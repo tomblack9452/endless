@@ -4,6 +4,11 @@
 // The lines for each version live here, newest first.
 
 export const WHATS_NEW: Readonly<Record<string, readonly string[]>> = {
+  '1.0.12': [
+    'a new full-screen splash as the game loads',
+    'tap steering: no more boosting by mistake',
+    'a cores spend is never charged twice',
+  ],
   '1.0.11': [
     'cores earned or spent offline are kept',
     'spending 100 cores or more asks first',

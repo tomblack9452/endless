@@ -63,7 +63,7 @@ secrets unless a CI build is added. `npm run check-server` says what's missing.
 ## Server
 
 Supabase. New migrations in `supabase/migrations/` (now up to
-`0023_function_hygiene.sql`) only reach the live database with
+`0024_spend_once.sql`) only reach the live database with
 `npm run db:apply`. Never edit one that has shipped: add the next number, add its
 marker to `MADE` in `scripts/apply-db-lib.mjs` (a table or function it makes, or a
 `select ... as there` query when it makes nothing, like `0023`), then `npm run db:setup`. After
@@ -79,7 +79,14 @@ the daily challenge (the `daily` board, `daily_period`, the streak's cores in
 (`prune_client_errors`), `0022` ghost rivals (`rival_path`: the run just above
 you on your ranked board, with only the pilot name), `0023` function hygiene
 (only the trigger runs `on_new_user`; every function has its own
-`search_path`; nothing changes for the game).
+`search_path`; nothing changes for the game), `0024` a cores spend taken once
+(`spend_cores_once` with the spend's id; `spend_cores` stays for older builds).
+
+The splash: Android 12+ shows its own (the icon on `#1d2031`, styles.xml),
+then the game's full-screen splash in `index.html` (lifted by
+`src/ui/splash.ts`); Android 11 and older show `res/drawable*/splash.png`, the
+same picture. The webview's background (`capacitor.config.ts`) and the first
+system bar style match its night sky.
 
 RevenueCat purchases arrive through the `revenuecat-webhook` edge function,
 which calls `store_purchase_at` (0014; apply it before redeploying the webhook)

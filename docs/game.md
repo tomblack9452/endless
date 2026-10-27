@@ -27,7 +27,7 @@ the code layout is in [development.md](development.md).
 | | Phone | Desktop |
 |---|---|---|
 | Steer | Drag anywhere, tap the sides, or tilt | Arrow keys or A / D |
-| Boost | Hold the boost button, or double-tap and hold anywhere | Shift, W, Up or Space |
+| Boost | Hold the boost button, or double-tap and hold anywhere (not with tap steering, where quick taps are steering) | Shift, W, Up or Space |
 | Pause | `pause`, top right (a button for keyboards and screen readers too: Enter or a click), or Android's back button (play resumes after a 3-2-1; main menu ends the run, and it still counts) | Esc or P |
 | Back | Android's back button closes the open screen, pauses a run or leaves the end screen; on the title screen it asks "close endless space?" (**close** / **stay**; back again stays) unless "ask before closing" is off. Since 1.0.11 it first closes a card (a reward, a promotion, what's new: one at a time, as a tap does), answers "no" to a question (the reminders offer, "spend N cores?"), cancels a report's reasons on a pilot's card, and puts off the pilot name screen | Esc does the same, but never leaves the page |
 | Start | `ranked`, `solo` or `endless` on the title screen | Space or Enter (ranked) |
@@ -726,7 +726,7 @@ are saved on the device.
   - where the boost button sits: right, left or middle
   - **left-handed layout:** the boost button swaps sides (right and left;
     the middle stays), and so do pause and the level at the top
-  - double-tap and hold to boost, on or off
+  - double-tap and hold to boost, on or off (hidden with tap steering, which never boosts on a double-tap)
   - vibration: off, light (shorter, softer pulses in the same rhythm) or
     full; older saves' on/off became full or off
   - ask before closing (the Android app only, on by default): back on the

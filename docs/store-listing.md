@@ -52,7 +52,7 @@ A login calendar, three daily goals and five weekly ones, 53 achievements, a dai
 
 PLAY YOUR WAY
 - One-hand play: drag, tap the sides, or tilt your phone, with adjustable sensitivity
-- Boost with a button on the left, right or middle, or double-tap and hold anywhere, and a left-handed layout
+- Boost with a button on the left, right or middle, or double-tap and hold anywhere (with drag or tilt), and a left-handed layout
 - Reduce motion, larger text, high contrast, a colour-blind mode (with shapes as well as colours), dark mode, separate music and effects volume, light or full vibration, and an assist mode that slows the game and marks a safe line
 - An optional daily reminder, once a day at most
 - A hands-on tutorial (try each way to steer, then a practice run that shows every pickup and power-up) and short tips on your first runs, all skippable and replayable
@@ -82,6 +82,14 @@ where these names may differ slightly):
 8. Stylized
 
 The first five are the best fit.
+
+## Release notes for 1.0.12
+
+379 characters (500 at most):
+
+<en-GB>
+A new full-screen splash: the dusk sky, the ringed planet and your ship on the lane, while the game loads. Tap steering no longer boosts by mistake when you tap quickly: with tap steering, boost is the button only (drag and tilt still have double-tap and hold). And a fix for a rare case where a cores spend could be charged twice if your signal dropped at just the wrong moment.
+</en-GB>
 
 ## Release notes for 1.0.11
 

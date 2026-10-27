@@ -226,8 +226,16 @@ back). `tests/settings.test.ts` loads 1.0.7's settings and checks every
 choice is kept and the new settings get their defaults.
 
 `tests/input.test.ts` checks double-tap and hold: a quick double-tap boosts,
-a slow one, a long press, a drag or taps on opposite sides don't, and the
-ship still steers while boosting.
+a slow one, a long press, a drag or taps on opposite sides don't, nor two
+quick taps on the same side with tap steering, and the ship still steers
+while boosting.
+
+The launch splash is in `index.html` (markup, styles and a small script, so it
+shows before any of the game loads) and `src/ui/splash.ts` lifts it. To see it
+held, block the game's script in Playwright (`page.route('**/assets/index-*.js', ...)`
+against `npm run build` and `vite preview`). Android 11 and older show
+`res/drawable*/splash.png` instead: the same picture, still; regenerate them
+from the built page at each size when the splash changes.
 
 `tests/ranks.test.ts` checks the rank ladder, that ranks are reached on XP
 alone, XP from every mode (doubled for the day's first three) and from goals,
