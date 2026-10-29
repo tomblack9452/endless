@@ -18,7 +18,8 @@ export class Haptics {
 
   private buzz(pattern: number | number[]): void {
     const p = scaled(pattern, this.strength);
-    if (p.length > 0 && can) navigator.vibrate(p);
+    // Browsers refuse (and log) a buzz before the first tap, like the login reward's at launch.
+    if (p.length > 0 && can && navigator.userActivation?.hasBeenActive !== false) navigator.vibrate(p);
   }
 
   nearMiss(): void {
