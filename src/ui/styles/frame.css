@@ -1,0 +1,301 @@
+/* The sci-fi details, used sparingly: cut corners and a soft glow on each
+   screen's main button and on its key card, segmented meters for progress,
+   hex icons on the title's bar. Everything else stays plain.
+
+   The shapes are drawn on a pseudo-element masked to the cut, so a filter on
+   the element itself can glow round the real shape (a mask or clip-path on the
+   element would clip its own glow). */
+
+/* Main buttons: the accent, cut at the top-left and bottom-right. */
+.pill.primary,
+.frame {
+  --cut: 10px;
+  position: relative;
+  isolation: isolate;
+  border-radius: 0;
+}
+
+.pill.primary {
+  background: none;
+  border-color: transparent;
+  filter: drop-shadow(0 0 9px color-mix(in srgb, var(--accent) 45%, transparent));
+}
+
+.pill.primary::before,
+.frame::before,
+.frame::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  -webkit-mask:
+    linear-gradient(135deg, transparent var(--cut), #000 calc(var(--cut) + 0.5px)) left / 51% 100% no-repeat,
+    linear-gradient(-45deg, transparent var(--cut), #000 calc(var(--cut) + 0.5px)) right / 51% 100% no-repeat;
+  mask:
+    linear-gradient(135deg, transparent var(--cut), #000 calc(var(--cut) + 0.5px)) left / 51% 100% no-repeat,
+    linear-gradient(-45deg, transparent var(--cut), #000 calc(var(--cut) + 0.5px)) right / 51% 100% no-repeat;
+}
+
+.pill.primary::before {
+  background: var(--accent);
+  transition: background-color 600ms;
+}
+
+.pill.small.primary {
+  --cut: 6px;
+  filter: drop-shadow(0 0 5px color-mix(in srgb, var(--accent) 35%, transparent));
+}
+
+.pill.primary:disabled {
+  filter: none;
+  opacity: 0.45;
+}
+
+/* Generals: the sheen moves to the masked shape. */
+.rank-top .pill.primary {
+  background: none;
+  animation: none;
+}
+
+.rank-top .pill.primary::before {
+  background: linear-gradient(110deg, var(--accent) 35%, color-mix(in srgb, var(--accent) 60%, #fff3c4) 50%, var(--accent) 65%) 0 0 / 300% 100%;
+  animation: rank-sheen 5s linear infinite;
+}
+
+.rank-top.reduce-motion .pill.primary::before {
+  animation: none;
+}
+
+/* Key cards: a 1px edge in the accent round a panel, with a faint inner glow. */
+.frame::before {
+  background: color-mix(in srgb, var(--accent) 60%, transparent);
+}
+
+.frame::after {
+  inset: 1px;
+  --cut: 9.6px;
+  background: var(--ui-bg);
+  box-shadow: inset 0 0 28px color-mix(in srgb, var(--accent) 16%, transparent);
+}
+
+/* Framed modals (pause, the offer card) sit over the frozen course. */
+.frame.modal {
+  --cut: 14px;
+  padding: 28px 24px 24px;
+}
+
+/* Segmented meters: every progress track reads as steps. The mask cuts the
+   track and its fill alike, so a fill still animates as one bar. */
+.xp-track,
+.lp-track,
+.meter {
+  --segs: 10;
+  border-radius: 0;
+  -webkit-mask: repeating-linear-gradient(90deg, #000 0 calc(100% / var(--segs) - 3px), transparent calc(100% / var(--segs) - 3px) calc(100% / var(--segs)));
+  mask: repeating-linear-gradient(90deg, #000 0 calc(100% / var(--segs) - 3px), transparent calc(100% / var(--segs) - 3px) calc(100% / var(--segs)));
+}
+
+.lp-track {
+  --segs: 8;
+  height: 4px;
+}
+
+/* Upgrade tiers: one step a tier. */
+.meter.tiers {
+  --segs: 5;
+  position: relative;
+  width: 100px;
+  height: 7px;
+  margin: 6px 0 4px;
+  background: color-mix(in srgb, currentColor 14%, transparent);
+  overflow: hidden;
+}
+
+.meter.tiers > i {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: var(--accent);
+}
+
+/* The level's progress in a run: steps, with no glow (it changes every frame). */
+.progress {
+  --segs: 8;
+  width: 88px;
+  height: 4px;
+  -webkit-mask: repeating-linear-gradient(90deg, #000 0 calc(100% / var(--segs) - 2px), transparent calc(100% / var(--segs) - 2px) calc(100% / var(--segs)));
+  mask: repeating-linear-gradient(90deg, #000 0 calc(100% / var(--segs) - 2px), transparent calc(100% / var(--segs) - 2px) calc(100% / var(--segs)));
+}
+
+/* Hex icons on the title's bar: a thin hexagon behind each icon, lit when there's news. */
+.bar-btn .hex {
+  position: relative;
+  isolation: isolate;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 44px;
+}
+
+.bar-btn .hex::before,
+.bar-btn .hex::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%);
+}
+
+.bar-btn .hex::before {
+  background: color-mix(in srgb, var(--accent) 55%, transparent);
+}
+
+.bar-btn .hex::after {
+  inset: 1px;
+  background: var(--ui-bg);
+}
+
+.bar-btn .hex.lit::after {
+  background: color-mix(in srgb, var(--accent) 16%, var(--ui-bg));
+}
+
+.bar-btn .hex svg {
+  width: 20px;
+  height: 20px;
+}
+
+/* The chips under the main button: pick a mode, then fly. */
+.mode-chips {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.mode-chip {
+  min-height: 44px;
+  padding: 0 4px;
+  font: inherit;
+  font-family: var(--font-mono);
+  font-size: min(calc(12px * var(--ui-scale)), 3.3vw);
+  letter-spacing: 0.06em;
+  color: inherit;
+  background: none;
+  border: 1px solid color-mix(in srgb, currentColor 28%, transparent);
+  pointer-events: auto;
+  cursor: pointer;
+}
+
+.mode-chip.on {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+}
+
+.mode-chip:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+}
+
+/* High contrast: shapes stay, the glow goes. */
+body.contrast .pill.primary,
+body.contrast .pill.small.primary {
+  filter: none;
+}
+
+/* Pause: a framed card in the middle (the panel behind it dims the course). */
+#screen-paused .pause-card {
+  position: absolute;
+  left: 50%;
+  right: auto;
+  width: min(320px, calc(100% - 48px));
+  transform: translate(-50%, -50%);
+}
+
+.pause-card .menu .pill {
+  width: 100%;
+}
+
+.offer-card.frame {
+  padding: 26px 22px 20px;
+  width: min(320px, calc(100vw - 48px));
+}
+
+/* The end screen: the score on a framed card, fly again biggest, the rest under it. */
+.over-card {
+  display: inline-block;
+  min-width: 200px;
+  margin: 10px auto 4px;
+  padding: 10px 30px 14px;
+  --cut: 12px;
+}
+
+.over-menu {
+  gap: 10px;
+  margin-top: 22px;
+}
+
+.over-again {
+  min-width: min(280px, 100%);
+  min-height: calc(58px * var(--ui-scale));
+  font-size: calc(17px * var(--ui-scale));
+}
+
+.over-row {
+  display: flex;
+  gap: 8px;
+  width: min(280px, 100%);
+}
+
+.over-row .pill {
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 0 10px;
+  font-size: calc(12px * var(--ui-scale));
+  letter-spacing: 0.08em;
+}
+
+.over-row:not(:has(.pill:not([hidden]))) {
+  display: none;
+}
+
+.over-menu-link,
+.over-next {
+  min-height: 44px;
+  margin: 0;
+  padding: 0 12px;
+  font: inherit;
+  font-size: calc(13px * var(--ui-scale));
+  letter-spacing: 0.08em;
+  color: inherit;
+  background: none;
+  border: 0;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+.over-next {
+  margin-top: 8px;
+  color: var(--accent);
+}
+
+/* A level setting's meter, beside its word. */
+.meter.level {
+  position: relative;
+  width: 54px;
+  height: 6px;
+  margin-left: auto;
+  margin-right: 10px;
+  background: color-mix(in srgb, currentColor 14%, transparent);
+}
+
+.meter.level > i {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: var(--accent);
+}
+
+.offer-card .offer-ring {
+  margin-left: auto;
+  margin-right: auto;
+}

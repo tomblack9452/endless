@@ -1,5 +1,5 @@
 import { CONFIG } from '../core/config';
-import { label, type SettingKey, type Settings } from '../core/settings';
+import { label, levelOf, type SettingKey, type Settings } from '../core/settings';
 import { SHOW_MS as HINT_MS } from './hints';
 import { Bars } from './systemBars';
 import { type CardView, renderControlCards, renderGuide } from './tutorialView';
@@ -320,13 +320,27 @@ export class UI {
     for (const el of document.querySelectorAll<HTMLElement>('[data-setting]')) {
       const value = el.querySelector('.value');
       if (value) value.textContent = label(s, el.dataset.setting as SettingKey);
+      const lv = levelOf(s, el.dataset.setting as SettingKey);
+      if (lv && value) {
+        let m = el.querySelector<HTMLElement>('.meter.level');
+        if (!m) {
+          m = document.createElement('span');
+          m.className = 'meter level';
+          m.setAttribute('aria-hidden', 'true');
+          m.append(document.createElement('i'));
+          el.insertBefore(m, value);
+        }
+        m.style.setProperty('--segs', String(lv.of));
+        (m.firstChild as HTMLElement).style.width = `${(100 * lv.on) / lv.of}%`;
+      }
     }
     // Tap-sides steering never boosts on a double-tap, so the row only shows for drag (and tilt with drag).
     const dbl = document.querySelector<HTMLElement>('[data-setting="doubleTapBoost"]');
     if (dbl) dbl.hidden = s.touch === 1;
   }
   /** Display settings that live on the page: text size, boost side, reduce motion, the HUD mirrored for the left hand. */
-  setDisplay(textScale: number, boostSide: 'right' | 'left' | 'middle', reduceMotion: boolean, leftHanded = false): void {
+  setDisplay(textScale: number, boostSide: 'right' | 'left' | 'middle', reduceMotion: boolean, leftHanded = false, contrast = false): void {
+    document.body.classList.toggle('contrast', contrast);
     document.documentElement.style.setProperty('--ui-scale', String(textScale));
     document.body.classList.toggle('left-handed', leftHanded);
     document.body.classList.toggle('boost-left', boostSide === 'left');
@@ -342,7 +356,24 @@ export class UI {
     }
   }
 
-  /** The big button: ranked (its name and the line under it), or for new players, endless. */
+  /** The mode chips under the big button: a tap picks the mode the button flies. */
+  bindModeChips(onMode: (mode: string) => void): void {
+    for (const el of document.querySelectorAll<HTMLElement>('[data-mode]')) {
+      el.addEventListener('pointerdown', (e) => e.stopPropagation());
+      el.addEventListener('click', () => onMode(el.dataset.mode ?? ''));
+    }
+  }
+
+  /** Light the chip for the mode the big button flies. */
+  setModeChip(mode: string): void {
+    for (const el of document.querySelectorAll<HTMLElement>('[data-mode]')) {
+      const on = el.dataset.mode === mode;
+      el.classList.toggle('on', on);
+      el.setAttribute('aria-pressed', String(on));
+    }
+  }
+
+  /** The big button: the chosen mode (its name and the line under it). */
   setPrimary(name: string, sub: string): void {
     $('title-ranked-name').textContent = name;
     this.rankedSub.textContent = sub;
@@ -351,7 +382,7 @@ export class UI {
   /** Show only what's open (data-feature on the title's buttons); a modes row with nothing in it goes. */
   setFeatures(open: (feature: string) => boolean): void {
     for (const el of document.querySelectorAll<HTMLElement>('#screen-title [data-feature]')) el.hidden = !open(el.dataset.feature ?? '');
-    const modes = document.querySelector<HTMLElement>('#screen-title .title-modes');
+    const modes = document.querySelector<HTMLElement>('#screen-title .mode-chips');
     if (modes) modes.hidden = [...modes.children].every((c) => (c as HTMLElement).hidden);
   }
 
@@ -760,8 +791,13 @@ export class UI {
         effect.className = 'label dim upgrade-effect';
         effect.textContent = r.effect;
         const pips = document.createElement('div');
-        pips.className = 'pips';
-        pips.textContent = '●'.repeat(r.tier) + '○'.repeat(r.max - r.tier);
+        pips.className = 'meter tiers';
+        pips.setAttribute('role', 'img');
+        pips.setAttribute('aria-label', `tier ${r.tier} of ${r.max}`);
+        pips.style.setProperty('--segs', String(r.max));
+        const fill = document.createElement('i');
+        fill.style.width = `${(100 * r.tier) / r.max}%`;
+        pips.append(fill);
         info.append(name, pips, effect);
         const b = document.createElement('button');
         b.type = 'button';
@@ -1006,6 +1042,13 @@ export class UI {
     $('title-rank-icon').innerHTML = icon;
     $('title-rank-name').textContent = name;
     $('title-credits').textContent = sub;
+  }
+
+  /** The end screen's line about spending (null hides it). */
+  setOverNext(text: string | null): void {
+    const b = $('over-next');
+    b.hidden = text === null;
+    b.textContent = text ?? '';
   }
 
   /** Rank result on the game-over screen (null clears it, e.g. solo runs). */

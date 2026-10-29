@@ -126,7 +126,7 @@
   #screen-title .pill {
     min-height: calc(44px * var(--ui-scale));
   }
-  .title-modes {
+  .mode-chips {
     margin-top: 8px;
   }
   .live-cards {
@@ -209,7 +209,7 @@
   outline-offset: 3px;
 }
 
-.title-modes {
+.mode-chips {
   display: grid;
   grid-auto-flow: column;
   grid-auto-columns: minmax(0, 1fr);

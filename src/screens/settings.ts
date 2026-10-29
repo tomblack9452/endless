@@ -37,7 +37,7 @@ export class SettingsScreen {
     if (!s.ghost) this.g.ghost.stop();
     this.g.world.assist = this.g.assistOn();
     if (this.g.assistOn() && this.g.state !== 'title') this.g.assisted = true;
-    this.g.ui.setDisplay(TEXT_SCALE[s.textSize], this.boostSide(), s.reduceMotion, s.leftHanded);
+    this.g.ui.setDisplay(TEXT_SCALE[s.textSize], this.boostSide(), s.reduceMotion, s.leftHanded, s.contrast);
     this.g.showroomSpin.auto = !s.reduceMotion; // the showroom's ship turns only when dragged
     // Colour-blind mode: the safe palette for hazards, pickups and power-ups, and a shape for each power-up.
     setSafeColours(s.colourBlind);

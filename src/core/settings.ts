@@ -155,6 +155,12 @@ export function cycle(s: Settings, key: SettingKey): void {
   else (s[key] as number) = (v + 1) % (OPTIONS[key]?.length ?? 1);
 }
 
+/** Settings that are a level (off to full): shown as a meter beside the word. */
+export function levelOf(s: Settings, key: SettingKey): { on: number; of: number } | null {
+  if (key !== 'music' && key !== 'effects' && key !== 'haptics') return null;
+  return { on: s[key], of: (OPTIONS[key]?.length ?? 1) - 1 };
+}
+
 export function label(s: Settings, key: SettingKey): string {
   const v = s[key];
   if (typeof v === 'boolean') return v ? 'on' : 'off';
