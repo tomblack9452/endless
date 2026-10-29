@@ -3,7 +3,8 @@ import type { RewardedPlacement } from '../ads/ads';
 import { questText } from '../economy/daily';
 import { dayKey } from '../economy/time';
 import { formatScore } from '../ui/ui';
-import { type Game, GIFT_ICON } from './game';
+import type { Game } from './game';
+import GIFT_ICON from '../assets/icons/gift.svg?raw';
 
 export class Revives {
   constructor(private readonly g: Game) {}

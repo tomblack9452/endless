@@ -89,60 +89,19 @@ import { Connection } from './connection';
 import { DevTools } from './devTools';
 import { CourseRuns } from './courseRuns';
 import { SoloScreen } from '../screens/solo';
+import GIFT_ICON from '../assets/icons/gift.svg?raw';
+import GOAL_ICON from '../assets/icons/goal.svg?raw';
+import { musicForArea } from '../audio/musicChoice';
+import { musicFor } from '../audio/musicChoice';
+import { REVEAL_KEY } from '../progression/reveal';
 
 type State = 'title' | 'playing' | 'paused' | 'countdown' | 'crashed' | 'finished';
 
 const DEG = Math.PI / 180;
 const PATH_STEP = 4;
 const FIRST_PLAYED_KEY = 'endless.firstPlayed';
-export const REVEAL_KEY = 'endless.reveal';
-
-/** A name the server made up for a new account ("pilot-3fa2"): the player hasn't picked one. */
-export const GENERATED_NAME = /^pilot-[0-9a-f]{4}$/;
 
 type InfoScreen = 'welcome' | 'name' | 'goals' | 'hangar' | 'record' | 'solo' | 'league' | 'shop' | 'store' | 'pass' | 'boards';
-
-/** "5 oct": the Monday this week's ranked course started. */
-/** "1:23.4" */
-export function formatTime(seconds: number): string {
-  const m = Math.floor(seconds / 60);
-  const s = seconds - m * 60;
-  return `${m}:${s < 10 ? '0' : ''}${s.toFixed(1)}`;
-}
-
-/** Music for an area of a set level. */
-export function musicForArea(theme: 'land' | 'canyon' | 'interior', biome?: string): MusicId {
-  if (biome === 'ice' || biome === 'volcanic' || biome === 'asteroids') return biome;
-  return theme;
-}
-
-/** Music for a level: the theme's, or the biome's own where it has one. */
-export function musicFor(level: number): MusicId {
-  const biome = biomeForLevel(level);
-  return biome === 'ice' || biome === 'volcanic' || biome === 'asteroids' ? biome : themeForLevel(level);
-}
-
-/** A wrapped present, for the daily reward. */
-export const GIFT_ICON =
-  '<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round"><rect x="12" y="26" width="40" height="28" rx="3"/><rect x="8" y="18" width="48" height="10" rx="2"/><path d="M32 18v36"/><path d="M32 18c-4-8-14-10-14-4s10 4 14 4c4 0 14 2 14-4s-10-4-14 4z"/></svg>';
-/** A goal badge: a star in a ring. */
-export const GOAL_ICON =
-  '<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round"><circle cx="32" cy="32" r="26"/><path d="M32 14l5.4 11.4 12.1 1.6-8.9 8.4 2.3 12.3L32 41.7l-10.9 6 2.3-12.3-8.9-8.4 12.1-1.6z"/></svg>';
-/** A season pass badge. */
-export const PASS_ICON =
-  '<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round"><path d="M32 6l22 10v16c0 13-9 22-22 26C19 54 10 45 10 32V16z"/><path d="M32 20l4 8 9 1-7 6 2 9-8-5-8 5 2-9-7-6 9-1z"/></svg>';
-
-/** "+250 credits" lines from several promotions at once, added into one. */
-export function mergeCredits(lines: string[]): string[] {
-  let credits = 0;
-  const rest: string[] = [];
-  for (const l of lines) {
-    const m = /^\+([\d,]+) credits$/.exec(l);
-    if (m) credits += Number(m[1].replace(/,/g, ''));
-    else if (!rest.includes(l)) rest.push(l);
-  }
-  return credits > 0 ? [`+${formatScore(credits)} credits`, ...rest] : rest;
-}
 
 export class Game {
   readonly basePalette = new LivePalette(); // the level's palette

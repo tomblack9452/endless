@@ -5,7 +5,10 @@ import type { Purchase } from '../server/backend';
 import type { ProductId } from '../store/store';
 import { googleAvailable } from '../platform/account';
 import { formatScore } from '../ui/ui';
-import { type Game, GIFT_ICON, PASS_ICON, mergeCredits } from './game';
+import type { Game } from './game';
+import GIFT_ICON from '../assets/icons/gift.svg?raw';
+import PASS_ICON from '../assets/icons/pass.svg?raw';
+import { mergeCredits } from '../ui/format';
 
 export class Purchases {
   constructor(private readonly g: Game) {}

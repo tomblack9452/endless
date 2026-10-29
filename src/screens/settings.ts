@@ -5,13 +5,10 @@ import { remindersAvailable } from '../platform/reminders';
 import { latestNotes, SEEN_KEY, whatsNewOnLaunch } from '../ui/whatsNew';
 import { storage } from '../core/storage';
 import type { Game } from '../core/game';
+import NEW_ICON from '../assets/icons/new.svg?raw';
 
 /** Where the boost button sits, by the boostSide setting (0 right, 1 left, 2 middle). */
 const BOOST_SIDES = ['right', 'left', 'middle'] as const;
-
-/** What's new: a four-point sparkle. */
-const NEW_ICON =
-  '<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round"><path d="M32 6c2 14 6 20 20 22-14 2-18 8-20 22-2-14-6-20-20-22 14-2 18-8 20-22z"/><path d="M50 40c1 5 2 7 7 8-5 1-6 3-7 8-1-5-2-7-7-8 5-1 6-3 7-8z"/></svg>';
 
 export class SettingsScreen {
   constructor(private readonly g: Game) {}

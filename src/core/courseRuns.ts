@@ -4,11 +4,11 @@ import { rewardText } from '../economy/reward';
 import { COURSES, courseLength } from '../world/courses';
 import { streakReward } from '../progression/challenge';
 import { formatScore } from '../ui/ui';
-import { type Game, formatTime, musicForArea, musicFor } from './game';
-
-/** The daily challenge: a flag at the finish line. */
-const FLAG_ICON =
-  '<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round"><path d="M16 58V8"/><path d="M16 10h34l-7 10 7 10H16"/><path d="M27 10v20M38 10v20M16 20h34"/></svg>';
+import type { Game } from './game';
+import FLAG_ICON from '../assets/icons/flag.svg?raw';
+import { formatTime } from '../ui/format';
+import { musicForArea } from '../audio/musicChoice';
+import { musicFor } from '../audio/musicChoice';
 
 export class CourseRuns {
   constructor(private readonly g: Game) {}

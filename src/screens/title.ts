@@ -5,7 +5,9 @@ import { dayKey, formatWait, untilTomorrow } from '../economy/time';
 import { storage } from '../core/storage';
 import { emblem, leagueName, LP_PER_DIVISION } from '../progression/leagues';
 import { formatScore, type TitleCard } from '../ui/ui';
-import { type Game, REVEAL_KEY, GOAL_ICON } from '../core/game';
+import type { Game } from '../core/game';
+import GOAL_ICON from '../assets/icons/goal.svg?raw';
+import { REVEAL_KEY } from '../progression/reveal';
 
 export class TitleScreen {
   constructor(private readonly g: Game) {}

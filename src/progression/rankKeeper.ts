@@ -3,7 +3,9 @@ import { emblem, LEAGUES, leagueName, leaguePar, LP_PER_DIVISION } from './leagu
 import { LOOKS, SLOT_NAMES } from '../ship/looks';
 import { TIER_LEAGUE } from '../ship/upgrades';
 import { type Celebration, formatScore, type RankResultView } from '../ui/ui';
-import { type Game, musicFor, mergeCredits } from '../core/game';
+import type { Game } from '../core/game';
+import { mergeCredits } from '../ui/format';
+import { musicFor } from '../audio/musicChoice';
 
 export class RankKeeper {
   constructor(private readonly g: Game) {}

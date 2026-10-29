@@ -8,7 +8,9 @@ import { weekKey } from '../progression/leagues';
 import { ACHIEVEMENTS, type Achievement, GROUP_NAMES, type Group, achievement, progressOn, rewardKeys } from '../progression/achievements';
 import { byKey, type LookItem, SLOT_NAMES } from '../ship/looks';
 import { formatScore } from '../ui/ui';
-import { type Game, GOAL_ICON, mergeCredits } from '../core/game';
+import type { Game } from '../core/game';
+import GOAL_ICON from '../assets/icons/goal.svg?raw';
+import { mergeCredits } from '../ui/format';
 
 export class GoalScreens {
   constructor(private readonly g: Game) {}

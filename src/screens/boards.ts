@@ -5,7 +5,8 @@ import { BOARD_TABS, boardCaption, boardName, boardQuery } from '../server/board
 import { ENVIRONMENTS } from '../world/courses';
 import { DIVISIONS, divisionReward, emblem, LEAGUES, leagueName, leaguePar, LP_PER_DIVISION } from '../progression/leagues';
 import { formatScore, type PilotCardView, type ProgressView } from '../ui/ui';
-import { type Game, GENERATED_NAME } from '../core/game';
+import type { Game } from '../core/game';
+import { GENERATED_NAME } from './account';
 
 export class BoardScreens {
   constructor(private readonly g: Game) {}

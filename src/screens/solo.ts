@@ -1,6 +1,7 @@
 import { COURSES, type Environment, ENVIRONMENTS } from '../world/courses';
 import { envStatus, nextEnvironment, newlyOpened } from '../progression/unlocks';
-import { type Game, formatTime } from '../core/game';
+import type { Game } from '../core/game';
+import { formatTime } from '../ui/format';
 
 export class SoloScreen {
   constructor(private readonly g: Game) {}

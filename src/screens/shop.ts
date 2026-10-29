@@ -11,14 +11,13 @@ import { VAULT_ORDER } from '../ship/catalogue';
 import { lookIcon, lookSwatch } from '../ship/hangar';
 import { byKey, keyOf, type LookItem, type Slot, SLOT_NAMES } from '../ship/looks';
 import { formatScore } from '../ui/ui';
-import { type Game, PASS_ICON, mergeCredits } from '../core/game';
+import type { Game } from '../core/game';
+import PASS_ICON from '../assets/icons/pass.svg?raw';
+import WALLET_ICON from '../assets/icons/wallet.svg?raw';
+import { mergeCredits } from '../ui/format';
 
 /** The shop's tabs: looks as cards (today, the set, the vault), then lists (the pass, cores, premium). */
 type ShopTab = 'today' | 'set' | 'vault';
-
-/** Credits and cores side by side (the wallet's two chips), for the first look at the shop. */
-const WALLET_ICON =
-  '<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round"><circle cx="22" cy="34" r="15"/><path d="M27.5 28.5a8 8 0 1 0 0 11"/><path d="M44 16l13 7.5v15L44 46l-13-7.5v-15z"/><path d="M44 25l6 3.5v7L44 39l-6-3.5v-7z"/></svg>';
 
 /** The first look at the shop or the store says what credits and cores are for (once, on this save). */
 const WALLET_EXPLAINED_KEY = 'endless.walletExplained';

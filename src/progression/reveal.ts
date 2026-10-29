@@ -54,3 +54,5 @@ export function nextStageText(runs: number, tutorialDone: boolean): string {
   if (left > 0) return `${s.name} ${verb} after ${left} more run${left === 1 ? '' : 's'} of ${CONFIG.reveal.validScore.toLocaleString('en-US')}+`;
   return `${s.name} ${verb} after the tutorial`;
 }
+
+export const REVEAL_KEY = 'endless.reveal';

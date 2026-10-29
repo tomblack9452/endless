@@ -5,7 +5,8 @@ import { rankName } from '../progression/ranks';
 import { shareAvailable, shareCard } from '../platform/share';
 import { leagueName } from '../progression/leagues';
 import { formatScore } from '../ui/ui';
-import { type Game, PASS_ICON } from './game';
+import type { Game } from './game';
+import PASS_ICON from '../assets/icons/pass.svg?raw';
 
 export class Connection {
   constructor(private readonly g: Game) {}

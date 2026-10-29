@@ -2,7 +2,10 @@ import { reportError } from '../platform/errors';
 import { storage } from '../core/storage';
 import { SESSION_KEY } from '../server/supabase';
 import { googleAvailable, googleSignIn } from '../platform/account';
-import { type Game, GENERATED_NAME } from '../core/game';
+import type { Game } from '../core/game';
+
+/** A name the server made up for a new account ("pilot-3fa2"): the player hasn't picked one. */
+export const GENERATED_NAME = /^pilot-[0-9a-f]{4}$/;
 
 /** A name the server takes (see set_pilot_name). */
 const PILOT_NAME = /^[A-Za-z0-9 _-]{3,16}$/;
