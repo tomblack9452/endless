@@ -13,19 +13,16 @@ import { Stage } from '../world/renderer';
 import { Sky } from '../world/sky';
 import { SpeedLines } from '../world/speedLines';
 import { Trail } from '../ship/trail';
-import { cycle, DEFAULT_SETTINGS, LEVEL_GAIN, loadSettings, saveSettings, type SettingKey, STEERING_RANGE, TEXT_SCALE, TILT_GAIN } from './settings';
+import { DEFAULT_SETTINGS, loadSettings } from './settings';
 import { EVENT_NOTICE, Events } from '../world/events';
 import { Weather } from '../world/weather';
 import { Ghost, rivalGhost } from '../ship/ghost';
 import { decalArt } from '../ship/decals';
 import { Haptics } from '../platform/haptics';
-import { SAFE, setSafeColours } from '../world/itemColours';
-import { remindersAvailable } from '../platform/reminders';
 import { Capacitor } from '@capacitor/core';
 import { exitChoice } from '../platform/exit';
 import { sendFeedback } from '../platform/feedback';
 import { errorLog } from '../platform/errors';
-import { latestNotes, SEEN_KEY, whatsNewOnLaunch } from '../ui/whatsNew';
 import { cancelOpenReport } from '../ui/report';
 import { quickRetryOn, tapRetries } from './retry';
 import { GateTracker, kmText, Milestones, milestonesCount } from './runBonus';
@@ -90,6 +87,7 @@ import { RecordScreen } from '../screens/record';
 import { RankKeeper } from '../progression/rankKeeper';
 import { Revives } from './revives';
 import { TitleScreen } from '../screens/title';
+import { SettingsScreen } from '../screens/settings';
 
 type State = 'title' | 'playing' | 'paused' | 'countdown' | 'crashed' | 'finished';
 
@@ -123,18 +121,12 @@ export function musicFor(level: number): MusicId {
   return biome === 'ice' || biome === 'volcanic' || biome === 'asteroids' ? biome : themeForLevel(level);
 }
 
-/** Where the boost button sits, by the boostSide setting (0 right, 1 left, 2 middle). */
-const BOOST_SIDES = ['right', 'left', 'middle'] as const;
-
 /** A wrapped present, for the daily reward. */
 export const GIFT_ICON =
   '<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round"><rect x="12" y="26" width="40" height="28" rx="3"/><rect x="8" y="18" width="48" height="10" rx="2"/><path d="M32 18v36"/><path d="M32 18c-4-8-14-10-14-4s10 4 14 4c4 0 14 2 14-4s-10-4-14 4z"/></svg>';
 /** A goal badge: a star in a ring. */
 export const GOAL_ICON =
   '<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round"><circle cx="32" cy="32" r="26"/><path d="M32 14l5.4 11.4 12.1 1.6-8.9 8.4 2.3 12.3L32 41.7l-10.9 6 2.3-12.3-8.9-8.4 12.1-1.6z"/></svg>';
-/** What's new: a four-point sparkle. */
-const NEW_ICON =
-  '<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round"><path d="M32 6c2 14 6 20 20 22-14 2-18 8-20 22-2-14-6-20-20-22 14-2 18-8 20-22z"/><path d="M50 40c1 5 2 7 7 8-5 1-6 3-7 8-1-5-2-7-7-8 5-1 6-3 7-8z"/></svg>';
 /** The daily challenge: a flag at the finish line. */
 const FLAG_ICON =
   '<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round"><path d="M16 58V8"/><path d="M16 10h34l-7 10 7 10H16"/><path d="M27 10v20M38 10v20M16 20h34"/></svg>';
@@ -155,8 +147,8 @@ export function mergeCredits(lines: string[]): string[] {
 }
 
 export class Game {
-  private readonly basePalette = new LivePalette(); // the level's palette
-  private readonly palette = new LivePalette(); // after time of day, read by materials
+  readonly basePalette = new LivePalette(); // the level's palette
+  readonly palette = new LivePalette(); // after time of day, read by materials
   private shownTextHex = -1;
   private shownPageHex = -1;
   readonly stage: Stage;
@@ -169,8 +161,8 @@ export class Game {
   private readonly sky: Sky;
   readonly trail: Trail;
   private readonly events: Events;
-  private readonly weather: Weather;
-  private readonly ghost: Ghost;
+  readonly weather: Weather;
+  readonly ghost: Ghost;
   /** Ranked: the ghost of the pilot just above you (settings > rival's ghost). */
   private readonly rival: Ghost;
   /** Counts runs, so an answer from the server for an earlier run is ignored. */
@@ -205,7 +197,7 @@ export class Game {
   readonly ui = new UI();
   readonly hints = new Hints((text, tip) => this.ui.showHint(text, tip));
   /** The Android app (not the web): back can leave it, so "ask before closing" applies. */
-  private native = Capacitor.getPlatform() === 'android';
+  native = Capacitor.getPlatform() === 'android';
   /** The "close endless space?" dialog is up. */
   exitAsking = false;
   readonly haptics = new Haptics();
@@ -307,7 +299,7 @@ export class Game {
   /** The minute the title's cards were last drawn (the daily card's time left). */
   private titleMinute = 0;
   /** Turns the showroom camera: on its own, or by a drag on the open scene. */
-  private readonly showroomSpin = new ShowroomSpin({ spin: CONFIG.camera.showroom.spin });
+  readonly showroomSpin = new ShowroomSpin({ spin: CONFIG.camera.showroom.spin });
   // Revive (not in ranked): once a run. While the offer is up the run isn't recorded yet.
   revived = false;
   /** The run as it stood at the first crash, when revived: what the boards get (a paid revive never adds to a board score). */
@@ -341,7 +333,7 @@ export class Game {
   private speed: number = CONFIG.speed.titleDrift;
   runStart = 0; // field distance when the run began
   score = 0; // shown score: distance points + bonus
-  private distanceScore = 0; // drives levels and difficulty
+  distanceScore = 0; // drives levels and difficulty
   private bonus = 0;
   private chain = 0; // near misses in a row
   private chainTimer = 0;
@@ -417,6 +409,8 @@ export class Game {
 
   readonly title = new TitleScreen(this);
 
+  readonly settingsScreen = new SettingsScreen(this);
+
   constructor(canvas: HTMLCanvasElement) {
     this.basePalette.set(BASE_PALETTE);
     this.palette.set(BASE_PALETTE);
@@ -436,8 +430,8 @@ export class Game {
     this.input.bindBoostControl(this.ui.boostControl);
     this.input.onTiltDenied = () => this.ui.showNotice('motion access off. drag to steer');
     this.sound.attachUnlock();
-    this.ui.bindMenus(this.onMenu, this.onSetting);
-    this.applySettings();
+    this.ui.bindMenus(this.onMenu, this.settingsScreen.onSetting);
+    this.settingsScreen.applySettings();
     this.applyLook(0);
 
     this.world.reset(0, false);
@@ -545,7 +539,7 @@ export class Game {
       // A new player starts with the welcome; the first daily reward waits for the end of it.
       if (this.onboarding.done) this.claimLogin();
       else this.firstLaunch.openWelcome();
-      void this.checkWhatsNew();
+      void this.settingsScreen.checkWhatsNew();
       void this.connect();
       void this.reminders.planReminders();
     });
@@ -586,7 +580,7 @@ export class Game {
     void loadSettings().then((s) => {
       this.settings = s;
       this.settingsLoaded = true;
-      this.applySettings();
+      this.settingsScreen.applySettings();
       void this.reminders.planReminders();
     });
     // Before modes were split, ranked and solo were endless runs: carry their bests over.
@@ -1015,7 +1009,7 @@ export class Game {
   private async connect(): Promise<void> {
     // The server's clock may have come after start-up stopped waiting: check today by it (asking again if need be).
     if (this.backend.clockKnown || (await this.backend.syncClock())) this.retime();
-    errorLog.attach(this.backend, () => this.errorScreen());
+    errorLog.attach(this.backend, () => this.settingsScreen.errorScreen());
     if (!(await this.signInAndSync())) return;
     const refund = await migrateTickets((n) => this.wallet.addCores(n, 'tickets'));
     if (refund > 0) {
@@ -1180,7 +1174,7 @@ export class Game {
   }
 
   /** Assist mode works everywhere but ranked. */
-  private assistOn(): boolean {
+  assistOn(): boolean {
     return this.settings.assist && this.mode !== 'ranked' && !this.dailyRunNow;
   }
 
@@ -1483,7 +1477,7 @@ export class Game {
       this.econ.declineOffer(); // the reminders offer: no thanks
     else if (cancelOpenReport()) return true;
     else if (this.ui.guideOpen) this.firstLaunch.closeGuide();
-    else if (this.settingsOpen) this.closeSettings();
+    else if (this.settingsOpen) this.settingsScreen.closeSettings();
     else if (this.infoOpen === 'welcome') return this.backAtTop();
     else if (this.infoOpen) this.closeInfo();
     else if (this.state === 'playing' || this.state === 'countdown') this.pause();
@@ -1605,7 +1599,7 @@ export class Game {
     } else if (e.code === 'Escape')
       this.back(); // what Android's back button does
     else if (e.code === 'KeyP') {
-      if (this.settingsOpen) this.closeSettings();
+      if (this.settingsOpen) this.settingsScreen.closeSettings();
       else if (this.infoOpen) this.closeInfo();
       else if (this.state === 'playing') this.pause();
       else if (this.state === 'paused') this.resume();
@@ -1621,12 +1615,12 @@ export class Game {
 
   private onMenu = (action: string): void => {
     if (action === 'resume') this.resume();
-    else if (action === 'settings') this.openSettings();
+    else if (action === 'settings') this.settingsScreen.openSettings();
     else if (action === 'delete') void this.account.deleteAccount();
     else if (action === 'google') void this.account.keepWithGoogle(false);
     else if (action === 'google-welcome') void this.account.keepWithGoogle(true);
     else if (action === 'privacy-choices') void this.ads.privacyChoices();
-    else if (action === 'feedback') void sendFeedback(this.feedbackScreen());
+    else if (action === 'feedback') void sendFeedback(this.settingsScreen.feedbackScreen());
     else if (action === 'name-later' && this.infoOpen === 'name') this.closeInfo();
     else if (action === 'tips') {
       this.hints.replay();
@@ -1635,10 +1629,10 @@ export class Game {
       if (this.state !== 'title') this.toMainMenu();
       this.onboarding.go('replay');
       this.feelUsed = null;
-      this.closeSettings();
+      this.settingsScreen.closeSettings();
       this.firstLaunch.openWelcome();
     } else if (action === 'guide') this.ui.showGuide('got it');
-    else if (action === 'whats-new') this.showWhatsNew();
+    else if (action === 'whats-new') this.settingsScreen.showWhatsNew();
     else if (action === 'menu') {
       const practising = this.practice;
       this.toMainMenu();
@@ -1653,7 +1647,7 @@ export class Game {
     else if (action === 'double') void this.revives.doubleCredits();
     else if (action === 'back') {
       if (this.infoOpen) this.closeInfo();
-      else this.closeSettings();
+      else this.settingsScreen.closeSettings();
     }
   };
 
@@ -1693,96 +1687,6 @@ export class Game {
     }
     this.infoOpen = null;
     this.ui.show('title');
-  }
-
-  private onSetting = (key: SettingKey): void => {
-    cycle(this.settings, key);
-    this.applySettings();
-    void saveSettings(this.settings);
-    if (key === 'reminders' && this.settings.reminders) void this.reminders.turnOnReminders();
-    else if (key === 'reminders' || key === 'reminderTime') void this.reminders.planReminders();
-  };
-
-  applySettings(): void {
-    const s = this.settings;
-    this.sound.setMuted(!s.sound);
-    this.sound.setLevels(LEVEL_GAIN[s.music], LEVEL_GAIN[s.effects]);
-    this.input.dragRange = STEERING_RANGE[s.steering];
-    this.input.tiltEnabled = s.tilt;
-    this.input.tiltSensitivity = TILT_GAIN[s.tiltSensitivity];
-    this.input.sidesMode = s.touch === 1;
-    this.input.doubleTapBoost = s.doubleTapBoost;
-    this.haptics.strength = s.haptics;
-    const low = this.lowGraphics();
-    this.stage.setPerformance(low);
-    this.weather.lite = low;
-    if (!s.ghost) this.ghost.stop();
-    this.world.assist = this.assistOn();
-    if (this.assistOn() && this.state !== 'title') this.assisted = true;
-    this.ui.setDisplay(TEXT_SCALE[s.textSize], this.boostSide(), s.reduceMotion, s.leftHanded);
-    this.showroomSpin.auto = !s.reduceMotion; // the showroom's ship turns only when dragged
-    // Colour-blind mode: the safe palette for hazards, pickups and power-ups, and a shape for each power-up.
-    setSafeColours(s.colourBlind);
-    this.world.setColourBlind(s.colourBlind);
-    for (const p of [this.basePalette, this.palette]) p.pickup.set(s.colourBlind ? SAFE.pickup : CONFIG.boost.pickup.color);
-    this.applyLook(this.distanceScore / CONFIG.score.levelLength);
-    this.ui.setDark(s.dark);
-    this.title.refreshTitle(); // the rank colour has a light and a dark version
-    this.ui.renderSettings(s);
-  }
-
-  /** Where the boost button sits: the setting, mirrored for the left hand (right and left swap; the middle stays). */
-  boostSide(): (typeof BOOST_SIDES)[number] {
-    const side = BOOST_SIDES[this.settings.boostSide] ?? 'right';
-    if (!this.settings.leftHanded || side === 'middle') return side;
-    return side === 'right' ? 'left' : 'right';
-  }
-
-  /** Where "send feedback" was pressed, for the mail: settings (over the title or a paused run), or the pause screen. */
-  /** The first launch after an update: a few lines about it (never on a fresh install, never twice). */
-  private async checkWhatsNew(): Promise<void> {
-    const seen = await storage.get(SEEN_KEY);
-    if (seen === __APP_VERSION__) return;
-    await storage.set(SEEN_KEY, __APP_VERSION__);
-    const lines = whatsNewOnLaunch(seen, __APP_VERSION__, !this.onboarding.done);
-    if (lines) this.showWhatsNew();
-  }
-
-  /** The card for this version (settings > help > what's new shows it again). */
-  private showWhatsNew(): void {
-    const notes = latestNotes(__APP_VERSION__);
-    if (!notes) return;
-    this.ui.celebrate([{ kicker: "what's new", icon: NEW_ICON, name: `version ${notes.version}`, lines: [...notes.lines] }]);
-  }
-
-  /** What was up when an error happened, for the error log. */
-  private errorScreen(): string {
-    if (this.settingsOpen) return 'settings';
-    if (this.infoOpen) return String(this.infoOpen);
-    return this.state === 'playing' || this.state === 'paused' || this.state === 'crashed' ? `${this.state} (${this.mode}, level ${this.level})` : this.state;
-  }
-
-  private feedbackScreen(): string {
-    const run = `${this.mode} run, level ${this.level}`;
-    if (this.settingsOpen) return this.state === 'paused' ? `settings (paused ${run})` : 'settings';
-    return this.state === 'paused' ? `pause (${run})` : this.state;
-  }
-
-  private openSettings(): void {
-    this.settingsOpen = true;
-    this.ui.setNative(this.native, remindersAvailable());
-    this.ui.show('settings');
-    this.account.refreshAccount();
-    void this.backend
-      .pilotName()
-      .then((name) =>
-        this.ui.setPilotName(name ?? '', this.backend.online ? '3 to 16 letters, numbers, spaces, - or _' : 'names come with the server', 'settings'),
-      );
-  }
-
-  private closeSettings(): void {
-    this.settingsOpen = false;
-    this.ui.show(this.state === 'paused' ? 'paused' : 'title');
   }
 
   /** Abandon the run and go back to the live title scene. Best score still counts. */
@@ -1850,7 +1754,7 @@ export class Game {
   }
 
   /** Low graphics: chosen in settings, or auto after it dropped this session. */
-  private lowGraphics(): boolean {
+  lowGraphics(): boolean {
     const g = this.settings.graphics;
     return g === 2 || (g === 0 && this.autoGraphics.dropped);
   }
@@ -1863,7 +1767,7 @@ export class Game {
       return;
     }
     if (!this.autoGraphics.feed(frameMs)) return;
-    this.applySettings();
+    this.settingsScreen.applySettings();
     this.ui.showNotice('graphics on low to keep things smooth. settings can change it');
   }
 
@@ -1997,7 +1901,7 @@ export class Game {
   };
 
   /** Apply time of day for `levelProgress` (score / levelLength) to every material and the UI. */
-  private applyLook(levelProgress: number): void {
+  applyLook(levelProgress: number): void {
     const w = this.world;
     const space = Math.max(w.deckMix, w.asteroidMix);
     applyAtmosphere(this.basePalette, this.palette, levelProgress, w.canyonMix, w.interiorMix, space, this.settings.contrast);
@@ -2280,7 +2184,10 @@ export class Game {
   /** Offer hint `id`, worded for the steering in use. Not during the practice run, which has its own prompts. */
   private tip(id: HintId): void {
     if (this.practice) return;
-    this.hints.offer(id, tipText(id, this.controlsNow(), { keys: id === 'boost' && !hasTouch(), doubleTap: this.doubleTapOn(), side: this.boostSide() }));
+    this.hints.offer(
+      id,
+      tipText(id, this.controlsNow(), { keys: id === 'boost' && !hasTouch(), doubleTap: this.doubleTapOn(), side: this.settingsScreen.boostSide() }),
+    );
   }
 
   /** Fill or drain the meter and ease the boost amount in and out. */

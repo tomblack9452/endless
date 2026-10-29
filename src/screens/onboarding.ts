@@ -86,7 +86,7 @@ export class FirstLaunch {
     this.g.settings.touch = id === 'sides' ? 1 : 0;
     if (!hasTouch()) this.g.onboarding.setKeys(id === 'keys');
     void saveSettings(this.g.settings);
-    this.g.applySettings();
+    this.g.settingsScreen.applySettings();
     this.g.haptics.pickup();
     this.openWelcome();
   }
@@ -121,7 +121,7 @@ export class FirstLaunch {
     const p = this.g.practice;
     if (!p) return;
     // Steering is worded for the controls chosen (keys only if the keys were); boost for the device.
-    const keys = { keys: !hasTouch(), doubleTap: this.g.doubleTapOn(), side: this.g.boostSide() };
+    const keys = { keys: !hasTouch(), doubleTap: this.g.doubleTapOn(), side: this.g.settingsScreen.boostSide() };
     const steerHow = { ...keys, keys: false };
     if (p.kind === 'trial') {
       this.g.teach.setStep(`trying ${CONTROL_CARDS[p.control].name} · ${Math.max(0, Math.ceil(TRIAL_SECONDS - p.s.t))} s`, 0, 0);
