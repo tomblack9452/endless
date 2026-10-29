@@ -101,7 +101,7 @@ export class HangarScreens {
     const check = this.g.upgrades.check(sys, this.g.wallet.credits, this.g.leagues.league);
     if (!check.ok || !this.g.wallet.spend(check.cost)) return;
     this.g.upgrades.raise(sys);
-    this.g.wallet.add(this.g.promoteLeague(null)); // buying the last points may complete a promotion
+    this.g.wallet.add(this.g.ranks.promoteLeague(null)); // buying the last points may complete a promotion
     this.g.sound.pickup();
     this.g.haptics.pickup();
     this.g.refreshTitle();

@@ -41,7 +41,7 @@ import { Color } from 'three';
 import { Ads, createAdNetwork, type RewardedPlacement } from '../ads/ads';
 import { entitlementFor, Entitlements } from '../store/entitlements';
 import { Progress } from '../progression/progress';
-import { creditsFor, insignia, promotionBonus, RANK_COLOURS, rankColour, Ranked, rankName, RANKS, type RunMode, xpToRank } from '../progression/ranks';
+import { creditsFor, insignia, RANK_COLOURS, rankColour, Ranked, rankName, RANKS, type RunMode, xpToRank } from '../progression/ranks';
 import { Wallet } from '../progression/wallet';
 import { Daily, questText } from '../economy/daily';
 import { Weekly } from '../economy/weekly';
@@ -62,17 +62,17 @@ import { fxDistance, fxTime } from '../world/fx';
 import { type Course, COURSES, courseLength, type DailyRun, dailyRun, type Environment, ENVIRONMENTS, type WeeklyRun, weeklyRun } from '../world/courses';
 import { Challenge, streakReward } from '../progression/challenge';
 import { envStatus, nextEnvironment, newlyOpened } from '../progression/unlocks';
-import { emblem, LEAGUES, leagueName, leaguePar, Leagues, LP_PER_DIVISION, weekKey } from '../progression/leagues';
+import { emblem, leagueName, leaguePar, Leagues, LP_PER_DIVISION, weekKey } from '../progression/leagues';
 import { ACHIEVEMENTS, type Snapshot, achievement, progressOn } from '../progression/achievements';
 import { refreshSeasonLooks, SETS } from '../ship/catalogue';
 import { GoalLog } from '../progression/goals';
 import { HangarScreen } from '../ui/hangarView';
-import { find, keyOf, LOOKS, Looks, type LookItem, type Owner, type ShipId, type Slot, type TrailId, SLOT_NAMES } from '../ship/looks';
+import { find, keyOf, Looks, type LookItem, type Owner, type ShipId, type Slot, type TrailId } from '../ship/looks';
 import type { Fin, Marking } from '../ship/looks';
-import { MAX_TIER, type ShipStats, STANDARD, SYSTEMS, type SystemId, TIER_LEAGUE, Upgrades } from '../ship/upgrades';
+import { MAX_TIER, type ShipStats, STANDARD, SYSTEMS, type SystemId, Upgrades } from '../ship/upgrades';
 import { newSeed } from './rng';
 import { loadNumber } from './storage';
-import { type Celebration, formatScore, type RankResultView, type TitleCard, UI } from '../ui/ui';
+import { type Celebration, formatScore, type TitleCard, UI } from '../ui/ui';
 import type { RoomId } from '../world/interior';
 import { biomeForLevel, type PowerKind, themeForLevel, themeName, World } from '../world/world';
 import { tintBiome } from '../world/biomes';
@@ -87,6 +87,7 @@ import { ReminderPrompts } from '../platform/reminderPrompts';
 import { AccountScreens } from '../screens/account';
 import { FirstLaunch } from '../screens/onboarding';
 import { RecordScreen } from '../screens/record';
+import { RankKeeper } from '../progression/rankKeeper';
 
 type State = 'title' | 'playing' | 'paused' | 'countdown' | 'crashed' | 'finished';
 
@@ -115,7 +116,7 @@ function musicForArea(theme: 'land' | 'canyon' | 'interior', biome?: string): Mu
 }
 
 /** Music for a level: the theme's, or the biome's own where it has one. */
-function musicFor(level: number): MusicId {
+export function musicFor(level: number): MusicId {
   const biome = biomeForLevel(level);
   return biome === 'ice' || biome === 'volcanic' || biome === 'asteroids' ? biome : themeForLevel(level);
 }
@@ -208,7 +209,7 @@ export class Game {
   readonly haptics = new Haptics();
   readonly progress = new Progress();
   // Run mode: ranked (the weekly level), solo (an environment or a set level) or endless.
-  private mode: RunMode = 'ranked';
+  mode: RunMode = 'ranked';
   /** Solo: the environment being played, or null (endless, ranked, set levels). */
   private environment: Environment | null = null;
   /** This week's ranked level (rebuilt when the week turns). */
@@ -286,7 +287,7 @@ export class Game {
   readonly goalsUi = new GoalsScreen();
   goalsTab: GoalsTab = 'daily';
   /** This ranked run scored at least the league's par (a weekly goal counts these). */
-  private beatPar = false;
+  beatPar = false;
   /** Credits the last run paid (for doubling with a rewarded ad). */
   private lastRunCredits = 0;
   readonly hangarUi = new HangarScreen();
@@ -326,7 +327,7 @@ export class Game {
   preview: Partial<Record<Slot, string>> | null = null;
   private pickupCount = 0;
   recorded = false; // this run's stats are saved
-  private assisted = false; // assist mode was on at some point this run
+  assisted = false; // assist mode was on at some point this run
   /** Which info screen is open from the title (stats, goals, hangar), if any. */
   infoOpen: InfoScreen | null = null;
   private boostSeconds = 0;
@@ -337,7 +338,7 @@ export class Game {
   state: State = 'title';
   private speed: number = CONFIG.speed.titleDrift;
   private runStart = 0; // field distance when the run began
-  private score = 0; // shown score: distance points + bonus
+  score = 0; // shown score: distance points + bonus
   private distanceScore = 0; // drives levels and difficulty
   private bonus = 0;
   private chain = 0; // near misses in a row
@@ -346,7 +347,7 @@ export class Game {
   private bestChain = 0;
   private nudgeMs = 0;
   private shownRoom = '';
-  private level = 1;
+  level = 1;
   /** Seed of the current (or last) run: the same seed rebuilds the same course. */
   seed = 0;
 
@@ -407,6 +408,8 @@ export class Game {
   readonly firstLaunch = new FirstLaunch(this);
 
   readonly record = new RecordScreen(this);
+
+  readonly ranks = new RankKeeper(this);
 
   constructor(canvas: HTMLCanvasElement) {
     this.basePalette.set(BASE_PALETTE);
@@ -824,7 +827,7 @@ export class Game {
     const score = this.assisted ? 0 : this.score;
     const fromPickups = this.assisted ? 0 : this.pickupCount * CONFIG.economy.runCredits.pickupCredits;
     let credits = creditsFor(score, this.mode === 'ranked') + fromPickups + this.bonusCredits;
-    credits += this.recordRank(this.state === 'finished');
+    credits += this.ranks.recordRank(this.state === 'finished');
     if (this.assisted) lines.push('assist mode. not counted as a best');
     this.wallet.add(credits);
     this.lastRunCredits = credits;
@@ -1112,7 +1115,7 @@ export class Game {
   }
 
   /** A new league week: pay last week's reward (before anything else rolls the week over and it's lost). */
-  private payLeagueWeek(now: number): void {
+  payLeagueWeek(now: number): void {
     const weekly = this.leagues.rollWeek(now);
     if (weekly <= 0) return;
     this.wallet.add(weekly);
@@ -1244,115 +1247,10 @@ export class Game {
     this.econ.setNews('goals', this.daily.loginDue(dayKey(now)) >= 0 || this.goals.goalsToClaim() > 0);
   }
 
-  /** Fold a run into the rank (every mode) and, for ranked, the league; fills the game-over block. Returns bonus credits. */
-  private recordRank(finished: boolean): number {
-    const lg = this.leagues;
-    const ranked = this.mode === 'ranked';
-    const score = this.assisted ? 0 : this.score;
-    const target = this.weekly.target;
-    this.beatPar = false;
-    const r = this.ranked.record(this.mode, score, this.level, this.seed, this.now(), ranked ? this.weekly.id : undefined);
-    const promoted = r.rankAfter > r.rankBefore;
-    const leagueLines: string[] = [];
-    const party: Celebration[] = [];
-    let bonus = r.credits;
-    if (ranked) {
-      this.submitToBoard('ranked', finished);
-      this.beatPar = score >= leaguePar(lg.league, target);
-      this.payLeagueWeek(this.now()); // a run in a new week: last week's reward first
-      const res = lg.record(this.score, target, this.now());
-      bonus += res.credits;
-      leagueLines.push(`${leagueName(lg.league, lg.division)} · ${res.lp >= 0 ? '+' : ''}${res.lp} lp (${lg.lp}/${LP_PER_DIVISION})`);
-      if (res.divisionUp) {
-        leagueLines.push(`division up: +${formatScore(res.credits)} credits`);
-        party.push({
-          kicker: 'division up',
-          icon: emblem(lg.league, lg.division),
-          name: leagueName(lg.league, lg.division),
-          lines: [`+${formatScore(res.credits)} credits`, `${formatScore(lg.current.weekly[lg.division])} credits a week`],
-          color: lg.current.color,
-        });
-      }
-      if (res.divisionDown) leagueLines.push('dropped a division');
-      bonus += this.promoteLeague(leagueLines, party);
-    }
-    if (promoted) {
-      const gives: string[] = [];
-      for (let k = r.rankBefore + 1; k <= r.rankAfter; k++) gives.push(...this.rankGives(k));
-      const newColour = rankColour(r.rankAfter);
-      if (newColour !== rankColour(r.rankBefore)) gives.push(`new menu colour: ${newColour.name}`);
-      party.unshift({ kicker: 'promoted', icon: insignia(r.rankAfter), name: rankName(r.rankAfter), lines: mergeCredits(gives), color: newColour.accent });
-    }
-    const lines = [...leagueLines, `+${r.xp} xp${r.doubled ? ' (double)' : ''}`];
-    if (ranked) lines.push(`league par this week: ${formatScore(leaguePar(lg.league, target))}`);
-    if (promoted) lines.splice(leagueLines.length, 0, `+${formatScore(r.credits)} promotion credits`);
-    const view: RankResultView = {
-      icon: insignia(r.rankAfter),
-      rank: rankName(r.rankAfter),
-      promoted,
-      xpFraction: this.record.xpFraction(),
-      lines,
-    };
-    this.ui.setGameOverRank(view);
-    if (party.length) this.ui.celebrate(party);
-    if (promoted) {
-      this.sound.level(true, musicFor(this.level));
-      this.haptics.level(true);
-      if (this.state !== 'crashed') this.ui.showNotice(`promoted to ${rankName(r.rankAfter)}`);
-    }
-    return bonus;
-  }
-
-  /** Promote to the next league if ready and enough upgrade points are owned. Returns credits. */
-  promoteLeague(lines: string[] | null, party: Celebration[] = []): number {
-    const lg = this.leagues;
-    this.payLeagueWeek(this.now());
-    const credits = lg.tryPromote(this.upgrades.points(), this.now());
-    if (credits > 0) {
-      party.push({
-        kicker: 'new league',
-        icon: emblem(lg.league, lg.division),
-        name: `${lg.current.name} league`,
-        lines: this.leagueGives(lg.league),
-        color: lg.current.color,
-      });
-      const text = `promoted to ${lg.current.name} league: +${formatScore(credits)} credits`;
-      if (lines) lines.push(text);
-      else this.ui.showNotice(text);
-      this.sound.level(true, musicFor(this.level));
-      this.haptics.level(true);
-    } else if (lg.promotionReady && lines) {
-      lines.push(`promotion ready: own ${LEAGUES[lg.league + 1].min} upgrade points`);
-    }
-    return credits;
-  }
-
-  /** What reaching rank `k` gives: its promotion credits, any looks, a new insignia. */
-  rankGives(k: number): string[] {
-    const out = [`+${formatScore(promotionBonus(k))} credits`];
-    if (k > 0 && RANKS[k].tier !== RANKS[k - 1].tier) out.push('new insignia');
-    for (const l of LOOKS) if (l.unlock.by === 'rank' && l.unlock.rank === k) out.push(`${l.name} ${SLOT_NAMES[l.slot]}`);
-    return out;
-  }
-
-  /** What reaching league `l` gives. */
-  leagueGives(l: number): string[] {
-    const x = LEAGUES[l];
-    const out: string[] = [];
-    if (x.promotion > 0) out.push(`+${formatScore(x.promotion)} credits`);
-    for (const look of LOOKS) if (look.unlock.by === 'league' && look.unlock.league === l) out.push(`${look.name} ${SLOT_NAMES[look.slot]}`);
-    TIER_LEAGUE.forEach((need, t) => {
-      if (need === l && need > 0) out.push(`tier ${t + 1} upgrades`);
-    });
-    out.push(`up to ${x.max} active upgrade points`);
-    out.push(`${formatScore(x.weekly[0])}-${formatScore(x.weekly[2])} credits a week`);
-    return out;
-  }
-
   // --- leaderboards ----------------------------------------------------------------
 
   /** Send a finished run to its board. Assisted and dev runs never go. */
-  private submitToBoard(board: BoardId, finished: boolean): void {
+  submitToBoard(board: BoardId, finished: boolean): void {
     if (this.assisted || this.invincible() || this.dev.autopilot) return;
     this.queueShip(); // the rank and league badges may have moved
     // A revived run counts as it stood at its first crash.

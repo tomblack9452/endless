@@ -70,7 +70,7 @@ export class RecordScreen {
         ? `${formatScore(rk.xp - RANKS[i].xp)} / ${formatScore(next.xp - RANKS[i].xp)} xp this rank${runsToGo ? ` · about ${runsToGo} run${runsToGo === 1 ? '' : 's'}` : ''}`
         : 'general grade 4: the top',
       checks,
-      gives: next ? [{ title: `${rankName(i + 1)} gives`, items: this.g.rankGives(i + 1) }] : [],
+      gives: next ? [{ title: `${rankName(i + 1)} gives`, items: this.g.ranks.rankGives(i + 1) }] : [],
       trend: {
         title: recent.length ? `last ${recent.length} runs` : 'recent runs',
         values: recent.map((h) => h.xp),
@@ -90,7 +90,7 @@ export class RecordScreen {
         icon: insignia(k),
         name: rankName(k),
         needs: `${formatScore(r.xp)} xp`,
-        gives: k === 0 ? '' : this.g.rankGives(k).join(' · '),
+        gives: k === 0 ? '' : this.g.ranks.rankGives(k).join(' · '),
         state: k < i ? 'done' : k === i ? 'current' : 'locked',
       })),
     });

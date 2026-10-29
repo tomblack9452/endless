@@ -46,7 +46,7 @@ export class BoardScreens {
         items: [`+${formatScore(divisionReward(l))} credits`, `${formatScore(lg.current.weekly[lg.division + 1])} credits a week`],
       });
     }
-    if (next) gives.push({ title: `${next.name} league gives`, items: this.g.leagueGives(l + 1) });
+    if (next) gives.push({ title: `${next.name} league gives`, items: this.g.ranks.leagueGives(l + 1) });
 
     const h = lg.history.slice(-20);
     const net = h.reduce((t, v) => t + v, 0);
@@ -73,7 +73,7 @@ export class BoardScreens {
         icon: emblem(k, k < l ? 2 : k === l ? lg.division : -1),
         name: y.name,
         needs: `${y.min === y.max ? y.max : `${y.min}-${y.max}`} upgrade points · par ${formatScore(leaguePar(k, target))}`,
-        gives: k === 0 ? 'where everyone starts' : this.g.leagueGives(k).slice(0, 3).join(' · '),
+        gives: k === 0 ? 'where everyone starts' : this.g.ranks.leagueGives(k).slice(0, 3).join(' · '),
         state: k < l ? 'done' : k === l ? 'current' : 'locked',
       })),
     });

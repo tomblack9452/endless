@@ -165,7 +165,7 @@ export class GoalScreens {
             kicker: 'promoted',
             icon: insignia(promo.rankAfter),
             name: rankName(promo.rankAfter),
-            lines: mergeCredits(Array.from({ length: promo.rankAfter - promo.rankBefore }, (_, k) => this.g.rankGives(promo.rankBefore + 1 + k)).flat()),
+            lines: mergeCredits(Array.from({ length: promo.rankAfter - promo.rankBefore }, (_, k) => this.g.ranks.rankGives(promo.rankBefore + 1 + k)).flat()),
             color: '#d4a63a',
           },
         ]);
