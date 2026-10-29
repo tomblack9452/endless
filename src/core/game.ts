@@ -22,22 +22,21 @@ import { Haptics } from '../platform/haptics';
 import { Capacitor } from '@capacitor/core';
 import { exitChoice } from '../platform/exit';
 import { sendFeedback } from '../platform/feedback';
-import { errorLog } from '../platform/errors';
 import { cancelOpenReport } from '../ui/report';
 import { quickRetryOn, tapRetries } from './retry';
 import { GateTracker, kmText, Milestones, milestonesCount } from './runBonus';
 import { crashMomentOn, crashOverReady, crashTimeScale } from './crashMoment';
 import { distanceText, sparkSvg, summaryRows } from '../ui/runSummary';
 import { type HintId, Hints, tipText } from '../ui/hints';
-import { migrateMissionLooks, migrateTickets } from '../progression/legacy';
+import { migrateMissionLooks } from '../progression/legacy';
 import { type Feature, nextStageText } from '../progression/reveal';
 import { type ControlId, hasTouch, type Lesson, type LessonState, Onboarding } from '../ui/onboarding';
 import { TeachView } from '../ui/tutorialView';
 import { Color } from 'three';
 import { Ads, createAdNetwork } from '../ads/ads';
-import { entitlementFor, Entitlements } from '../store/entitlements';
+import { Entitlements } from '../store/entitlements';
 import { Progress } from '../progression/progress';
-import { creditsFor, insignia, Ranked, rankName, RANKS, type RunMode } from '../progression/ranks';
+import { creditsFor, insignia, Ranked, RANKS, type RunMode } from '../progression/ranks';
 import { Wallet } from '../progression/wallet';
 import { Daily, questText } from '../economy/daily';
 import { Weekly } from '../economy/weekly';
@@ -51,14 +50,13 @@ import { type BoardId, createBackend, type RunSubmission } from '../server/backe
 import { BOARD_TABS, boardForRun } from '../server/boards';
 import { Outbox } from '../server/outbox';
 import { CloudSave } from '../server/sync';
-import { shareAvailable, shareCard } from '../platform/share';
 import { createStore, type StoreProduct } from '../store/store';
 import { storage } from './storage';
 import { fxDistance, fxTime } from '../world/fx';
 import { type Course, COURSES, courseLength, type DailyRun, dailyRun, type Environment, ENVIRONMENTS, type WeeklyRun, weeklyRun } from '../world/courses';
 import { Challenge, streakReward } from '../progression/challenge';
 import { envStatus, nextEnvironment, newlyOpened } from '../progression/unlocks';
-import { emblem, leagueName, leaguePar, Leagues, weekKey } from '../progression/leagues';
+import { emblem, leaguePar, Leagues, weekKey } from '../progression/leagues';
 import { ACHIEVEMENTS, type Snapshot, achievement, progressOn } from '../progression/achievements';
 import { refreshSeasonLooks, SETS } from '../ship/catalogue';
 import { GoalLog } from '../progression/goals';
@@ -88,6 +86,7 @@ import { Revives } from './revives';
 import { TitleScreen } from '../screens/title';
 import { SettingsScreen } from '../screens/settings';
 import { Powers } from './powers';
+import { Connection } from './connection';
 
 type State = 'title' | 'playing' | 'paused' | 'countdown' | 'crashed' | 'finished';
 
@@ -293,8 +292,6 @@ export class Game {
   private economyTimer = 0;
   /** The saved settings have been read (until then they're the defaults). */
   settingsLoaded = false;
-  /** Asking the server whether it's back, and when it was last asked (the device's clock). */
-  private rechecking = false;
   private lastRecheck = 0;
   /** The minute the title's cards were last drawn (the daily card's time left). */
   private titleMinute = 0;
@@ -373,8 +370,6 @@ export class Game {
   private quick = false;
   /** crashMs when the crashed run was settled (after any revive offer). */
   private settledMs = 0;
-  /** This run set a new personal best (the share card says so). */
-  private shareNew = false;
   /** The daily run's streak line for the end screen. */
   private dailyLine = '';
   /** The best line for quick retry's panel. */
@@ -410,6 +405,8 @@ export class Game {
   readonly settingsScreen = new SettingsScreen(this);
 
   readonly powers = new Powers(this);
+
+  readonly connection = new Connection(this);
 
   constructor(canvas: HTMLCanvasElement) {
     this.basePalette.set(BASE_PALETTE);
@@ -499,7 +496,7 @@ export class Game {
     this.ui.bindNameBox('name', (name) => void this.account.saveNameScreen(name));
     window.addEventListener('online', () => {
       void this.outbox.flush();
-      void this.recheck();
+      void this.connection.recheck();
     });
     window.addEventListener('offline', () => this.refreshBar());
     // The server's clock, for the day's and week's keys: asked for now, alongside
@@ -540,7 +537,7 @@ export class Game {
       if (this.onboarding.done) this.claimLogin();
       else this.firstLaunch.openWelcome();
       void this.settingsScreen.checkWhatsNew();
-      void this.connect();
+      void this.connection.connect();
       void this.reminders.planReminders();
     });
     this.outbox.onLate = (run, res) => {
@@ -772,7 +769,7 @@ export class Game {
     this.fillSummary(true);
     const where = themeForLevel(this.level) === 'interior' ? this.world.roomName || 'corridor' : this.areaName(this.level);
     const extra = this.finishRun(where);
-    this.offerShare(isNew);
+    this.connection.offerShare(isNew);
     if (this.course) {
       const length = courseLength(this.course);
       const pct = Math.floor((100 * (this.world.distance - this.world.finishAt + length)) / length);
@@ -957,7 +954,7 @@ export class Game {
     if (Date.now() - this.lastRecheck > 20_000) {
       // Offline: is the server back?
       this.lastRecheck = Date.now();
-      void this.recheck();
+      void this.connection.recheck();
     }
     if (this.turnDay(now) || Math.floor(now / 60_000) !== this.titleMinute) {
       // A new day's challenge, or the minute its time left counts down.
@@ -999,121 +996,14 @@ export class Game {
   }
 
   /** The server's clock has arrived (late at start-up, or moved): turn the day and week by it, and pay today's login reward if it's due. */
-  private retime(): void {
+  retime(): void {
     if (!this.economyLoaded) return;
     this.tickEconomy(Infinity);
     if (this.onboarding.done) this.claimLogin();
   }
 
-  /** Sign in and sync with the server, if there is one (see src/server). */
-  private async connect(): Promise<void> {
-    // The server's clock may have come after start-up stopped waiting: check today by it (asking again if need be).
-    if (this.backend.clockKnown || (await this.backend.syncClock())) this.retime();
-    errorLog.attach(this.backend, () => this.settingsScreen.errorScreen());
-    if (!(await this.signInAndSync())) return;
-    const refund = await migrateTickets((n) => this.wallet.addCores(n, 'tickets'));
-    if (refund > 0) {
-      this.ui.showNotice(`ranked is unlimited now: your spare tickets became ${formatScore(refund)} cores`);
-      this.title.refreshTitle();
-    }
-    // What the account has bought, as the server's purchase records have it.
-    const records = (await this.backend.purchases()) ?? [];
-    const bought = [...new Set(records.map((r) => r.product))];
-    for (const id of bought) this.purchases.grantProduct(id);
-    const pass = this.purchases.restorePass(records);
-    if (pass) this.ui.celebrate([{ kicker: 'season pass', icon: PASS_ICON, name: 'premium restored', lines: pass }]);
-    // Refunded (and not bought again): no longer owned on this device either.
-    for (const id of bought) {
-      const e = id.startsWith('refunded:') ? entitlementFor(id.slice(9)) : null;
-      if (e && !bought.some((b) => entitlementFor(b) === e)) this.entitlements.revoke(e);
-    }
-    this.applyLooks();
-    await this.store.start(this.backend.userId);
-    void this.ads.start().then(() => {
-      const row = document.getElementById('privacy-choices');
-      if (row) row.hidden = !this.ads.privacyRequired; // Google asks for a way back to the consent form here
-    });
-    this.storeProducts = await this.store.products();
-    if (this.infoOpen === 'store') this.shop.openStore();
-  }
-
-  /**
-   * Sign in, then bring the cloud save, the wallet and the waiting runs up to
-   * date. False if the cloud save was newer and the game is starting again
-   * from it. Started offline, it runs again when the server comes back (recheck).
-   */
-  private async signInAndSync(): Promise<boolean> {
-    if (!(await this.backend.signIn())) return true;
-    void errorLog.send(); // anything noted before signing in
-    if (await this.cloud.start()) {
-      location.reload(); // the cloud save is newer: start again from it
-      return false;
-    }
-    await this.wallet.link(this.backend);
-    await this.checkMaxOut();
-    this.title.refreshTitle();
-    this.queueShip();
-    void this.account.askName();
-    void this.outbox.flush(); // runs that couldn't be sent last time
-    return true;
-  }
-
-  /** The end screen's share button: for a new personal best in any mode, and every ranked run. */
-  private offerShare(isNew: boolean): void {
-    this.shareNew = isNew && !this.assisted && this.score > 0;
-    this.ui.showShare((this.shareNew || this.mode === 'ranked') && shareAvailable());
-  }
-
-  /** A picture of this run for the share sheet: the score, the mode or board, and your ship, in the store art's dusk. */
-  private async share(): Promise<void> {
-    const lg = this.leagues;
-    const lines: string[] = [];
-    if (this.mode === 'ranked')
-      lines.push(
-        `${rankName(this.ranked.rank)} · ${leagueName(lg.league, lg.division)}`,
-        `best this week ${formatScore(this.progress.weeklyBest(this.weekly.id))}`,
-      );
-    else if (this.dailyRunNow) {
-      const streak = this.challenge.streakOn(this.dailyRunNow.day);
-      lines.push(streak > 1 ? `${streak} days in a row` : 'the same course for everyone today');
-    } else lines.push(rankName(this.ranked.rank));
-    const outcome = await shareCard({
-      score: formatScore(this.score),
-      mode: this.modeLabel(),
-      kicker: this.shareNew ? 'new best' : '',
-      lines,
-      ship: this.portraits.get(this.shipLook(), 4),
-    });
-    if (outcome === 'saved') this.ui.showNotice('share card saved');
-    else if (outcome === 'unavailable') this.ui.showNotice("sharing isn't available here");
-  }
-
-  /** There's a server, but it can't be reached right now (no signal, or it's down). Everything on the device carries on. */
-  offline(): boolean {
-    return this.backend.online && (!this.backend.reachable || (typeof navigator !== 'undefined' && navigator.onLine === false));
-  }
-
-  /** Offline: ask the server for the time now and then (it needs no sign-in), and pick everything up again when it answers. */
-  async recheck(): Promise<void> {
-    if (!this.offline() || this.rechecking) return;
-    this.rechecking = true;
-    try {
-      if (!(await this.backend.syncClock())) return;
-      this.retime();
-      if (!this.backend.userId) await this.signInAndSync();
-      else {
-        void this.outbox.flush();
-        void errorLog.send();
-        void this.wallet.refresh().then(() => this.title.refreshTitle());
-      }
-    } finally {
-      this.rechecking = false;
-      this.refreshBar();
-    }
-  }
-
   refreshBar(now = this.now()): void {
-    this.ui.setOffline(this.offline());
+    this.ui.setOffline(this.connection.offline());
     this.econ.setBar(this.wallet.credits, this.wallet.cores);
     this.econ.setNews('goals', this.daily.loginDue(dayKey(now)) >= 0 || this.goals.goalsToClaim() > 0);
   }
@@ -1151,7 +1041,7 @@ export class Game {
   }
 
   /** Send your looks to the boards a moment after they change (trying looks on sends nothing: only what's equipped). */
-  private queueShip(): void {
+  queueShip(): void {
     window.clearTimeout(this.shipTimer);
     this.shipTimer = window.setTimeout(() => void this.syncShip(), 2000);
   }
@@ -1179,7 +1069,7 @@ export class Game {
   }
 
   /** What the HUD and game-over screen call this run. */
-  private modeLabel(): string {
+  modeLabel(): string {
     if (this.mode === 'ranked') return `ranked · ${this.weekly.name}`;
     if (this.dailyRunNow) return `daily · ${this.dailyRunNow.name}`;
     if (this.course) return `level ${COURSES.indexOf(this.course) + 1} · ${this.course.name}`;
@@ -1642,7 +1532,7 @@ export class Game {
         this.onboarding.go('quit');
         this.firstLaunch.openWelcome();
       }
-    } else if (action === 'share') void this.share();
+    } else if (action === 'share') void this.connection.share();
     else if (action === 'details') this.ui.showDetails(!this.ui.detailsOpen);
     else if (action === 'double') void this.revives.doubleCredits();
     else if (action === 'back') {
@@ -1810,7 +1700,7 @@ export class Game {
   }
 
   /** Maxed out from the SQL editor (players.max_out): done once, when the game next opens or comes back. */
-  private async checkMaxOut(): Promise<void> {
+  async checkMaxOut(): Promise<void> {
     if (!this.backend.online || !(await this.backend.takeMaxOut())) return;
     this.maxOut();
     this.ui.showNotice('maxed out: every look, upgrade and level, top rank and league');
@@ -2293,7 +2183,7 @@ export class Game {
     this.ui.setGameOver(this.score, best.score, this.score >= best.score, this.nearMissCount, this.bestChain, this.seed);
     this.fillSummary(false);
     const extra = this.finishRun(null);
-    this.offerShare(this.score > before);
+    this.connection.offerShare(this.score > before);
     this.wallet.add(starCredits);
     const starText = [1, 2, 4].map((b) => (stars & b ? '★' : '☆')).join('');
     const lines = [`${starText}  ${formatTime(time)}${res.bestTime ? ' (best)' : ` · best ${formatTime(best.time)}`}`];
@@ -2319,7 +2209,7 @@ export class Game {
     this.ui.setGameOver(this.score, best, isNew, this.nearMissCount, this.bestChain, this.seed);
     this.fillSummary(false);
     const extra = this.finishRun(null);
-    this.offerShare(isNew);
+    this.connection.offerShare(isNew);
     this.ui.setGameOverExtra([formatTime(this.runTime), this.dailyLine, extra].filter(Boolean).join(' · '));
     this.title.refreshTitle();
   }

@@ -87,7 +87,7 @@ export class BoardScreens {
     const tab = BOARD_TABS[0];
     const mine = this.g.progress.weeklyBest(this.g.weekly.id);
     const own: [string, string][] = mine > 0 ? [['your best', formatScore(mine)]] : [['no ranked run yet this week', '']];
-    if (this.g.offline()) {
+    if (this.g.connection.offline()) {
       this.g.ui.renderBoard(own, "you're offline. the board comes back with a connection");
       return;
     }
@@ -98,7 +98,7 @@ export class BoardScreens {
         own,
         !this.g.backend.online
           ? 'the leaderboards need the server'
-          : this.g.offline()
+          : this.g.connection.offline()
             ? "you're offline. the board comes back with a connection"
             : "couldn't load the board",
       );
@@ -196,7 +196,7 @@ export class BoardScreens {
       const generated = !name || GENERATED_NAME.test(name);
       const note = !this.g.backend.online
         ? 'names come with the server'
-        : this.g.offline()
+        : this.g.connection.offline()
           ? 'names can be changed with a connection'
           : generated
             ? 'pick your pilot name: 3 to 16 letters, numbers, spaces, - or _'
@@ -218,9 +218,9 @@ export class BoardScreens {
       return;
     }
     const offlineNote = `you're offline. the boards come back when you're connected.${own.length > 0 ? ' this is your best on this device.' : ''}`;
-    if (this.g.offline()) {
+    if (this.g.connection.offline()) {
       this.g.ui.renderLeaderboard(caption, own, offlineNote);
-      void this.g.recheck();
+      void this.g.connection.recheck();
       return;
     }
     this.g.ui.renderLeaderboard(caption, [], 'loading');
@@ -228,7 +228,7 @@ export class BoardScreens {
     const rows = await this.g.backend.board(boardQuery(tab, this.g.leagues.league, this.g.now()));
     if (seq !== this.boardSeq || this.g.infoOpen !== 'boards') return; // moved on while it loaded
     this.g.refreshBar();
-    if (rows === null) this.g.ui.renderLeaderboard(caption, own, this.g.offline() ? offlineNote : "couldn't load the board. try again in a moment");
+    if (rows === null) this.g.ui.renderLeaderboard(caption, own, this.g.connection.offline() ? offlineNote : "couldn't load the board. try again in a moment");
     else if (rows.length === 0) this.g.ui.renderLeaderboard(caption, [], 'nobody yet. fly a run to be first');
     else
       this.g.ui.renderLeaderboard(
