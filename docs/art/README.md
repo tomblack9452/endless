@@ -36,3 +36,15 @@ run well on mid-range phones. Then:
 
 Next step if Tom picks one: a working prototype of one environment and the
 title screen in the engine, compared on a phone against today's look.
+
+## UI pattern boards
+
+Four boards (`ui-*.png`) of patterns from similar mobile games, drawn in the
+Prism style, two takes each:
+
+| Board | Pattern | From |
+|---|---|---|
+| [The front screen](ui-title.png) | the scene is the menu: tap anywhere to fly, places in the corners, or a mode carousel with one fly button | Alto's Odyssey, Crossy Road |
+| [The run](ui-hud.png) | one big number; boost and power-up timers as rings on the ship; near misses beside it | Smash Hit, Race the Sun |
+| [After a crash](ui-results.png) | score against best, fly again biggest, then what the run moved (rank, league) | endless runner results screens |
+| [Looks](ui-shop.png) | a showroom of the ship itself, one price and one button; a grid with rarity as a glow | Crossy Road's character picker |
