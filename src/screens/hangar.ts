@@ -104,7 +104,7 @@ export class HangarScreens {
     this.g.wallet.add(this.g.ranks.promoteLeague(null)); // buying the last points may complete a promotion
     this.g.sound.pickup();
     this.g.haptics.pickup();
-    this.g.refreshTitle();
+    this.g.title.refreshTitle();
     this.renderHangar(true);
   };
 

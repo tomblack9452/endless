@@ -400,7 +400,7 @@ export class ShopScreens {
     this.g.haptics.pickup();
     this.g.ui.showNotice(notice);
     this.g.applyLooks();
-    this.g.refreshTitle();
+    this.g.title.refreshTitle();
     this.g.checkGoals();
   }
 
@@ -488,7 +488,7 @@ export class ShopScreens {
       const lines = this.g.grant({ credits: n * CONFIG.economy.shop.creditsPerCore });
       this.g.ui.showNotice(lines.join(' · '));
       this.g.sound.pickup();
-      this.g.refreshTitle();
+      this.g.title.refreshTitle();
       if (this.g.infoOpen === 'store') this.openStore();
     });
   }
@@ -542,7 +542,7 @@ export class ShopScreens {
       },
     ]);
     this.g.sound.power();
-    this.g.refreshTitle();
+    this.g.title.refreshTitle();
     if (this.g.infoOpen === 'store') this.openStore();
     else this.openPass();
   }

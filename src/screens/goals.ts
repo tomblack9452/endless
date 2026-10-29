@@ -47,7 +47,7 @@ export class GoalScreens {
     const taskRows = (list: readonly Quest[], prefix: string, passXp: number): TaskRow[] =>
       list.map((q, i) => ({
         id: `${prefix}${i}`,
-        name: questText(q, this.g.open('ranked')),
+        name: questText(q, this.g.title.open('ranked')),
         progress: `${formatScore(q.progress)} / ${formatScore(q.target)}`,
         fraction: q.progress / q.target,
         reward: `+${formatScore(q.credits)} credits · +${formatScore(passXp)} pass xp`,
@@ -136,12 +136,12 @@ export class GoalScreens {
     if (/^q\d$/.test(id)) {
       const q = this.g.daily.claim(Number(id.slice(1)));
       if (!q) return;
-      name = questText(q, this.g.open('ranked'));
+      name = questText(q, this.g.title.open('ranked'));
       lines = [...this.g.grant({ credits: q.credits }), ...this.passXp(CONFIG.economy.quests.passXp)];
     } else if (/^w\d$/.test(id)) {
       const q = this.g.weeklyGoals.claim(Number(id.slice(1)));
       if (!q) return;
-      name = questText(q, this.g.open('ranked'));
+      name = questText(q, this.g.title.open('ranked'));
       lines = [...this.g.grant({ credits: q.credits }), ...this.passXp(CONFIG.economy.weekly.passXp)];
     } else if (id === 'qall' || id === 'wall') {
       // Named for the day or week the goals belong to (not the clock now: it may have turned since), so the server pays it once.
@@ -175,7 +175,7 @@ export class GoalScreens {
     this.g.sound.pickup();
     this.g.haptics.pickup();
     this.renderGoals();
-    this.g.refreshTitle();
+    this.g.title.refreshTitle();
   }
 
   openGoals(tab: GoalsTab = this.g.goalsTab): void {

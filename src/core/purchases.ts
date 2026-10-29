@@ -42,7 +42,7 @@ export class Purchases {
     this.grantProduct(id);
     this.g.ui.celebrate([{ kicker: 'thank you', icon: GIFT_ICON, name: 'purchase complete', lines: mergeCredits(lines) }]);
     this.g.sound.power();
-    this.g.refreshTitle();
+    this.g.title.refreshTitle();
     if (this.g.infoOpen === 'shop') this.g.shop.openShop();
     else if (this.g.infoOpen === 'store') this.g.shop.openStore();
     else if (this.g.infoOpen === 'pass') this.g.shop.openPass();
@@ -59,7 +59,7 @@ export class Purchases {
       await this.g.wallet.link(this.g.backend);
       if (this.g.wallet.cores >= target) break;
     }
-    this.g.refreshTitle();
+    this.g.title.refreshTitle();
     if (this.g.infoOpen === 'shop') this.g.shop.openShop();
     else if (this.g.infoOpen === 'store') this.g.shop.openStore();
     else if (this.g.infoOpen === 'pass') this.g.shop.openPass();
@@ -95,13 +95,13 @@ export class Purchases {
     if (passRefunded(records, now) && this.g.pass.refund()) {
       this.g.ui.showNotice('your season pass was refunded, so its premium track is closed');
       void this.g.wallet.refresh(); // the server took back the cores its premium tiers paid
-      this.g.refreshTitle();
+      this.g.title.refreshTitle();
       if (this.g.infoOpen === 'pass') this.g.shop.openPass();
       return null;
     }
     if (this.g.pass.premium || !passBought(records, now)) return null;
     const lines = this.g.pass.unlockPremium('money').flatMap((r) => this.g.grant(r));
-    this.g.refreshTitle();
+    this.g.title.refreshTitle();
     if (this.g.infoOpen === 'pass') this.g.shop.openPass();
     else if (this.g.infoOpen === 'store') this.g.shop.openStore();
     return lines.length > 0 ? mergeCredits(lines) : ['premium rewards from every tier you reach'];

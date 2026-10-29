@@ -85,7 +85,7 @@ export class Revives {
     this.g.ui.markDoubled(formatScore(n), formatScore(n * 2));
     this.g.ui.showNotice(`doubled: +${formatScore(n * 2)} credits this run · ${formatScore(this.g.wallet.credits)} credits now`);
     this.g.sound.power();
-    this.g.refreshTitle();
+    this.g.title.refreshTitle();
   }
 
   /** The free daily gift (a rewarded ad, or free with premium). */
@@ -95,7 +95,7 @@ export class Revives {
     this.g.daily.takeGift(day);
     const lines = this.g.grant(CONFIG.ads.dailyGift, `gift:${day}`);
     this.g.ui.celebrate([{ kicker: 'free gift', icon: GIFT_ICON, name: 'daily gift', lines }]);
-    this.g.refreshTitle();
+    this.g.title.refreshTitle();
   }
 
   /** Swap an unfinished daily goal for another (a rewarded ad, or free with premium), once a day. */
@@ -104,9 +104,9 @@ export class Revives {
     const day = dayKey(this.g.now());
     if (!/^q\d$/.test(id) || !this.g.daily.canReroll(day) || !(await this.watchAd('rerollQuest')) || !this.g.daily.canReroll(day)) return;
     const q = this.g.daily.reroll(i, day);
-    if (q) this.g.ui.showNotice(`new goal: ${questText(q, this.g.open('ranked'))}`);
+    if (q) this.g.ui.showNotice(`new goal: ${questText(q, this.g.title.open('ranked'))}`);
     this.g.goals.renderGoals();
-    this.g.refreshTitle();
+    this.g.title.refreshTitle();
   }
 
   /** Free revives a day: one for everyone, more with premium. */
@@ -131,7 +131,7 @@ export class Revives {
     this.g.graceT = R.graceSeconds;
     this.g.stage.shakeX = this.g.stage.shakeY = 0;
     this.g.stage.roll = 0;
-    this.g.refreshTitle();
+    this.g.title.refreshTitle();
     this.g.ui.show(null);
     this.g.ui.showHud(true);
     this.g.startCountdown();

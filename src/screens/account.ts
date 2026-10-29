@@ -164,7 +164,7 @@ export class AccountScreens {
    * stays until a name is saved. Only with the server (names live there).
    */
   async askName(): Promise<void> {
-    if (this.nameOk || this.g.nameLater || !this.g.backend.online || !this.g.onboarding.done || !this.g.open('leaderboard')) return;
+    if (this.nameOk || this.g.nameLater || !this.g.backend.online || !this.g.onboarding.done || !this.g.title.open('leaderboard')) return;
     const name = await this.g.backend.pilotName();
     if (name === null) return; // no answer (no signal): ask another time
     if (!GENERATED_NAME.test(name)) {

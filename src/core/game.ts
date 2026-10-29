@@ -33,7 +33,7 @@ import { crashMomentOn, crashOverReady, crashTimeScale } from './crashMoment';
 import { distanceText, sparkSvg, summaryRows } from '../ui/runSummary';
 import { type HintId, Hints, tipText } from '../ui/hints';
 import { migrateMissionLooks, migrateTickets } from '../progression/legacy';
-import { type Feature, isOpen, nextStageText, STAGES, stageFor } from '../progression/reveal';
+import { type Feature, nextStageText } from '../progression/reveal';
 import { type ControlId, hasTouch, type Lesson, type LessonState, Onboarding } from '../ui/onboarding';
 import { itemCard, powerItem } from '../ui/guide';
 import { TeachView } from '../ui/tutorialView';
@@ -41,7 +41,7 @@ import { Color } from 'three';
 import { Ads, createAdNetwork } from '../ads/ads';
 import { entitlementFor, Entitlements } from '../store/entitlements';
 import { Progress } from '../progression/progress';
-import { creditsFor, insignia, RANK_COLOURS, rankColour, Ranked, rankName, RANKS, type RunMode, xpToRank } from '../progression/ranks';
+import { creditsFor, insignia, Ranked, rankName, RANKS, type RunMode } from '../progression/ranks';
 import { Wallet } from '../progression/wallet';
 import { Daily, questText } from '../economy/daily';
 import { Weekly } from '../economy/weekly';
@@ -49,7 +49,7 @@ import { type GoalsTab, GoalsScreen } from '../ui/goalsView';
 import { Pass, runXp } from '../economy/pass';
 import { type Reward, rewardLook, rewardParts, rewardText } from '../economy/reward';
 import { DailyShop } from '../economy/shop';
-import { dayKey, formatWait, untilTomorrow } from '../economy/time';
+import { dayKey } from '../economy/time';
 import { EconomyView } from '../economy/view';
 import { type BoardId, createBackend, type RunSubmission } from '../server/backend';
 import { BOARD_TABS, boardForRun } from '../server/boards';
@@ -62,7 +62,7 @@ import { fxDistance, fxTime } from '../world/fx';
 import { type Course, COURSES, courseLength, type DailyRun, dailyRun, type Environment, ENVIRONMENTS, type WeeklyRun, weeklyRun } from '../world/courses';
 import { Challenge, streakReward } from '../progression/challenge';
 import { envStatus, nextEnvironment, newlyOpened } from '../progression/unlocks';
-import { emblem, leagueName, leaguePar, Leagues, LP_PER_DIVISION, weekKey } from '../progression/leagues';
+import { emblem, leagueName, leaguePar, Leagues, weekKey } from '../progression/leagues';
 import { ACHIEVEMENTS, type Snapshot, achievement, progressOn } from '../progression/achievements';
 import { refreshSeasonLooks, SETS } from '../ship/catalogue';
 import { GoalLog } from '../progression/goals';
@@ -72,7 +72,7 @@ import type { Fin, Marking } from '../ship/looks';
 import { MAX_TIER, type ShipStats, STANDARD, SYSTEMS, type SystemId, Upgrades } from '../ship/upgrades';
 import { newSeed } from './rng';
 import { loadNumber } from './storage';
-import { type Celebration, formatScore, type TitleCard, UI } from '../ui/ui';
+import { type Celebration, formatScore, UI } from '../ui/ui';
 import type { RoomId } from '../world/interior';
 import { biomeForLevel, type PowerKind, themeForLevel, themeName, World } from '../world/world';
 import { tintBiome } from '../world/biomes';
@@ -89,13 +89,14 @@ import { FirstLaunch } from '../screens/onboarding';
 import { RecordScreen } from '../screens/record';
 import { RankKeeper } from '../progression/rankKeeper';
 import { Revives } from './revives';
+import { TitleScreen } from '../screens/title';
 
 type State = 'title' | 'playing' | 'paused' | 'countdown' | 'crashed' | 'finished';
 
 const DEG = Math.PI / 180;
 const PATH_STEP = 4;
 const FIRST_PLAYED_KEY = 'endless.firstPlayed';
-const REVEAL_KEY = 'endless.reveal';
+export const REVEAL_KEY = 'endless.reveal';
 
 /** A name the server made up for a new account ("pilot-3fa2"): the player hasn't picked one. */
 export const GENERATED_NAME = /^pilot-[0-9a-f]{4}$/;
@@ -274,7 +275,7 @@ export class Game {
   /** Obstacles flown past this run (the practice run's obstacle lesson). */
   private passCount = 0;
   /** The reveal stage last announced (null until read from storage). */
-  private revealSeen: number | null = null;
+  revealSeen: number | null = null;
   readonly ads = new Ads(
     createAdNetwork(),
     () => this.entitlements.has('premium'),
@@ -414,6 +415,8 @@ export class Game {
 
   readonly revives = new Revives(this);
 
+  readonly title = new TitleScreen(this);
+
   constructor(canvas: HTMLCanvasElement) {
     this.basePalette.set(BASE_PALETTE);
     this.palette.set(BASE_PALETTE);
@@ -453,7 +456,7 @@ export class Game {
     });
     // Tapping anywhere also starts; the button is the explicit target.
     this.ui.startButton.addEventListener('click', () => {
-      if (this.state === 'title') this.startPrimary();
+      if (this.state === 'title') this.title.startPrimary();
     });
     this.ui.bindTitleCards(this.onTitleLink);
     this.ui.bindWelcome({
@@ -485,7 +488,7 @@ export class Game {
         void this.wallet
           .refresh()
           .then(() => this.checkMaxOut())
-          .then(() => this.refreshTitle());
+          .then(() => this.title.refreshTitle());
         this.ads.preload();
       }
     });
@@ -538,7 +541,7 @@ export class Game {
       if (!this.goalLog.started) this.goalLog.startWith(ACHIEVEMENTS.filter((a) => progressOn(a, this.snapshot()).done).map((a) => a.id));
       // A new week: this week's ranked run, and last week's league reward.
       this.turnWeek(this.now());
-      this.refreshTitle();
+      this.title.refreshTitle();
       // A new player starts with the welcome; the first daily reward waits for the end of it.
       if (this.onboarding.done) this.claimLogin();
       else this.firstLaunch.openWelcome();
@@ -569,7 +572,7 @@ export class Game {
       reroll: (id) => void this.revives.onReroll(id),
     });
     this.ui.titleLeague.addEventListener('pointerdown', (e) => e.stopPropagation());
-    this.ui.titleLeague.addEventListener('click', () => (this.open('ranked') ? this.boards.openLeague() : undefined));
+    this.ui.titleLeague.addEventListener('click', () => (this.title.open('ranked') ? this.boards.openLeague() : undefined));
     this.ui.bindSolo(
       (i) => this.startCourse(i),
       (i) => this.startSolo(i),
@@ -589,7 +592,7 @@ export class Game {
     // Before modes were split, ranked and solo were endless runs: carry their bests over.
     void Promise.all([loadNumber(CONFIG.storageKeys.best, 0), loadNumber('endless.soloBest', 0), this.progress.load()]).then(([a, b]) => {
       if (Math.max(a, b) > this.progress.endlessBest) this.progress.recordEndless(Math.max(a, b));
-      this.refreshTitle();
+      this.title.refreshTitle();
     });
   }
 
@@ -851,7 +854,7 @@ export class Game {
       if (next) lines.push(`solo: ${next.env.name} opens at level ${next.status.level} (${next.status.toGo} to go)`);
     }
     this.econ.setOverRewards(this.runRewards());
-    this.refreshTitle();
+    this.title.refreshTitle();
     this.checkGoals(); // the stats are in: any goal this run finished pays out now
     return lines.join(' · ');
   }
@@ -871,13 +874,13 @@ export class Game {
       rooms: this.roomsEntered,
       beatPar: this.beatPar,
     };
-    if (!this.open('ranked')) {
+    if (!this.title.open('ranked')) {
       // Ranked isn't open yet: its goals take any run, against the bronze par.
       run.ranked = true;
       run.beatPar = score >= leaguePar(0, this.weekly.target);
     }
     const done = [...this.daily.recordRun(dayKey(now), run), ...this.weeklyGoals.recordRun(weekKey(now), run)];
-    for (const q of done) out.push(`goal done: ${questText(q, this.open('ranked'))} · claim it in goals`);
+    for (const q of done) out.push(`goal done: ${questText(q, this.title.open('ranked'))} · claim it in goals`);
     const xp = runXp(score);
     const before = this.pass.tier;
     const paid = this.pass.addXp(now, xp);
@@ -917,7 +920,7 @@ export class Game {
     this.ui.celebrate([{ kicker: `day ${step + 1} of ${CONFIG.economy.login.length}`, icon: GIFT_ICON, name: 'daily reward', lines }]);
     this.sound.power();
     this.haptics.pickup();
-    this.refreshTitle();
+    this.title.refreshTitle();
     if (this.infoOpen === 'goals') this.goals.renderGoals();
   }
 
@@ -965,7 +968,7 @@ export class Game {
     if (this.turnDay(now) || Math.floor(now / 60_000) !== this.titleMinute) {
       // A new day's challenge, or the minute its time left counts down.
       this.titleMinute = Math.floor(now / 60_000);
-      this.ui.renderTitleCards(this.titleCards(now));
+      this.ui.renderTitleCards(this.title.titleCards(now));
     }
     this.refreshBar(now);
     // The season looks by the trusted clock (start-up had only the phone's); owned or worn ones stay.
@@ -1017,7 +1020,7 @@ export class Game {
     const refund = await migrateTickets((n) => this.wallet.addCores(n, 'tickets'));
     if (refund > 0) {
       this.ui.showNotice(`ranked is unlimited now: your spare tickets became ${formatScore(refund)} cores`);
-      this.refreshTitle();
+      this.title.refreshTitle();
     }
     // What the account has bought, as the server's purchase records have it.
     const records = (await this.backend.purchases()) ?? [];
@@ -1054,7 +1057,7 @@ export class Game {
     }
     await this.wallet.link(this.backend);
     await this.checkMaxOut();
-    this.refreshTitle();
+    this.title.refreshTitle();
     this.queueShip();
     void this.account.askName();
     void this.outbox.flush(); // runs that couldn't be sent last time
@@ -1107,7 +1110,7 @@ export class Game {
       else {
         void this.outbox.flush();
         void errorLog.send();
-        void this.wallet.refresh().then(() => this.refreshTitle());
+        void this.wallet.refresh().then(() => this.title.refreshTitle());
       }
     } finally {
       this.rechecking = false;
@@ -1309,7 +1312,7 @@ export class Game {
     }
     if (party.length > 0) {
       this.ui.celebrate(party);
-      this.refreshTitle();
+      this.title.refreshTitle();
       this.haptics.level(false);
     }
   }
@@ -1358,7 +1361,7 @@ export class Game {
   }
 
   /** Ranked: this week's level (the same for everyone), your upgrades up to the league's cap. */
-  private startRanked(): void {
+  startRanked(): void {
     const active = this.upgrades.activePoints();
     const cap = this.leagues.current.max;
     if (active > cap) {
@@ -1380,7 +1383,7 @@ export class Game {
   }
 
   /** Endless: open ground, then every area and biome in turn, forever. */
-  private startEndless(): void {
+  startEndless(): void {
     this.beginRun(0, newSeed(), 'endless');
   }
 
@@ -1427,7 +1430,7 @@ export class Game {
       challenge: 'daily',
     };
     const f = needs[name];
-    if (f && !this.open(f)) {
+    if (f && !this.title.open(f)) {
       this.ui.showNotice(nextStageText(this.progress.stats.validRuns, this.onboarding.done) || 'not open yet');
       return;
     }
@@ -1467,110 +1470,6 @@ export class Game {
     if (this.settings.tilt) return 'tilt';
     if (this.settings.touch === 1) return 'sides';
     return !hasTouch() && (this.onboarding.keys ?? true) ? 'keys' : 'drag';
-  }
-
-  /** How much of the game is open to this player (new players see it in stages: reveal.ts). */
-  private revealStage(): number {
-    return stageFor(this.progress.stats.validRuns, this.onboarding.done);
-  }
-
-  open(f: Feature): boolean {
-    return this.allOpen || isOpen(f, this.revealStage());
-  }
-
-  /** The big button: ranked once it's open, endless before. */
-  private startPrimary(): void {
-    if (this.open('ranked')) this.startRanked();
-    else this.startEndless();
-  }
-
-  /** Say so, once, when a new part of the game opens. */
-  private announceReveal(): void {
-    if (this.revealSeen === null) return; // not read yet
-    const stage = this.revealStage();
-    if (stage <= this.revealSeen) return;
-    // A save from before the stages (or the first look at an old save): open, without a fanfare.
-    const quiet = (this.revealSeen < 0 && stage === STAGES.length) || stage === 0;
-    if (!quiet) {
-      const lines = STAGES.slice(Math.max(0, this.revealSeen), stage).map((s) => s.text);
-      this.ui.celebrate([{ kicker: 'new', icon: GOAL_ICON, name: 'more to play', lines }]);
-    }
-    this.revealSeen = stage;
-    void storage.set(REVEAL_KEY, String(stage));
-  }
-
-  /** The live cards above the big button: the pass, today's goals, a reward waiting. */
-  private titleCards(now: number): TitleCard[] {
-    const cards: TitleCard[] = [];
-    const day = dayKey(now);
-    const due = this.daily.loginDue(day);
-    if (due >= 0) cards.push({ id: 'claim', kicker: 'daily reward', title: `day ${due + 1} ready to claim`, hot: true });
-    if (this.daily.giftReady(day) && this.ads.offers('dailyGift')) cards.push({ id: 'gift', kicker: 'free gift', title: this.ads.label(), hot: true });
-    if (this.open('daily')) {
-      // Today's challenge: your best (or a new course), the time left, the streak in the kicker.
-      const best = this.challenge.bestOn(this.today.day);
-      const streak = this.challenge.streakOn(this.today.day);
-      cards.push({
-        id: 'challenge',
-        kicker: streak > 0 ? `daily · ${streak} day${streak === 1 ? '' : 's'}` : 'daily challenge',
-        title: best > 0 ? `best ${formatScore(best)}` : 'new course',
-        sub: `${formatWait(untilTomorrow(now))} left`,
-        hot: !this.challenge.playedOn(this.today.day),
-      });
-    }
-    const quests = this.daily.quests;
-    const done = quests.filter((q) => q.done).length;
-    const toClaim = this.goals.goalsToClaim();
-    cards.push({
-      id: 'daily',
-      kicker: "today's goals",
-      title: toClaim > 0 ? `${toClaim} to claim` : done >= quests.length ? 'all done' : `${done} of ${quests.length} done`,
-      fraction: quests.length ? done / quests.length : 0,
-      hot: toClaim > 0,
-    });
-    const P = CONFIG.economy.pass;
-    const tier = this.pass.tier;
-    cards.push({
-      id: 'pass',
-      kicker: `pass · tier ${tier}`,
-      title: tier >= P.tiers ? 'complete' : `${formatScore(P.xpPerTier - (this.pass.xp % P.xpPerTier))} xp to go`,
-      fraction: this.pass.tierFraction,
-    });
-    return cards;
-  }
-
-  refreshTitle(): void {
-    const colour = rankColour(this.ranked.rank);
-    const dark = this.settings.dark;
-    this.ui.setAccent(
-      this.settings.contrast ? (dark ? '#ffffff' : '#2b2824') : dark ? colour.dark : colour.accent,
-      !this.settings.contrast && colour === RANK_COLOURS[RANK_COLOURS.length - 1],
-    );
-    const i = this.ranked.rank;
-    this.applyLooks(); // the wing decal follows your rank and league
-    const lg = this.leagues;
-    this.ui.setTitleLeague(emblem(lg.league, lg.division), `${leagueName(lg.league, lg.division)} · ${lg.lp} lp`, lg.lp / LP_PER_DIVISION);
-    const next = RANKS[i + 1];
-    this.ui.setTitleRank(insignia(i), rankName(i), next ? `${formatScore(xpToRank(this.ranked.xp, i + 1))} xp to ${rankName(i + 1)}` : 'the top rank');
-    const wb = this.progress.weeklyBest(this.weekly.id);
-    const now = this.now();
-    const runs = this.progress.stats.validRuns;
-    if (this.open('ranked')) this.ui.setPrimary('ranked', wb > 0 ? `your best this week ${formatScore(wb)}` : 'the same run for everyone, all week');
-    else this.ui.setPrimary('fly', this.progress.endlessBest > 0 ? `endless · best ${formatScore(this.progress.endlessBest)}` : 'endless: every area in turn');
-    this.ui.setFeatures((f) =>
-      f === 'endless' || f === 'zen' || f === 'league'
-        ? this.open('ranked')
-        : f === 'boards'
-          ? this.open('leaderboard')
-          : f === 'solo' || f === 'shop' || f === 'record'
-            ? this.open(f)
-            : true,
-    );
-    this.ui.setTitleNext(this.allOpen ? '' : nextStageText(runs, this.onboarding.done));
-    this.ui.renderTitleCards(this.titleCards(now));
-    this.refreshBar(now);
-    this.announceReveal();
-    this.cloud.push(); // most changes end here: keep the cloud save current
   }
 
   /**
@@ -1701,7 +1600,7 @@ export class Game {
   private onKey = (e: KeyboardEvent): void => {
     if (e.repeat || (e.target as HTMLElement | null)?.tagName === 'INPUT') return; // typing a name is not a shortcut
     if ((e.code === 'Space' || e.code === 'Enter') && this.state !== 'paused') {
-      if (this.state === 'title' && !this.settingsOpen && !this.infoOpen) this.startPrimary();
+      if (this.state === 'title' && !this.settingsOpen && !this.infoOpen) this.title.startPrimary();
       else this.onTap();
     } else if (e.code === 'Escape')
       this.back(); // what Android's back button does
@@ -1828,7 +1727,7 @@ export class Game {
     for (const p of [this.basePalette, this.palette]) p.pickup.set(s.colourBlind ? SAFE.pickup : CONFIG.boost.pickup.color);
     this.applyLook(this.distanceScore / CONFIG.score.levelLength);
     this.ui.setDark(s.dark);
-    this.refreshTitle(); // the rank colour has a light and a dark version
+    this.title.refreshTitle(); // the rank colour has a light and a dark version
     this.ui.renderSettings(s);
   }
 
@@ -1932,7 +1831,7 @@ export class Game {
     this.ui.hideBanner();
     this.ui.showHud(false);
     this.ui.show('title');
-    this.refreshTitle();
+    this.title.refreshTitle();
     this.lastTime = performance.now();
     void this.account.askName();
   }
@@ -1998,11 +1897,11 @@ export class Game {
     this.progress.openAll(); // every solo environment, set level and part of the game
     if (!this.onboarding.done) this.onboarding.set('done');
     this.wallet.add(100000);
-    this.refreshTitle();
+    this.title.refreshTitle();
   }
 
   /** Everything open: maxed out (the SQL editor's max_out, or the dev panel's "unlock all"). */
-  private get allOpen(): boolean {
+  get allOpen(): boolean {
     return this.progress.allOpen;
   }
 
@@ -2019,14 +1918,14 @@ export class Game {
     if (this.entitlements.has('premium')) this.entitlements.clear();
     else this.entitlements.grant('premium');
     this.applyLooks();
-    this.refreshTitle();
+    this.title.refreshTitle();
     return this.entitlements.has('premium');
   }
 
   devAddCores(n: number): void {
     this.wallet.addCores(n);
     this.econ.bump('cores');
-    this.refreshTitle();
+    this.title.refreshTitle();
   }
 
   /** The launch splash has gone (main.ts). */
@@ -2496,7 +2395,7 @@ export class Game {
     if (!(stars & 4)) lines.push(`score ${formatScore(c.target)} for the third star`);
     lines.push(extra);
     this.ui.setGameOverExtra(lines.join(' · '));
-    this.refreshTitle();
+    this.title.refreshTitle();
   }
 
   /** Crossed the daily challenge's finish line. */
@@ -2515,7 +2414,7 @@ export class Game {
     const extra = this.finishRun(null);
     this.offerShare(isNew);
     this.ui.setGameOverExtra([formatTime(this.runTime), this.dailyLine, extra].filter(Boolean).join(' · '));
-    this.refreshTitle();
+    this.title.refreshTitle();
   }
 
   /** The daily run as it ended: today's best and the streak, and the streak's reward on a new day. */

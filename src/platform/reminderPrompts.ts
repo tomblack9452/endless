@@ -36,11 +36,11 @@ export class ReminderPrompts {
     if (!remindersAvailable() || !this.g.economyLoaded || !this.g.settingsLoaded) return;
     if (!this.g.settings.reminders) return scheduleReminders([]);
     const day = dayKey(this.g.now());
-    const dailyOpen = this.g.open('daily');
+    const dailyOpen = this.g.title.open('daily');
     const [h, m] = REMINDER_TIMES[this.g.settings.reminderTime] ?? REMINDER_TIMES[3];
     await scheduleReminders(
       planReminders(Date.now(), h, m, {
-        rankedOpen: this.g.open('ranked'),
+        rankedOpen: this.g.title.open('ranked'),
         dailyOpen,
         doneDay: (dailyOpen ? this.g.challenge.playedOn(day) : this.g.daily.loginDue(day) < 0) ? day : null,
       }),

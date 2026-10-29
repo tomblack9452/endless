@@ -330,7 +330,7 @@ export class FirstLaunch {
     this.g.player.setVisible(false);
     this.g.trail.setVisible(false);
     this.g.ui.show('title');
-    this.g.refreshTitle();
+    this.g.title.refreshTitle();
     this.g.claimLogin();
     void this.g.account.askName();
   }
