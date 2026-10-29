@@ -225,7 +225,7 @@
   width: 100%;
   min-width: 0;
   min-height: calc(76px * var(--ui-scale));
-  border-radius: 22px;
+  border-radius: calc(var(--round) + 4px);
   box-shadow: 0 10px 24px -14px color-mix(in srgb, var(--text) 70%, transparent);
 }
 

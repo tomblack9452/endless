@@ -83,6 +83,14 @@ where these names may differ slightly):
 
 The first five are the best fit.
 
+## Release notes for 1.0.13
+
+395 characters (500 at most):
+
+<en-GB>
+A fresher look: one fly button for the mode you pick, with ranked showing this week's best and your league place. The end screen puts fly again first and tells you what your credits now buy. Credit packs join the store, and tapping something you can't afford offers a cores swap or a pack. Optional usage stats show what to improve: only sent if you agree, and you can turn them off in settings.
+</en-GB>
+
 ## Release notes for 1.0.12
 
 379 characters (500 at most):

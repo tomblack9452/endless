@@ -26,7 +26,10 @@ main.ts ── Game (core/game.ts) ── owns the shared state and the loop
   the DOM or Three.js. They're where the rules live, and where the unit tests are.
 - **Views** (`ui/`, `economy/view.ts`) turn a model's view object into DOM. The
   markup for every screen is in `index.html`; the styles are in `ui/styles/`,
-  one file per area, imported in cascade order by `ui/style.css`.
+  one file per area, imported in cascade order by `ui/style.css`. The
+  sci-fi details (the glow on main buttons, accent-edged `.frame` cards,
+  segmented `.meter`s, the bar's hex icons) are all in `ui/styles/frame.css`,
+  imported last: use those classes rather than new one-off styles.
 - **World** (`world/`) builds the course from a seed (deterministic: ranked and
   the daily challenge depend on it) and draws it with Three.js. `world.ts` is
   both: splitting generation from drawing is the next big step (see the plan).
@@ -38,7 +41,16 @@ main.ts ── Game (core/game.ts) ── owns the shared state and the loop
   and `local.ts` (no server). Runs go through `server/outbox.ts`, which retries
   on no signal and drops a rejected run. Cores changes queue in
   `progression/wallet.ts` until the server takes them; each spend carries an id
-  the server takes once (`0024_spend_once.sql`).
+  the server takes once (`0024_spend_once.sql`). Credit packs are paid on
+  the server by the store webhook and reach the device through the credit
+  sync (`0026_credit_packs.sql`).
+- Usage stats go through `platform/analytics.ts` only: one typed `log()` per
+  event (the `Events` interface). It sends nothing on the web, in a build
+  without Firebase, before the consent form agrees, or with the setting off;
+  callers never check. Add an event to `Events` before logging it, never with
+  personal data (docs/analytics.md). The Firebase plugin's web half is
+  stubbed out in `vite.config.ts` (`platform/stubs/`), as the game doesn't ship
+  the Firebase JS SDK.
 - The server's clock decides days, weeks and seasons (`server_now`).
 
 ## Rules for new code

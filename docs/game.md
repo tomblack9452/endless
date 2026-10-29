@@ -270,13 +270,18 @@ Events change the look and sound only, never the course.
 
 ## Modes
 
-The title screen leads with **ranked**, a big button showing your best on
-this week's run, with **solo**, **endless** and **zen** under it. Above it, **live
+The title screen leads with one big **fly** button for the mode you've picked,
+with a row of **mode chips** under it: ranked, solo, endless, daily and zen
+(each shows once it's unlocked). The pick is remembered (`endless.lastMode`,
+`src/ui/hubMode.ts`). On ranked the button's line shows this week's best and
+your place in the league; on solo, the last area flown (tap the solo chip again
+to choose another). Above it, **live
 cards** show a daily reward when one is waiting, the free gift, the **daily
 challenge** (your streak, today's best and the time left; tap it to fly),
 today's goals and the season pass (your tier and the XP to the next). Along the bottom, a bar of five:
-**hangar**, **shop**, **goals**, **leaderboard** and **service record**, each
-with a dot when something there needs you. Settings is the gear top left;
+**hangar**, **shop**, **goals**, **ranks** (the leaderboards) and **record**
+(the service record), each on a thin hexagon that lights, with a dot, when
+something there needs you. Settings is the gear top left;
 credits and cores sit top right (tapping them opens the shop).
 
 **First launch** (`src/ui/onboarding.ts`) opens on a welcome: pick how you steer
@@ -545,6 +550,26 @@ leaving keeps nothing.
 
 ## Credits, upgrades and looks
 
+**The end screen** (1.0.13) leads with the score on a framed card, then **fly
+again** (the biggest button), double credits and share under it, and main
+menu. When the run's credits put something in reach, a line says so ("enough
+for thrusters tier 2 · open hangar") and goes there. When something is within
+20% of the wallet, it says "N credits from X · top up" and opens the store
+instead: that store prompt shows at most once a session
+(`StorePrompts` in `src/economy/nudge.ts`), and never during a run, the
+countdown or the revive offer.
+
+**Short of credits or cores.** Tapping an upgrade or look the wallet can't
+cover opens a sheet: "N credits short", with the smallest credit pack that
+covers it (at its store price), a swap of just enough cores (25 credits each,
+when you have them; it then buys the thing), or not now
+(`src/screens/shortOf.ts`). Cores work the same way with the core packs.
+
+**Credit packs** (1.0.13): 5,000, 15,000 and 40,000 credits for money, in the
+store beside the core packs. The bigger packs give more for the price, and
+each row's best is marked "best value". They're paid on the server
+(docs/store.md).
+
 **Credits** come mostly from runs (1 per 125 points in ranked, 1 per 250 in
 solo and endless, plus 1 for every pickup), and also from quests, goals,
 promotions, league rewards and set level stars. Spend them in
@@ -718,6 +743,9 @@ level, best chain, near misses, pickups, and where you crash most. Every run has
 Settings are under `settings` on the title screen or the pause menu, and
 are saved on the device.
 
+- **Share usage stats** (the Android app, 1.0.13): on by default, but nothing
+  is sent unless the player also agreed on the ad consent form
+  (docs/analytics.md).
 - **Sound:** sound on/off, and music and effects each at their own level (off, low, medium or full).
 - **Controls:**
   - tilt to steer, and tilt sensitivity

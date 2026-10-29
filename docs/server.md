@@ -147,8 +147,16 @@ the game), `0024` (a cores spend is taken once, 1.0.12: `spend_cores_once()`
 takes a spend with the id the game gives it, and answers one sent again
 after a lost answer as taken without charging again; `spend_cores()` stays
 as it was for older versions, and the game falls back to it on a database
-without `0024`).
-Apply `0014` and `0016` before deploying the webhook again; 1.0.7's webhook
+without `0024`), `0025` (account counts, 1.0.13: `account_counts()`, totals
+of accounts, anonymous and Google, new and active ones, for the service role
+only; docs/analytics.md), `0026` (credit packs, 1.0.13: the webhook's
+`store_credit_purchase()` records the purchase and adds the credits to the
+server's balance in one call, so a resent event pays nothing; a pack bought
+before the device's first credit sync waits in `wallets.credits_owed`;
+`store_credit_refund()` takes them back, never below zero; `sync_credits()`
+again, adding what's owed on the first sync).
+Apply `0026` before deploying 1.0.13's webhook (it calls
+`store_credit_purchase` for the credit packs). Apply `0014` and `0016` before deploying the webhook again; 1.0.7's webhook
 (a constant-time secret check) wants a redeploy after `db:apply`:
 `supabase functions deploy revenuecat-webhook --no-verify-jwt`. 1.0.8 to
 1.0.11 don't change the webhook.
