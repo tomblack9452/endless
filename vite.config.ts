@@ -23,7 +23,8 @@ export default defineConfig(({ mode }) => ({
     __BUILD__: JSON.stringify(`${(process.env.GITHUB_SHA ?? 'dev').slice(0, 7)} · ${new Date().toISOString().slice(0, 10)}`),
   },
   // The fairness tests fly whole levels for many seeds: slow on a busy machine.
-  test: { testTimeout: 30000 },
+  // Browser tests (tests/browser/*.spec.ts) run with Playwright, not here.
+  test: { testTimeout: 30000, include: ['tests/**/*.test.ts'] },
   build: {
     target: 'es2020',
     assetsInlineLimit: 0,
