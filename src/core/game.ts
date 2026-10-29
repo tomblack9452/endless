@@ -32,7 +32,6 @@ import { type HintId, Hints, tipText } from '../ui/hints';
 import { migrateMissionLooks, migrateTickets } from '../progression/legacy';
 import { type Feature, nextStageText } from '../progression/reveal';
 import { type ControlId, hasTouch, type Lesson, type LessonState, Onboarding } from '../ui/onboarding';
-import { itemCard, powerItem } from '../ui/guide';
 import { TeachView } from '../ui/tutorialView';
 import { Color } from 'three';
 import { Ads, createAdNetwork } from '../ads/ads';
@@ -88,6 +87,7 @@ import { RankKeeper } from '../progression/rankKeeper';
 import { Revives } from './revives';
 import { TitleScreen } from '../screens/title';
 import { SettingsScreen } from '../screens/settings';
+import { Powers } from './powers';
 
 type State = 'title' | 'playing' | 'paused' | 'countdown' | 'crashed' | 'finished';
 
@@ -315,11 +315,11 @@ export class Game {
   readonly upgrades = new Upgrades();
   readonly leagues = new Leagues();
   /** This run's ship systems (your switched-on upgrades). */
-  private ship: ShipStats = STANDARD;
+  ship: ShipStats = STANDARD;
   readonly looks = new Looks();
   /** A locked look being tried on in the hangar (not yet owned). */
   preview: Partial<Record<Slot, string>> | null = null;
-  private pickupCount = 0;
+  pickupCount = 0;
   recorded = false; // this run's stats are saved
   assisted = false; // assist mode was on at some point this run
   /** Which info screen is open from the title (stats, goals, hangar), if any. */
@@ -355,12 +355,10 @@ export class Game {
   // Power-ups (see CONFIG.powers).
   shield = false;
   graceT = 0; // seconds of passing through things after a shield hit
-  private magnetT = 0;
-  private slowT = 0;
-  private slowLevel = 0; // eased 0..1
-  private phaseT = 0; // phase armed: seconds left to pass through the next thing hit
-  private passT = 0; // seconds of passing through it (phase used)
-  private doubleT = 0; // double points: seconds left
+  slowLevel = 0; // eased 0..1
+  phaseT = 0; // phase armed: seconds left to pass through the next thing hit
+  passT = 0; // seconds of passing through it (phase used)
+  doubleT = 0; // double points: seconds left
   /** Gate runs ahead (endless) and the distance milestones passed (endless and solo). */
   private readonly gates = new GateTracker();
   private readonly milestones = new Milestones();
@@ -410,6 +408,8 @@ export class Game {
   readonly title = new TitleScreen(this);
 
   readonly settingsScreen = new SettingsScreen(this);
+
+  readonly powers = new Powers(this);
 
   constructor(canvas: HTMLCanvasElement) {
     this.basePalette.set(BASE_PALETTE);
@@ -682,7 +682,7 @@ export class Game {
     this.boostMeter = this.dev.fullBoost ? 1 : 0;
     this.boosting = false;
     this.boostLevel = 0;
-    this.endPowers();
+    this.powers.endPowers();
     if (this.ship.startShield) {
       this.shield = true;
       this.player.setShield(true);
@@ -1715,7 +1715,7 @@ export class Game {
     this.input.releaseAll();
     this.boosting = false;
     this.boostLevel = 0;
-    this.endPowers();
+    this.powers.endPowers();
     this.chain = 0;
     this.speed = CONFIG.speed.titleDrift;
     this.stage.pullBack = this.stage.drop = 0;
@@ -2035,8 +2035,8 @@ export class Game {
       this.haptics.pickup();
     }
     const power = this.world.collectPower(prev);
-    if (power >= 0) this.gainPower(power as PowerKind);
-    this.updatePowers(dt);
+    if (power >= 0) this.powers.gainPower(power as PowerKind);
+    this.powers.updatePowers(dt);
     this.updateEvents(dt, speed * dt);
     this.ui.setBoost(this.boostMeter, this.boostMeter >= CONFIG.boost.minToStart, this.boosting);
 
@@ -2467,7 +2467,7 @@ export class Game {
     this.player.reset();
     this.player.setVisible(true);
     this.trail.setVisible(true);
-    this.endPowers();
+    this.powers.endPowers();
     this.graceT = Z.fadeMs / 1000; // a moment to find the line again
     this.boosting = false;
     this.boostLevel = 0;
@@ -2488,57 +2488,6 @@ export class Game {
       hit: crashed && !this.fell ? this.hitWhat : '',
     };
     this.ui.setRunSummary(sparkSvg(this.speeds), summaryRows(view));
-  }
-
-  private gainPower(kind: PowerKind): void {
-    const p = CONFIG.powers;
-    if (kind === 0) {
-      this.shield = true;
-      this.player.setShield(true);
-    } else if (kind === 1) this.magnetT = p.magnet.seconds + this.ship.magnetExtra;
-    else if (kind === 2) this.slowT = p.slow.seconds;
-    else if (kind === 3) this.phaseT = p.phase.seconds;
-    else this.doubleT = p.double.seconds;
-    this.pickupCount++;
-    if (this.practice)
-      this.firstLaunch.practiceGot(kind); // the lesson card says it
-    else this.ui.showNotice(itemCard(powerItem(kind)).on);
-    this.sound.power();
-    this.haptics.pickup();
-  }
-
-  private updatePowers(dt: number): void {
-    this.graceT = Math.max(0, this.graceT - dt);
-    this.phaseT = Math.max(0, this.phaseT - dt);
-    this.passT = Math.max(0, this.passT - dt);
-    this.doubleT = Math.max(0, this.doubleT - dt);
-    this.player.updateShield(dt, this.graceT);
-    // Phase: the ship ghosts while it's armed, and most of all while it passes through.
-    this.player.setPhase(this.passT > 0 ? 1 : this.phaseT > 0 ? 0.6 : 0, this.runTime, this.settings.reduceMotion);
-    if (this.magnetT > 0) {
-      this.magnetT = Math.max(0, this.magnetT - dt);
-      this.world.attractPickups(dt);
-    }
-    this.slowT = Math.max(0, this.slowT - dt);
-    const goal = this.slowT > 0 ? 1 : 0;
-    this.slowLevel += (goal - this.slowLevel) * (1 - Math.exp(-4 * dt));
-    const parts: string[] = [];
-    if (this.shield) parts.push('shield');
-    if (this.magnetT > 0) parts.push(`magnet ${Math.ceil(this.magnetT)}`);
-    if (this.slowT > 0) parts.push(`slow-mo ${Math.ceil(this.slowT)}`);
-    if (this.phaseT > 0) parts.push(`phase ${Math.ceil(this.phaseT)}`);
-    if (this.doubleT > 0) parts.push(`x${CONFIG.powers.double.factor} ${Math.ceil(this.doubleT)}`);
-    this.ui.setPower(parts.join('  '));
-  }
-
-  private endPowers(): void {
-    this.shield = false;
-    this.graceT = this.magnetT = this.slowT = this.slowLevel = 0;
-    this.phaseT = this.passT = this.doubleT = 0;
-    this.player.setPhase(0, 0, true);
-    this.player.setShield(false);
-    this.player.updateShield(0, 0);
-    this.ui.setPower('');
   }
 
   private updateCamera(dt: number): void {
