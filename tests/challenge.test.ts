@@ -26,7 +26,10 @@ describe('the day seed', () => {
   it("is the server's day, not the phone's", async () => {
     // The phone has been moved two days on; the server says it's still the 15th.
     vi.useFakeTimers({ now: T0 + 2 * DAY, toFake: ['Date'] });
-    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify(new Date(T0).toISOString()), { status: 200 })));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response(JSON.stringify(new Date(T0).toISOString()), { status: 200 })),
+    );
     const b = new SupabaseBackend('https://x.supabase.co', 'k');
     expect(dayKey(b.now())).toBe('2026-10-17');
     await b.syncClock();

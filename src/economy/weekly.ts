@@ -88,7 +88,7 @@ export class Weekly {
 
   claim(i: number): Quest | null {
     const q = this.s.goals[i];
-    if (!q || !q.done || q.claimed) return null;
+    if (!q?.done || q.claimed) return null;
     q.claimed = true;
     this.save();
     return q;

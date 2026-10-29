@@ -13,7 +13,18 @@ import { Stage } from '../world/renderer';
 import { Sky } from '../world/sky';
 import { SpeedLines } from '../world/speedLines';
 import { Trail } from '../ship/trail';
-import { cycle, DEFAULT_SETTINGS, LEVEL_GAIN, loadSettings, REMINDER_TIMES, saveSettings, type SettingKey, STEERING_RANGE, TEXT_SCALE, TILT_GAIN } from './settings';
+import {
+  cycle,
+  DEFAULT_SETTINGS,
+  LEVEL_GAIN,
+  loadSettings,
+  REMINDER_TIMES,
+  saveSettings,
+  type SettingKey,
+  STEERING_RANGE,
+  TEXT_SCALE,
+  TILT_GAIN,
+} from './settings';
 import { EVENT_NOTICE, Events } from '../world/events';
 import { Weather } from '../world/weather';
 import { Ghost, rivalGhost } from '../ship/ghost';
@@ -303,7 +314,11 @@ export class Game {
   private passCount = 0;
   /** The reveal stage last announced (null until read from storage). */
   private revealSeen: number | null = null;
-  private readonly ads = new Ads(createAdNetwork(), () => this.entitlements.has('premium'), () => this.firstPlayed);
+  private readonly ads = new Ads(
+    createAdNetwork(),
+    () => this.entitlements.has('premium'),
+    () => this.firstPlayed,
+  );
   /** The shop card tapped (on the ship to try), or -1. */
   private shopPick = -1;
   private readonly dailyShop = new DailyShop();
@@ -424,9 +439,7 @@ export class Game {
     this.basePalette.set(BASE_PALETTE);
     this.palette.set(BASE_PALETTE);
     this.stage = new Stage(canvas, this.palette);
-    const textures = CONFIG.blocks.textured
-      ? createBlockTextures(this.stage.renderer.capabilities.getMaxAnisotropy())
-      : undefined;
+    const textures = CONFIG.blocks.textured ? createBlockTextures(this.stage.renderer.capabilities.getMaxAnisotropy()) : undefined;
     this.world = new World(this.stage.scene, this.palette, textures);
     this.player = new Player(this.stage.scene, this.palette);
     this.speedLines = new SpeedLines(this.stage.scene, this.palette);
@@ -490,7 +503,10 @@ export class Game {
       else {
         if (this.state !== 'paused') this.sound.resume(); // a paused run stays quiet until it's resumed
         void this.backend.syncClock().then((known) => known && this.retime());
-        void this.wallet.refresh().then(() => this.checkMaxOut()).then(() => this.refreshTitle());
+        void this.wallet
+          .refresh()
+          .then(() => this.checkMaxOut())
+          .then(() => this.refreshTitle());
         this.ads.preload();
       }
     });
@@ -498,7 +514,11 @@ export class Game {
 
     this.ui.bindCelebration();
     this.ui.bindTitleLinks(this.onTitleLink);
-    this.ui.bindBoards(BOARD_TABS, (id) => void this.showBoard(id), (name) => void this.savePilotName(name));
+    this.ui.bindBoards(
+      BOARD_TABS,
+      (id) => void this.showBoard(id),
+      (name) => void this.savePilotName(name),
+    );
     this.ui.bindNameBox('settings', (name) => void this.savePilotName(name, 'settings'));
     this.ui.bindNameBox('name', (name) => void this.saveNameScreen(name));
     window.addEventListener('online', () => {
@@ -571,7 +591,10 @@ export class Game {
     });
     this.ui.titleLeague.addEventListener('pointerdown', (e) => e.stopPropagation());
     this.ui.titleLeague.addEventListener('click', () => (this.open('ranked') ? this.openLeague() : undefined));
-    this.ui.bindSolo((i) => this.startCourse(i), (i) => this.startSolo(i));
+    this.ui.bindSolo(
+      (i) => this.startCourse(i),
+      (i) => this.startSolo(i),
+    );
     this.ui.bindUpgrades(this.onBuyUpgrade, (id) => {
       this.upgrades.toggle(id as SystemId);
       this.haptics.pickup();
@@ -602,7 +625,14 @@ export class Game {
    * `startScore` > 0 starts part-way along (dev skip). `seed` replays a
    * known course; otherwise every run gets a fresh one.
    */
-  private beginRun(startScore = 0, seed = newSeed(), mode: RunMode = 'endless', course: Course | null = null, env: Environment | null = null, daily: DailyRun | null = null): void {
+  private beginRun(
+    startScore = 0,
+    seed = newSeed(),
+    mode: RunMode = 'endless',
+    course: Course | null = null,
+    env: Environment | null = null,
+    daily: DailyRun | null = null,
+  ): void {
     this.ui.clearCelebration();
     this.econ.dismissOffer();
     this.econ.setCountdown(0);
@@ -726,7 +756,13 @@ export class Game {
     this.crashMs = 0;
     this.crashRealMs = 0;
     this.hitWhat = fell ? '' : this.world.hitName();
-    this.moment = crashMomentOn({ setting: this.settings.crashMoment, reduceMotion: this.settings.reduceMotion, ranked: this.mode === 'ranked', practice: this.practice !== null, zen: this.zen });
+    this.moment = crashMomentOn({
+      setting: this.settings.crashMoment,
+      reduceMotion: this.settings.reduceMotion,
+      ranked: this.mode === 'ranked',
+      practice: this.practice !== null,
+      zen: this.zen,
+    });
     if (this.moment) this.ui.showRoom(fell ? 'fell' : this.hitWhat ? `hit ${this.hitWhat}` : 'hit');
     this.input.enabled = false;
     this.speedLines.update(0, 0, 0);
@@ -764,7 +800,9 @@ export class Game {
     if (this.course) {
       const length = courseLength(this.course);
       const pct = Math.floor((100 * (this.world.distance - this.world.finishAt + length)) / length);
-      this.ui.setGameOverExtra([`${Math.max(0, Math.min(99, pct))}% of ${this.course.name}`, this.dailyRunNow ? this.dailyLine : '', extra].filter(Boolean).join(' · '));
+      this.ui.setGameOverExtra(
+        [`${Math.max(0, Math.min(99, pct))}% of ${this.course.name}`, this.dailyRunNow ? this.dailyLine : '', extra].filter(Boolean).join(' · '),
+      );
     } else this.ui.setGameOverExtra(extra);
   }
 
@@ -820,7 +858,12 @@ export class Game {
     this.ui.showDouble(credits > 0 && this.ads.offers('doubleCredits') ? `double +${formatScore(credits)} credits · ${this.ads.label()}` : null);
     this.ads.afterRun(Date.now(), false); // the device clock, like the first-played time it is measured from
     this.ads.preload(); // an ad ready for the offers after a run (none for premium)
-    const from = [fromPickups > 0 ? `${formatScore(fromPickups)} from pickups` : '', this.bonusCredits > 0 ? `${formatScore(this.bonusCredits)} from milestones and gate runs` : ''].filter(Boolean).join(', ');
+    const from = [
+      fromPickups > 0 ? `${formatScore(fromPickups)} from pickups` : '',
+      this.bonusCredits > 0 ? `${formatScore(this.bonusCredits)} from milestones and gate runs` : '',
+    ]
+      .filter(Boolean)
+      .join(', ');
     lines.push(`+${formatScore(credits)} credits${from ? ` (${from})` : ''}`);
     const board = boardForRun(this.mode, this.environment?.id ?? null, this.course !== null, this.dailyRunNow !== null);
     if (board && board !== 'ranked') this.submitToBoard(board, this.state === 'finished');
@@ -916,7 +959,17 @@ export class Game {
   private shopTrying = false;
 
   /** The cards for the open shop tab, and the line, heading and buy button that go with them. */
-  private shopTabView(now: number, owned: (key: string) => boolean): { heading: string; reset: string; info: string; items: LookItem[]; cards: { price: string; premium: boolean; deal: boolean }[]; buy: { text: string; enabled: boolean } } {
+  private shopTabView(
+    now: number,
+    owned: (key: string) => boolean,
+  ): {
+    heading: string;
+    reset: string;
+    info: string;
+    items: LookItem[];
+    cards: { price: string; premium: boolean; deal: boolean }[];
+    buy: { text: string; enabled: boolean };
+  } {
     const priceOf = (item: LookItem): string => {
       const u = item.unlock;
       return u.by === 'credits' ? `${formatScore(u.cost)} credits` : u.by === 'cores' || u.by === 'vault' ? `${formatScore(u.cost)} cores` : '';
@@ -934,7 +987,9 @@ export class Game {
           : `${so.missing.length} of ${so.items.length} looks left · the lot for ${formatScore(so.price)} cores, ${formatScore(saved)} less than one by one · own the whole set for +${so.set.bonusCores} cores`,
         items: so.items,
         cards: so.items.map((item) => ({ price: priceOf(item), premium: item.unlock.by === 'cores', deal: false })),
-        buy: so.complete ? { text: 'set complete', enabled: false } : { text: `buy the set · ${formatScore(so.price)} cores`, enabled: this.wallet.cores >= so.price },
+        buy: so.complete
+          ? { text: 'set complete', enabled: false }
+          : { text: `buy the set · ${formatScore(so.price)} cores`, enabled: this.wallet.cores >= so.price },
       };
     }
     if (this.shopTab === 'vault') {
@@ -946,7 +1001,9 @@ export class Game {
         info: `a rare look, for sale a month at a time. when it goes it's away for ${VAULT_ORDER.length - 1} months`,
         items: [v.item],
         cards: [{ price: priceOf(v.item), premium: true, deal: false }],
-        buy: mine ? { text: `${v.item.name} is yours`, enabled: false } : { text: `buy ${v.item.name} · ${formatScore(v.price)} cores`, enabled: this.wallet.cores >= v.price },
+        buy: mine
+          ? { text: `${v.item.name} is yours`, enabled: false }
+          : { text: `buy ${v.item.name} · ${formatScore(v.price)} cores`, enabled: this.wallet.cores >= v.price },
       };
     }
     const offers = this.dailyShop.offers(dayKey(now), owned);
@@ -1028,7 +1085,11 @@ export class Game {
         kicker: 'your wallet',
         icon: WALLET_ICON,
         name: 'credits and cores',
-        lines: ['credits: every run pays them. for looks and upgrades', 'cores: rarer. from daily rewards, goals, the pass and the store', 'for premium looks, the vault, revives and the pass'],
+        lines: [
+          'credits: every run pays them. for looks and upgrades',
+          'cores: rarer. from daily rewards, goals, the pass and the store',
+          'for premium looks, the vault, revives and the pass',
+        ],
       },
     ]);
   }
@@ -1050,7 +1111,13 @@ export class Game {
         ? `${tier} premium reward${tier === 1 ? '' : 's'} waiting`
         : 'premium rewards on every tier';
     return {
-      pass: { title: `season ${s.season} pass`, left: `${s.end - now > 2 * 86_400_000 ? `${Math.ceil((s.end - now) / 86_400_000)}d` : formatWait(s.end - now)} left`, hook, tier: `${tier}/${tiers}`, fraction: tier / tiers },
+      pass: {
+        title: `season ${s.season} pass`,
+        left: `${s.end - now > 2 * 86_400_000 ? `${Math.ceil((s.end - now) / 86_400_000)}d` : formatWait(s.end - now)} left`,
+        hook,
+        tier: `${tier}/${tiers}`,
+        fraction: tier / tiers,
+      },
       cores,
     };
   }
@@ -1106,9 +1173,18 @@ export class Game {
       passButtons.push({ act: 'pass-open', text: 'see the tiers', enabled: true });
     } else {
       const next = Math.min(tier + 1, P.tiers);
-      perks.push('more at every tier, on top of the free track', "the season's new looks", `next up: ${rewardText(premiumReward(next, s.season))} at tier ${next}`);
+      perks.push(
+        'more at every tier, on top of the free track',
+        "the season's new looks",
+        `next up: ${rewardText(premiumReward(next, s.season))} at tier ${next}`,
+      );
       if (tier > 0) perks.push(`the ${tier} tier${tier === 1 ? '' : 's'} you've reached pay out as you unlock`);
-      passButtons.push({ act: 'pass-cores', text: `unlock · ${formatScore(P.premiumCores)} cores`, enabled: this.wallet.cores >= P.premiumCores, primary: this.wallet.cores >= P.premiumCores });
+      passButtons.push({
+        act: 'pass-cores',
+        text: `unlock · ${formatScore(P.premiumCores)} cores`,
+        enabled: this.wallet.cores >= P.premiumCores,
+        primary: this.wallet.cores >= P.premiumCores,
+      });
       const m = price.get('season_pass');
       if (m) passButtons.push({ act: 'season_pass', text: `unlock · ${m}`, enabled: true });
       passButtons.push({ act: 'pass-open', text: 'see the tiers', enabled: true });
@@ -1120,7 +1196,14 @@ export class Game {
       const img = `store/${p.id}.png`;
       if ('look' in p) {
         const mine = this.ownsProduct(p.id);
-        extras.push({ img, name: 'starter pack', sub: `${formatScore(p.cores)} cores and ${rewardText({ look: p.look })}`, tag: 'once', button: mine ? owned('owned') : money(p.id), owned: mine });
+        extras.push({
+          img,
+          name: 'starter pack',
+          sub: `${formatScore(p.cores)} cores and ${rewardText({ look: p.look })}`,
+          tag: 'once',
+          button: mine ? owned('owned') : money(p.id),
+          owned: mine,
+        });
       } else if ('premium' in p) {
         const mine = this.entitlements.has('premium');
         extras.push({
@@ -1133,7 +1216,11 @@ export class Game {
         });
       } else if ('cores' in p) packs.push({ img, name: `${formatScore(p.cores)} cores`, sub: '', tag: '', button: money(p.id), owned: false });
     }
-    const packsNote = !app ? 'packs of cores, the starter pack and premium are in the android app' : this.storeProducts.length === 0 ? "the store isn't answering. check your connection and come back" : '';
+    const packsNote = !app
+      ? 'packs of cores, the starter pack and premium are in the android app'
+      : this.storeProducts.length === 0
+        ? "the store isn't answering. check your connection and come back"
+        : '';
 
     const S = CONFIG.economy.shop;
     const foot: { label: string; button: StoreButton }[] = [];
@@ -1156,7 +1243,11 @@ export class Game {
       packsNote,
       extras,
       swapNote: `${formatScore(S.creditsPerCore)} credits for every core`,
-      swaps: S.swaps.map((n) => ({ act: `swap-${n}`, text: `${formatScore(n)} cores → ${formatScore(n * S.creditsPerCore)} credits`, enabled: this.wallet.cores >= n })),
+      swaps: S.swaps.map((n) => ({
+        act: `swap-${n}`,
+        text: `${formatScore(n)} cores → ${formatScore(n * S.creditsPerCore)} credits`,
+        enabled: this.wallet.cores >= n,
+      })),
       foot,
     });
     if (this.state === 'title') {
@@ -1279,7 +1370,15 @@ export class Game {
   private confirmCores(cost: number, what: string, go: () => void): void {
     if (!asksBeforeSpending(cost)) return go();
     this.econ.offer(
-      { kicker: '', name: `spend ${formatScore(cost)} cores?`, lines: [what, `you have ${formatScore(this.wallet.cores)} cores`], yes: `buy · ${formatScore(cost)} cores`, yesEnabled: this.wallet.cores >= cost, no: 'not now', seconds: 0 },
+      {
+        kicker: '',
+        name: `spend ${formatScore(cost)} cores?`,
+        lines: [what, `you have ${formatScore(this.wallet.cores)} cores`],
+        yes: `buy · ${formatScore(cost)} cores`,
+        yesEnabled: this.wallet.cores >= cost,
+        no: 'not now',
+        seconds: 0,
+      },
       go,
       () => undefined,
     );
@@ -1356,7 +1455,14 @@ export class Game {
     if (this.pass.premium || !this.wallet.spendCores(CONFIG.economy.pass.premiumCores, `pass-premium:${this.pass.season}`)) return;
     const paid = this.pass.unlockPremium('cores');
     const lines = paid.flatMap((r) => this.grant(r));
-    this.ui.celebrate([{ kicker: 'season pass', icon: PASS_ICON, name: 'premium unlocked', lines: lines.length > 0 ? mergeCredits(lines) : ['premium rewards from every tier you reach'] }]);
+    this.ui.celebrate([
+      {
+        kicker: 'season pass',
+        icon: PASS_ICON,
+        name: 'premium unlocked',
+        lines: lines.length > 0 ? mergeCredits(lines) : ['premium rewards from every tier you reach'],
+      },
+    ]);
     this.sound.power();
     this.refreshTitle();
     if (this.infoOpen === 'store') this.openStore();
@@ -1646,7 +1752,7 @@ export class Game {
     const result = await this.store.buy(id);
     if (result === 'cancelled') return;
     if (result === 'failed') {
-      this.ui.showNotice('purchase didn\'t go through. nothing was charged');
+      this.ui.showNotice("purchase didn't go through. nothing was charged");
       return;
     }
     const p = CONFIG.economy.store.products.find((x) => x.id === id)!;
@@ -1764,7 +1870,11 @@ export class Game {
   private async share(): Promise<void> {
     const lg = this.leagues;
     const lines: string[] = [];
-    if (this.mode === 'ranked') lines.push(`${rankName(this.ranked.rank)} · ${leagueName(lg.league, lg.division)}`, `best this week ${formatScore(this.progress.weeklyBest(this.weekly.id))}`);
+    if (this.mode === 'ranked')
+      lines.push(
+        `${rankName(this.ranked.rank)} · ${leagueName(lg.league, lg.division)}`,
+        `best this week ${formatScore(this.progress.weeklyBest(this.weekly.id))}`,
+      );
     else if (this.dailyRunNow) {
       const streak = this.challenge.streakOn(this.dailyRunNow.day);
       lines.push(streak > 1 ? `${streak} days in a row` : 'the same course for everyone today');
@@ -1964,7 +2074,10 @@ export class Game {
       big,
       goal,
       fraction: lg.lp / LP_PER_DIVISION,
-      detail: lg.top || lg.promotionReady ? `par ${formatScore(parNow)} this week` : `${lg.lp} / ${LP_PER_DIVISION} lp · about ${runs} run${runs === 1 ? '' : 's'} at par`,
+      detail:
+        lg.top || lg.promotionReady
+          ? `par ${formatScore(parNow)} this week`
+          : `${lg.lp} / ${LP_PER_DIVISION} lp · about ${runs} run${runs === 1 ? '' : 's'} at par`,
       checks,
       gives,
       trend: { title: h.length ? `last ${h.length} runs` : 'recent runs', values: h, summary: h.length ? `${net >= 0 ? '+' : ''}${net} lp` : '', unit: 'lp' },
@@ -1999,7 +2112,14 @@ export class Game {
     this.ui.renderBoard([], this.backend.online ? 'loading' : '');
     const rows = await this.backend.board(boardQuery(tab, lg.league, this.now()));
     if (!this.backend.online || rows === null) {
-      this.ui.renderBoard(own, !this.backend.online ? 'the leaderboards need the server' : this.offline() ? "you're offline. the board comes back with a connection" : "couldn't load the board");
+      this.ui.renderBoard(
+        own,
+        !this.backend.online
+          ? 'the leaderboards need the server'
+          : this.offline()
+            ? "you're offline. the board comes back with a connection"
+            : "couldn't load the board",
+      );
       this.refreshBar();
       return;
     }
@@ -2028,12 +2148,10 @@ export class Game {
       ...(board === 'ranked' ? { week: this.weekly.id.replace(/^ranked-/, '') } : {}),
     };
     this.lastSent = sub;
-    void this.outbox
-      .send(sub)
-      .then((res) => {
-        if (!res) return; // waiting for a signal
-        this.boardNotice(board, res);
-      });
+    void this.outbox.send(sub).then((res) => {
+      if (!res) return; // waiting for a signal
+      this.boardNotice(board, res);
+    });
   }
 
   /** "#4 on the endless board" once a run is on its board. */
@@ -2123,7 +2241,13 @@ export class Game {
     best('daily', 'best daily challenge');
     best('endless', 'best endless');
     for (const e of ENVIRONMENTS) best(`solo:${e.id}`, `best solo: ${e.name}`);
-    if (st.runs !== undefined) rows.push(['furthest level', String(st.bestLevel || 1)], ['best chain', `x${st.bestChain ?? 0}`], ['near misses', n(st.nearMisses)], ['pickups', n(st.pickups)]);
+    if (st.runs !== undefined)
+      rows.push(
+        ['furthest level', String(st.bestLevel || 1)],
+        ['best chain', `x${st.bestChain ?? 0}`],
+        ['near misses', n(st.nearMisses)],
+        ['pickups', n(st.pickups)],
+      );
     const since = p.since ? `since ${new Date(p.since).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' }).toLowerCase()}` : '';
     const note = [p.premium ? '◆ premium' : '', since, st.runs === undefined ? 'no stats shared yet' : ''].filter(Boolean).join(' · ');
     return { icon: insignia(rank), rank: st.rank === undefined ? 'rank unknown' : rankName(rank), note, rows };
@@ -2152,7 +2276,13 @@ export class Game {
     void this.backend.pilotName().then((name) => {
       // The name is asked for here, when it's first needed: a generated one ("pilot-3fa2") invites a real one.
       const generated = !name || GENERATED_NAME.test(name);
-      const note = !this.backend.online ? 'names come with the server' : this.offline() ? 'names can be changed with a connection' : generated ? 'pick your pilot name: 3 to 16 letters, numbers, spaces, - or _' : '3 to 16 letters, numbers, spaces, - or _. once an hour';
+      const note = !this.backend.online
+        ? 'names come with the server'
+        : this.offline()
+          ? 'names can be changed with a connection'
+          : generated
+            ? 'pick your pilot name: 3 to 16 letters, numbers, spaces, - or _'
+            : '3 to 16 letters, numbers, spaces, - or _. once an hour';
       if (this.infoOpen === 'boards') this.ui.setPilotName(name ?? '', note);
     });
   }
@@ -2182,7 +2312,12 @@ export class Game {
     this.refreshBar();
     if (rows === null) this.ui.renderLeaderboard(caption, own, this.offline() ? offlineNote : "couldn't load the board. try again in a moment");
     else if (rows.length === 0) this.ui.renderLeaderboard(caption, [], 'nobody yet. fly a run to be first');
-    else this.ui.renderLeaderboard(caption, rows.map((r) => this.boardRow(r)), '');
+    else
+      this.ui.renderLeaderboard(
+        caption,
+        rows.map((r) => this.boardRow(r)),
+        '',
+      );
   }
 
   private async savePilotName(name: string, box = 'board'): Promise<boolean> {
@@ -2209,7 +2344,7 @@ export class Game {
     if (!this.deleteArmed) {
       this.deleteArmed = true;
       if (value) value.textContent = 'tap again';
-      this.ui.showNotice('tap again to delete everything. this can\'t be undone');
+      this.ui.showNotice("tap again to delete everything. this can't be undone");
       this.deleteTimer = window.setTimeout(() => {
         this.deleteArmed = false;
         if (value) value.textContent = 'delete';
@@ -2476,7 +2611,8 @@ export class Game {
     if (this.preview) Object.assign(eq, this.preview);
     this.player.setShape(eq.hull as ShipId);
     this.player.setPaint(find('paint', eq.paint).colors ?? null);
-    const decal = eq.decal === 'rank' ? insignia(this.ranked.rank) : eq.decal === 'league' ? emblem(this.leagues.league, this.leagues.division) : decalArt(eq.decal);
+    const decal =
+      eq.decal === 'rank' ? insignia(this.ranked.rank) : eq.decal === 'league' ? emblem(this.leagues.league, this.leagues.division) : decalArt(eq.decal);
     this.player.setDressing(eq.markings as Marking, eq.fins as Fin, decal);
     const flame = find('engine', eq.engine).colors;
     this.trail.setTint(flame?.[0] ?? null, flame?.[1] ?? null);
@@ -2572,7 +2708,9 @@ export class Game {
 
   /** What finishing a goal gives, in words. */
   private goalRewardText(a: Achievement): string {
-    const looks = rewardKeys(a.id).map((k) => byKey(k)).filter((l): l is LookItem => !!l);
+    const looks = rewardKeys(a.id)
+      .map((k) => byKey(k))
+      .filter((l): l is LookItem => !!l);
     return [`+${a.credits.toLocaleString('en-US')} credits`, ...looks.map((l) => `${l.name} ${SLOT_NAMES[l.slot]}`)].join(' · ');
   }
 
@@ -2610,17 +2748,29 @@ export class Game {
     this.goalsUi.renderDaily({
       calendar: login.map((r, i) => ({
         day: i + 1,
-        reward: rewardParts(r).map((p) => p.replace(/^\+/, '')).join(', '),
+        reward: rewardParts(r)
+          .map((p) => p.replace(/^\+/, ''))
+          .join(', '),
         state: i < claimedUpTo ? 'claimed' : i === step && due >= 0 ? 'today' : 'next',
       })),
       claim: due >= 0 ? { text: `claim day ${step + 1}`, enabled: true } : { text: `next reward in ${formatWait(untilTomorrow(now))}`, enabled: false },
       reset: `new in ${formatWait(untilTomorrow(now))}`,
-      rows: [...taskRows(qs, 'q', Q.passXp).map((r) => (r.state === 'open' && this.daily.canReroll(day) && this.ads.offers('rerollQuest') ? { ...r, reroll: `swap for another goal · ${this.ads.label()}` } : r)), bonusRow('qall', 'claim all three', Q.allDoneCores, this.daily.bonusReady, this.daily.bonusClaimed, qs)],
+      rows: [
+        ...taskRows(qs, 'q', Q.passXp).map((r) =>
+          r.state === 'open' && this.daily.canReroll(day) && this.ads.offers('rerollQuest')
+            ? { ...r, reroll: `swap for another goal · ${this.ads.label()}` }
+            : r,
+        ),
+        bonusRow('qall', 'claim all three', Q.allDoneCores, this.daily.bonusReady, this.daily.bonusClaimed, qs),
+      ],
     });
     // Weekly.
     const wg = this.weeklyGoals.goals;
     const weekEnd = Date.parse(`${weekKey(now)}T00:00:00Z`) + 7 * 86_400_000;
-    this.goalsUi.renderWeekly(`new in ${formatWait(weekEnd - now)}`, [...taskRows(wg, 'w', W.passXp), bonusRow('wall', 'claim all five', W.allDoneCores, this.weeklyGoals.bonusReady, this.weeklyGoals.bonusClaimed, wg)]);
+    this.goalsUi.renderWeekly(`new in ${formatWait(weekEnd - now)}`, [
+      ...taskRows(wg, 'w', W.passXp),
+      bonusRow('wall', 'claim all five', W.allDoneCores, this.weeklyGoals.bonusReady, this.weeklyGoals.bonusClaimed, wg),
+    ]);
     // Achievements.
     const snap = this.snapshot();
     const groups = (Object.keys(GROUP_NAMES) as Group[]).map((g) => ({
@@ -2628,12 +2778,27 @@ export class Game {
       rows: ACHIEVEMENTS.filter((a) => a.group === g).map((a): TaskRow => {
         const p = progressOn(a, snap);
         const claimed = this.goalLog.has(a.id);
-        return { id: `a:${a.id}`, name: a.name, text: a.text, progress: `${formatScore(p.have)} / ${formatScore(p.target)}`, fraction: p.have / p.target, reward: `${this.goalRewardText(a)} · +${CONFIG.rank.goalXp} xp`, state: claimed ? 'claimed' : p.done ? 'claim' : 'open' };
+        return {
+          id: `a:${a.id}`,
+          name: a.name,
+          text: a.text,
+          progress: `${formatScore(p.have)} / ${formatScore(p.target)}`,
+          fraction: p.have / p.target,
+          reward: `${this.goalRewardText(a)} · +${CONFIG.rank.goalXp} xp`,
+          state: claimed ? 'claimed' : p.done ? 'claim' : 'open',
+        };
       }),
     }));
     const doneCount = ACHIEVEMENTS.filter((a) => progressOn(a, snap).done).length;
-    this.goalsUi.renderAchievements(`${doneCount} of ${ACHIEVEMENTS.length} done. each pays credits and rank xp, and unlocks a look to wear. they count everything you've done, from the start.`, groups);
-    this.goalsUi.setTabNews({ daily: due >= 0 || this.daily.claimable > 0, weekly: this.weeklyGoals.claimable > 0, achievements: this.achievementsToClaim() > 0 });
+    this.goalsUi.renderAchievements(
+      `${doneCount} of ${ACHIEVEMENTS.length} done. each pays credits and rank xp, and unlocks a look to wear. they count everything you've done, from the start.`,
+      groups,
+    );
+    this.goalsUi.setTabNews({
+      daily: due >= 0 || this.daily.claimable > 0,
+      weekly: this.weeklyGoals.claimable > 0,
+      achievements: this.achievementsToClaim() > 0,
+    });
   }
 
   /** Finished achievements not yet claimed. */
@@ -2666,7 +2831,9 @@ export class Game {
       const source = id === 'qall' ? `goals:${this.daily.day}` : `weekly:${this.weeklyGoals.week}`;
       const cores = id === 'qall' ? this.daily.claimBonus() : this.weeklyGoals.claimBonus();
       if (cores <= 0) return;
-      this.ui.celebrate([{ kicker: id === 'qall' ? "today's goals" : "this week's goals", icon: GOAL_ICON, name: 'all done', lines: this.grant({ cores }, source) }]);
+      this.ui.celebrate([
+        { kicker: id === 'qall' ? "today's goals" : "this week's goals", icon: GOAL_ICON, name: 'all done', lines: this.grant({ cores }, source) },
+      ]);
     } else if (id.startsWith('a:')) {
       const a = achievement(id.slice(2));
       if (!a || this.goalLog.has(a.id) || !progressOn(a, this.snapshot()).done) return;
@@ -2676,7 +2843,15 @@ export class Game {
       const promo = this.ranked.addXp(CONFIG.rank.goalXp);
       lines = [...this.grant({ credits: a.credits + promo.credits }), `+${CONFIG.rank.goalXp} xp`];
       if (promo.rankAfter > promo.rankBefore) {
-        this.ui.celebrate([{ kicker: 'promoted', icon: insignia(promo.rankAfter), name: rankName(promo.rankAfter), lines: mergeCredits(Array.from({ length: promo.rankAfter - promo.rankBefore }, (_, k) => this.rankGives(promo.rankBefore + 1 + k)).flat()), color: '#d4a63a' }]);
+        this.ui.celebrate([
+          {
+            kicker: 'promoted',
+            icon: insignia(promo.rankAfter),
+            name: rankName(promo.rankAfter),
+            lines: mergeCredits(Array.from({ length: promo.rankAfter - promo.rankBefore }, (_, k) => this.rankGives(promo.rankBefore + 1 + k)).flat()),
+            color: '#d4a63a',
+          },
+        ]);
       }
     } else return;
     if (name) this.ui.showNotice(`${name}: ${mergeCredits(lines).join(' · ')}`);
@@ -2700,9 +2875,15 @@ export class Game {
       for (const a of fresh) this.goalLog.markSeen(a.id);
       if (fresh.length > 0) this.goalLog.save();
       if (fresh.length > 3) {
-        party.push({ kicker: `${fresh.length} goals complete`, icon: GOAL_ICON, name: `${fresh.length} goals`, lines: [...fresh.slice(0, 5).map((a) => a.name), 'claim them in goals'] });
+        party.push({
+          kicker: `${fresh.length} goals complete`,
+          icon: GOAL_ICON,
+          name: `${fresh.length} goals`,
+          lines: [...fresh.slice(0, 5).map((a) => a.name), 'claim them in goals'],
+        });
       } else {
-        for (const a of fresh) party.push({ kicker: 'goal complete', icon: GOAL_ICON, name: a.name, lines: [a.text, ...this.goalRewardText(a).split(' · '), 'claim it in goals'] });
+        for (const a of fresh)
+          party.push({ kicker: 'goal complete', icon: GOAL_ICON, name: a.name, lines: [a.text, ...this.goalRewardText(a).split(' · '), 'claim it in goals'] });
       }
       for (const id of sets) {
         const set = SETS.find((x) => x.id === id);
@@ -2841,7 +3022,8 @@ export class Game {
   /** Ranked with the rival's ghost on: ask the server for the run just above yours, and fly it if it's still this run. */
   private async loadRival(serial: number): Promise<void> {
     const r = await this.backend.rivalRun().catch(() => null);
-    if (!r || serial !== this.runSerial || this.mode !== 'ranked' || (this.state !== 'playing' && this.state !== 'countdown' && this.state !== 'paused')) return;
+    if (!r || serial !== this.runSerial || this.mode !== 'ranked' || (this.state !== 'playing' && this.state !== 'countdown' && this.state !== 'paused'))
+      return;
     this.rival.fly(rivalGhost(r.path, r.seconds, this.weekly.id, PATH_STEP));
     this.ui.showNotice(`racing ${r.name}'s ghost · ${formatScore(r.score)}`);
   }
@@ -2864,7 +3046,15 @@ export class Game {
 
   private onTitleLink = (name: string): void => {
     // Every way in to a part of the game that isn't open yet says when it opens (the cores chip, cards...).
-    const needs: Record<string, Feature> = { solo: 'solo', record: 'record', shop: 'shop', 'shop-cores': 'shop', pass: 'shop', boards: 'leaderboard', challenge: 'daily' };
+    const needs: Record<string, Feature> = {
+      solo: 'solo',
+      record: 'record',
+      shop: 'shop',
+      'shop-cores': 'shop',
+      pass: 'shop',
+      boards: 'leaderboard',
+      challenge: 'daily',
+    };
     const f = needs[name];
     if (f && !this.open(f)) {
       this.ui.showNotice(nextStageText(this.progress.stats.validRuns, this.onboarding.done) || 'not open yet');
@@ -2881,8 +3071,7 @@ export class Game {
       this.shopPick = -1;
       this.preview = null;
       this.openShop();
-    }
-    else if (name === 'shop-cores') this.openStore(null);
+    } else if (name === 'shop-cores') this.openStore(null);
     else if (name === 'pass') this.openPass(null);
     else if (name === 'boards') this.openBoards();
     else if (name === 'daily') this.openGoals('daily');
@@ -2928,7 +3117,10 @@ export class Game {
     const feel =
       step === 'feel'
         ? {
-            note: c === used ? `you flew with ${name(used)}. keep it, or tap another card to try it for ${TRIAL_SECONDS} s.` : `${name(c)} it is. try it for ${TRIAL_SECONDS} s first, or keep it.`,
+            note:
+              c === used
+                ? `you flew with ${name(used)}. keep it, or tap another card to try it for ${TRIAL_SECONDS} s.`
+                : `${name(c)} it is. try it for ${TRIAL_SECONDS} s first, or keep it.`,
             tryLabel: c === used ? null : `try ${name(c)} · ${TRIAL_SECONDS} s`,
             keepLabel: `keep ${name(c)}`,
           }
@@ -3299,7 +3491,13 @@ export class Game {
     const quests = this.daily.quests;
     const done = quests.filter((q) => q.done).length;
     const toClaim = this.goalsToClaim();
-    cards.push({ id: 'daily', kicker: "today's goals", title: toClaim > 0 ? `${toClaim} to claim` : done >= quests.length ? 'all done' : `${done} of ${quests.length} done`, fraction: quests.length ? done / quests.length : 0, hot: toClaim > 0 });
+    cards.push({
+      id: 'daily',
+      kicker: "today's goals",
+      title: toClaim > 0 ? `${toClaim} to claim` : done >= quests.length ? 'all done' : `${done} of ${quests.length} done`,
+      fraction: quests.length ? done / quests.length : 0,
+      hot: toClaim > 0,
+    });
     const P = CONFIG.economy.pass;
     const tier = this.pass.tier;
     cards.push({
@@ -3314,7 +3512,10 @@ export class Game {
   private refreshTitle(): void {
     const colour = rankColour(this.ranked.rank);
     const dark = this.settings.dark;
-    this.ui.setAccent(this.settings.contrast ? (dark ? '#ffffff' : '#2b2824') : dark ? colour.dark : colour.accent, !this.settings.contrast && colour === RANK_COLOURS[RANK_COLOURS.length - 1]);
+    this.ui.setAccent(
+      this.settings.contrast ? (dark ? '#ffffff' : '#2b2824') : dark ? colour.dark : colour.accent,
+      !this.settings.contrast && colour === RANK_COLOURS[RANK_COLOURS.length - 1],
+    );
     const i = this.ranked.rank;
     this.applyLooks(); // the wing decal follows your rank and league
     const lg = this.leagues;
@@ -3326,7 +3527,15 @@ export class Game {
     const runs = this.progress.stats.validRuns;
     if (this.open('ranked')) this.ui.setPrimary('ranked', wb > 0 ? `your best this week ${formatScore(wb)}` : 'the same run for everyone, all week');
     else this.ui.setPrimary('fly', this.progress.endlessBest > 0 ? `endless · best ${formatScore(this.progress.endlessBest)}` : 'endless: every area in turn');
-    this.ui.setFeatures((f) => (f === 'endless' || f === 'zen' || f === 'league' ? this.open('ranked') : f === 'boards' ? this.open('leaderboard') : f === 'solo' || f === 'shop' || f === 'record' ? this.open(f) : true));
+    this.ui.setFeatures((f) =>
+      f === 'endless' || f === 'zen' || f === 'league'
+        ? this.open('ranked')
+        : f === 'boards'
+          ? this.open('leaderboard')
+          : f === 'solo' || f === 'shop' || f === 'record'
+            ? this.open(f)
+            : true,
+    );
     this.ui.setTitleNext(this.allOpen ? '' : nextStageText(runs, this.onboarding.done));
     this.ui.renderTitleCards(this.titleCards(now));
     this.refreshBar(now);
@@ -3363,7 +3572,8 @@ export class Game {
   back(): boolean {
     if (this.exitAsking) this.closeExitAsk();
     else if (this.ui.celebrating) this.ui.skipCelebration();
-    else if (this.econ.offerOpen && !(this.state === 'crashed' && this.revivePending)) this.econ.declineOffer(); // the reminders offer: no thanks
+    else if (this.econ.offerOpen && !(this.state === 'crashed' && this.revivePending))
+      this.econ.declineOffer(); // the reminders offer: no thanks
     else if (cancelOpenReport()) return true;
     else if (this.ui.guideOpen) this.closeGuide();
     else if (this.settingsOpen) this.closeSettings();
@@ -3462,7 +3672,17 @@ export class Game {
       case 'title':
         break; // pick a mode with the buttons
       case 'crashed':
-        if (tapRetries({ crashMs: this.crashMs, settledMs: this.settledMs, revivePending: this.revivePending, offerOpen: this.econ.offerOpen, quick: this.quick, lockMs: CONFIG.crash.retryLockMs })) this.retry();
+        if (
+          tapRetries({
+            crashMs: this.crashMs,
+            settledMs: this.settledMs,
+            revivePending: this.revivePending,
+            offerOpen: this.econ.offerOpen,
+            quick: this.quick,
+            lockMs: CONFIG.crash.retryLockMs,
+          })
+        )
+          this.retry();
         break;
       case 'finished':
         if (this.overShown && !this.econ.offerOpen) this.retry();
@@ -3475,8 +3695,8 @@ export class Game {
     if ((e.code === 'Space' || e.code === 'Enter') && this.state !== 'paused') {
       if (this.state === 'title' && !this.settingsOpen && !this.infoOpen) this.startPrimary();
       else this.onTap();
-    }
-    else if (e.code === 'Escape') this.back(); // what Android's back button does
+    } else if (e.code === 'Escape')
+      this.back(); // what Android's back button does
     else if (e.code === 'KeyP') {
       if (this.settingsOpen) this.closeSettings();
       else if (this.infoOpen) this.closeInfo();
@@ -3504,15 +3724,13 @@ export class Game {
     else if (action === 'tips') {
       this.hints.replay();
       this.ui.showNotice('tips are back for your next runs');
-    }
-    else if (action === 'tutorial') {
+    } else if (action === 'tutorial') {
       if (this.state !== 'title') this.toMainMenu();
       this.onboarding.go('replay');
       this.feelUsed = null;
       this.closeSettings();
       this.openWelcome();
-    }
-    else if (action === 'guide') this.ui.showGuide('got it');
+    } else if (action === 'guide') this.ui.showGuide('got it');
     else if (action === 'whats-new') this.showWhatsNew();
     else if (action === 'menu') {
       const practising = this.practice;
@@ -3523,8 +3741,7 @@ export class Game {
         this.onboarding.go('quit');
         this.openWelcome();
       }
-    }
-    else if (action === 'share') void this.share();
+    } else if (action === 'share') void this.share();
     else if (action === 'details') this.ui.showDetails(!this.ui.detailsOpen);
     else if (action === 'double') void this.doubleCredits();
     else if (action === 'back') {
@@ -3625,7 +3842,10 @@ export class Game {
       {
         kicker: '',
         name: 'a daily reminder?',
-        lines: [`a nudge at ${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')} when there's something new to fly. once a day at most`, 'settings can change the time or turn it off'],
+        lines: [
+          `a nudge at ${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')} when there's something new to fly. once a day at most`,
+          'settings can change the time or turn it off',
+        ],
         yes: 'remind me',
         yesEnabled: true,
         no: 'no thanks',
@@ -3709,7 +3929,11 @@ export class Game {
     this.ui.setNative(this.native, remindersAvailable());
     this.ui.show('settings');
     this.refreshAccount();
-    void this.backend.pilotName().then((name) => this.ui.setPilotName(name ?? '', this.backend.online ? '3 to 16 letters, numbers, spaces, - or _' : 'names come with the server', 'settings'));
+    void this.backend
+      .pilotName()
+      .then((name) =>
+        this.ui.setPilotName(name ?? '', this.backend.online ? '3 to 16 letters, numbers, spaces, - or _' : 'names come with the server', 'settings'),
+      );
   }
 
   private closeSettings(): void {
@@ -3941,7 +4165,7 @@ export class Game {
     this.stage.fog.density = CONFIG.fog.density * this.events.fogScale() * this.weather.fogScale();
     // Stars: full over the deck, faint outside at night.
     const sky = this.palette.sky;
-    const daylight = Math.pow(0.2126 * sky.r + 0.7152 * sky.g + 0.0722 * sky.b, 1 / 2.2);
+    const daylight = (0.2126 * sky.r + 0.7152 * sky.g + 0.0722 * sky.b) ** (1 / 2.2);
     const night = Math.max(0, Math.min(1, (0.55 - daylight) / 0.35)) * CONFIG.space.nightStars * (1 - w.interiorMix);
     this.sky.setAmount(Math.max(space, night));
     this.stage.setPlanetVisible(1 - this.world.interiorMix);
@@ -3962,12 +4186,12 @@ export class Game {
     const skyHex = this.palette.sky.getHex();
     if (skyHex !== this.shownSky) {
       this.shownSky = skyHex;
-      this.ui.setSkyColor('#' + this.palette.sky.getHexString());
+      this.ui.setSkyColor(`#${this.palette.sky.getHexString()}`);
     }
     const page = this.palette.fog.getHex();
     if (page !== this.shownPageHex) {
       this.shownPageHex = page;
-      this.ui.setPageColor('#' + this.palette.fog.getHexString());
+      this.ui.setPageColor(`#${this.palette.fog.getHexString()}`);
     }
   }
 
@@ -4016,7 +4240,13 @@ export class Game {
     const slope = (terrain.heightAtX(dist + 6, sx) - terrain.heightAtX(dist, sx)) / 6;
     // Positive pitch dips the nose, so climbing subtracts.
     const pitch = this.boostLevel * CONFIG.boost.shipPitchDeg * DEG - Math.atan(slope) * CONFIG.terrain.shipPitch;
-    this.player.update(dt, this.dev.autopilot ? this.autopilot() : this.input.steering(), lateralSpeedAt(speed) * this.ship.steer, pitch, this.onIce ? CONFIG.hazards.ice.grip : 1);
+    this.player.update(
+      dt,
+      this.dev.autopilot ? this.autopilot() : this.input.steering(),
+      lateralSpeedAt(speed) * this.ship.steer,
+      pitch,
+      this.onIce ? CONFIG.hazards.ice.grip : 1,
+    );
     this.weather.update(dt, speed);
     // No streaks inside the ship: they'd run through its walls and ceiling like loose wires.
     this.speedLines.update(dt, speed, this.settings.reduceMotion || this.lowGraphics() ? 0 : this.boostLevel * (1 - this.world.insideMix));
@@ -4241,7 +4471,7 @@ export class Game {
     a.canyon = this.world.canyonMix;
     a.interior = this.world.interiorMix;
     const sky = this.palette.sky;
-    a.daylight = Math.pow(0.2126 * sky.r + 0.7152 * sky.g + 0.0722 * sky.b, 1 / 2.2);
+    a.daylight = (0.2126 * sky.r + 0.7152 * sky.g + 0.0722 * sky.b) ** (1 / 2.2);
     // Busier music deeper into each theme and at higher speed.
     const sub = (this.level - 1) % CONFIG.themes.levelsPerTheme;
     const speedNorm = (this.speed - CONFIG.speed.base) / (CONFIG.speed.max - CONFIG.speed.base);
@@ -4352,7 +4582,17 @@ export class Game {
     this.dailyLine = r.streak > 0 ? `${r.streak} day streak` : '';
     if (r.reward) {
       const lines = this.grant(r.reward); // on the card that follows, not the end screen as well
-      this.ui.celebrate([{ kicker: `${r.streak} day${r.streak === 1 ? '' : 's'} in a row`, icon: FLAG_ICON, name: 'daily streak', lines: [...lines, r.streak < CONFIG.daily.streak.length ? `tomorrow: ${rewardText(streakReward(r.streak + 1))}` : 'the top of the ladder: keep it going'] }]);
+      this.ui.celebrate([
+        {
+          kicker: `${r.streak} day${r.streak === 1 ? '' : 's'} in a row`,
+          icon: FLAG_ICON,
+          name: 'daily streak',
+          lines: [
+            ...lines,
+            r.streak < CONFIG.daily.streak.length ? `tomorrow: ${rewardText(streakReward(r.streak + 1))}` : 'the top of the ladder: keep it going',
+          ],
+        },
+      ]);
     }
     return { best: r.best, isNew: r.isNew };
   }
@@ -4487,7 +4727,15 @@ export class Game {
 
   /** The run summary behind "details" on the end screen. */
   private fillSummary(crashed: boolean): void {
-    const view = { speeds: this.speeds, distance: this.world.distance - this.runStart, level: this.level, nearMisses: this.nearMissCount, bestChain: this.bestChain, crashed, hit: crashed && !this.fell ? this.hitWhat : '' };
+    const view = {
+      speeds: this.speeds,
+      distance: this.world.distance - this.runStart,
+      level: this.level,
+      nearMisses: this.nearMissCount,
+      bestChain: this.bestChain,
+      crashed,
+      hit: crashed && !this.fell ? this.hitWhat : '',
+    };
     this.ui.setRunSummary(sparkSvg(this.speeds), summaryRows(view));
   }
 
@@ -4501,7 +4749,8 @@ export class Game {
     else if (kind === 3) this.phaseT = p.phase.seconds;
     else this.doubleT = p.double.seconds;
     this.pickupCount++;
-    if (this.practice) this.practiceGot(kind); // the lesson card says it
+    if (this.practice)
+      this.practiceGot(kind); // the lesson card says it
     else this.ui.showNotice(itemCard(powerItem(kind)).on);
     this.sound.power();
     this.haptics.pickup();
@@ -4548,8 +4797,7 @@ export class Game {
     const still = this.settings.reduceMotion;
     if (still) this.stage.roll *= 0.3; // a hint of lean, no swing
     this.stage.fovBoost =
-      Math.min(c.maxFovBoost, Math.max(0, (this.speed - CONFIG.speed.base) * c.fovPerSpeed)) +
-      (still ? 0 : this.boostLevel * CONFIG.boost.fovKick);
+      Math.min(c.maxFovBoost, Math.max(0, (this.speed - CONFIG.speed.base) * c.fovPerSpeed)) + (still ? 0 : this.boostLevel * CONFIG.boost.fovKick);
     const b = CONFIG.boost;
     this.stage.pullBack = this.boostLevel * b.cameraPullBack;
     this.stage.drop = this.boostLevel * b.cameraDrop;

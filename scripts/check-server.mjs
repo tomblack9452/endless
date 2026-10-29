@@ -51,16 +51,30 @@ if (signup.status === 0) bad(`can't reach ${url}`, 'check the project URL and yo
 else if (signup.status === 200 && signup.body?.access_token) {
   token = signup.body.access_token;
   ok('anonymous sign-in works');
-} else if (signup.status === 401 || signup.status === 403) bad('the server turned the key down', 'use the anon / public key, not the service_role key (Project settings > API)');
-else if (/anonymous/i.test(JSON.stringify(signup.body))) bad('anonymous sign-ins are off', 'Authentication > Sign In / Providers > turn on "Allow anonymous sign-ins"');
+} else if (signup.status === 401 || signup.status === 403)
+  bad('the server turned the key down', 'use the anon / public key, not the service_role key (Project settings > API)');
+else if (/anonymous/i.test(JSON.stringify(signup.body)))
+  bad('anonymous sign-ins are off', 'Authentication > Sign In / Providers > turn on "Allow anonymous sign-ins"');
 else bad(`sign-in failed (${signup.status}): ${JSON.stringify(signup.body)}`, 'check the key, and that anonymous sign-ins are on');
 
 if (token) {
   const headers = { apikey: key, Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
-  const board = await call('/rest/v1/rpc/leaderboard', { method: 'POST', headers, body: JSON.stringify({ p_board: 'endless', p_period: 'all', p_league: 0, p_limit: 1 }) });
+  const board = await call('/rest/v1/rpc/leaderboard', {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ p_board: 'endless', p_period: 'all', p_league: 0, p_limit: 1 }),
+  });
   if (board.status === 200) ok('the database is set up (leaderboard answers)');
-  else if (board.status === 404) bad('the database has no leaderboard function yet', 'run `npm run db:apply` (needs SUPABASE_DB_URL in .env), or run `npm run db:setup` and paste the files it makes in supabase/parts/ into the SQL editor, in order');
-  else bad(`leaderboard failed (${board.status}): ${JSON.stringify(board.body)}`, 'run `npm run db:apply`, or the files `npm run db:setup` makes in supabase/parts/');
+  else if (board.status === 404)
+    bad(
+      'the database has no leaderboard function yet',
+      'run `npm run db:apply` (needs SUPABASE_DB_URL in .env), or run `npm run db:setup` and paste the files it makes in supabase/parts/ into the SQL editor, in order',
+    );
+  else
+    bad(
+      `leaderboard failed (${board.status}): ${JSON.stringify(board.body)}`,
+      'run `npm run db:apply`, or the files `npm run db:setup` makes in supabase/parts/',
+    );
 
   const name = await call(`/rest/v1/players?select=name&user_id=eq.${signup.body.user.id}`, { headers });
   if (name.status === 200 && name.body?.[0]?.name) ok(`new accounts get a pilot name (${name.body[0].name})`);

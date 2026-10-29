@@ -1,5 +1,5 @@
 import {
-  BufferGeometry,
+  type BufferGeometry,
   Color,
   ConeGeometry,
   CylinderGeometry,
@@ -82,9 +82,7 @@ export function mushroomTree(): BufferGeometry {
   ];
   for (let i = 0; i < 4; i++) {
     const ang = (i / 4) * Math.PI * 2 + 0.4;
-    parts.push(
-      part(new OctahedronGeometry(0.14, 0), '#d4bd86', scale(1, 1.6, 1), move(0.18 + Math.cos(ang) * 0.95, 2.78, Math.sin(ang) * 0.95)),
-    );
+    parts.push(part(new OctahedronGeometry(0.14, 0), '#d4bd86', scale(1, 1.6, 1), move(0.18 + Math.cos(ang) * 0.95, 2.78, Math.sin(ang) * 0.95)));
   }
   return build(parts);
 }
@@ -257,9 +255,7 @@ export function tumbleweed(): BufferGeometry {
   const colours = ['#b49866', '#9c8257', '#c4aa78'];
   for (let i = 0; i < 7; i++) {
     const a = (i / 7) * Math.PI;
-    loops.push(
-      part(new TorusGeometry(0.5 - (i % 3) * 0.05, 0.025, 3, 12), colours[i % 3], tiltX(a), tiltZ(a * 1.7 + i)),
-    );
+    loops.push(part(new TorusGeometry(0.5 - (i % 3) * 0.05, 0.025, 3, 12), colours[i % 3], tiltX(a), tiltZ(a * 1.7 + i)));
   }
   return build(loops);
 }
@@ -304,7 +300,14 @@ export function grassTuft(): BufferGeometry {
     const a = (i / 6) * Math.PI * 2;
     const h = 0.32 + (i % 3) * 0.1;
     blades.push(
-      part(new ConeGeometry(0.035, h, 3), i % 2 ? '#7f9466' : '#6c8358', move(0, h / 2, 0), tiltX(Math.sin(a) * 0.35), tiltZ(Math.cos(a) * 0.35), move(Math.cos(a) * 0.08, 0, Math.sin(a) * 0.08)),
+      part(
+        new ConeGeometry(0.035, h, 3),
+        i % 2 ? '#7f9466' : '#6c8358',
+        move(0, h / 2, 0),
+        tiltX(Math.sin(a) * 0.35),
+        tiltZ(Math.cos(a) * 0.35),
+        move(Math.cos(a) * 0.08, 0, Math.sin(a) * 0.08),
+      ),
     );
   }
   return build(blades);
@@ -332,7 +335,8 @@ export function rockArch(): BufferGeometry {
     parts.push(part(lump(1.3, 1, 0.25), '#958675', scale(1, 2.4, 1), move(side * 5.2, 2.6, 0)));
     parts.push(part(lump(1.0, 1, 0.25), '#a29382', scale(1.1, 1.3, 1), move(side * 4.8, 5.6, 0)));
   }
-  for (let i = -2; i <= 2; i++) parts.push(part(lump(1.15, 1, 0.3), i % 2 ? '#ab9c8a' : '#9c8d7b', scale(1.2, 0.8, 1), move(i * 2.1, 7.2 - Math.abs(i) * 0.35, 0)));
+  for (let i = -2; i <= 2; i++)
+    parts.push(part(lump(1.15, 1, 0.3), i % 2 ? '#ab9c8a' : '#9c8d7b', scale(1.2, 0.8, 1), move(i * 2.1, 7.2 - Math.abs(i) * 0.35, 0)));
   return build(parts);
 }
 

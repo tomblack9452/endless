@@ -165,7 +165,12 @@ export class Input {
     // Not with tap-sides steering, where quick taps are steering and would boost by accident.
     const T = CONFIG.boost.doubleTap;
     const now = e.timeStamp;
-    if (this.doubleTapBoost && !this.sidesMode && now - this.lastTapAt <= T.gapMs && Math.hypot(e.clientX - this.lastTapX, e.clientY - this.lastTapY) <= T.slopPx) {
+    if (
+      this.doubleTapBoost &&
+      !this.sidesMode &&
+      now - this.lastTapAt <= T.gapMs &&
+      Math.hypot(e.clientX - this.lastTapX, e.clientY - this.lastTapY) <= T.slopPx
+    ) {
       this.tapBoostPointer = e.pointerId;
     }
     this.lastTapAt = -Infinity;
@@ -247,5 +252,5 @@ export function leanOf(angle: number, beta: number | null, gamma: number | null)
 const BOOST_KEYS = new Set(['ShiftLeft', 'ShiftRight', 'KeyW', 'ArrowUp', 'Space']);
 
 function clamp(v: number, lo: number, hi: number): number {
-  return v < lo ? lo : v > hi ? hi : v;
+  return v < lo ? lo : Math.min(v, hi);
 }

@@ -710,7 +710,6 @@ ROOMS.foundry.decor = foundryDecor;
 ROOMS.deck.decor = deckDecor;
 ROOMS.shaft.decor = (api) => corridorDecor(api, 5);
 
-
 // --- landmark rooms ------------------------------------------------------------
 
 /** Drop shaft: a catwalk over a deep shaft, red beacons, then the deck drops away to the level below. */

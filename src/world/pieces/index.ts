@@ -24,7 +24,26 @@ import * as ventilation from './ship/vents-fan';
 // pieces; a family's room template in interior.ts now only gives its name,
 // lighting, look and wall dressing.
 
-const FILES = [servers, cargo, cargoLift, deck, reactor, engine, hangar, lab, flooded, dropShaft, command, ventilation, hydroponics, security, maintenance, plant, passages, corridors];
+const FILES = [
+  servers,
+  cargo,
+  cargoLift,
+  deck,
+  reactor,
+  engine,
+  hangar,
+  lab,
+  flooded,
+  dropShaft,
+  command,
+  ventilation,
+  hydroponics,
+  security,
+  maintenance,
+  plant,
+  passages,
+  corridors,
+];
 
 export const PIECES: readonly Piece[] = FILES.flatMap((f) => Object.values(f) as Piece[]);
 
@@ -44,7 +63,10 @@ export function pickPiece(family: RoomId, tier: number): Piece | null {
   const t = Math.min(2, tier);
   let options = PIECES.filter((p) => p.family === family && t >= p.tiers[0] && t <= p.tiers[1]);
   // A family whose pieces all start later still appears, with its easiest piece.
-  if (!options.length) options = PIECES.filter((p) => p.family === family).sort((a, b) => a.tiers[0] - b.tiers[0]).slice(0, 1);
+  if (!options.length)
+    options = PIECES.filter((p) => p.family === family)
+      .sort((a, b) => a.tiers[0] - b.tiers[0])
+      .slice(0, 1);
   if (!options.length) return null;
   let total = 0;
   for (const p of options) total += p.weight;

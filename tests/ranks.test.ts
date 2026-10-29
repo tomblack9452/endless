@@ -34,7 +34,7 @@ describe('xp', () => {
     expect(xpFor(8000, false)).toBeGreaterThan(0);
   });
 
-  it('comes from every mode, doubled for the day\'s first three runs', () => {
+  it("comes from every mode, doubled for the day's first three runs", () => {
     const r = new Ranked();
     const day = Date.UTC(2026, 9, 5, 12);
     const xp = xpFor(6000, false);

@@ -88,7 +88,10 @@ export class Stage {
   private width = 1;
   private height = 1;
 
-  constructor(canvas: HTMLCanvasElement, private readonly palette: LivePalette) {
+  constructor(
+    canvas: HTMLCanvasElement,
+    private readonly palette: LivePalette,
+  ) {
     this.renderer = new WebGLRenderer({
       canvas,
       antialias: CONFIG.render.antialias,
@@ -122,7 +125,10 @@ export class Stage {
       shader.uniforms.uGroundAt = this.groundAt;
       shader.uniforms.uGroundStyle = this.groundStyle;
       shader.vertexShader = shader.vertexShader
-        .replace('#include <common>', `#include <common>\n${TERRAIN_GLSL}\nvarying float vHillShade;\nvarying float vPit;\nvarying vec2 vGround;\nuniform vec2 uGroundAt;`)
+        .replace(
+          '#include <common>',
+          `#include <common>\n${TERRAIN_GLSL}\nvarying float vHillShade;\nvarying float vPit;\nvarying vec2 vGround;\nuniform vec2 uGroundAt;`,
+        )
         .replace(
           '#include <begin_vertex>',
           `#include <begin_vertex>
@@ -139,7 +145,9 @@ export class Stage {
           vHillShade = clamp((hillAt(hillD + 1.0) - hillAt(hillD - 1.0)) * 0.5, -1.0, 1.0);`,
         );
       shader.fragmentShader = shader.fragmentShader
-        .replace('#include <common>', `#include <common>
+        .replace(
+          '#include <common>',
+          `#include <common>
 varying float vHillShade;
 varying float vPit;
 varying vec2 vGround;
@@ -150,8 +158,11 @@ float gNoise(vec2 p) {
   vec2 f = fract(p);
   f = f * f * (3.0 - 2.0 * f);
   return mix(mix(gHash(i), gHash(i + vec2(1.0, 0.0)), f.x), mix(gHash(i + vec2(0.0, 1.0)), gHash(i + vec2(1.0, 1.0)), f.x), f.y);
-}`)
-        .replace('#include <color_fragment>', `#include <color_fragment>
+}`,
+        )
+        .replace(
+          '#include <color_fragment>',
+          `#include <color_fragment>
         diffuseColor.rgb *= 1.0 + vHillShade * ${CONFIG.terrain.shade.toFixed(2)};
         if (uGroundStyle.x > 0.0 || uGroundStyle.y > 0.0) {
           // Broad patches: greener grass and warmer bare dirt, tinting whatever the ground colour is.
@@ -175,10 +186,14 @@ float gNoise(vec2 p) {
           diffuseColor.rgb *= 1.0 - gravel * 0.12 * uGroundStyle.z;
         }
         // Chasm walls darken as soon as they drop below the rim (each wall is one steep strip of ground).
-        diffuseColor.rgb *= 1.0 - 0.9 * smoothstep(0.0, 0.06, vPit);`)
+        diffuseColor.rgb *= 1.0 - 0.9 * smoothstep(0.0, 0.06, vPit);`,
+        )
         // ...and stay dark through the fog, so a chasm reads as a drop, not pale mist.
-        .replace('#include <fog_fragment>', `#include <fog_fragment>
-        gl_FragColor.rgb = mix(gl_FragColor.rgb, vec3(0.045, 0.04, 0.035), smoothstep(0.01, 0.12, vPit) * 0.92);`);
+        .replace(
+          '#include <fog_fragment>',
+          `#include <fog_fragment>
+        gl_FragColor.rgb = mix(gl_FragColor.rgb, vec3(0.045, 0.04, 0.035), smoothstep(0.01, 0.12, vPit) * 0.92);`,
+        );
     };
     const ground = new Mesh(groundGeometry(), this.groundMat);
     this.ground = ground;
@@ -340,7 +355,7 @@ float gNoise(vec2 p) {
     const c = CONFIG.camera;
     const halfH = ((c.hfov + this.fovBoost) * DEG) / 2;
     let v = (2 * Math.atan(Math.tan(halfH) / (this.width / this.height))) / DEG;
-    v = v < c.minVfov ? c.minVfov : v > c.maxVfov ? c.maxVfov : v;
+    v = v < c.minVfov ? c.minVfov : Math.min(v, c.maxVfov);
     // Never so narrow that the ship falls below shipY on screen.
     return Math.max(v, SHIP_MIN_VFOV);
   }

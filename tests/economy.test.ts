@@ -101,8 +101,18 @@ describe('daily', () => {
   });
 
   it('a finished quest in an older save counts as already paid', async () => {
-    const store = new Map<string, string>([['endless.daily', JSON.stringify({ questDay: '2026-10-05', quests: [{ type: 'runs', target: 3, progress: 3, credits: 100, done: true }], allDonePaid: true })]]);
-    (globalThis as { localStorage?: unknown }).localStorage = { getItem: (k: string) => store.get(k) ?? null, setItem: (k: string, v: string) => void store.set(k, v), key: () => null, length: 0 };
+    const store = new Map<string, string>([
+      [
+        'endless.daily',
+        JSON.stringify({ questDay: '2026-10-05', quests: [{ type: 'runs', target: 3, progress: 3, credits: 100, done: true }], allDonePaid: true }),
+      ],
+    ]);
+    (globalThis as { localStorage?: unknown }).localStorage = {
+      getItem: (k: string) => store.get(k) ?? null,
+      setItem: (k: string, v: string) => void store.set(k, v),
+      key: () => null,
+      length: 0,
+    };
     const d = new Daily();
     await d.load('2026-10-05');
     expect(d.claimable).toBe(0);
@@ -180,9 +190,12 @@ describe('season pass', () => {
   });
 });
 
-describe('season pass bought for money, from the server\'s records', () => {
+describe("season pass bought for money, from the server's records", () => {
   const s = seasonAt(T0);
-  const bought = (at: number, product = 'season_pass') => [{ product: 'premium', at: T0 }, { product, at }];
+  const bought = (at: number, product = 'season_pass') => [
+    { product: 'premium', at: T0 },
+    { product, at },
+  ];
 
   it('counts in the season it was bought, and only then', () => {
     expect(passBought(bought(s.start), T0)).toBe(true);
@@ -273,7 +286,9 @@ describe('revive', () => {
 
 describe('pass saves from before tiers took 600 xp', () => {
   it('keep their tier', async () => {
-    const store = new Map<string, string>([['endless.pass', JSON.stringify({ season: seasonAt(T0).season, xp: 1300, premium: false, paidFree: 10, paidPremium: 0 })]]);
+    const store = new Map<string, string>([
+      ['endless.pass', JSON.stringify({ season: seasonAt(T0).season, xp: 1300, premium: false, paidFree: 10, paidPremium: 0 })],
+    ]);
     (globalThis as { localStorage?: unknown }).localStorage = {
       getItem: (k: string) => store.get(k) ?? null,
       setItem: (k: string, v: string) => void store.set(k, v),

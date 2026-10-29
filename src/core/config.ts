@@ -231,7 +231,6 @@ export const CONFIG = {
     // at the palette face's brightness, 1 = fully palette coloured.
     tint: 0.22,
     brightness: 1.55, // lifts textured faces; the texture itself darkens them
-
   },
 
   // Day to night. Time of day advances with score: each level moves one key
@@ -327,7 +326,7 @@ export const CONFIG = {
       bigHills: [1, 3], // big hill sections per open-ground theme
       bigHillWidth: [70, 130], // half-width of a big hill (units along the run)
       bigHillHeight: [3.5, 6],
-    },    // The canyon is about readable shapes, not random clutter: the walls wind,
+    }, // The canyon is about readable shapes, not random clutter: the walls wind,
     // and obstacles are dark rocks that stand out from the sand.
     //   level 1: winding path, a few lone boulders
     //   level 2: rockfall bands across the path with one wide gap
@@ -510,7 +509,13 @@ export const CONFIG = {
         lab: ['#e9f1ee', 3, 2],
       },
       // Crates come in a few paints (and tread or hatch lids).
-      crateLooks: [['#ffffff', 0], ['#e8cf8a', 1], ['#a9bdd0', 1], ['#c99a7c', 0], ['#a9c19d', 1]],
+      crateLooks: [
+        ['#ffffff', 0],
+        ['#e8cf8a', 1],
+        ['#a9bdd0', 1],
+        ['#c99a7c', 0],
+        ['#a9c19d', 1],
+      ],
       // Ramps between decks: gentler and lower than the canyon's (the ceiling comes too).
       elevation: {
         spacing: [90, 180],
@@ -565,9 +570,32 @@ export const CONFIG = {
         // Drop shaft: a railed catwalk over a deep shaft, then the deck drops away steeply to the level below.
         dropShaft: { weight: 2, minSub: 1, length: [80, 110], extraWidth: 4, height: 7.5, catwalkHalf: 1.6, drop: [3.5, 5], dropLength: [10, 14], dropAt: 0.6 },
         // Cargo lift: the floor rises on a lift platform; hooks on chains swing across.
-        cargoLift: { weight: 2, minSub: 0, length: [75, 105], extraWidth: 4, height: 6.5, rise: [2.6, 3.6], liftLength: [8, 11], liftAt: 0.35, hookSpacing: [11, 16], hookY: 0.45, hookFreq: 0.09, crates: 0.35 },
+        cargoLift: {
+          weight: 2,
+          minSub: 0,
+          length: [75, 105],
+          extraWidth: 4,
+          height: 6.5,
+          rise: [2.6, 3.6],
+          liftLength: [8, 11],
+          liftAt: 0.35,
+          hookSpacing: [11, 16],
+          hookY: 0.45,
+          hookFreq: 0.09,
+          crates: 0.35,
+        },
         // Flooded section: water over the deck; railed catwalks, one on the lane.
-        flooded: { weight: 2, minSub: 1, length: [70, 105], extraWidth: 4.5, height: 4.6, catwalkHalf: 1.5, sideWalks: [12, 20], sideLength: [10, 20], level: -0.45 },
+        flooded: {
+          weight: 2,
+          minSub: 1,
+          length: [70, 105],
+          extraWidth: 4.5,
+          height: 4.6,
+          catwalkHalf: 1.5,
+          sideWalks: [12, 20],
+          sideLength: [10, 20],
+          level: -0.45,
+        },
         // Command deck: tiers of consoles under a big viewscreen, the floor raised a step.
         command: { weight: 2, minSub: 0, length: [70, 100], extraWidth: 5, height: 4.6, tier: 1.1, rowSpacing: [9, 13], gapWidth: 3.2, enclosure: 0.35 },
         // Ventilation: giant fans turning in pits under the deck; the lane keeps to the walkways.
@@ -633,7 +661,15 @@ export const CONFIG = {
     countsAfter: 8, // seconds a run must last (or finish) to keep the streak
     // The streak's rewards, by days in a row (day 7 and on pay the last). Cores go
     // through earn_cores as 'daily:<date>', which pays 3 at most (0019).
-    streak: [{ credits: 100 }, { credits: 150 }, { credits: 200, cores: 1 }, { credits: 250 }, { credits: 300, cores: 2 }, { credits: 350 }, { credits: 500, cores: 3 }],
+    streak: [
+      { credits: 100 },
+      { credits: 150 },
+      { credits: 200, cores: 1 },
+      { credits: 250 },
+      { credits: 300, cores: 2 },
+      { credits: 350 },
+      { credits: 500, cores: 3 },
+    ],
   },
 
   // Assist mode (settings): a gentler way to play.
@@ -669,15 +705,7 @@ export const CONFIG = {
     confirmCores: 100,
     // The 7-day login calendar: one claim a day (UTC), looping after day 7. A
     // missed day just waits: the next claim is the next day on the calendar.
-    login: [
-      { credits: 100 },
-      { cores: 5 },
-      { credits: 150 },
-      { credits: 250 },
-      { cores: 10 },
-      { credits: 300 },
-      { cores: 15, look: 'paint:aurora' },
-    ],
+    login: [{ credits: 100 }, { cores: 5 }, { credits: 150 }, { credits: 250 }, { cores: 10 }, { credits: 300 }, { cores: 15, look: 'paint:aurora' }],
     // Three a day (UTC), the same for everyone. Each pays credits and pass XP;
     // finishing all three pays cores.
     quests: { count: 3, credits: [60, 120], allDoneCores: 4, passXp: 30 },
@@ -711,7 +739,10 @@ export const CONFIG = {
   // never before day afterDays, at most one per everyRuns runs and minSeconds,
   // never after a new best, never for premium.
   ads: {
-    rewarded: { revive: true, doubleCredits: true, dailyGift: true, rerollQuest: true } as Record<'revive' | 'doubleCredits' | 'dailyGift' | 'rerollQuest', boolean>,
+    rewarded: { revive: true, doubleCredits: true, dailyGift: true, rerollQuest: true } as Record<
+      'revive' | 'doubleCredits' | 'dailyGift' | 'rerollQuest',
+      boolean
+    >,
     dailyGift: { credits: 150, cores: 2 },
     interstitial: { enabled: false, afterDays: 3, everyRuns: 3, minSeconds: 180 },
   },
@@ -723,15 +754,59 @@ export const CONFIG = {
     // Ice lakes: open ice the lane runs across. On it you slow a little and slide.
     ice: { firstAfter: 120, spacing: [130, 240], halfWidth: [6, 12], halfLength: [16, 32], slow: 0.86, grip: 0.24, runoff: 16, laneSlope: 0.5 },
     // Lava lakes: glowing pools off the lane. Touch one and the run ends, shield or not.
-    lava: { firstAfter: 80, spacing: [[90, 150], [60, 110], [40, 80]], halfWidth: [2.2, 4.5], halfLength: [3, 7], gap: [0.6, 3] },
+    lava: {
+      firstAfter: 80,
+      spacing: [
+        [90, 150],
+        [60, 110],
+        [40, 80],
+      ],
+      halfWidth: [2.2, 4.5],
+      halfLength: [3, 7],
+      gap: [0.6, 3],
+    },
     // Lava bombs from eruptions: they fall in front of you, landing off the lane, a
     // ring marking the spot as they come down. None at level 1 of the plain.
     // Bombs come in salvos: one at level 2 of the plain, a pair, three at level 3, a few units apart, landing either side.
-    bombs: { spacing: [[0, 0], [90, 150], [60, 110]], salvo: [0, 2, 3], salvoGap: [5, 9], height: 26, fallOver: 90, landAhead: [18, 28], radius: [0.8, 1.3], gap: [0.4, 2.6] },
+    bombs: {
+      spacing: [
+        [0, 0],
+        [90, 150],
+        [60, 110],
+      ],
+      salvo: [0, 2, 3],
+      salvoGap: [5, 9],
+      height: 26,
+      fallOver: 90,
+      landAhead: [18, 28],
+      radius: [0.8, 1.3],
+      gap: [0.4, 2.6],
+    },
     // Lava rivers cross the whole way; a basalt causeway carries the lane over, narrower deeper in.
-    river: { firstAfter: 150, spacing: [[300, 420], [220, 320], [160, 240]], length: [10, 18], half: [2.6, 2.3, 2.0] },
+    river: {
+      firstAfter: 150,
+      spacing: [
+        [300, 420],
+        [220, 320],
+        [160, 240],
+      ],
+      length: [10, 18],
+      half: [2.6, 2.3, 2.0],
+    },
     // Lava geysers: a vent that erupts on a cycle of distance. One on the lane is always down when you arrive.
-    geysers: { firstAfter: 100, spacing: [[90, 140], [60, 100], [40, 70]], count: [1, 2.6], half: [0.45, 0.7], period: [16, 26], height: [2.2, 3.2], laneChance: [0.15, 0.3, 0.4] },
+    geysers: {
+      firstAfter: 100,
+      spacing: [
+        [90, 140],
+        [60, 100],
+        [40, 70],
+      ],
+      count: [1, 2.6],
+      half: [0.45, 0.7],
+      period: [16, 26],
+      height: [2.2, 3.2],
+      laneChance: [0.15, 0.3, 0.4],
+    },
     // How much denser the ice field and volcanic plain are than other open ground.
     density: { ice: 1.25, volcanic: 1.3 },
   },

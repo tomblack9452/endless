@@ -17,7 +17,12 @@ describe('the day', () => {
   it('is the same for everyone on a date and changes with it', () => {
     expect(shopFor('2026-03-02').map((o) => keyOf(o.item))).toEqual(shopFor('2026-03-02').map((o) => keyOf(o.item)));
     const days = new Set<string>();
-    for (let i = 0; i < 20; i++) days.add(shopFor(dayKey(T0 + i * DAY)).map((o) => keyOf(o.item)).join());
+    for (let i = 0; i < 20; i++)
+      days.add(
+        shopFor(dayKey(T0 + i * DAY))
+          .map((o) => keyOf(o.item))
+          .join(),
+      );
     expect(days.size).toBeGreaterThan(15);
   });
 
@@ -50,7 +55,7 @@ describe('the day', () => {
     expect(all).toHaveLength(CONFIG.economy.shop.slots);
   });
 
-  it('keeps the day\'s picks when you buy one, and changes at midnight', () => {
+  it("keeps the day's picks when you buy one, and changes at midnight", () => {
     const shop = new DailyShop();
     const owned = new Set<string>();
     const first = shop.offers('2026-03-02', (k) => owned.has(k));

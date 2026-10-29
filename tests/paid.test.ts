@@ -41,7 +41,7 @@ describe('entitlements', () => {
     expect(again.has('premium')).toBe(false);
   });
 
-  it('are kept, and older saves\' bought products carry over', async () => {
+  it("are kept, and older saves' bought products carry over", async () => {
     data.set('endless.purchases', JSON.stringify(['starter_pack']));
     const e = new Entitlements();
     await e.load();
@@ -96,7 +96,11 @@ class FakeNetwork implements AdNetwork {
 
 /** Ads on a started network (consent done). */
 async function started(net: FakeNetwork, premium = false): Promise<Ads> {
-  const ads = new Ads(net, () => premium, () => 0);
+  const ads = new Ads(
+    net,
+    () => premium,
+    () => 0,
+  );
   await ads.start();
   await Promise.resolve();
   return ads;
@@ -115,20 +119,38 @@ describe('ad units', () => {
 
 describe('ads', () => {
   it('offer nothing without a network, unless premium (free rewards)', async () => {
-    const free = new Ads(new FakeNetwork(false), () => false, () => 0);
+    const free = new Ads(
+      new FakeNetwork(false),
+      () => false,
+      () => 0,
+    );
     expect(free.offers('revive')).toBe(false);
     expect(await free.reward('revive')).toBe(false);
-    const premium = new Ads(new FakeNetwork(false), () => true, () => 0);
+    const premium = new Ads(
+      new FakeNetwork(false),
+      () => true,
+      () => 0,
+    );
     expect(premium.offers('revive')).toBe(true);
     expect(await premium.reward('revive')).toBe(true);
   });
 
   it('swap a daily goal for free where there are no ads (the web)', async () => {
-    const web = new Ads(new FakeNetwork(false), () => false, () => 0);
+    const web = new Ads(
+      new FakeNetwork(false),
+      () => false,
+      () => 0,
+    );
     expect(web.offers('rerollQuest')).toBe(true);
     expect(web.label()).toBe('free');
     expect(await web.reward('rerollQuest')).toBe(true);
-    expect(new Ads(new FakeNetwork(true), () => false, () => 0).label()).toBe('watch an ad');
+    expect(
+      new Ads(
+        new FakeNetwork(true),
+        () => false,
+        () => 0,
+      ).label(),
+    ).toBe('watch an ad');
   });
 
   it('reward only an ad watched to the end, and never show one to premium', async () => {
@@ -143,7 +165,11 @@ describe('ads', () => {
 
   it('load one ad ahead after consent, and another after each is shown', async () => {
     const net = new FakeNetwork(true);
-    const ads = new Ads(net, () => false, () => 0);
+    const ads = new Ads(
+      net,
+      () => false,
+      () => 0,
+    );
     ads.preload();
     expect(net.loads).toBe(0); // not before consent
     await ads.start();
@@ -166,7 +192,11 @@ describe('ads', () => {
     try {
       const net = new FakeNetwork(true);
       net.fill = 'hang';
-      const ads = new Ads(net, () => false, () => 0);
+      const ads = new Ads(
+        net,
+        () => false,
+        () => 0,
+      );
       await ads.start();
       const tap = ads.watch('revive');
       expect(await ads.watch('revive')).toBe('busy'); // a second tap waits for the first
@@ -184,7 +214,11 @@ describe('ads', () => {
       let premium = false;
       const net = new FakeNetwork(true);
       net.fill = 'fail';
-      const ads = new Ads(net, () => premium, () => 0);
+      const ads = new Ads(
+        net,
+        () => premium,
+        () => 0,
+      );
       await ads.start();
       await vi.advanceTimersByTimeAsync(0);
       expect(net.loads).toBe(1);
@@ -212,7 +246,11 @@ describe('ads', () => {
   it('keep interstitials off at launch', () => {
     expect(CONFIG.ads.interstitial.enabled).toBe(false);
     const net = new FakeNetwork(true);
-    const ads = new Ads(net, () => false, () => 0);
+    const ads = new Ads(
+      net,
+      () => false,
+      () => 0,
+    );
     for (let i = 0; i < 20; i++) ads.afterRun(30 * DAY + i * 600_000, false);
     expect(net.interstitials).toBe(0);
   });
@@ -223,7 +261,11 @@ describe('ads', () => {
     I.enabled = true;
     try {
       const net = new FakeNetwork(true);
-      const ads = new Ads(net, () => false, () => 0);
+      const ads = new Ads(
+        net,
+        () => false,
+        () => 0,
+      );
       for (let i = 0; i < 10; i++) ads.afterRun(DAY + i * 600_000, false); // before day 3
       expect(net.interstitials).toBe(0);
       const t = 10 * DAY;
@@ -234,7 +276,11 @@ describe('ads', () => {
       expect(ads.afterRun(t + I.minSeconds * 1000 + 1, true)).toBe(false); // a new best
       expect(ads.afterRun(t + I.minSeconds * 1000 + 2, false)).toBe(true);
       const premiumNet = new FakeNetwork(true);
-      const premium = new Ads(premiumNet, () => true, () => 0);
+      const premium = new Ads(
+        premiumNet,
+        () => true,
+        () => 0,
+      );
       for (let i = 0; i < 10; i++) premium.afterRun(t + i * 600_000, false);
       expect(premiumNet.interstitials).toBe(0);
     } finally {

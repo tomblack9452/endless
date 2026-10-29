@@ -16,7 +16,20 @@ const owner = (over: Partial<Owner> = {}, snap: Record<string, number> = {}): Ow
     const a = achievement(id);
     return a
       ? progressOn(a, {
-          runs: 0, distance: 0, seconds: 0, nearMisses: 0, bestChain: 0, pickups: 0, crashes: 0, furthest: 1, endlessBest: 0, envBest: {}, coursesDone: 0, stars: 0, upgradePoints: 0, looksOwned: 0,
+          runs: 0,
+          distance: 0,
+          seconds: 0,
+          nearMisses: 0,
+          bestChain: 0,
+          pickups: 0,
+          crashes: 0,
+          furthest: 1,
+          endlessBest: 0,
+          envBest: {},
+          coursesDone: 0,
+          stars: 0,
+          upgradePoints: 0,
+          looksOwned: 0,
           ...snap,
         })
       : { have: 0, target: 1, done: false };
@@ -40,7 +53,7 @@ describe('the hangar', () => {
     expect(v.summary).toMatch(/^\d+ of \d+ looks$/);
   });
 
-  it('has a card for every look in the slot, in the catalogue\'s order', () => {
+  it("has a card for every look in the slot, in the catalogue's order", () => {
     for (const slot of SLOTS) {
       const v = view(slot, null);
       expect(v.cards.map((c) => c.id)).toEqual(itemsIn(slot).map((i) => i.id));
@@ -86,7 +99,7 @@ describe('the hangar', () => {
     expect(view('paint', 'nebula', deps({ credits: 1e6 })).detail?.action.enabled).toBe(false); // cores, not credits
   });
 
-  it('sells a vault look only while it is the month\'s', () => {
+  it("sells a vault look only while it is the month's", () => {
     const [here, away] = [VAULT_ORDER[0], VAULT_ORDER[1]];
     const [s1, i1] = here.split(':');
     const [s2, i2] = away.split(':');

@@ -243,7 +243,8 @@ export class Ranked {
 export function insignia(i: number): string {
   const rk = RANKS[i];
   const parts: string[] = [];
-  const chevron = (y: number) => `<path d="M10 ${y + 9} L24 ${y} L38 ${y + 9}" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linejoin="round" stroke-linecap="round"/>`;
+  const chevron = (y: number) =>
+    `<path d="M10 ${y + 9} L24 ${y} L38 ${y + 9}" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linejoin="round" stroke-linecap="round"/>`;
   const rocker = (y: number) => `<path d="M11 ${y} Q24 ${y + 7} 37 ${y}" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>`;
   const bar = (y: number) => `<rect x="12" y="${y}" width="24" height="5" rx="1" fill="currentColor"/>`;
   const diamond = (cx: number, cy: number, s: number, fill: boolean) =>

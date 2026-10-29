@@ -39,7 +39,11 @@ function run(level: number, seed: number, seconds: number, each: (w: Inner, worl
     s.world.advance(1 / 20, speed, 0);
     score += speed * (1 / 20) * CONFIG.score.pointsPerUnit;
     for (const r of s.w.rivers) seen.rivers.add(Math.round(r.d0));
-    for (const [f, set] of [[s.w.lavaBombs, seen.bombs], [s.w.vents, seen.vents], [s.w.columns, seen.columns]] as const) {
+    for (const [f, set] of [
+      [s.w.lavaBombs, seen.bombs],
+      [s.w.vents, seen.vents],
+      [s.w.columns, seen.columns],
+    ] as const) {
       for (let i = 0; i < f.top; i++) if (f.active[i]) set.add(Math.round(f.d[i] * 10));
     }
     each(s.w, s.world);

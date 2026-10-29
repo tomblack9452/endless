@@ -63,7 +63,9 @@ export interface BoardRow {
 }
 
 /** The summary of a service record each pilot sends for others to see: rank, xp and lifetime stats, all numbers. */
-export type PilotStats = Partial<Record<'rank' | 'xp' | 'runs' | 'seconds' | 'distance' | 'bestLevel' | 'bestChain' | 'nearMisses' | 'pickups' | 'rankedRuns', number>>;
+export type PilotStats = Partial<
+  Record<'rank' | 'xp' | 'runs' | 'seconds' | 'distance' | 'bestLevel' | 'bestChain' | 'nearMisses' | 'pickups' | 'rankedRuns', number>
+>;
 
 /** A pilot's service record as the boards show it. */
 export interface PilotRecord {

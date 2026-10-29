@@ -105,7 +105,9 @@ describe('solo environments', () => {
             }
           }
           const prev = world.distance;
-          eased += (Math.max(-1, Math.min(1, (target - hooked.shipX) * 1.5)) - eased) * (1 - Math.exp(-(CONFIG.steering.response * (world.onIce() ? CONFIG.hazards.ice.grip : 1)) / 60));
+          eased +=
+            (Math.max(-1, Math.min(1, (target - hooked.shipX) * 1.5)) - eased) *
+            (1 - Math.exp(-(CONFIG.steering.response * (world.onIce() ? CONFIG.hazards.ice.grip : 1)) / 60));
           world.advance(1 / 60, speed, eased * lateralSpeedAt(speed));
           crashed = world.overPit() || world.inLava() || world.hitTest(prev);
         }
@@ -114,7 +116,6 @@ describe('solo environments', () => {
     });
   });
 });
-
 
 // Ranked: endless from the start on the week's seed. Twelve weeks in a row,
 // each survivable for 90 seconds by a pilot that follows the lane.
@@ -125,7 +126,11 @@ function mondays(n: number): string[] {
 }
 
 /** Fly an endless run on `seed`; returns the lane seen at each row, and whether it crashed. */
-function flyEndless(seed: number, seconds: number, opts: { weave?: boolean; boost?: boolean; powerRate?: number } = {}): { lanes: Map<number, number>; crashedAt: number | null } {
+function flyEndless(
+  seed: number,
+  seconds: number,
+  opts: { weave?: boolean; boost?: boolean; powerRate?: number } = {},
+): { lanes: Map<number, number>; crashedAt: number | null } {
   const world = new World(new Scene(), new LivePalette());
   const hooked = world as unknown as Hooked;
   const lanes = new Map<number, number>();
@@ -213,7 +218,10 @@ describe('the daily challenge', () => {
     for (const r of runs) {
       expect(courseLength(r.course), r.day).toBe(CONFIG.daily.length);
       const d = r.course.sections.map((s) => s.difficulty);
-      expect([...d].sort((a, b) => a - b), r.day).toEqual(d);
+      expect(
+        [...d].sort((a, b) => a - b),
+        r.day,
+      ).toEqual(d);
       // About a minute: a try, not a level.
       const seconds = r.course.sections.reduce((t, s) => t + s.length / speedAt(s.difficulty), 0);
       expect(seconds, r.day).toBeGreaterThan(45);

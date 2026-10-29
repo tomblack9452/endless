@@ -55,6 +55,6 @@ export class LivePalette {
   }
 
   textCss(): string {
-    return '#' + this.text.getHexString();
+    return `#${this.text.getHexString()}`;
   }
 }

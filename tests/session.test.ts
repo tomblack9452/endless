@@ -39,7 +39,8 @@ function auth(status: number) {
       calls.push(path);
       await new Promise((r) => setTimeout(r, 5));
       if (path === '/auth/v1/signup') return new Response(JSON.stringify({ ...fresh, user: { id: 'someone-new' } }), { status: 200 });
-      if (path.startsWith('/auth/v1/token?grant_type=refresh_token')) return status === 200 ? new Response(JSON.stringify(fresh), { status }) : new Response(JSON.stringify({ error_code: 'x' }), { status });
+      if (path.startsWith('/auth/v1/token?grant_type=refresh_token'))
+        return status === 200 ? new Response(JSON.stringify(fresh), { status }) : new Response(JSON.stringify({ error_code: 'x' }), { status });
       return new Response('{}', { status: 404 });
     }),
   );

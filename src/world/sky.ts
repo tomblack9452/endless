@@ -11,7 +11,7 @@ import {
   PlaneGeometry,
   Points,
   PointsMaterial,
-  Scene,
+  type Scene,
   SRGBColorSpace,
   Vector3,
 } from 'three';
@@ -88,7 +88,7 @@ export class Sky {
     // Stars, denser towards the top, a few brighter ones.
     const pos = new Float32Array(S.stars * 3);
     for (let i = 0; i < S.stars; i++) {
-      dome((Math.random() * 2 - 1) * 55, 2 + Math.pow(Math.random(), 0.7) * 70, v);
+      dome((Math.random() * 2 - 1) * 55, 2 + Math.random() ** 0.7 * 70, v);
       pos.set([v.x, v.y, v.z], i * 3);
     }
     const geo = new BufferGeometry();

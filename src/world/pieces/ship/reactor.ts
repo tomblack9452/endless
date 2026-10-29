@@ -23,13 +23,30 @@ export const reactor1: Piece = {
     [19, '#.....................#'],
   ),
   overlays: [
-    {at: 22, kind: 'steam', x: 2.8, y: -1.5, h: 4},
-    {at: 30, kind: 'steam', x: -2.8, y: -1.5, h: 4},
-    {at: 36, kind: 'steam', x: 2.8, y: -1.5, h: 4},
+    { at: 22, kind: 'steam', x: 2.8, y: -1.5, h: 4 },
+    { at: 30, kind: 'steam', x: -2.8, y: -1.5, h: 4 },
+    { at: 36, kind: 'steam', x: 2.8, y: -1.5, h: 4 },
   ],
   routes: [
-    { tag: 'main', points: [[0, 0], [18, 4.5], [40, 4.5], [58, 0]] },
-    { tag: 'alt', reward: 'pickups', points: [[0, 0], [18, -4.5], [40, -4.5], [58, 0]] },
+    {
+      tag: 'main',
+      points: [
+        [0, 0],
+        [18, 4.5],
+        [40, 4.5],
+        [58, 0],
+      ],
+    },
+    {
+      tag: 'alt',
+      reward: 'pickups',
+      points: [
+        [0, 0],
+        [18, -4.5],
+        [40, -4.5],
+        [58, 0],
+      ],
+    },
   ],
 };
 
@@ -48,13 +65,28 @@ export const reactor2: Piece = {
     [25, '#...................#'],
   ),
   overlays: [
-    {at: 28, kind: 'steam', x: -5, y: -3, h: 6},
-    {at: 34, kind: 'steam', x: 3, y: -3, h: 6},
-    {at: 40, kind: 'steam', x: -6, y: -3, h: 6},
-    {at: 31, kind: 'sparks', x: -8.5, y: 1.5},
+    { at: 28, kind: 'steam', x: -5, y: -3, h: 6 },
+    { at: 34, kind: 'steam', x: 3, y: -3, h: 6 },
+    { at: 40, kind: 'steam', x: -6, y: -3, h: 6 },
+    { at: 31, kind: 'sparks', x: -8.5, y: 1.5 },
   ],
   routes: [
-    { tag: 'main', points: [[0, 0], [70, 0]] },
-    { tag: 'alt', reward: 'pickups', points: [[0, 0], [24, 6], [46, 6], [70, 0]] },
+    {
+      tag: 'main',
+      points: [
+        [0, 0],
+        [70, 0],
+      ],
+    },
+    {
+      tag: 'alt',
+      reward: 'pickups',
+      points: [
+        [0, 0],
+        [24, 6],
+        [46, 6],
+        [70, 0],
+      ],
+    },
   ],
 };

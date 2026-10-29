@@ -45,7 +45,11 @@ export function reportLink(send: (reason: ReportReason) => Promise<ReportResult>
     const picks = document.createElement('div');
     picks.className = 'pilot-report-reasons';
     picks.append(...REPORT_REASONS.map(([id, text]) => button('tab', text, () => void go(id))));
-    box.replaceChildren(line('report them for'), picks, button('label link dim pilot-report-link', 'cancel', () => box.replaceChildren(link)));
+    box.replaceChildren(
+      line('report them for'),
+      picks,
+      button('label link dim pilot-report-link', 'cancel', () => box.replaceChildren(link)),
+    );
   };
   const go = async (reason: ReportReason) => {
     box.replaceChildren(line('sending'));

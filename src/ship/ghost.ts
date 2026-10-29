@@ -43,7 +43,13 @@ export class Ghost {
   private on = false;
 
   /** `tint`: the rival's ghost takes the accent instead of the text colour. */
-  constructor(scene: Scene, geometry: BufferGeometry, private readonly palette: LivePalette, private readonly tint: Color | null = null, opacity = 0.28) {
+  constructor(
+    scene: Scene,
+    geometry: BufferGeometry,
+    private readonly palette: LivePalette,
+    private readonly tint: Color | null = null,
+    opacity = 0.28,
+  ) {
     this.mat = new MeshBasicMaterial({ transparent: true, opacity, depthWrite: false });
     this.mesh = new Mesh(geometry, this.mat);
     this.mesh.visible = false;

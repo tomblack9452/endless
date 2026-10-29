@@ -56,12 +56,7 @@ export function planReminders(now: number, hour: number, minute: number, st: Rem
     if (st.doneDay !== null && dayKey(at.getTime()) === st.doneDay) continue;
     // The game's week turns on Monday, UTC: say so on the day it does.
     const monday = new Date(Date.parse(`${dayKey(at.getTime())}T00:00:00Z`)).getUTCDay() === 1;
-    const body =
-      monday && st.rankedOpen
-        ? "new ranked run: this week's course is up"
-        : st.dailyOpen
-          ? "today's challenge is up"
-          : 'your daily reward is ready';
+    const body = monday && st.rankedOpen ? "new ranked run: this week's course is up" : st.dailyOpen ? "today's challenge is up" : 'your daily reward is ready';
     out.push({ id: REMINDER_IDS[i], at, title: 'endless space', body });
   }
   return out;

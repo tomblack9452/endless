@@ -21,11 +21,14 @@ export function liftSplash(onGone: () => void = () => undefined): void {
   // Two frames: the game's first frame is on screen behind the splash.
   requestAnimationFrame(() =>
     requestAnimationFrame(() => {
-      setTimeout(() => {
-        el.classList.add('done');
-        el.addEventListener('transitionend', (e) => e.target === el && gone());
-        setTimeout(gone, 800); // no transition to wait for (reduce motion, a hidden tab)
-      }, Math.max(0, MIN_MS - performance.now()));
+      setTimeout(
+        () => {
+          el.classList.add('done');
+          el.addEventListener('transitionend', (e) => e.target === el && gone());
+          setTimeout(gone, 800); // no transition to wait for (reduce motion, a hidden tab)
+        },
+        Math.max(0, MIN_MS - performance.now()),
+      );
     }),
   );
 }

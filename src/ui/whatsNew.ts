@@ -4,22 +4,14 @@
 // The lines for each version live here, newest first.
 
 export const WHATS_NEW: Readonly<Record<string, readonly string[]>> = {
-  '1.0.12': [
-    'a new full-screen splash as the game loads',
-    'tap steering: no more boosting by mistake',
-    'a cores spend is never charged twice',
-  ],
+  '1.0.12': ['a new full-screen splash as the game loads', 'tap steering: no more boosting by mistake', 'a cores spend is never charged twice'],
   '1.0.11': [
     'cores earned or spent offline are kept',
     'spending 100 cores or more asks first',
     'bigger tap areas; back closes every card',
     'lots of small fixes from a full check-up',
   ],
-  '1.0.10': [
-    'smoother on mid-range phones',
-    'graphics: auto, high or low in settings',
-    'auto turns to low by itself if needed',
-  ],
+  '1.0.10': ['smoother on mid-range phones', 'graphics: auto, high or low in settings', 'auto turns to low by itself if needed'],
   '1.0.9': [
     'new power-ups: phase and double points',
     'risk lanes, gate runs and km milestones',

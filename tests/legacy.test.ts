@@ -73,7 +73,7 @@ describe('tickets paid back', () => {
     expect(got).toBe(90);
   });
 
-  it('pays nothing for the week\'s own tickets or a new save', async () => {
+  it("pays nothing for the week's own tickets or a new save", async () => {
     expect(await migrateTickets(() => {})).toBe(0);
     data.set('endless.tickets', JSON.stringify({ count: 3 }));
     expect(await migrateTickets(() => {})).toBe(0);

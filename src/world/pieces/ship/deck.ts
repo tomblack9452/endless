@@ -26,12 +26,27 @@ export const deck1: Piece = {
     [25, '#...................#'],
   ),
   overlays: [
-    {at: 8, kind: 'holo', x: -6, y: 1, w: 2, h: 1.2},
-    {at: 31, kind: 'holo', x: 2.5, y: 1, w: 1.6, h: 1},
+    { at: 8, kind: 'holo', x: -6, y: 1, w: 2, h: 1.2 },
+    { at: 31, kind: 'holo', x: 2.5, y: 1, w: 1.6, h: 1 },
   ],
   routes: [
-    { tag: 'main', points: [[0, 0], [63, 0]] },
-    { tag: 'alt', reward: 'pickups', points: [[0, 0], [20, 5], [43, 5], [63, 0]] },
+    {
+      tag: 'main',
+      points: [
+        [0, 0],
+        [63, 0],
+      ],
+    },
+    {
+      tag: 'alt',
+      reward: 'pickups',
+      points: [
+        [0, 0],
+        [20, 5],
+        [43, 5],
+        [63, 0],
+      ],
+    },
   ],
 };
 
@@ -52,11 +67,24 @@ export const deck2: Piece = {
     [8, '#.............K.......#'],
     [28, '#.....................#'],
   ),
-  overlays: [
-    {at: 24, kind: 'holo', x: 3, y: 1, w: 0.2, h: 1.4},
-  ],
+  overlays: [{ at: 24, kind: 'holo', x: 3, y: 1, w: 0.2, h: 1.4 }],
   routes: [
-    { tag: 'main', points: [[0, 0], [68, 0]] },
-    { tag: 'risky', reward: 'pickups', points: [[0, 0], [24, 6], [44, 6], [68, 0]] },
+    {
+      tag: 'main',
+      points: [
+        [0, 0],
+        [68, 0],
+      ],
+    },
+    {
+      tag: 'risky',
+      reward: 'pickups',
+      points: [
+        [0, 0],
+        [24, 6],
+        [44, 6],
+        [68, 0],
+      ],
+    },
   ],
 };

@@ -19,7 +19,7 @@ export function isLight(hex: string): boolean {
   if (h.length !== 6 || Number.isNaN(n)) return false;
   const lin = (c: number): number => {
     const v = c / 255;
-    return v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
+    return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
   };
   const y = 0.2126 * lin((n >> 16) & 255) + 0.7152 * lin((n >> 8) & 255) + 0.0722 * lin(n & 255);
   return y > 0.18; // about mid-grey to the eye

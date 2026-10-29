@@ -100,7 +100,12 @@ describe('the asteroid belt', () => {
   });
 
   it('keeps every rock clear of the lane when the ship gets to it', () => {
-    for (const [level, seed] of [[13, 1], [14, 2], [15, 3], [15, 4]]) {
+    for (const [level, seed] of [
+      [13, 1],
+      [14, 2],
+      [15, 3],
+      [15, 4],
+    ]) {
       const s = fly(level, seed, 25);
       // The ship's half width is 0.16; the lane keeps a margin of more than that.
       expect(s.minGap, `level ${level} seed ${seed}`).toBeGreaterThan(CONFIG.ship.hitHalfWidth + 0.3);

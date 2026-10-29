@@ -137,7 +137,10 @@ export class Trail {
   private readonly right: Flame;
 
   /** `mount` is the ship's engine point (Player.engine). */
-  constructor(mount: Object3D, private readonly palette: LivePalette) {
+  constructor(
+    mount: Object3D,
+    private readonly palette: LivePalette,
+  ) {
     this.centre = new Flame(mount, this.material);
     this.left = new Flame(mount, this.material);
     this.right = new Flame(mount, this.material);

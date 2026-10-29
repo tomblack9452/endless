@@ -207,7 +207,12 @@ export class Looks {
     const done: string[] = [];
     for (const s of sets) {
       if (this.paidSets.has(s.id)) continue;
-      if (s.items.every((k) => { const it = byKey(k); return it !== undefined && this.owns(it, o); })) {
+      if (
+        s.items.every((k) => {
+          const it = byKey(k);
+          return it !== undefined && this.owns(it, o);
+        })
+      ) {
         this.paidSets.add(s.id);
         done.push(s.id);
       }

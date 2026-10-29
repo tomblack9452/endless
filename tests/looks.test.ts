@@ -109,20 +109,70 @@ describe('the catalogue', () => {
 
   it('keeps every old id (saves from before the catalogue grew still work)', () => {
     const old = [
-      'hull:dart', 'hull:wing', 'hull:needle', 'hull:manta', 'hull:arrow', 'hull:talon', 'hull:nova', 'hull:raptor',
-      'paint:standard', 'paint:slate', 'paint:crimson', 'paint:cobalt', 'paint:olive', 'paint:sand', 'paint:white', 'paint:carbon', 'paint:gunmetal', 'paint:chrome',
-      'paint:silver', 'paint:gold', 'paint:platinum', 'paint:diamond', 'paint:champion', 'paint:supernova', 'paint:nebula', 'paint:solar', 'paint:void',
-      'paint:aurora', 'paint:frost', 'paint:ember', 'paint:mint', 'paint:rose', 'paint:midnight', 'paint:glacier',
-      'markings:none', 'markings:stripe', 'markings:twin', 'markings:split', 'markings:chevron', 'markings:twotone',
-      'fins:none', 'fins:tail', 'fins:twin', 'fins:winglets',
-      'engine:standard', 'engine:amber', 'engine:cyan', 'engine:violet', 'engine:green', 'engine:white', 'engine:red', 'engine:plasma', 'engine:solar', 'engine:ice', 'engine:gold',
-      'decal:none', 'decal:rank', 'decal:league',
+      'hull:dart',
+      'hull:wing',
+      'hull:needle',
+      'hull:manta',
+      'hull:arrow',
+      'hull:talon',
+      'hull:nova',
+      'hull:raptor',
+      'paint:standard',
+      'paint:slate',
+      'paint:crimson',
+      'paint:cobalt',
+      'paint:olive',
+      'paint:sand',
+      'paint:white',
+      'paint:carbon',
+      'paint:gunmetal',
+      'paint:chrome',
+      'paint:silver',
+      'paint:gold',
+      'paint:platinum',
+      'paint:diamond',
+      'paint:champion',
+      'paint:supernova',
+      'paint:nebula',
+      'paint:solar',
+      'paint:void',
+      'paint:aurora',
+      'paint:frost',
+      'paint:ember',
+      'paint:mint',
+      'paint:rose',
+      'paint:midnight',
+      'paint:glacier',
+      'markings:none',
+      'markings:stripe',
+      'markings:twin',
+      'markings:split',
+      'markings:chevron',
+      'markings:twotone',
+      'fins:none',
+      'fins:tail',
+      'fins:twin',
+      'fins:winglets',
+      'engine:standard',
+      'engine:amber',
+      'engine:cyan',
+      'engine:violet',
+      'engine:green',
+      'engine:white',
+      'engine:red',
+      'engine:plasma',
+      'engine:solar',
+      'engine:ice',
+      'engine:gold',
+      'decal:none',
+      'decal:rank',
+      'decal:league',
     ];
     for (const k of old) expect(byKey(k), k).toBeDefined();
   });
 
   it('prices old paid items the same', () => {
-    const cost = (k: string) => (byKey(k)?.unlock as { cost?: number }).cost;
+    const cost = (k: string) => (byKey(k)?.unlock as { cost?: number } | undefined)?.cost;
     expect(cost('hull:arrow')).toBe(1500);
     expect(cost('hull:talon')).toBe(4000);
     expect(cost('hull:nova')).toBe(400);
@@ -154,7 +204,23 @@ describe('goals', () => {
     for (const a of ACHIEVEMENTS) {
       let last = -1;
       for (const k of steps) {
-        const snap: Snapshot = { ...BLANK, runs: k * 100, distance: k * 10000, seconds: k * 5000, nearMisses: k * 1000, bestChain: k * 5, pickups: k * 500, crashes: k * 100, furthest: 1 + k * 5, endlessBest: k * 10000, coursesDone: Math.floor(k), stars: k * 10, upgradePoints: k * 5, looksOwned: k * 20, envBest: { 'open-ground': k * 3000 } };
+        const snap: Snapshot = {
+          ...BLANK,
+          runs: k * 100,
+          distance: k * 10000,
+          seconds: k * 5000,
+          nearMisses: k * 1000,
+          bestChain: k * 5,
+          pickups: k * 500,
+          crashes: k * 100,
+          furthest: 1 + k * 5,
+          endlessBest: k * 10000,
+          coursesDone: Math.floor(k),
+          stars: k * 10,
+          upgradePoints: k * 5,
+          looksOwned: k * 20,
+          envBest: { 'open-ground': k * 3000 },
+        };
         const have = progressOn(a, snap).have;
         expect(have, `${a.id} at ${k}`).toBeGreaterThanOrEqual(last);
         last = have;

@@ -10,7 +10,7 @@ import {
   MeshBasicMaterial,
   PlaneGeometry,
   Raycaster,
-  Scene,
+  type Scene,
   Vector3,
 } from 'three';
 import type { Fin, Marking, ShipId } from './looks';
@@ -245,7 +245,21 @@ function hullPoint(f: Frame, a: number, b: number): [number, number] {
 }
 
 /** Marking ids for the hull shader (0 = none). */
-export const MARKING_ID: Record<Marking, number> = { none: 0, stripe: 1, twin: 2, split: 3, twotone: 4, chevron: 5, nose: 6, tips: 7, spine: 8, hazard: 9, checker: 10, dots: 11, rings: 12 };
+export const MARKING_ID: Record<Marking, number> = {
+  none: 0,
+  stripe: 1,
+  twin: 2,
+  split: 3,
+  twotone: 4,
+  chevron: 5,
+  nose: 6,
+  tips: 7,
+  spine: 8,
+  hazard: 9,
+  checker: 10,
+  dots: 11,
+  rings: 12,
+};
 
 /**
  * Markings are painted by the hull's own shader, worked out per pixel from
@@ -317,7 +331,8 @@ function finGeometry(geometry: BufferGeometry, f: Frame, fin: Exclude<Fin, 'none
     tri(bl, br, top);
   };
   if (fin === 'tail') wedge(0, 0, 0.26);
-  else if (fin === 'blade') wedge(0, 0, 0.15, 0.72); // long and low
+  else if (fin === 'blade')
+    wedge(0, 0, 0.15, 0.72); // long and low
   else if (fin === 'crest') {
     wedge(0, 0, 0.34, 0.5);
     wedge(-halfW * 0.4, -0.08, 0.12, 0.3);
@@ -356,7 +371,7 @@ function svgTexture(svg: string, texture: CanvasTexture): void {
     ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
     texture.needsUpdate = true;
   };
-  img.src = 'data:image/svg+xml;utf8,' + encodeURIComponent(svg.replace(/currentColor/g, '#ffffff'));
+  img.src = `data:image/svg+xml;utf8,${encodeURIComponent(svg.replace(/currentColor/g, '#ffffff'))}`;
 }
 
 /** Perceived brightness 0..1. */
@@ -407,7 +422,10 @@ export class Player {
   private falling = false;
   private fallVel = 0;
 
-  constructor(scene: Scene, private readonly palette: LivePalette) {
+  constructor(
+    scene: Scene,
+    private readonly palette: LivePalette,
+  ) {
     this.matTop = new MeshBasicMaterial({ color: palette.ship, side: DoubleSide });
     this.matShade = new MeshBasicMaterial({ color: palette.shipShade, side: DoubleSide });
     this.matShadow = new MeshBasicMaterial({
@@ -436,10 +454,7 @@ export class Player {
     this.root.add(this.shield);
 
     const sg = new BufferGeometry();
-    sg.setAttribute(
-      'position',
-      new Float32BufferAttribute([...xyz(NOSE), ...xyz(LEFT), ...xyz(RIGHT)], 3),
-    );
+    sg.setAttribute('position', new Float32BufferAttribute([...xyz(NOSE), ...xyz(LEFT), ...xyz(RIGHT)], 3));
     this.shadow = new Mesh(sg, this.matShadow);
     this.shadow.position.y = 0.01;
     this.shadow.scale.set(1.05, 1, 1.05);
@@ -681,7 +696,10 @@ export class Player {
     const a = NOSE.clone().lerp(LEFT, 0.5);
     const b = LEFT.clone().lerp(RIGHT, 0.5);
     const c = RIGHT.clone().lerp(NOSE, 0.5);
-    const g = NOSE.clone().add(LEFT).add(RIGHT).multiplyScalar(1 / 3);
+    const g = NOSE.clone()
+      .add(LEFT)
+      .add(RIGHT)
+      .multiplyScalar(1 / 3);
     const tris = [
       [NOSE, a, g],
       [a, LEFT, g],
@@ -692,11 +710,18 @@ export class Player {
     ].slice(0, CONFIG.crash.fragments);
 
     tris.forEach((t, i) => {
-      const centre = t[0].clone().add(t[1]).add(t[2]).multiplyScalar(1 / 3);
+      const centre = t[0]
+        .clone()
+        .add(t[1])
+        .add(t[2])
+        .multiplyScalar(1 / 3);
       const geo = new BufferGeometry();
       geo.setAttribute(
         'position',
-        new Float32BufferAttribute(t.flatMap((v) => xyz(v.clone().sub(centre))), 3),
+        new Float32BufferAttribute(
+          t.flatMap((v) => xyz(v.clone().sub(centre))),
+          3,
+        ),
       );
       const mesh = new Mesh(geo, i % 2 === 0 ? this.matTop : this.matShade);
       mesh.userData.base = centre;

@@ -1,7 +1,21 @@
 import { storage } from '../core/storage';
 import { reportError } from '../platform/errors';
 import type { ShipLook } from '../ship/portrait';
-import type { Backend, BoardQuery, BoardRow, ClientError, LinkResult, PilotRecord, PilotStats, Purchase, ReportReason, ReportResult, RivalRun, RunSubmission, SubmitResult } from './backend';
+import type {
+  Backend,
+  BoardQuery,
+  BoardRow,
+  ClientError,
+  LinkResult,
+  PilotRecord,
+  PilotStats,
+  Purchase,
+  ReportReason,
+  ReportResult,
+  RivalRun,
+  RunSubmission,
+  SubmitResult,
+} from './backend';
 
 // Supabase over plain fetch (no SDK, to keep the bundle small):
 //   auth      anonymous sign-in, refreshed as it expires; a Google login can be
@@ -42,7 +56,11 @@ export class SupabaseBackend implements Backend {
     // server_now (0012) answers to the anon key, so this works before signing in.
     try {
       const sent = Date.now();
-      const res = await fetch(`${this.url}/rest/v1/rpc/server_now`, { method: 'POST', headers: { apikey: this.key, 'Content-Type': 'application/json' }, body: '{}' });
+      const res = await fetch(`${this.url}/rest/v1/rpc/server_now`, {
+        method: 'POST',
+        headers: { apikey: this.key, 'Content-Type': 'application/json' },
+        body: '{}',
+      });
       this.reachable = res.status < 500;
       const got = Date.now();
       const at = res.ok ? Date.parse(String(await res.json().catch(() => ''))) : NaN;
@@ -122,7 +140,7 @@ export class SupabaseBackend implements Backend {
       const e = (await res.json().catch(() => ({}))) as { error_code?: string; code?: string | number; msg?: string; message?: string };
       const code = typeof e.error_code === 'string' ? e.error_code : typeof e.code === 'string' ? e.code : '';
       const why = code || (/already/i.test(e.msg ?? e.message ?? '') ? 'identity_already_exists' : `http_${res.status}`);
-      this.authError = e.msg ?? e.message ? `${why}: ${e.msg ?? e.message}` : why;
+      this.authError = (e.msg ?? e.message) ? `${why}: ${e.msg ?? e.message}` : why;
       // 4xx is the server saying no (a bad or used-up token); 5xx, 408 and 429 are worth another try.
       return { session: null, code: why, refused: res.status >= 400 && res.status < 500 && res.status !== 408 && res.status !== 429 };
     }
@@ -287,16 +305,30 @@ export class SupabaseBackend implements Backend {
     // Any other answer is the server saying no, and asking again won't change it.
     // The "too quickly" rate limit is the one 4xx worth another try.
     const message = SupabaseBackend.reason(body);
-    if (status === 0 || status >= 500 || status === 401 || status === 403 || status === 429 || /too many runs too quickly/.test(message)) return { status: 'retry', message };
+    if (status === 0 || status >= 500 || status === 401 || status === 403 || status === 429 || /too many runs too quickly/.test(message))
+      return { status: 'retry', message };
     return { status: 'rejected', message };
   }
 
   async board(q: BoardQuery): Promise<BoardRow[] | null> {
-    const rows = await this.call<{ rank: number; name: string; score: number; you: boolean; premium?: boolean; ship?: ShipLook | null; pid?: string | null }[]>('/rest/v1/rpc/leaderboard', {
-      method: 'POST',
-      body: JSON.stringify({ p_board: q.board, p_period: q.period, p_league: q.league, p_limit: q.limit ?? 50 }),
-    });
-    return rows ? rows.map((r) => ({ rank: Number(r.rank), name: r.name, score: r.score, you: r.you, premium: r.premium === true, ship: r.ship ?? null, pid: r.pid ?? undefined })) : null;
+    const rows = await this.call<{ rank: number; name: string; score: number; you: boolean; premium?: boolean; ship?: ShipLook | null; pid?: string | null }[]>(
+      '/rest/v1/rpc/leaderboard',
+      {
+        method: 'POST',
+        body: JSON.stringify({ p_board: q.board, p_period: q.period, p_league: q.league, p_limit: q.limit ?? 50 }),
+      },
+    );
+    return rows
+      ? rows.map((r) => ({
+          rank: Number(r.rank),
+          name: r.name,
+          score: r.score,
+          you: r.you,
+          premium: r.premium === true,
+          ship: r.ship ?? null,
+          pid: r.pid ?? undefined,
+        }))
+      : null;
   }
 
   async purchases(): Promise<Purchase[] | null> {
@@ -324,7 +356,14 @@ export class SupabaseBackend implements Backend {
   }
 
   async pilotRecord(pid: string): Promise<PilotRecord | null> {
-    const r = await this.call<{ name: string; premium: boolean; ship: ShipLook | null; record: PilotStats | null; bests: Record<string, number> | null; since: number } | null>('/rest/v1/rpc/pilot_record', {
+    const r = await this.call<{
+      name: string;
+      premium: boolean;
+      ship: ShipLook | null;
+      record: PilotStats | null;
+      bests: Record<string, number> | null;
+      since: number;
+    } | null>('/rest/v1/rpc/pilot_record', {
       method: 'POST',
       body: JSON.stringify({ p_pid: pid }),
     });
@@ -333,7 +372,10 @@ export class SupabaseBackend implements Backend {
   }
 
   async rivalRun(): Promise<RivalRun | null> {
-    const rows = await this.call<{ name: string; score: number; seconds: number; distance: number; path: number[] | null }[]>('/rest/v1/rpc/rival_path', { method: 'POST', body: '{}' });
+    const rows = await this.call<{ name: string; score: number; seconds: number; distance: number; path: number[] | null }[]>('/rest/v1/rpc/rival_path', {
+      method: 'POST',
+      body: '{}',
+    });
     const r = rows?.[0];
     if (!r || !Array.isArray(r.path) || r.path.length < 2) return null;
     return { name: r.name, score: Number(r.score) || 0, seconds: Number(r.seconds) || 0, distance: Number(r.distance) || 0, path: r.path.map(Number) };

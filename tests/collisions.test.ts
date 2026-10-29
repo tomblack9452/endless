@@ -122,8 +122,10 @@ function audit(world: World, found: Map<string, Finding>): void {
       for (const h of FOOTPRINT.slice(SLICES.length)) slice(mesh, (h - y) / sy, f.sx[i], f.sz[i], ext);
       const fx = turned ? ext[2] : ext[0];
       const fz = turned ? ext[2] : ext[1];
-      if (dx > f.hx[i] * TOO_SMALL + 0.05) note('drawn wider than its hitbox (x)', `drawn ${dx.toFixed(2)} hit ${f.hx[i].toFixed(2)} ratio ${(dx / f.hx[i]).toFixed(2)}`);
-      if (dz > f.hz[i] * TOO_SMALL + 0.05) note('drawn deeper than its hitbox (z)', `drawn ${dz.toFixed(2)} hit ${f.hz[i].toFixed(2)} ratio ${(dz / f.hz[i]).toFixed(2)}`);
+      if (dx > f.hx[i] * TOO_SMALL + 0.05)
+        note('drawn wider than its hitbox (x)', `drawn ${dx.toFixed(2)} hit ${f.hx[i].toFixed(2)} ratio ${(dx / f.hx[i]).toFixed(2)}`);
+      if (dz > f.hz[i] * TOO_SMALL + 0.05)
+        note('drawn deeper than its hitbox (z)', `drawn ${dz.toFixed(2)} hit ${f.hz[i].toFixed(2)} ratio ${(dz / f.hz[i]).toFixed(2)}`);
       if (f.hx[i] > fx * TOO_BIG + SLACK) note('hitbox wider than the shape (x)', `drawn ${fx.toFixed(2)} hit ${f.hx[i].toFixed(2)}`);
       if (f.hz[i] > fz * TOO_BIG + SLACK) note('hitbox deeper than the shape (z)', `drawn ${fz.toFixed(2)} hit ${f.hz[i].toFixed(2)}`);
     }

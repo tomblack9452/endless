@@ -1,4 +1,4 @@
-import { BufferAttribute, BufferGeometry, Color, LineBasicMaterial, LineSegments, Points, PointsMaterial, Scene } from 'three';
+import { BufferAttribute, BufferGeometry, Color, LineBasicMaterial, LineSegments, Points, PointsMaterial, type Scene } from 'three';
 import { CONFIG } from '../core/config';
 import type { LivePalette } from './palette';
 import type { Biome } from './biomes';

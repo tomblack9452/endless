@@ -1,4 +1,4 @@
-import { BufferGeometry, type Color, InstancedBufferAttribute, InstancedMesh, type Material, Scene } from 'three';
+import { type BufferGeometry, type Color, InstancedBufferAttribute, InstancedMesh, type Material, type Scene } from 'three';
 import { CONFIG } from '../core/config';
 import { terrain } from './terrain';
 
@@ -286,7 +286,7 @@ export class InstancedField {
       // Ramp: 0 far out, 1 once `finish` ahead of the ship, eased.
       const ahead = this.d[i] - distance;
       let t = 1 - (ahead - this.phase[i]) / this.freq[i];
-      t = t < 0 ? 0 : t > 1 ? 1 : t;
+      t = t < 0 ? 0 : Math.min(t, 1);
       if (m === 2) {
         this.x[i] = this.bx[i] + this.amp[i] * t * t * (3 - 2 * t);
       } else {

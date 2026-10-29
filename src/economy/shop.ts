@@ -58,7 +58,10 @@ export function shopFor(day: string, owned: (key: string) => boolean = () => fal
   const pool = dailyPool();
   const next = picker(hash(`shop-${day}`));
   // The day's order, the same for everyone; then what you own sinks (stable).
-  const order = pool.map((item) => ({ item, r: next() })).sort((a, b) => a.r - b.r).map((x) => x.item);
+  const order = pool
+    .map((item) => ({ item, r: next() }))
+    .sort((a, b) => a.r - b.r)
+    .map((x) => x.item);
   const fresh = order.filter((l) => !owned(keyOf(l)));
   const rest = order.filter((l) => owned(keyOf(l)));
   const ranked = [...fresh, ...rest];

@@ -1,4 +1,4 @@
-import { BufferAttribute, BufferGeometry, LineBasicMaterial, LineSegments, Scene } from 'three';
+import { BufferAttribute, BufferGeometry, LineBasicMaterial, LineSegments, type Scene } from 'three';
 import { CONFIG } from '../core/config';
 import type { LivePalette } from './palette';
 
@@ -20,7 +20,10 @@ export class SpeedLines {
   private readonly material: LineBasicMaterial;
   private readonly mesh: LineSegments;
 
-  constructor(scene: Scene, private readonly palette: LivePalette) {
+  constructor(
+    scene: Scene,
+    private readonly palette: LivePalette,
+  ) {
     this.geometry.setAttribute('position', new BufferAttribute(this.positions, 3));
     this.material = new LineBasicMaterial({
       color: palette.text,

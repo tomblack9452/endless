@@ -46,7 +46,9 @@ describe('error reports', () => {
   });
 
   it('keep a short stack: a few lines, file names not whole addresses', () => {
-    const stack = ['TypeError: x is undefined', ...Array.from({ length: 12 }, (_, i) => `    at f${i} (https://localhost/assets/index-abc.js:1:${i})`)].join('\n');
+    const stack = ['TypeError: x is undefined', ...Array.from({ length: 12 }, (_, i) => `    at f${i} (https://localhost/assets/index-abc.js:1:${i})`)].join(
+      '\n',
+    );
     const s = shortStack(stack);
     expect(s.split('\n')).toHaveLength(6);
     expect(s).toContain('at f0 index-abc.js:1:0');
@@ -73,7 +75,16 @@ describe('error reports', () => {
     log.report('purchase', boom); // the same message and stack again: once
     await vi.runAllTimersAsync();
     expect(s.got).toHaveLength(1);
-    expect(s.got[0]).toEqual([expect.objectContaining({ message: 'purchase: Error: boom', version: '1.0.7', platform: 'android', device: 'Pixel 7 · android 14', screen: 'over', at: 1234 })]);
+    expect(s.got[0]).toEqual([
+      expect.objectContaining({
+        message: 'purchase: Error: boom',
+        version: '1.0.7',
+        platform: 'android',
+        device: 'Pixel 7 · android 14',
+        screen: 'over',
+        at: 1234,
+      }),
+    ]);
     for (let i = 0; i < 40; i++) log.report('', `error ${i}`);
     await vi.runAllTimersAsync();
     expect(s.got.flat()).toHaveLength(SESSION_MAX);

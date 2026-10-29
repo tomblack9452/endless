@@ -20,12 +20,18 @@ export const cargoLift1: Piece = {
     [5, '#...................#'],
   ),
   overlays: [
-    {at: 16, kind: 'step', rise: 3.2, rows: 4},
-    {at: 10, kind: 'hook', x: [-4, 4], arrive: 3.6},
-    {at: 28, kind: 'hook', x: [-4, 4], arrive: -3.6},
-    {at: 38, kind: 'hook', x: [-4, 4], arrive: 3.4},
+    { at: 16, kind: 'step', rise: 3.2, rows: 4 },
+    { at: 10, kind: 'hook', x: [-4, 4], arrive: 3.6 },
+    { at: 28, kind: 'hook', x: [-4, 4], arrive: -3.6 },
+    { at: 38, kind: 'hook', x: [-4, 4], arrive: 3.4 },
   ],
   routes: [
-    { tag: 'main', points: [[0, 0], [49, 0]] },
+    {
+      tag: 'main',
+      points: [
+        [0, 0],
+        [49, 0],
+      ],
+    },
   ],
 };

@@ -10,7 +10,15 @@ import type { Backend } from './backend';
 
 const PREFIX = 'endless.';
 const SAVED_AT = 'endless.savedAt';
-const SKIP = new Set(['endless.session', 'endless.outbox', 'endless.errors', 'endless.seenVersion', 'endless.remindersOffered', 'endless.coresPending', SAVED_AT]);
+const SKIP = new Set([
+  'endless.session',
+  'endless.outbox',
+  'endless.errors',
+  'endless.seenVersion',
+  'endless.remindersOffered',
+  'endless.coresPending',
+  SAVED_AT,
+]);
 
 function lifetimeCredits(data: Record<string, string>): number {
   try {

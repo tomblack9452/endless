@@ -5,11 +5,14 @@ import { describe, expect, it } from 'vitest';
 // sparks and weather, live elsewhere and may.) This keeps the weekly level the
 // same for everyone and lets a server re-fly a run from its inputs.
 
-const GENERATION = import.meta.glob(['../src/world/world.ts', '../src/world/interior.ts', '../src/world/courses.ts', '../src/world/terrain.ts', '../src/world/pieces/**/*.ts'], {
-  query: '?raw',
-  import: 'default',
-  eager: true,
-}) as Record<string, string>;
+const GENERATION = import.meta.glob(
+  ['../src/world/world.ts', '../src/world/interior.ts', '../src/world/courses.ts', '../src/world/terrain.ts', '../src/world/pieces/**/*.ts'],
+  {
+    query: '?raw',
+    import: 'default',
+    eager: true,
+  },
+) as Record<string, string>;
 
 describe('course generation is deterministic', () => {
   it('covers the generator files', () => {
@@ -55,7 +58,7 @@ describe('risk lanes and gate runs are the seed', () => {
     expect(b.risks).toEqual(a.risks);
   });
 
-  it('lay an endless run\'s gate runs the same however it\'s flown', () => {
+  it("lay an endless run's gate runs the same however it's flown", () => {
     const a = layout(4242, () => 0, true);
     expect(layout(4242, (t) => Math.cos(t) * 6, true).gates).toEqual(a.gates);
   });

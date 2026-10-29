@@ -22,12 +22,22 @@ export const command1: Piece = {
     [15, '#.....................#'],
   ),
   overlays: [
-    {at: 2, kind: 'step', rise: 1.1, rows: 4},
-    {at: 46, kind: 'step', rise: -1.1, rows: 4},
-    {at: 48, kind: 'holo', x: 0, y: 1.2, w: 14, h: 2.6},
+    { at: 2, kind: 'step', rise: 1.1, rows: 4 },
+    { at: 46, kind: 'step', rise: -1.1, rows: 4 },
+    { at: 48, kind: 'holo', x: 0, y: 1.2, w: 14, h: 2.6 },
   ],
   routes: [
-    { tag: 'main', points: [[0, 0], [8, 0], [20, 3], [32, 3], [44, 0], [51, 0]] },
+    {
+      tag: 'main',
+      points: [
+        [0, 0],
+        [8, 0],
+        [20, 3],
+        [32, 3],
+        [44, 0],
+        [51, 0],
+      ],
+    },
   ],
 };
 
@@ -48,11 +58,28 @@ export const command2: Piece = {
     [10, '#.....................#'],
   ),
   overlays: [
-    {at: 26, kind: 'holo', x: 0, y: 1, w: 3, h: 1.4},
-    {at: 54, kind: 'holo', x: 0, y: 1.2, w: 14, h: 2.6},
+    { at: 26, kind: 'holo', x: 0, y: 1, w: 3, h: 1.4 },
+    { at: 54, kind: 'holo', x: 0, y: 1.2, w: 14, h: 2.6 },
   ],
   routes: [
-    { tag: 'main', points: [[0, 0], [20, 5], [36, 5], [56, 0]] },
-    { tag: 'alt', reward: 'pickups', points: [[0, 0], [20, -5], [36, -5], [56, 0]] },
+    {
+      tag: 'main',
+      points: [
+        [0, 0],
+        [20, 5],
+        [36, 5],
+        [56, 0],
+      ],
+    },
+    {
+      tag: 'alt',
+      reward: 'pickups',
+      points: [
+        [0, 0],
+        [20, -5],
+        [36, -5],
+        [56, 0],
+      ],
+    },
   ],
 };

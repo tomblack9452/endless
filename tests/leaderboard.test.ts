@@ -55,9 +55,15 @@ async function fakeFetch(input: RequestInfo | URL, init?: RequestInit): Promise<
       const args = JSON.parse(String(init?.body ?? '{}')) as Record<string, unknown>;
       const names = Object.keys(args);
       // A list of numbers is a Postgres array (the ghost's path); a list of anything else is JSON.
-      const values = names.map((k) => (Array.isArray(args[k]) ? (args[k].every((x) => typeof x === 'number') ? `{${(args[k] as number[]).join(',')}}` : JSON.stringify(args[k])) : args[k]));
+      const values = names.map((k) =>
+        Array.isArray(args[k]) ? (args[k].every((x) => typeof x === 'number') ? `{${(args[k] as number[]).join(',')}}` : JSON.stringify(args[k])) : args[k],
+      );
       const call = `public.${rpc[1]}(${names.map((k, i) => `${k} => $${i + 1}`).join(', ')})`;
-      if (rpc[1] === 'leaderboard') return json(200, (await db.query(`select * from ${call}`, values)).rows.map((r) => ({ ...(r as object) })));
+      if (rpc[1] === 'leaderboard')
+        return json(
+          200,
+          (await db.query(`select * from ${call}`, values)).rows.map((r) => ({ ...(r as object) })),
+        );
       const r = await db.query<{ v: unknown }>(`select ${call} as v`, values);
       return json(200, r.rows[0].v);
     }

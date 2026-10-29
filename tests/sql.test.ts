@@ -121,7 +121,18 @@ describe('supabase/setup.sql', () => {
     await fresh.exec(SUPABASE_STANDIN);
     await fresh.exec(SETUP);
     const t = await fresh.query<{ table_name: string }>("select table_name from information_schema.tables where table_schema = 'public' order by 1");
-    expect(t.rows.map((r) => r.table_name)).toEqual(['bests', 'client_errors', 'core_log', 'name_words', 'players', 'reports', 'runs', 'saves', 'store_events', 'wallets']);
+    expect(t.rows.map((r) => r.table_name)).toEqual([
+      'bests',
+      'client_errors',
+      'core_log',
+      'name_words',
+      'players',
+      'reports',
+      'runs',
+      'saves',
+      'store_events',
+      'wallets',
+    ]);
   });
 
   it('can run again over a database it already set up, as the Supabase GitHub integration does', async () => {
@@ -195,9 +206,23 @@ describe('db:apply (the migrations from a terminal)', () => {
     const second = await applyMigrations(asClient(d), migrations);
     expect(second).toEqual({ applied: [], recorded: [] });
     const t = await d.query<{ n: string }>("select table_name n from information_schema.tables where table_schema = 'public' order by 1");
-    expect(t.rows.map((r) => r.n)).toEqual(['bests', 'client_errors', 'core_log', 'endless_migrations', 'name_words', 'players', 'reports', 'runs', 'saves', 'store_events', 'wallets']);
+    expect(t.rows.map((r) => r.n)).toEqual([
+      'bests',
+      'client_errors',
+      'core_log',
+      'endless_migrations',
+      'name_words',
+      'players',
+      'reports',
+      'runs',
+      'saves',
+      'store_events',
+      'wallets',
+    ]);
     // Every table has row-level security on (Supabase's advisor flags any that don't).
-    const open = await d.query<{ n: string }>("select relname n from pg_class c join pg_namespace s on s.oid = c.relnamespace where s.nspname = 'public' and c.relkind = 'r' and not c.relrowsecurity");
+    const open = await d.query<{ n: string }>(
+      "select relname n from pg_class c join pg_namespace s on s.oid = c.relnamespace where s.nspname = 'public' and c.relkind = 'r' and not c.relrowsecurity",
+    );
     expect(open.rows).toEqual([]);
   });
 
@@ -223,7 +248,10 @@ describe('db:apply (the migrations from a terminal)', () => {
     const t = await d.query<{ n: string }>("select table_name n from information_schema.tables where table_schema = 'public' and table_name = 'half'");
     expect(t.rows).toHaveLength(0);
     // And the earlier ones stay done.
-    expect((await d.query<{ name: string }>('select name from public.endless_migrations order by 1')).rows.map((r) => r.name)).toEqual([migrations[0][0], migrations[1][0]]);
+    expect((await d.query<{ name: string }>('select name from public.endless_migrations order by 1')).rows.map((r) => r.name)).toEqual([
+      migrations[0][0],
+      migrations[1][0],
+    ]);
   });
 });
 
@@ -274,7 +302,15 @@ describe('the 1.0.11 audit', () => {
     await as(a);
     await db.query('select public.delete_my_account()');
     await admin();
-    for (const [t, col] of [['reports', 'reporter'], ['reports', 'target'], ['client_errors', 'user_id'], ['players', 'user_id'], ['bests', 'user_id'], ['runs', 'user_id'], ['core_log', 'user_id']])
+    for (const [t, col] of [
+      ['reports', 'reporter'],
+      ['reports', 'target'],
+      ['client_errors', 'user_id'],
+      ['players', 'user_id'],
+      ['bests', 'user_id'],
+      ['runs', 'user_id'],
+      ['core_log', 'user_id'],
+    ])
       expect((await db.query(`select 1 from public.${t} where ${col} = $1`, [a])).rows.length, `${t}.${col}`).toBe(0);
   });
 
@@ -285,7 +321,10 @@ describe('the 1.0.11 audit', () => {
               has_function_privilege('authenticated', p.oid, 'execute') as auth, p.prosecdef as definer, p.proconfig as config
        from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public'`,
     );
-    const anon = fns.rows.filter((f) => f.anon).map((f) => f.sig.replace(/\(.*/, '')).sort();
+    const anon = fns.rows
+      .filter((f) => f.anon)
+      .map((f) => f.sig.replace(/\(.*/, ''))
+      .sort();
     expect(anon).toEqual(['daily_period', 'pass_season', 'server_now']); // the clock, and two pure date helpers
     expect(fns.rows.find((f) => f.sig === 'on_new_user()')).toMatchObject({ anon: false, auth: false });
     // Every function has its own search_path (Supabase's linter), the security definer ones above all.
@@ -323,7 +362,11 @@ describe('submit_run', () => {
 
   it('orders players best first and says who you are', async () => {
     const [a, b, c] = [await newUser(), await newUser(), await newUser()];
-    for (const [u, score] of [[a, 1000], [b, 1700], [c, 1300]] as const) {
+    for (const [u, score] of [
+      [a, 1000],
+      [b, 1700],
+      [c, 1300],
+    ] as const) {
       await as(u);
       await submit({ board: 'solo:canyon', score });
     }
@@ -416,13 +459,18 @@ describe('the daily challenge', () => {
     await admin();
     return (await db.query<{ d: string }>("select ((now() at time zone 'utc')::date)::text as d")).rows[0].d;
   };
-  const earn = async (amount: number, reason: string) => (await db.query<{ earn_cores: number }>('select public.earn_cores($1, $2)', [amount, reason])).rows[0].earn_cores;
+  const earn = async (amount: number, reason: string) =>
+    (await db.query<{ earn_cores: number }>('select public.earn_cores($1, $2)', [amount, reason])).rows[0].earn_cores;
 
   it("takes a run on the daily board, filed under the server's day, everyone together", async () => {
     const [a, b] = [await newUser(), await newUser()];
     const day = await today();
     await as(a);
-    expect(await submit({ board: 'daily', league: 3, score: 2400, distance: 3600, seconds: 70, finished: true })).toEqual({ rank: 1, best: 2400, newBest: true });
+    expect(await submit({ board: 'daily', league: 3, score: 2400, distance: 3600, seconds: 70, finished: true })).toEqual({
+      rank: 1,
+      best: 2400,
+      newBest: true,
+    });
     await as(b);
     expect(await submit({ board: 'daily', score: 2600, distance: 3000, seconds: 60 })).toMatchObject({ rank: 1, newBest: true });
     const rows = await board('daily', day, 0);
@@ -592,7 +640,8 @@ describe('credits on the server', () => {
 });
 
 describe('cores', () => {
-  const earn = async (amount: number, reason: string) => (await db.query<{ earn_cores: number }>('select public.earn_cores($1, $2)', [amount, reason])).rows[0].earn_cores;
+  const earn = async (amount: number, reason: string) =>
+    (await db.query<{ earn_cores: number }>('select public.earn_cores($1, $2)', [amount, reason])).rows[0].earn_cores;
   const today = () => new Date().toISOString().slice(0, 10);
   const season = () => Math.floor((Date.parse(today()) - Date.UTC(2026, 8, 14)) / (42 * 86_400_000)) + 1;
 
@@ -658,7 +707,8 @@ describe('cores', () => {
     await admin();
     await db.query('update public.wallets set cores = 100 where user_id = $1', [a]);
     await as(a);
-    const spend = async (n: number, id: string | null) => (await db.query<{ spend_cores_once: boolean }>('select public.spend_cores_once($1, $2, $3)', [n, 'look', id])).rows[0].spend_cores_once;
+    const spend = async (n: number, id: string | null) =>
+      (await db.query<{ spend_cores_once: boolean }>('select public.spend_cores_once($1, $2, $3)', [n, 'look', id])).rows[0].spend_cores_once;
     const old = async (n: number) => (await db.query<{ spend_cores: boolean }>("select public.spend_cores($1, 'look')", [n])).rows[0].spend_cores;
     expect(await spend(30, 'abc-1')).toBe(true);
     expect(await spend(30, 'abc-1')).toBe(true); // the same spend again: "taken", no charge
@@ -687,11 +737,13 @@ describe('cores', () => {
 
 describe('store purchases (the webhook, with the service key)', () => {
   const buy = async (id: string, user: string, product: string, cores: number, tx = id) =>
-    (await db.query<{ store_purchase: string }>('select public.store_purchase($1, $2, $3, $4, $5, $6)', [id, user, product, 'INITIAL_PURCHASE', tx, cores])).rows[0].store_purchase;
+    (await db.query<{ store_purchase: string }>('select public.store_purchase($1, $2, $3, $4, $5, $6)', [id, user, product, 'INITIAL_PURCHASE', tx, cores]))
+      .rows[0].store_purchase;
   const refund = async (id: string, user: string, product: string, cores: number, tx: string) =>
     (await db.query<{ store_refund: string }>('select public.store_refund($1, $2, $3, $4, $5)', [id, user, product, tx, cores])).rows[0].store_refund;
   const coresOf = async (u: string) => (await db.query<{ cores: number }>('select cores from public.wallets where user_id = $1', [u])).rows[0].cores;
-  const products = async (u: string) => (await db.query<{ product: string }>('select product from public.store_events where user_id = $1 order by at, id', [u])).rows.map((r) => r.product);
+  const products = async (u: string) =>
+    (await db.query<{ product: string }>('select product from public.store_events where user_id = $1 order by at, id', [u])).rows.map((r) => r.product);
 
   it('keep the event and pay its cores together, once', async () => {
     const a = await newUser();
@@ -719,9 +771,25 @@ describe('store purchases (the webhook, with the service key)', () => {
     await admin();
     const at = async (id: string) => (await db.query<{ at: Date }>('select at from public.store_events where id = $1', [id])).rows[0].at.getTime();
     const bought = Date.now() - 3 * 86_400_000;
-    await db.query('select public.store_purchase_at($1, $2, $3, $4, $5, $6, $7)', ['ev-at', a, 'season_pass', 'NON_RENEWING_PURCHASE', 'tx-at', 0, new Date(bought).toISOString()]);
+    await db.query('select public.store_purchase_at($1, $2, $3, $4, $5, $6, $7)', [
+      'ev-at',
+      a,
+      'season_pass',
+      'NON_RENEWING_PURCHASE',
+      'tx-at',
+      0,
+      new Date(bought).toISOString(),
+    ]);
     expect(Math.abs((await at('ev-at')) - bought)).toBeLessThan(1000);
-    await db.query('select public.store_purchase_at($1, $2, $3, $4, $5, $6, $7)', ['ev-later', a, 'premium', 'NON_RENEWING_PURCHASE', 'tx-later', 0, new Date(Date.now() + 86_400_000).toISOString()]);
+    await db.query('select public.store_purchase_at($1, $2, $3, $4, $5, $6, $7)', [
+      'ev-later',
+      a,
+      'premium',
+      'NON_RENEWING_PURCHASE',
+      'tx-later',
+      0,
+      new Date(Date.now() + 86_400_000).toISOString(),
+    ]);
     expect(await at('ev-later')).toBeLessThanOrEqual(Date.now() + 1000);
   });
 
@@ -753,7 +821,8 @@ describe('a refunded season pass', () => {
   };
   const refundPass = async (u: string, id: string) => {
     await admin();
-    return (await db.query<{ store_refund: string }>('select public.store_refund($1, $2, $3, $4, $5)', [`rf-${id}`, u, 'season_pass', `tx-${id}`, 0])).rows[0].store_refund;
+    return (await db.query<{ store_refund: string }>('select public.store_refund($1, $2, $3, $4, $5)', [`rf-${id}`, u, 'season_pass', `tx-${id}`, 0])).rows[0]
+      .store_refund;
   };
 
   it('takes back the cores its premium tiers paid, keeps the free track, and pays no more premium tiers', async () => {
@@ -769,7 +838,7 @@ describe('a refunded season pass', () => {
     expect(await refundPass(a, 'sp1')).toBe('refunded');
     expect(await coresOf(a)).toBe(105); // 35 from the premium tiers back
     await admin();
-    const log = await db.query<{ delta: number }>("select delta from public.core_log where user_id = $1 and reason = $2", [a, `refund:pass:${s}`]);
+    const log = await db.query<{ delta: number }>('select delta from public.core_log where user_id = $1 and reason = $2', [a, `refund:pass:${s}`]);
     expect(log.rows.map((r) => r.delta)).toEqual([-35]);
     expect(await earn(a, 15, `pass:${s}:p6`)).toBe(0);
     expect(await earn(a, 5, `pass:${s}:f10`)).toBe(5);
@@ -777,7 +846,7 @@ describe('a refunded season pass', () => {
     expect(await coresOf(a)).toBe(110);
   });
 
-  it("never goes below zero, and pays premium tiers again if the pass is bought again", async () => {
+  it('never goes below zero, and pays premium tiers again if the pass is bought again', async () => {
     const a = await newUser();
     const s = await season();
     await buyPass(a, 'sp2');
@@ -838,7 +907,11 @@ describe('reporting a pilot', () => {
   /** Give a player `n` runs on the server. */
   const runsFor = async (u: string, n: number) => {
     await admin();
-    for (let i = 0; i < n; i++) await db.query("insert into public.runs (user_id, week, league, score, seconds, distance, finished, path, board, at) values ($1, current_date, 0, 1200, 40, 2000, false, '{}', 'endless', now() - interval '1 hour')", [u]);
+    for (let i = 0; i < n; i++)
+      await db.query(
+        "insert into public.runs (user_id, week, league, score, seconds, distance, finished, path, board, at) values ($1, current_date, 0, 1200, 40, 2000, false, '{}', 'endless', now() - interval '1 hour')",
+        [u],
+      );
   };
 
   it('keeps one report per reporter per pilot a week, never about yourself', async () => {
@@ -850,7 +923,7 @@ describe('reporting a pilot', () => {
     await rejects(report(a, pid, 'rude'), /pick a reason/);
     await rejects(report(a, '00000000-0000-0000-0000-000000000000', 'name'), /no such pilot/);
     await admin();
-    await db.query("update public.reports set week = week - 7 where reporter = $1", [a]); // a week on
+    await db.query('update public.reports set week = week - 7 where reporter = $1', [a]); // a week on
     expect(await report(a, pid, 'score')).toBe('reported');
   });
 
@@ -858,7 +931,10 @@ describe('reporting a pilot', () => {
     const a = await newUser();
     await as(a);
     await rejects(db.query('select * from public.reports'), /permission denied/);
-    await rejects(db.query(`insert into public.reports (reporter, target, reason, name, week) values ('${a}', '${a}', 'name', 'x', now())`), /permission denied/);
+    await rejects(
+      db.query(`insert into public.reports (reporter, target, reason, name, week) values ('${a}', '${a}', 'name', 'x', now())`),
+      /permission denied/,
+    );
     await as(null);
     await rejects(db.query(`select public.report_pilot('${a}', 'name')`), /permission denied/);
   });
@@ -879,7 +955,7 @@ describe('reporting a pilot', () => {
     // Reports of the old name don't carry over to a new one.
     await admin();
     await db.query("update public.players set name_changed_at = now() - interval '2 hours', name = 'Fresh Name' where user_id = $1", [target]);
-    await db.query("update public.reports set week = week - 7 where target = $1", [target]);
+    await db.query('update public.reports set week = week - 7 where target = $1', [target]);
     await report(a, pid, 'name');
     expect(await nameOf(target)).toBe('Fresh Name');
   });
@@ -923,15 +999,28 @@ describe('reporting a pilot', () => {
 });
 
 describe('error reports', () => {
-  const log = async (errors: unknown) => (await db.query<{ log_errors: number }>('select public.log_errors($1::jsonb)', [JSON.stringify(errors)])).rows[0].log_errors;
-  const one = (over: Record<string, unknown> = {}) => ({ message: 'TypeError: x', stack: 'at f index.js:1:2', version: '1.0.7', platform: 'android', device: 'Pixel 7 · android 14', screen: 'over', at: Date.now(), ...over });
+  const log = async (errors: unknown) =>
+    (await db.query<{ log_errors: number }>('select public.log_errors($1::jsonb)', [JSON.stringify(errors)])).rows[0].log_errors;
+  const one = (over: Record<string, unknown> = {}) => ({
+    message: 'TypeError: x',
+    stack: 'at f index.js:1:2',
+    version: '1.0.7',
+    platform: 'android',
+    device: 'Pixel 7 · android 14',
+    screen: 'over',
+    at: Date.now(),
+    ...over,
+  });
 
   it('are kept, trimmed, and dated within the last week', async () => {
     const a = await newUser();
     await as(a);
     expect(await log([one(), one({ message: 'm'.repeat(900), at: Date.now() + 86_400_000 }), one({ message: '' }), 'nonsense'])).toBe(2);
     await admin();
-    const rows = await db.query<{ message: string; device: string; at: Date; user_id: string }>('select message, device, at, user_id from public.client_errors where user_id = $1 order by id', [a]);
+    const rows = await db.query<{ message: string; device: string; at: Date; user_id: string }>(
+      'select message, device, at, user_id from public.client_errors where user_id = $1 order by id',
+      [a],
+    );
     expect(rows.rows).toHaveLength(2);
     expect(rows.rows[0]).toMatchObject({ message: 'TypeError: x', device: 'Pixel 7 · android 14' });
     expect(rows.rows[1].message).toHaveLength(300);
@@ -948,7 +1037,7 @@ describe('error reports', () => {
     expect(await log(many)).toBe(0);
   });
 
-  it('clear themselves after 60 days: the sender\'s own, and a few of anyone\'s on each call', async () => {
+  it("clear themselves after 60 days: the sender's own, and a few of anyone's on each call", async () => {
     const [a, b, c] = [await newUser(), await newUser(), await newUser()];
     for (const u of [a, b]) {
       await as(u);
@@ -976,9 +1065,14 @@ describe('error reports', () => {
     await as(a);
     await log(Array.from({ length: 12 }, (_, i) => one({ message: `p${i}` })));
     await admin();
-    await db.query("update public.client_errors set received_at = now() - interval '90 days' - (substr(message, 2)::int * interval '1 hour') where user_id = $1 and message ~ '^p[0-9]+$'", [a]);
+    await db.query(
+      "update public.client_errors set received_at = now() - interval '90 days' - (substr(message, 2)::int * interval '1 hour') where user_id = $1 and message ~ '^p[0-9]+$'",
+      [a],
+    );
     expect((await db.query<{ n: number }>('select public.prune_client_errors(5) as n')).rows[0].n).toBe(5);
-    const rest = (await db.query<{ message: string }>('select message from public.client_errors where user_id = $1 order by received_at', [a])).rows.map((r) => r.message);
+    const rest = (await db.query<{ message: string }>('select message from public.client_errors where user_id = $1 order by received_at', [a])).rows.map(
+      (r) => r.message,
+    );
     expect(rest).toEqual(['p6', 'p5', 'p4', 'p3', 'p2', 'p1', 'p0']); // the oldest five went
     await as(a);
     await rejects(db.query('select public.prune_client_errors(5)'), /permission denied/);

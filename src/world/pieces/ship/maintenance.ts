@@ -19,12 +19,25 @@ export const gantry1: Piece = {
     [5, '#   ===  ===        #'],
     [20, '#...................#'],
   ),
-  overlays: [
-    {at: 30, kind: 'sparks', x: 8.5, y: 1.5},
-  ],
+  overlays: [{ at: 30, kind: 'sparks', x: 8.5, y: 1.5 }],
   routes: [
-    { tag: 'main', points: [[0, 0], [65, 0]] },
-    { tag: 'alt', reward: 'pickups', points: [[0, 0], [19, -5], [46, -5], [65, 0]] },
+    {
+      tag: 'main',
+      points: [
+        [0, 0],
+        [65, 0],
+      ],
+    },
+    {
+      tag: 'alt',
+      reward: 'pickups',
+      points: [
+        [0, 0],
+        [19, -5],
+        [46, -5],
+        [65, 0],
+      ],
+    },
   ],
 };
 
@@ -59,11 +72,21 @@ export const breach1: Piece = {
     [3, '#.................#'],
   ),
   overlays: [
-    {at: 14, kind: 'sparks', x: 7.6, y: 1},
-    {at: 30, kind: 'sparks', x: -7.6, y: 1.4},
-    {at: 46, kind: 'steam', x: 7.6, y: 0, h: 2.4},
+    { at: 14, kind: 'sparks', x: 7.6, y: 1 },
+    { at: 30, kind: 'sparks', x: -7.6, y: 1.4 },
+    { at: 46, kind: 'steam', x: 7.6, y: 0, h: 2.4 },
   ],
   routes: [
-    { tag: 'main', points: [[0, 0], [6, 0], [18, 3], [42, -3], [54, 0], [60, 0]] },
+    {
+      tag: 'main',
+      points: [
+        [0, 0],
+        [6, 0],
+        [18, 3],
+        [42, -3],
+        [54, 0],
+        [60, 0],
+      ],
+    },
   ],
 };

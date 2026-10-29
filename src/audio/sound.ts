@@ -135,7 +135,7 @@ export class Sound {
 
   update(dt: number, s: AudioState): void {
     const ctx = this.ctx;
-    if (!ctx || ctx.state !== 'running') return;
+    if (ctx?.state !== 'running') return;
     const m = this.music;
     m.speedNorm = clamp01((s.speed - CONFIG.speed.base) / (CONFIG.speed.max - CONFIG.speed.base));
     m.boost = s.boost;
@@ -168,7 +168,7 @@ export class Sound {
     const run = s.playing ? 1 : 0;
 
     // Engine body: root and fifth in D, rising up to ~8 semitones with speed and boost.
-    const rise = Math.pow(2, (n * 5 + b * 3) / 12);
+    const rise = 2 ** ((n * 5 + b * 3) / 12);
     const root = midiHz(ROOT_MIDI - 12) * rise;
     this.bodyOscs[0].frequency.setTargetAtTime(root, t, 0.2);
     this.bodyOscs[1].frequency.setTargetAtTime(root * 1.5, t, 0.2);
@@ -178,7 +178,7 @@ export class Sound {
     this.rumbleFilter.frequency.setTargetAtTime(110 + n * 220 + b * 320, t, 0.15);
     this.rumbleGain.gain.setTargetAtTime(on * run * A.rumble * (0.6 + 0.4 * n + 0.6 * b), t, 0.15);
 
-    this.whine.frequency.setTargetAtTime(midiHz(ROOT_MIDI + 36) * Math.pow(2, (n * 7 + b * 5) / 12), t, 0.25);
+    this.whine.frequency.setTargetAtTime(midiHz(ROOT_MIDI + 36) * 2 ** ((n * 7 + b * 5) / 12), t, 0.25);
     this.whineGain.gain.setTargetAtTime(on * run * A.whine * (0.4 + 0.6 * n + 1.2 * b), t, 0.2);
 
     this.airFilter.frequency.setTargetAtTime(500 + n * 700 + b * 1600, t, 0.12);
@@ -434,8 +434,7 @@ export class Sound {
   // --- building blocks -------------------------------------------------------
 
   private build(): void {
-    const Ctx =
-      window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    const Ctx = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
     if (!Ctx) return;
     const ctx = new Ctx();
     this.ctx = ctx;
@@ -705,7 +704,7 @@ export class Sound {
 }
 
 function clamp01(v: number): number {
-  return v < 0 ? 0 : v > 1 ? 1 : v;
+  return v < 0 ? 0 : Math.min(v, 1);
 }
 
 function lerp(a: number, b: number, t: number): number {

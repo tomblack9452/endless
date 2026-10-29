@@ -24,7 +24,11 @@ describe('pilot name filter', () => {
   });
 
   it('has the same words as the database', () => {
-    const db = [...MIGRATION.split('-- BEGIN WORDS')[1].split('-- END WORDS')[0].matchAll(/\('([a-z]+)'\)/g)].map((x) => x[1]);
+    const db = [
+      ...MIGRATION.split('-- BEGIN WORDS')[1]
+        .split('-- END WORDS')[0]
+        .matchAll(/\('([a-z]+)'\)/g),
+    ].map((x) => x[1]);
     expect(db).toEqual(WORDS);
   });
 });

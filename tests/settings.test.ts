@@ -108,7 +108,8 @@ describe('comfort settings', () => {
       return (h * 60 + 360) % 360;
     };
     expect(SAFE_SHAPES.length).toBe(5); // phase and double points (1.0.9) have theirs
-    for (const c of [SAFE.pickup, SAFE.shield, SAFE.magnet, SAFE.slow, SAFE.phase, SAFE.double]) expect(hue(c) === -1 || (hue(c) > 190 && hue(c) < 230), c).toBe(true);
+    for (const c of [SAFE.pickup, SAFE.shield, SAFE.magnet, SAFE.slow, SAFE.phase, SAFE.double])
+      expect(hue(c) === -1 || (hue(c) > 190 && hue(c) < 230), c).toBe(true);
     for (const c of [SAFE.hazard, SAFE.mark]) expect(hue(c) > 20 && hue(c) < 40, c).toBe(true);
   });
 });

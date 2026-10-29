@@ -31,7 +31,10 @@ This is a secret: .env is never committed, and it is never part of the game's bu
 }
 
 const dir = join(dirname(fileURLToPath(import.meta.url)), '..', 'supabase', 'migrations');
-const migrations = readdirSync(dir).filter((f) => f.endsWith('.sql')).sort().map((f) => [f, readFileSync(join(dir, f), 'utf8')]);
+const migrations = readdirSync(dir)
+  .filter((f) => f.endsWith('.sql'))
+  .sort()
+  .map((f) => [f, readFileSync(join(dir, f), 'utf8')]);
 
 const client = new pg.Client({ connectionString: url, ssl: { rejectUnauthorized: false } });
 try {
@@ -42,7 +45,11 @@ try {
 }
 try {
   const { applied, recorded } = await applyMigrations(client, migrations, (l) => console.log(`  ${l}`));
-  console.log(applied.length + recorded.length === 0 ? '\nThe database is already up to date.' : `\nDone: ${applied.length} applied, ${recorded.length} found already in place.`);
+  console.log(
+    applied.length + recorded.length === 0
+      ? '\nThe database is already up to date.'
+      : `\nDone: ${applied.length} applied, ${recorded.length} found already in place.`,
+  );
   console.log('Next: turn on anonymous sign-ins (Authentication > Sign In / Providers), then `npm run check-server`.');
 } catch (e) {
   console.log(`\n${e.message}`);

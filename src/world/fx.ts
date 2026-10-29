@@ -1,14 +1,4 @@
-import {
-  AdditiveBlending,
-  BufferAttribute,
-  DoubleSide,
-  BufferGeometry,
-  Color,
-  MeshBasicMaterial,
-  Points,
-  PointsMaterial,
-  type Scene,
-} from 'three';
+import { AdditiveBlending, BufferAttribute, DoubleSide, BufferGeometry, Color, MeshBasicMaterial, Points, PointsMaterial, type Scene } from 'three';
 
 // Animated set dressing for the ship interior: pouring liquids, pools,
 // steam, blinking lights, holograms and sparks. The animated looks are
@@ -119,7 +109,7 @@ export function fxMaterial(kind: FxKind, opts: { transparent?: boolean; opacity?
 }
 
 /** Colours for liquids and lights (fx colour table order). */
-export const enum Liquid {
+export enum Liquid {
   Coolant = 0,
   Water = 1,
   Molten = 2,

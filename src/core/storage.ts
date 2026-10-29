@@ -32,7 +32,7 @@ class LocalStore implements KeyValueStore {
     try {
       for (let i = 0; i < localStorage.length; i++) {
         const k = localStorage.key(i);
-        if (k && k.startsWith(prefix)) out[k] = localStorage.getItem(k) ?? '';
+        if (k?.startsWith(prefix)) out[k] = localStorage.getItem(k) ?? '';
       }
     } catch {
       // Storage blocked: nothing saved.

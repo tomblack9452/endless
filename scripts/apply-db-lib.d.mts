@@ -1,5 +1,5 @@
 export function applyMigrations(
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // biome-ignore lint/suspicious/noExplicitAny: rows come back in whatever shape each query asks for
   db: { query(sql: string, params?: unknown[]): Promise<{ rows: any[] }> },
   migrations: [string, string][],
   log?: (line: string) => void,

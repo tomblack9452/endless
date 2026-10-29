@@ -212,7 +212,6 @@ export const ENVIRONMENTS: readonly Environment[] = [
   { id: 'volcanic', name: 'volcanic plain', theme: 'land', biome: 'volcanic', sector: 6 },
 ];
 
-
 /**
  * This week's ranked run: endless from the start on the week's own seed, so
  * it's the same course for everyone all week, and new every Monday (UTC).
@@ -294,7 +293,14 @@ export function dailyRun(day: string): DailyRun {
   const pick = dayPicker(seed);
   const one = <T>(list: readonly T[]): T => list[Math.floor(pick() * list.length)];
   const D = CONFIG.daily;
-  const outdoor = (a: DailyArea, sub: 0 | 1 | 2, length: number): Section => ({ name: a.names[sub], theme: a.theme, ...(a.biome ? { biome: a.biome } : {}), length, sub, difficulty: 0 });
+  const outdoor = (a: DailyArea, sub: 0 | 1 | 2, length: number): Section => ({
+    name: a.names[sub],
+    theme: a.theme,
+    ...(a.biome ? { biome: a.biome } : {}),
+    length,
+    sub,
+    difficulty: 0,
+  });
   const start = one(DAILY_AREAS);
   // The shape of the day: one area all the way, open ground into another
   // biome or the canyon, or out there and into the ship to finish.
@@ -316,7 +322,8 @@ export function dailyRun(day: string): DailyRun {
   const area = DAILY_AREAS.find((a) => a.theme === middle.theme && a.biome === middle.biome) ?? start;
   if (pick() < 0.7) middle.overlay = one(area.overlays);
   const last = sections[sections.length - 1];
-  if (pick() < 0.4) last.event = last.theme === 'interior' ? 'redAlert' : (DAILY_AREAS.find((a) => a.theme === last.theme && a.biome === last.biome) ?? start).event;
+  if (pick() < 0.4)
+    last.event = last.theme === 'interior' ? 'redAlert' : (DAILY_AREAS.find((a) => a.theme === last.theme && a.biome === last.biome) ?? start).event;
   const label = new Date(`${day}T00:00:00Z`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' }).toLowerCase();
   return { id: `daily-${day}`, day, name: label, course: { id: `daily-${day}`, name: `daily · ${label}`, blurb: '', seed, target: 0, sections } };
 }

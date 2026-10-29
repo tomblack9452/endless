@@ -114,7 +114,6 @@ export interface PassView {
   premiumOwned: boolean;
 }
 
-
 export interface OfferView {
   kicker: string;
   name: string;

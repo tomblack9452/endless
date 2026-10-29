@@ -20,7 +20,8 @@ function server(owner: string | null) {
     if (path === '/auth/v1/signup') return json(200, session('anon'));
     if (path === '/auth/v1/token?grant_type=id_token') {
       if (body.link_identity) {
-        if (owner && owner !== 'anon') return json(422, { code: 422, error_code: 'identity_already_exists', msg: 'Identity is already linked to another user' });
+        if (owner && owner !== 'anon')
+          return json(422, { code: 422, error_code: 'identity_already_exists', msg: 'Identity is already linked to another user' });
         owner = 'anon';
         return json(200, session('anon'));
       }
@@ -66,7 +67,7 @@ describe('keeping an account with google', () => {
     expect(await b.googleAccount()).toBe('tom@example.com');
   });
 
-  it("says when the Google login already keeps another account, and switches to it", async () => {
+  it('says when the Google login already keeps another account, and switches to it', async () => {
     vi.spyOn(storage, 'get').mockResolvedValue(null);
     const set = vi.spyOn(storage, 'set').mockResolvedValue();
     server('old-phone');

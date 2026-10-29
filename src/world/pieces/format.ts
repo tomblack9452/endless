@@ -276,7 +276,7 @@ export function routeX(route: Route, r: number): number {
 export function maxRouteSlope(): number {
   const S = CONFIG.steering;
   const top = CONFIG.speed.max;
-  const lateral = S.maxLateralSpeed * Math.pow(top / CONFIG.speed.base, S.lateralSpeedExponent);
+  const lateral = S.maxLateralSpeed * (top / CONFIG.speed.base) ** S.lateralSpeedExponent;
   return (CONFIG.themes.lane.slopeFraction * lateral) / top;
 }
 
@@ -344,7 +344,8 @@ export function check(piece: Piece): string[] {
   if (main) {
     for (const [k, rt] of piece.routes.entries()) {
       if (rt.points[0][1] !== main.points[0][1]) out.push(`${piece.id} route ${k} doesn't start where the main route does`);
-      if (rt.points[rt.points.length - 1][1] !== main.points[main.points.length - 1][1]) out.push(`${piece.id} route ${k} doesn't end where the main route does`);
+      if (rt.points[rt.points.length - 1][1] !== main.points[main.points.length - 1][1])
+        out.push(`${piece.id} route ${k} doesn't end where the main route does`);
     }
   }
   return [...new Set(out)];

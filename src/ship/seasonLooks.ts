@@ -24,8 +24,70 @@ type Kind = 'p1' | 'p2' | 'e1' | 'd1' | 'f1' | 'c1' | 'c2' | 'c3' | 'c4';
 const SLOT_OF: Record<Kind, Slot> = { p1: 'paint', p2: 'paint', e1: 'engine', d1: 'decal', f1: 'paint', c1: 'paint', c2: 'paint', c3: 'engine', c4: 'engine' };
 const SHOP_KINDS: Kind[] = ['c1', 'c2', 'c3', 'c4'];
 
-const ADJ = ['solar', 'glacier', 'velvet', 'static', 'hollow', 'silent', 'lunar', 'storm', 'tidal', 'violet', 'wild', 'echo', 'faded', 'polar', 'quiet', 'distant', 'bright', 'deep', 'rising', 'sunken', 'stray', 'woven', 'burnt', 'pale', 'electric', 'sleeping', 'restless', 'broken', 'gilded', 'hidden'];
-const NOUN = ['drift', 'signal', 'orbit', 'tide', 'vector', 'current', 'horizon', 'harbour', 'relay', 'cinder', 'flare', 'wake', 'shard', 'reef', 'spire', 'halo', 'ridge', 'bloom', 'haze', 'wave', 'field', 'gate', 'arc', 'beacon', 'canyon', 'delta', 'ember', 'meridian', 'zenith', 'lantern'];
+const ADJ = [
+  'solar',
+  'glacier',
+  'velvet',
+  'static',
+  'hollow',
+  'silent',
+  'lunar',
+  'storm',
+  'tidal',
+  'violet',
+  'wild',
+  'echo',
+  'faded',
+  'polar',
+  'quiet',
+  'distant',
+  'bright',
+  'deep',
+  'rising',
+  'sunken',
+  'stray',
+  'woven',
+  'burnt',
+  'pale',
+  'electric',
+  'sleeping',
+  'restless',
+  'broken',
+  'gilded',
+  'hidden',
+];
+const NOUN = [
+  'drift',
+  'signal',
+  'orbit',
+  'tide',
+  'vector',
+  'current',
+  'horizon',
+  'harbour',
+  'relay',
+  'cinder',
+  'flare',
+  'wake',
+  'shard',
+  'reef',
+  'spire',
+  'halo',
+  'ridge',
+  'bloom',
+  'haze',
+  'wave',
+  'field',
+  'gate',
+  'arc',
+  'beacon',
+  'canyon',
+  'delta',
+  'ember',
+  'meridian',
+  'zenith',
+  'lantern',
+];
 
 /** Small seeded generator (mulberry32): the same season always gives the same numbers. */
 function rng(seed: number): () => number {
@@ -47,7 +109,10 @@ function hsl(h: number, s: number, l: number): string {
   const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
   const m = l - c / 2;
   const [r, g, b] = h < 60 ? [c, x, 0] : h < 120 ? [x, c, 0] : h < 180 ? [0, c, x] : h < 240 ? [0, x, c] : h < 300 ? [x, 0, c] : [c, 0, x];
-  const hex = (v: number) => Math.round(Math.max(0, Math.min(1, v + m)) * 255).toString(16).padStart(2, '0');
+  const hex = (v: number) =>
+    Math.round(Math.max(0, Math.min(1, v + m)) * 255)
+      .toString(16)
+      .padStart(2, '0');
   return `#${hex(r)}${hex(g)}${hex(b)}`;
 }
 
@@ -59,7 +124,7 @@ export function lab(hex: string): [number, number, number] {
     return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
   };
   const [r, g, b] = [lin((n >> 16) & 255), lin((n >> 8) & 255), lin(n & 255)];
-  const f = (t: number) => (t > 216 / 24389 ? Math.cbrt(t) : (24389 / 27 * t + 16) / 116);
+  const f = (t: number) => (t > 216 / 24389 ? Math.cbrt(t) : ((24389 / 27) * t + 16) / 116);
   const x = f((0.4124 * r + 0.3576 * g + 0.1805 * b) / 0.95047);
   const y = f(0.2126 * r + 0.7152 * g + 0.0722 * b);
   const z = f((0.0193 * r + 0.1192 * g + 0.9505 * b) / 1.08883);
@@ -91,7 +156,11 @@ const MARK = [
   '<path fill="currentColor" d="M12 9.5l1.2 2.5-1.2 4-1.2-4zM5.5 9.5c2.5 0 4.5.8 5.6 2.6l-.5 1.4c-1.6-1.2-3.4-1.9-5.1-2zM18.5 9.5c-2.5 0-4.5.8-5.6 2.6l.5 1.4c1.6-1.2 3.4-1.9 5.1-2z"/>',
   '<path fill="currentColor" d="M10.8 6.5h2.4v4.3h4.3v2.4h-4.3v4.3h-2.4v-4.3H6.5v-2.4h4.3z"/>',
 ];
-const PIPS = ['', '<circle cx="7" cy="17" r="1.1" fill="currentColor"/><circle cx="17" cy="17" r="1.1" fill="currentColor"/>', '<circle cx="12" cy="4.8" r="1.1" fill="currentColor"/>'];
+const PIPS = [
+  '',
+  '<circle cx="7" cy="17" r="1.1" fill="currentColor"/><circle cx="17" cy="17" r="1.1" fill="currentColor"/>',
+  '<circle cx="12" cy="4.8" r="1.1" fill="currentColor"/>',
+];
 
 /** The season's wing decal: an outline, a mark and maybe pips, as 24 x 24 SVG like the hand-made ones. */
 export function seasonDecalSvg(season: number): string {
@@ -174,7 +243,10 @@ export function seasonLooks(season: number, base: readonly LookItem[], taken = n
     // The shade sits clearly darker than the top, whatever its hue.
     let dark = l - 0.2;
     let shade = hsl(shadeHue, s, dark);
-    while (lab(shade)[0] > lab(top)[0] - 12 && dark > 0.08) shade = hsl(shadeHue, s, (dark -= 0.04));
+    while (lab(shade)[0] > lab(top)[0] - 12 && dark > 0.08) {
+      dark -= 0.04;
+      shade = hsl(shadeHue, s, dark);
+    }
     return { slot: 'paint', id: `s${season}-${kind}`, name: name('paint', label), unlock: { by: 'reward', from: 'pass' }, colors: [top, shade] };
   };
   const engine = (kind: Kind, label: string, hue: number, tipHue: number): LookItem => ({
@@ -184,7 +256,10 @@ export function seasonLooks(season: number, base: readonly LookItem[], taken = n
     unlock: { by: 'reward', from: 'pass' },
     colors: [colour('engine', hue, 0.85, 0.58), hsl(tipHue, 0.9, 0.7)],
   });
-  const priced = (item: LookItem, low: number, high: number): LookItem => ({ ...item, unlock: { by: 'credits', cost: Math.round((low + r() * (high - low)) / 500) * 500 } });
+  const priced = (item: LookItem, low: number, high: number): LookItem => ({
+    ...item,
+    unlock: { by: 'credits', cost: Math.round((low + r() * (high - low)) / 500) * 500 },
+  });
 
   const out: LookItem[] = [];
   if (season >= 2) {
@@ -227,4 +302,3 @@ export function isSeasonShopLook(item: LookItem, season: number): boolean {
   const n = seasonOf(item.id);
   return n === season && SHOP_KINDS.some((k) => item.id.endsWith(`-${k}`));
 }
-

@@ -71,7 +71,10 @@ export class Wallet {
   }
 
   private save(): void {
-    void storage.set(KEY, JSON.stringify({ credits: this.credits, earned: this.earned, cores: this.cores, coresEarned: this.coresEarned, synced: this.creditsSynced }));
+    void storage.set(
+      KEY,
+      JSON.stringify({ credits: this.credits, earned: this.earned, cores: this.cores, coresEarned: this.coresEarned, synced: this.creditsSynced }),
+    );
   }
 
   /** Sync credits a moment after they change (one call for a burst of changes). */
@@ -139,7 +142,8 @@ export class Wallet {
       if (!remote) return;
       while (this.pending.length > 0) {
         const c = this.pending[0];
-        const answer = c.kind === 'earn' ? await remote.earnCores(c.n, c.reason).catch(() => null) : await remote.spendCores(c.n, c.reason, c.id).catch(() => null);
+        const answer =
+          c.kind === 'earn' ? await remote.earnCores(c.n, c.reason).catch(() => null) : await remote.spendCores(c.n, c.reason, c.id).catch(() => null);
         if (answer === null) return; // no answer: keep it (and the device's balance) for the next try
         this.pending.shift();
         this.savePending();

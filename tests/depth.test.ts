@@ -38,11 +38,12 @@ describe('the power-up pool', () => {
       const seen: string[] = [];
       for (let t = 0; t < 1200; t += 1 / 30) {
         world.advance(1 / 30, 60, 0);
-        for (let i = 0; i < f.top; i++) if (f.active[i]) {
-          kinds.add(f.colorIdx[i]);
-          const key = `${Math.round(f.d[i])}:${f.colorIdx[i]}`;
-          if (!seen.includes(key)) seen.push(key);
-        }
+        for (let i = 0; i < f.top; i++)
+          if (f.active[i]) {
+            kinds.add(f.colorIdx[i]);
+            const key = `${Math.round(f.d[i])}:${f.colorIdx[i]}`;
+            if (!seen.includes(key)) seen.push(key);
+          }
       }
       return { kinds, seen };
     };
@@ -166,7 +167,9 @@ describe('the crash moment', () => {
 describe('the run summary', () => {
   it('draws the speed as a line in its box, lowest at the bottom', () => {
     expect(sparkPoints([5], 100, 40)).toBe('');
-    const pts = sparkPoints([36, 50, 75], 100, 40).split(' ').map((p) => p.split(',').map(Number));
+    const pts = sparkPoints([36, 50, 75], 100, 40)
+      .split(' ')
+      .map((p) => p.split(',').map(Number));
     expect(pts[0]).toEqual([0, 39]);
     expect(pts[2]).toEqual([100, 1]);
     expect(sparkSvg([40, 41, 42])).toContain('<polyline');

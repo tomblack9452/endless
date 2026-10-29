@@ -26,8 +26,27 @@ export const cargo1: Piece = {
     [22, '#.......................#'],
   ),
   routes: [
-    { tag: 'main', points: [[0, 0], [16, 0], [37, 5], [48, 5], [69, 0]] },
-    { tag: 'alt', reward: 'pickups', points: [[0, 0], [16, 0], [24, -2], [48, -2], [69, 0]] },
+    {
+      tag: 'main',
+      points: [
+        [0, 0],
+        [16, 0],
+        [37, 5],
+        [48, 5],
+        [69, 0],
+      ],
+    },
+    {
+      tag: 'alt',
+      reward: 'pickups',
+      points: [
+        [0, 0],
+        [16, 0],
+        [24, -2],
+        [48, -2],
+        [69, 0],
+      ],
+    },
   ],
 };
 
@@ -54,5 +73,13 @@ export const cargo2: Piece = {
     { at: 32, kind: 'hook', x: [-4, 4], arrive: 3.5 },
     { at: 40, kind: 'hook', x: [-4, 4], arrive: -3.6 },
   ],
-  routes: [{ tag: 'main', points: [[0, 0], [49, 0]] }],
+  routes: [
+    {
+      tag: 'main',
+      points: [
+        [0, 0],
+        [49, 0],
+      ],
+    },
+  ],
 };

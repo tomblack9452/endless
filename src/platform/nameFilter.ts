@@ -12,16 +12,54 @@
 
 /** Roots refused anywhere in a name, however it's spelt around them. */
 export const STRONG = [
-  'fuck', 'fuk', 'shit', 'cunt', 'nigg', 'fagg', 'faggot', 'whore', 'slut', 'bitch', 'penis', 'pussy', 'porn',
-  'jizz', 'twat', 'wank', 'dildo', 'boob', 'kike', 'chink', 'retard', 'nazi', 'hitler', 'sperm', 'vagina', 'clit',
-  'hentai', 'rapist', 'molest', 'asshole', 'bastard', 'bollock', 'cocksuck', 'motherf', 'blowjob', 'handjob', 'skank',
+  'fuck',
+  'fuk',
+  'shit',
+  'cunt',
+  'nigg',
+  'fagg',
+  'faggot',
+  'whore',
+  'slut',
+  'bitch',
+  'penis',
+  'pussy',
+  'porn',
+  'jizz',
+  'twat',
+  'wank',
+  'dildo',
+  'boob',
+  'kike',
+  'chink',
+  'retard',
+  'nazi',
+  'hitler',
+  'sperm',
+  'vagina',
+  'clit',
+  'hentai',
+  'rapist',
+  'molest',
+  'asshole',
+  'bastard',
+  'bollock',
+  'cocksuck',
+  'motherf',
+  'blowjob',
+  'handjob',
+  'skank',
 ];
 
 const LEET: Record<string, string> = { '0': 'o', '1': 'i', '3': 'e', '4': 'a', '5': 's', '7': 't', '8': 'b' };
 
 /** The name's words, each spelt both ways (leetspeak undone; digits dropped). */
 export function nameForms(name: string): { leet: string[]; plain: string[] } {
-  const raw = name.replace(/([a-z])([A-Z])/g, '$1 $2').toLowerCase().split(/[ _-]+/).filter(Boolean);
+  const raw = name
+    .replace(/([a-z])([A-Z])/g, '$1 $2')
+    .toLowerCase()
+    .split(/[ _-]+/)
+    .filter(Boolean);
   return {
     leet: raw.map((w) => w.replace(/[0134578]/g, (c) => LEET[c]).replace(/[^a-z]/g, '')),
     plain: raw.map((w) => w.replace(/[^a-z]/g, '')),

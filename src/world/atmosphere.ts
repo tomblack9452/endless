@@ -30,7 +30,7 @@ const CANYON_ROCK = new Color(T.canyon.rock);
 const CANYON_OBSTACLE = new Color(T.canyon.obstacle);
 const INTERIOR_SKY = new Color(T.interior.sky);
 const INTERIOR_FOG = new Color(T.interior.fog);
-const INTERIOR_LIGHT = Math.pow(T.interior.light, 2.2);
+const INTERIOR_LIGHT = T.interior.light ** 2.2;
 const lit = new Color();
 const WHITE = new Color(1, 1, 1);
 const BLACK = new Color(0.02, 0.02, 0.025);
@@ -48,13 +48,13 @@ function smooth(t: number): number {
 
 /** Perceptual (sRGB-ish) brightness of a linear colour. */
 function brightness(c: Color): number {
-  return Math.pow(0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b, 1 / 2.2);
+  return (0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b) ** (1 / 2.2);
 }
 
 /** 0 when `c` is bright enough for dark text, 1 when it needs light text. */
 function darkness(c: Color, from: number, to: number): number {
   const t = (from - brightness(c)) / (from - to);
-  return smooth(t < 0 ? 0 : t > 1 ? 1 : t);
+  return smooth(t < 0 ? 0 : Math.min(t, 1));
 }
 
 /**
@@ -104,7 +104,6 @@ function highContrast(out: LivePalette): void {
 }
 
 function applyTimeOfDay(base: LivePalette, out: LivePalette, levelProgress: number): void {
-
   const n = KEYS.length;
   const t = ((levelProgress % n) + n) % n;
   const i = Math.floor(t);
@@ -121,8 +120,8 @@ function applyTimeOfDay(base: LivePalette, out: LivePalette, levelProgress: numb
   out.fog.copy(fogA).lerp(fogB, f);
 
   // Light values are perceptual; colours are stored linear, so convert.
-  const ground = Math.pow(a.light + (b.light - a.light) * f, 2.2);
-  const blocks = Math.pow(a.blocks + (b.blocks - a.blocks) * f, 2.2);
+  const ground = (a.light + (b.light - a.light) * f) ** 2.2;
+  const blocks = (a.blocks + (b.blocks - a.blocks) * f) ** 2.2;
   out.ground.multiplyScalar(ground);
   // Ground fades towards the fog colour as it darkens, so night isn't muddy.
   out.ground.lerp(out.fog, (1 - ground) * A.groundFogTint);

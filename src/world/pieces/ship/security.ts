@@ -26,7 +26,17 @@ export const lasers1: Piece = {
     [9, '#...............#'],
   ),
   routes: [
-    { tag: 'main', points: [[0, 0], [8, 0], [20, 3], [44, -3], [56, 0], [61, 0]] },
+    {
+      tag: 'main',
+      points: [
+        [0, 0],
+        [8, 0],
+        [20, 3],
+        [44, -3],
+        [56, 0],
+        [61, 0],
+      ],
+    },
   ],
 };
 
@@ -51,10 +61,16 @@ export const lasers2: Piece = {
     [7, '#...............#'],
   ),
   overlays: [
-    {at: 18, kind: 'door', x: 0, half: 2},
-    {at: 34, kind: 'door', x: 0, half: 2},
+    { at: 18, kind: 'door', x: 0, half: 2 },
+    { at: 34, kind: 'door', x: 0, half: 2 },
   ],
   routes: [
-    { tag: 'main', points: [[0, 0], [49, 0]] },
+    {
+      tag: 'main',
+      points: [
+        [0, 0],
+        [49, 0],
+      ],
+    },
   ],
 };

@@ -3,7 +3,7 @@
 export const ROOT_MIDI = 50; // D3. Everything in the game is in D.
 
 export function midiHz(m: number): number {
-  return 440 * Math.pow(2, (m - 69) / 12);
+  return 440 * 2 ** ((m - 69) / 12);
 }
 
 export type NoiseColour = 'white' | 'pink' | 'brown';
@@ -49,8 +49,8 @@ export function impulseResponse(ctx: BaseAudioContext, seconds: number, decay: n
     for (let i = 0; i < len; i++) {
       const t = i / len;
       const k = 0.55 - 0.45 * t; // brightness falls with time
-      lp += k * ((Math.random() * 2 - 1) - lp);
-      d[i] = lp * Math.pow(1 - t, decay);
+      lp += k * (Math.random() * 2 - 1 - lp);
+      d[i] = lp * (1 - t) ** decay;
     }
   }
   return buf;

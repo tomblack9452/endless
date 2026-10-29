@@ -6,7 +6,22 @@ import { type CardView, renderControlCards, renderGuide } from './tutorialView';
 import { reportLink } from './report';
 import type { ReportReason, ReportResult } from '../server/backend';
 
-export type ScreenName = 'title' | 'paused' | 'over' | 'settings' | 'goals' | 'hangar' | 'record' | 'solo' | 'league' | 'shop' | 'store' | 'pass' | 'boards' | 'welcome' | 'name';
+export type ScreenName =
+  | 'title'
+  | 'paused'
+  | 'over'
+  | 'settings'
+  | 'goals'
+  | 'hangar'
+  | 'record'
+  | 'solo'
+  | 'league'
+  | 'shop'
+  | 'store'
+  | 'pass'
+  | 'boards'
+  | 'welcome'
+  | 'name';
 
 /** Everything the league screen shows. */
 /** The service record and league screens share one layout. */
@@ -635,7 +650,10 @@ export class UI {
     icon.innerHTML = v.icon;
     const text = document.createElement('span');
     text.className = 'pilot-rank';
-    text.append(Object.assign(document.createElement('span'), { className: 'label', textContent: v.rank }), Object.assign(document.createElement('span'), { className: 'label dim', textContent: v.note }));
+    text.append(
+      Object.assign(document.createElement('span'), { className: 'label', textContent: v.rank }),
+      Object.assign(document.createElement('span'), { className: 'label dim', textContent: v.note }),
+    );
     head.append(icon, text);
     const rows = document.createElement('div');
     rows.className = 'pilot-rows';
@@ -681,7 +699,8 @@ export class UI {
   markDoubled(before: string, after: string): void {
     for (const id of ['over-stats', 'over-extra', 'over-best']) {
       const el = $(id);
-      if (el.children.length === 0 && el.textContent?.includes(`+${before} credits`)) el.textContent = el.textContent.replace(`+${before} credits`, `+${after} credits (doubled)`);
+      if (el.children.length === 0 && el.textContent?.includes(`+${before} credits`))
+        el.textContent = el.textContent.replace(`+${before} credits`, `+${after} credits (doubled)`);
     }
     const b = $('over-double') as HTMLButtonElement;
     b.hidden = false;
@@ -1209,9 +1228,7 @@ export class UI {
   }
 
   setGameOver(score: number, best: number, isNewBest: boolean, nearMisses: number, bestCombo: number, seed: number): void {
-    this.overStats.textContent =
-      (nearMisses > 0 ? `near misses ${nearMisses}, best chain x${bestCombo}` : 'no near misses') +
-      ` · seed ${seed}`; // for reporting a layout
+    this.overStats.textContent = `${nearMisses > 0 ? `near misses ${nearMisses}, best chain x${bestCombo}` : 'no near misses'} · seed ${seed}`; // for reporting a layout
     this.overScore.textContent = formatScore(score);
     this.overBest.textContent = isNewBest ? 'new best' : `best ${formatScore(best)}`;
   }

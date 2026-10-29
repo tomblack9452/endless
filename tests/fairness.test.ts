@@ -26,7 +26,14 @@ interface Hooked {
   shipX: number;
 }
 
-function drive(seed: number, level: number, autopilot = true, room: RoomId | null = null, seconds = SECONDS, gates = false): { crashed: boolean; at: number; room: string; hazards: number; gates: number; risks: number } {
+function drive(
+  seed: number,
+  level: number,
+  autopilot = true,
+  room: RoomId | null = null,
+  seconds = SECONDS,
+  gates = false,
+): { crashed: boolean; at: number; room: string; hazards: number; gates: number; risks: number } {
   const world = new World(new Scene(), new LivePalette());
   world.devRoom = room;
   world.gateRuns = gates;
@@ -65,7 +72,8 @@ function drive(seed: number, level: number, autopilot = true, room: RoomId | nul
     const prev = world.distance;
     eased += (steer - eased) * (1 - Math.exp(-CONFIG.steering.response * (world.onIce() ? CONFIG.hazards.ice.grip : 1) * DT));
     world.advance(DT, speed, eased * lateralSpeedAt(speed));
-    if (world.overPit() || world.inLava() || world.hitTest(prev)) return { crashed: true, at: Math.round(score), room: world.roomName, hazards: 0, gates: 0, risks: 0 };
+    if (world.overPit() || world.inLava() || world.hitTest(prev))
+      return { crashed: true, at: Math.round(score), room: world.roomName, hazards: 0, gates: 0, risks: 0 };
   }
   const w = world as unknown as { iceLakes: unknown[]; lavaLakes: unknown[]; lavaBombs: { count: number } };
   const gateCount = world.gateLog.reduce((n, g) => n + g.gates, 0);
@@ -111,7 +119,11 @@ interface SplitHooked extends Hooked {
   chasmStart: number;
 }
 
-function driveAlt(seed: number, level: number, gates = false): { crashed: boolean; at: number; splits: number; chasms: number; risks: number; pickups: number } {
+function driveAlt(
+  seed: number,
+  level: number,
+  gates = false,
+): { crashed: boolean; at: number; splits: number; chasms: number; risks: number; pickups: number } {
   const world = new World(new Scene(), new LivePalette());
   world.gateRuns = gates;
   let pickups = 0;
@@ -164,7 +176,8 @@ function driveAlt(seed: number, level: number, gates = false): { crashed: boolea
     eased += (steer - eased) * (1 - Math.exp(-CONFIG.steering.response * (world.onIce() ? CONFIG.hazards.ice.grip : 1) * DT));
     world.advance(DT, speed, eased * lateralSpeedAt(speed));
     pickups += world.collect(prev);
-    if (world.overPit() || world.inLava() || world.hitTest(prev)) return { crashed: true, at: Math.round(score), splits: hooked.altRoutes, chasms: chasms.size, risks: world.riskLanes, pickups };
+    if (world.overPit() || world.inLava() || world.hitTest(prev))
+      return { crashed: true, at: Math.round(score), splits: hooked.altRoutes, chasms: chasms.size, risks: world.riskLanes, pickups };
   }
   return { crashed: false, at: 0, splits: hooked.altRoutes, chasms: chasms.size, risks: world.riskLanes, pickups };
 }

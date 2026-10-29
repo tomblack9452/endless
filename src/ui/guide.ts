@@ -115,7 +115,7 @@ const SAFE_SQUASH: Partial<Record<ItemId, string>> = {
 export function itemIcon(id: ItemId): string {
   const c = itemCard(id).color;
   const gem = `<path d="M12 2.5 20.2 7.2v9.6L12 21.5 3.8 16.8V7.2z" fill="${c}" fill-opacity=".35"/><path d="M12 2.5 20.2 7.2v9.6L12 21.5 3.8 16.8V7.2zM12 2.5 7.5 9.5h9zM7.5 9.5 3.8 16.8M16.5 9.5l3.7 7.3M7.5 9.5 12 16.5l4.5-7M12 16.5v5"/>`;
-  const squash = safeColours() ? SAFE_SQUASH[id] ?? '' : '';
+  const squash = safeColours() ? (SAFE_SQUASH[id] ?? '') : '';
   const shape =
     id === 'pickup'
       ? `<path d="M12 2.5 20 12 12 21.5 4 12z" fill="${c}" fill-opacity=".35"/><path d="M12 2.5 20 12 12 21.5 4 12zM4 12h16M12 2.5 9.5 12 12 21.5 14.5 12z"/>`

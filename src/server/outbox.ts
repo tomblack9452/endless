@@ -89,7 +89,10 @@ export class Outbox {
       // A daily run that waited past midnight: the board it was for is closed (the server would file it under the new day's).
       // Likewise a ranked run once the week has turned: last week's course on this week's board.
       const now = this.backend.now();
-      if ((next.run.board === 'daily' && next.run.day && next.run.day !== dayKey(now)) || (next.run.board === 'ranked' && next.run.week && next.run.week !== weekKey(now))) {
+      if (
+        (next.run.board === 'daily' && next.run.day && next.run.day !== dayKey(now)) ||
+        (next.run.board === 'ranked' && next.run.week && next.run.week !== weekKey(now))
+      ) {
         this.items.shift();
         this.save();
         continue;

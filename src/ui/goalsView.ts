@@ -97,7 +97,8 @@ export class GoalsScreen {
 
   /** A dot on a tab with something to claim. */
   setTabNews(news: Record<GoalsTab, boolean>): void {
-    for (const t of document.querySelectorAll<HTMLElement>('[data-goaltab]')) t.querySelector('.news')?.classList.toggle('on', news[t.dataset.goaltab as GoalsTab]);
+    for (const t of document.querySelectorAll<HTMLElement>('[data-goaltab]'))
+      t.querySelector('.news')?.classList.toggle('on', news[t.dataset.goaltab as GoalsTab]);
   }
 
   renderDaily(v: DailyView): void {

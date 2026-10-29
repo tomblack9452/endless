@@ -236,7 +236,9 @@ export class Daily {
     const q = this.s.quests[i];
     if (!q || q.done || this.s.rerollDay === day) return null;
     const taken = new Set(this.s.quests.map((x) => x.type));
-    const pool = questsFor(`${day}-reroll-${i}`).concat(questsFor(`${day}-reroll-${i}-b`)).filter((x) => !taken.has(x.type));
+    const pool = questsFor(`${day}-reroll-${i}`)
+      .concat(questsFor(`${day}-reroll-${i}-b`))
+      .filter((x) => !taken.has(x.type));
     if (pool.length === 0) return null;
     this.s.quests[i] = pool[0];
     this.s.rerollDay = day;
@@ -251,7 +253,7 @@ export class Daily {
   /** Claim quest `i` if it's finished: returns its credits, or null. */
   claim(i: number): Quest | null {
     const q = this.s.quests[i];
-    if (!q || !q.done || q.claimed) return null;
+    if (!q?.done || q.claimed) return null;
     q.claimed = true;
     this.save();
     return q;

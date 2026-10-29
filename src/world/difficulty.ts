@@ -19,5 +19,5 @@ export function densityAt(score: number): number {
 
 export function lateralSpeedAt(speed: number): number {
   const st = CONFIG.steering;
-  return st.maxLateralSpeed * Math.pow(Math.max(1, speed / CONFIG.speed.base), st.lateralSpeedExponent);
+  return st.maxLateralSpeed * Math.max(1, speed / CONFIG.speed.base) ** st.lateralSpeedExponent;
 }

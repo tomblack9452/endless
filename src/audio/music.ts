@@ -275,7 +275,7 @@ export class Music {
 
   private bass(semi: number, t: number): void {
     const ctx = this.ctx;
-    const f = midiHz(ROOT_MIDI - 12 + ((semi % 12) + 12) % 12);
+    const f = midiHz(ROOT_MIDI - 12 + (((semi % 12) + 12) % 12));
     const o = ctx.createOscillator();
     o.frequency.value = f;
     const o2 = ctx.createOscillator();

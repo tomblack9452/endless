@@ -26,7 +26,17 @@ export const coolant1: Piece = {
     [9, '#.................#'],
   ),
   routes: [
-    { tag: 'main', points: [[0, 0], [8, 0], [20, 3], [44, -3], [56, 0], [61, 0]] },
+    {
+      tag: 'main',
+      points: [
+        [0, 0],
+        [8, 0],
+        [20, 3],
+        [44, -3],
+        [56, 0],
+        [61, 0],
+      ],
+    },
   ],
 };
 
@@ -53,7 +63,13 @@ export const vents1: Piece = {
     [11, '#.................#'],
   ),
   routes: [
-    { tag: 'main', points: [[0, 0], [49, 0]] },
+    {
+      tag: 'main',
+      points: [
+        [0, 0],
+        [49, 0],
+      ],
+    },
   ],
 };
 
@@ -82,11 +98,21 @@ export const foundry1: Piece = {
     [11, '#...................#'],
   ),
   overlays: [
-    {at: 14, kind: 'sparks', x: -8, y: 1},
-    {at: 38, kind: 'sparks', x: 8, y: 1},
+    { at: 14, kind: 'sparks', x: -8, y: 1 },
+    { at: 38, kind: 'sparks', x: 8, y: 1 },
   ],
   routes: [
-    { tag: 'main', points: [[0, 0], [8, 0], [20, -3], [44, 3], [56, 0], [61, 0]] },
+    {
+      tag: 'main',
+      points: [
+        [0, 0],
+        [8, 0],
+        [20, -3],
+        [44, 3],
+        [56, 0],
+        [61, 0],
+      ],
+    },
   ],
 };
 
@@ -105,21 +131,31 @@ export const collapse1: Piece = {
     [26, '#.....................#'],
   ),
   overlays: [
-    {at: 10, kind: 'debris', x: 5.5, w: 1.4},
-    {at: 14, kind: 'debris', x: 7.5, w: 1.4},
-    {at: 18, kind: 'debris', x: 6.5, w: 1.4},
-    {at: 22, kind: 'debris', x: 7.5, w: 1.4},
-    {at: 26, kind: 'debris', x: 7.5, w: 1.4},
-    {at: 30, kind: 'debris', x: 4.5, w: 1.4},
-    {at: 34, kind: 'debris', x: 4.5, w: 1.4},
-    {at: 38, kind: 'debris', x: 4.5, w: 1.4},
-    {at: 42, kind: 'debris', x: 1.5, w: 1.4},
-    {at: 46, kind: 'debris', x: 2.5, w: 1.4},
-    {at: 50, kind: 'debris', x: 4.5, w: 1.4},
-    {at: 24, kind: 'sparks', x: -9.5, y: 2},
-    {at: 40, kind: 'sparks', x: 9.5, y: 2},
+    { at: 10, kind: 'debris', x: 5.5, w: 1.4 },
+    { at: 14, kind: 'debris', x: 7.5, w: 1.4 },
+    { at: 18, kind: 'debris', x: 6.5, w: 1.4 },
+    { at: 22, kind: 'debris', x: 7.5, w: 1.4 },
+    { at: 26, kind: 'debris', x: 7.5, w: 1.4 },
+    { at: 30, kind: 'debris', x: 4.5, w: 1.4 },
+    { at: 34, kind: 'debris', x: 4.5, w: 1.4 },
+    { at: 38, kind: 'debris', x: 4.5, w: 1.4 },
+    { at: 42, kind: 'debris', x: 1.5, w: 1.4 },
+    { at: 46, kind: 'debris', x: 2.5, w: 1.4 },
+    { at: 50, kind: 'debris', x: 4.5, w: 1.4 },
+    { at: 24, kind: 'sparks', x: -9.5, y: 2 },
+    { at: 40, kind: 'sparks', x: 9.5, y: 2 },
   ],
   routes: [
-    { tag: 'main', points: [[0, 0], [8, 0], [20, 3], [44, -3], [56, 0], [61, 0]] },
+    {
+      tag: 'main',
+      points: [
+        [0, 0],
+        [8, 0],
+        [20, 3],
+        [44, -3],
+        [56, 0],
+        [61, 0],
+      ],
+    },
   ],
 };

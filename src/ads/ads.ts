@@ -104,7 +104,11 @@ class AdMobAds implements AdNetwork {
         resolve(r);
       };
       try {
-        handles.push(AdMob.addListener(E.Rewarded, () => void (earned = true)));
+        handles.push(
+          AdMob.addListener(E.Rewarded, () => {
+            earned = true;
+          }),
+        );
         // The reward can arrive just after the close (some ad networks): a moment's grace before calling it skipped.
         handles.push(AdMob.addListener(E.Dismissed, () => (earned ? finish('rewarded') : void setTimeout(() => finish(earned ? 'rewarded' : 'skipped'), 600))));
         handles.push(
@@ -116,7 +120,9 @@ class AdMobAds implements AdNetwork {
         void Promise.all(handles)
           .then(() => AdMob.showRewardVideoAd())
           .then(
-            (reward) => void (earned ||= !!reward && reward.amount > 0),
+            (reward) => {
+              if (reward && reward.amount > 0) earned = true;
+            },
             () => finish('unavailable'),
           );
       } catch {

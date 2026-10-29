@@ -1,4 +1,4 @@
-import { BoxGeometry, Color, CylinderGeometry, MeshBasicMaterial, PlaneGeometry, OctahedronGeometry, RingGeometry, Scene, type Texture } from 'three';
+import { BoxGeometry, Color, CylinderGeometry, MeshBasicMaterial, PlaneGeometry, OctahedronGeometry, RingGeometry, type Scene, type Texture } from 'three';
 import { patchBlockMaterial } from './blockTextures';
 import { CONFIG } from '../core/config';
 import { featureRand, rand, seed as seedRandom } from '../core/rng';
@@ -117,7 +117,7 @@ const TUMBLEWEED_HIT = 0.45;
 const FAMILY_LOOK_IDS = Object.keys(CONFIG.themes.interior.familyLooks); // a bridge edge moving more than this in a row has jumped, not bent // pit sides: a thin steel lip, then black
 
 /** Open-ground prop kinds. */
-export const enum Prop {
+export enum Prop {
   Mushroom,
   Spire,
   Rock,
@@ -146,7 +146,7 @@ export const PROP_HIT: Record<Prop, number> = {
 };
 
 function clamp(v: number, lo: number, hi: number): number {
-  return v < lo ? lo : v > hi ? hi : v;
+  return v < lo ? lo : Math.min(v, hi);
 }
 
 /** Smoothstep of t clamped to 0..1. */
@@ -418,7 +418,11 @@ export class World {
   private nextPickupAt = Infinity;
   private nextPowerAt = Infinity;
 
-  constructor(scene: Scene, private readonly palette: LivePalette, textures?: { side: Texture; top: Texture }) {
+  constructor(
+    scene: Scene,
+    private readonly palette: LivePalette,
+    textures?: { side: Texture; top: Texture },
+  ) {
     const s = F.cubeSize;
     const box = new BoxGeometry(s, s, s).translate(0, s / 2, 0);
     this.matLight = new MeshBasicMaterial({ map: textures?.top ?? null });
@@ -479,7 +483,9 @@ export class World {
     this.strips.setColorTable([new Color(1, 1, 1), new Color(L.amber), new Color(L.teal), this.redLight, new Color(L.dark), new Color(L.green)]);
     // Wall dressing: shaded geometry tinted per instance from the decor table (Decor order).
     const D = TH.interior.decor;
-    const decorTable = [D.steel, D.copper, D.teal, D.red, D.dark, D.yellow, D.panel, D.green, D.wood, D.woodDark, D.rope, D.glass, D.cliff].map((h) => new Color(h));
+    const decorTable = [D.steel, D.copper, D.teal, D.red, D.dark, D.yellow, D.panel, D.green, D.wood, D.woodDark, D.rope, D.glass, D.cliff].map(
+      (h) => new Color(h),
+    );
     this.decorMat = new MeshBasicMaterial({ vertexColors: true });
     this.decorMat.color.setScalar(0.95);
     this.pipes = new InstancedField(scene, pipeSegment(), this.decorMat, F.maxPipes);
@@ -493,14 +499,24 @@ export class World {
     this.pours.setColorTable(LIQUID_COLOURS);
     this.pools = new InstancedField(scene, new CylinderGeometry(1, 1, 0.04, 18), fxMaterial('pool'), F.maxPools);
     this.pools.setColorTable(LIQUID_COLOURS);
-    this.steamPlumes = new InstancedField(scene, new CylinderGeometry(0.5, 0.18, 1, 10, 1, true).translate(0, 0.5, 0), fxMaterial('steam', { opacity: 0.55 }), F.maxSteam);
+    this.steamPlumes = new InstancedField(
+      scene,
+      new CylinderGeometry(0.5, 0.18, 1, 10, 1, true).translate(0, 0.5, 0),
+      fxMaterial('steam', { opacity: 0.55 }),
+      F.maxSteam,
+    );
     this.blinkers = new InstancedField(scene, box, fxMaterial('blink'), F.maxBlinkers);
     this.blinkers.setColorTable([new Color(1, 1, 1), new Color(L.amber), new Color(L.teal), new Color(L.red), new Color(L.dark), new Color(L.green)]);
     this.holos = new InstancedField(scene, new PlaneGeometry(1, 1).translate(0, 0.5, 0), fxMaterial('holo', { additive: true }), F.maxHolos);
     this.holos.setColorTable([LIQUID_COLOURS[4]]);
     this.fans = new InstancedField(scene, ceilingFan(), this.decorMat, F.maxFans);
     // A flared plume, open at both ends.
-    this.vents = new InstancedField(scene, new CylinderGeometry(0.75, 0.5, 1, 12, 1, true).translate(0, 0.5, 0), fxMaterial('vent', { opacity: 0.6 }), F.maxVents);
+    this.vents = new InstancedField(
+      scene,
+      new CylinderGeometry(0.75, 0.5, 1, 12, 1, true).translate(0, 0.5, 0),
+      fxMaterial('vent', { opacity: 0.6 }),
+      F.maxVents,
+    );
     this.vents.setColorTable([LIQUID_COLOURS[3], LIQUID_COLOURS[2]]); // steam, and lava for the volcanic plain's geysers
     this.sparks = new Sparks(scene);
     this.waters = new InstancedField(scene, unitBox, fxMaterial('water'), F.maxWaters);
@@ -537,7 +553,26 @@ export class World {
       this.vents,
       this.tanks,
     ];
-    this.fields = [...this.solids, this.pools, this.steamPlumes, this.blinkers, this.holos, this.fans, this.tufts, this.arches, this.pickups, this.powers, this.pipes, this.greebles, this.voids, this.canisters, this.waters, this.iceSheets, this.lavaSheets, this.marks];
+    this.fields = [
+      ...this.solids,
+      this.pools,
+      this.steamPlumes,
+      this.blinkers,
+      this.holos,
+      this.fans,
+      this.tufts,
+      this.arches,
+      this.pickups,
+      this.powers,
+      this.pipes,
+      this.greebles,
+      this.voids,
+      this.canisters,
+      this.waters,
+      this.iceSheets,
+      this.lavaSheets,
+      this.marks,
+    ];
     this.applyPalette();
   }
 
@@ -715,7 +750,28 @@ export class World {
 
   /** What the last hit was, in words ("a rock spire"), for the crash moment. */
   hitName(): string {
-    const names = ['a crate', 'the hull', 'a rock wall', 'a boulder', 'a mushroom tree', 'a spire tree', 'a crystal', 'a bush', 'a dead tree', 'a rock spire', 'a cactus', 'a basalt column', 'a tumbleweed', 'a mesa', 'a lava bomb', 'a shuttle', 'a laser beam', 'a falling curtain', this.biome === 'volcanic' ? 'a lava geyser' : 'a steam vent', 'a tank'];
+    const names = [
+      'a crate',
+      'the hull',
+      'a rock wall',
+      'a boulder',
+      'a mushroom tree',
+      'a spire tree',
+      'a crystal',
+      'a bush',
+      'a dead tree',
+      'a rock spire',
+      'a cactus',
+      'a basalt column',
+      'a tumbleweed',
+      'a mesa',
+      'a lava bomb',
+      'a shuttle',
+      'a laser beam',
+      'a falling curtain',
+      this.biome === 'volcanic' ? 'a lava geyser' : 'a steam vent',
+      'a tank',
+    ];
     if (this.asteroidMix > 0.5 && this.lastHit === 3) return 'an asteroid';
     return names[this.lastHit] ?? '';
   }
@@ -729,7 +785,7 @@ export class World {
    * hit it meanwhile; obstacles still do).
    */
   private bringIn(dt: number): void {
-    const slot = (((Math.round(this.distance / STEP) % FLOOR_ROWS) + FLOOR_ROWS) % FLOOR_ROWS);
+    const slot = ((Math.round(this.distance / STEP) % FLOOR_ROWS) + FLOOR_ROWS) % FLOOR_ROWS;
     if (Math.abs(this.wallD[slot] - this.distance) > STEP * 0.6) {
       this.bringingIn = false;
       return;
@@ -757,7 +813,7 @@ export class World {
    * hit, but never out of the course. Returns true if the ship was pushed back.
    */
   clampToWalls(margin: number): boolean {
-    const slot = (((Math.round(this.distance / STEP) % FLOOR_ROWS) + FLOOR_ROWS) % FLOOR_ROWS);
+    const slot = ((Math.round(this.distance / STEP) % FLOOR_ROWS) + FLOOR_ROWS) % FLOOR_ROWS;
     if (Math.abs(this.wallD[slot] - this.distance) > STEP * 0.6) return false;
     const lo = this.wallL[slot] + margin;
     const hi = this.wallR[slot] - margin;
@@ -797,7 +853,7 @@ export class World {
 
   /** Remember a row's inner wall faces (world x) for clampToWalls. */
   private recordWalls(d: number, left: number, right: number): void {
-    const slot = (((Math.round(d / STEP) % FLOOR_ROWS) + FLOOR_ROWS) % FLOOR_ROWS);
+    const slot = ((Math.round(d / STEP) % FLOOR_ROWS) + FLOOR_ROWS) % FLOOR_ROWS;
     this.wallD[slot] = d;
     this.wallL[slot] = left;
     this.wallR[slot] = right;
@@ -1291,7 +1347,20 @@ export class World {
     if (biome === 'alien') {
       for (let i = 0; i < lt.tuftsPerRow; i++) {
         const s = 0.6 + rand() * 0.6;
-        this.tufts.spawn(wrap(laneRel + (rand() * 2 - 1) * W), 0, d + (rand() - 0.5) * STEP, s, s * (0.8 + rand() * 0.5), s, rand() * 6.28, false, true, 0, 0, false);
+        this.tufts.spawn(
+          wrap(laneRel + (rand() * 2 - 1) * W),
+          0,
+          d + (rand() - 0.5) * STEP,
+          s,
+          s * (0.8 + rand() * 0.5),
+          s,
+          rand() * 6.28,
+          false,
+          true,
+          0,
+          0,
+          false,
+        );
       }
     }
     // Tumbleweeds rolling across (not on the ice).
@@ -1485,12 +1554,13 @@ export class World {
     if (o > 0.5) this.altNow = px;
     const hit = R.post * ROCK_HIT;
     // The rocks line the narrow stretch only: the swings out and back stay open.
-    if (o >= this.riskOff * 0.9) for (const out of [-1, 1]) {
-      const x = px + this.riskSide * out * (R.half + hit);
-      if (Math.abs(x - this.lane) - hit < LANE + jitter + 0.3) continue; // the lane stays open
-      const h = 0.7 + featureRand() * 0.9;
-      this.obstacleRocks.spawn(wrap(x - this.shipX), 0, d, R.post, h / BOULDER_HEIGHT, R.post, featureRand() * 6.28, true, true, hit, hit);
-    }
+    if (o >= this.riskOff * 0.9)
+      for (const out of [-1, 1]) {
+        const x = px + this.riskSide * out * (R.half + hit);
+        if (Math.abs(x - this.lane) - hit < LANE + jitter + 0.3) continue; // the lane stays open
+        const h = 0.7 + featureRand() * 0.9;
+        this.obstacleRocks.spawn(wrap(x - this.shipX), 0, d, R.post, h / BOULDER_HEIGHT, R.post, featureRand() * 6.28, true, true, hit, hit);
+      }
     // The practice run places its own pickups; its risk lanes have none.
     if (this.riskPickupsLeft > 0 && d >= this.riskPickupAt && o > this.riskOff * 0.95 && !this.scripted) {
       this.riskPickupsLeft--;
@@ -1536,7 +1606,8 @@ export class World {
     if (this.gateNext >= G.gates || d < this.gateFirst(level) + this.gateNext * G.spacing) return;
     this.gateNext++;
     const canyon = this.theme === 'canyon';
-    if (this.quiet(d) || this.inChasm(d) || this.inChasm(d + 6) || this.riverAt(d) || this.onLake(this.iceLakes, this.lane, d, 2, CONFIG.hazards.ice.runoff)) return;
+    if (this.quiet(d) || this.inChasm(d) || this.inChasm(d + 6) || this.riverAt(d) || this.onLake(this.iceLakes, this.lane, d, 2, CONFIG.hazards.ice.runoff))
+      return;
     if (canyon && (this.splitStart !== Infinity || d >= this.splitAt - 40 || (this.genBiome !== 'asteroids' && d >= this.chasmAt - 20))) return;
     const land = !canyon;
     const gap = G.gap + maxSlope * STEP * 0.5;
@@ -1698,7 +1769,10 @@ export class World {
 
   /** This row's slice of every lake it crosses. */
   private lakeSlices(d: number): void {
-    for (const [lakes, field, crust] of [[this.iceLakes, this.iceSheets, false], [this.lavaLakes, this.lavaSheets, true]] as const) {
+    for (const [lakes, field, crust] of [
+      [this.iceLakes, this.iceSheets, false],
+      [this.lavaLakes, this.lavaSheets, true],
+    ] as const) {
       for (const l of lakes) {
         const t = (d - l.d) / l.rd;
         if (t <= -1 || t >= 1) continue;
@@ -1885,9 +1959,12 @@ export class World {
     if (split.active) {
       // Ride down the middle of our branch.
       this.laneTarget = this.splitSide * (this.splitHalf + hw / 2);
-    } else if (left < c.exit + (space ? A.exitLead : 60)) this.laneTarget = 0; // line up with the interior door
-    else if (inMouth || Math.abs(this.lane - this.cx) > hw - LANE - 1) this.laneTarget = 0; // head for the middle as the walls close in
-    else if (chasm && this.chasmKind === 2) this.laneTarget = -this.chasmSide * Math.min(1.5, maxOffset); // leave room for the fork
+    } else if (left < c.exit + (space ? A.exitLead : 60))
+      this.laneTarget = 0; // line up with the interior door
+    else if (inMouth || Math.abs(this.lane - this.cx) > hw - LANE - 1)
+      this.laneTarget = 0; // head for the middle as the walls close in
+    else if (chasm && this.chasmKind === 2)
+      this.laneTarget = -this.chasmSide * Math.min(1.5, maxOffset); // leave room for the fork
     else this.retargetOffset(d, maxOffset);
     this.moveLane(maxSlope, this.laneTarget, maxOffset);
     hw = hwAll;
@@ -1902,7 +1979,6 @@ export class World {
       if (b0 < a1) a1 = b0 = (a1 + b0) / 2;
       terrain.setLift(this.splitStart + 4, a1, b0, this.splitEnd - 2, this.cx, this.splitHalf, L.up, L.down, -this.splitSide);
     }
-
 
     // Walls: two staggered inner rocks per side so there are no gaps to slip
     // through, plus tall outer rocks for the canyon sides.
@@ -2088,7 +2164,19 @@ export class World {
   private swayingAsteroid(arrive: number, d: number, r: number, amp: number, freq: number, phase: number): void {
     const hit = r * ROCK_HIT;
     this.obstacleRocks.setNextMotion(amp, freq, phase);
-    this.obstacleRocks.spawn(arrive - amp * Math.sin(phase) - this.shipX, 0, d, r, (r * (1.45 + rand() * 0.5)) / BOULDER_HEIGHT, r, rand() * Math.PI * 2, true, false, hit, hit);
+    this.obstacleRocks.spawn(
+      arrive - amp * Math.sin(phase) - this.shipX,
+      0,
+      d,
+      r,
+      (r * (1.45 + rand() * 0.5)) / BOULDER_HEIGHT,
+      r,
+      rand() * Math.PI * 2,
+      true,
+      false,
+      hit,
+      hit,
+    );
   }
 
   /** How far a swaying rock's x changes while the ship is alongside it. */
@@ -2171,7 +2259,10 @@ export class World {
     const r2 = 0.9 + rand() * 0.5;
     const reach = this.swayReach(amp, freq, Math.max(r1, r2) * ROCK_HIT);
     const gap = LANE + jitter + 0.5 + reach;
-    for (const [side, r, ph] of [[-1, r1, phase], [1, r2, phase + Math.PI]] as const) {
+    for (const [side, r, ph] of [
+      [-1, r1, phase],
+      [1, r2, phase + Math.PI],
+    ] as const) {
       const arrive = this.lane + side * (gap + r * ROCK_HIT);
       if (Math.abs(arrive - this.cx) > hw - 0.3) continue; // too near the edge to swing: skip this one
       this.swayingAsteroid(arrive, d, r, amp, freq, ph);
@@ -2256,7 +2347,20 @@ export class World {
       if (island > this.splitHalf * 0.6 && rand() < 0.35 && this.genBiome !== 'asteroids') {
         const s = 0.9 + rand() * 0.8;
         const wx = this.cx + (rand() - 0.5) * island;
-        if (Math.abs(wx - this.lane) > LANE + s + jitter) this.crystals.spawn(wx - this.shipX, 0, d, s, s * (1 + rand() * 0.6), s, rand() * 6.28, true, false, s * PROP_HIT[Prop.Crystal], s * PROP_HIT[Prop.Crystal]);
+        if (Math.abs(wx - this.lane) > LANE + s + jitter)
+          this.crystals.spawn(
+            wx - this.shipX,
+            0,
+            d,
+            s,
+            s * (1 + rand() * 0.6),
+            s,
+            rand() * 6.28,
+            true,
+            false,
+            s * PROP_HIT[Prop.Crystal],
+            s * PROP_HIT[Prop.Crystal],
+          );
       }
     }
     // The other branch: its own line wanders a little, and rocks stay off it.
@@ -2442,7 +2546,10 @@ export class World {
       this.greebles.nextColor = row % 2 === 0 ? Decor.Wood : Decor.WoodDark;
       this.greebles.nextTilt = true;
       this.greebles.spawn((x0 + x1) / 2 - this.shipX, -0.12, d, x1 - x0, 0.12, STEP + 0.04, turn, false, false, 0, 0, false);
-      for (const [x, s, rail, prevX] of [[x0, -1, railL, prev[0]], [x1, 1, railR, prev[1]]] as const) {
+      for (const [x, s, rail, prevX] of [
+        [x0, -1, railL, prev[0]],
+        [x1, 1, railR, prev[1]],
+      ] as const) {
         // Where the edge jumped, its rail starts afresh rather than angling across.
         const px = Math.abs(x - prevX) < BRIDGE_JUMP ? prevX : x;
         if (rail) {
@@ -2451,7 +2558,20 @@ export class World {
           const len = Math.hypot(x - px, STEP);
           this.pipes.nextColor = Decor.Rope;
           this.pipes.nextTilt = true;
-          this.pipes.spawn((x + px) / 2 - this.shipX, C.railHeight, d - STEP / 2, 0.05, 0.05, len + 0.08, Math.atan2(-(x - px), STEP), false, false, 0, 0, false);
+          this.pipes.spawn(
+            (x + px) / 2 - this.shipX,
+            C.railHeight,
+            d - STEP / 2,
+            0.05,
+            0.05,
+            len + 0.08,
+            Math.atan2(-(x - px), STEP),
+            false,
+            false,
+            0,
+            0,
+            false,
+          );
           if (row % 3 === 0) {
             this.greebles.nextColor = Decor.WoodDark;
             this.greebles.spawn(x - s * 0.05 - this.shipX, 0, d, 0.12, C.railHeight + 0.15, 0.12, 0, false, false, 0, 0, false);
@@ -2546,7 +2666,7 @@ export class World {
   /** Remember the lane after each row (for the dev autopilot). */
   private rowLane(d: number): void {
     // Called at the start of the next row, so it stores the previous row's lane.
-    const slot = (((Math.round(this.laneLogD / STEP) % FLOOR_ROWS) + FLOOR_ROWS) % FLOOR_ROWS);
+    const slot = ((Math.round(this.laneLogD / STEP) % FLOOR_ROWS) + FLOOR_ROWS) % FLOOR_ROWS;
     if (this.laneLogD !== -Infinity) {
       this.laneRingD[slot] = this.laneLogD;
       this.laneRing[slot] = this.lane;
@@ -2556,7 +2676,7 @@ export class World {
 
   /** The safe lane at distance `d` (world x), or null if it isn't known (autopilot, revive). */
   laneAt(d: number): number | null {
-    const slot = (((Math.round(d / STEP) % FLOOR_ROWS) + FLOOR_ROWS) % FLOOR_ROWS);
+    const slot = ((Math.round(d / STEP) % FLOOR_ROWS) + FLOOR_ROWS) % FLOOR_ROWS;
     return Math.abs(this.laneRingD[slot] - d) <= STEP ? this.laneRing[slot] : null;
   }
 
@@ -2892,8 +3012,7 @@ export class World {
         // A course names a piece by id, or just a room family.
         named = pieceById(entry);
         next = named ? named.family : (entry as RoomId);
-      }
-      else this.lastRoom = this.room;
+      } else this.lastRoom = this.room;
       const piece = named ?? this.choosePiece(next, sub);
       // No piece (or no room for one before the area ends): a plain corridor.
       if (!piece || !this.startPiece(piece, d, base, maxSlope)) this.startRoom('corridor', d, base, maxSlope);
@@ -3015,7 +3134,10 @@ export class World {
         const x1 = this.floorSegs[i * 2 + 1];
         this.hull.nextTilt = true;
         this.hullBox((x0 + x1) / 2, -0.14, d, x1 - x0, 0.14, depth, false);
-        for (const [edge, s] of [[x0, -1], [x1, 1]] as const) {
+        for (const [edge, s] of [
+          [x0, -1],
+          [x1, 1],
+        ] as const) {
           if (Math.abs(edge - (this.cx + s * hw)) < 0.05) continue; // meets the wall: nothing to trim
           // Inside another piece of floor (where walkways join): no edge here either.
           let covered = false;
@@ -3157,7 +3279,20 @@ export class World {
       for (let k = 0; k < 2; k++) {
         const len = fc.width - door - 2;
         this.pipes.nextColor = k ? Decor.Copper : Decor.Steel;
-        this.pipes.spawn(cx + s * (door + 1 + len / 2) - this.shipX, 4.4 + k * 3.5, front - 0.7, 0.45 - k * 0.15, 0.45 - k * 0.15, len, Math.PI / 2, false, false, 0, 0, false);
+        this.pipes.spawn(
+          cx + s * (door + 1 + len / 2) - this.shipX,
+          4.4 + k * 3.5,
+          front - 0.7,
+          0.45 - k * 0.15,
+          0.45 - k * 0.15,
+          len,
+          Math.PI / 2,
+          false,
+          false,
+          0,
+          0,
+          false,
+        );
       }
     }
     // Towers standing proud of the hull, with lit windows.
@@ -3197,7 +3332,7 @@ export class World {
   private readonly wallR = new Float32Array(FLOOR_ROWS);
 
   private recordFloor(d: number): void {
-    const slot = (((Math.round(d / STEP) % FLOOR_ROWS) + FLOOR_ROWS) % FLOOR_ROWS);
+    const slot = ((Math.round(d / STEP) % FLOOR_ROWS) + FLOOR_ROWS) % FLOOR_ROWS;
     this.floorD[slot] = d;
     this.floorCount[slot] = this.floorN;
     for (let i = 0; i < Math.max(0, this.floorN) * 2; i++) this.floorRows[slot * 12 + i] = this.floorSegs[i];
@@ -3205,7 +3340,7 @@ export class World {
 
   /** True if the ship is over a pit (no floor under it). */
   overPit(): boolean {
-    const slot = (((Math.round(this.distance / STEP) % FLOOR_ROWS) + FLOOR_ROWS) % FLOOR_ROWS);
+    const slot = ((Math.round(this.distance / STEP) % FLOOR_ROWS) + FLOOR_ROWS) % FLOOR_ROWS;
     if (Math.abs(this.floorD[slot] - this.distance) > STEP * 0.6) return false;
     const n = this.floorCount[slot];
     if (n < 0) return false;
@@ -3354,7 +3489,7 @@ export class World {
         w.greebles.spawn(x - w.shipX, 1.1, d, 0.35, Math.max(0.5, top - 2.2), 0.35, 0, false, false, 0, 0, false);
         this.greeble(x, 0, d, 0.7, 0.9, 0.7, Decor.Copper); // cylinder block
       },
-            step(a, b, delta) {
+      step(a, b, delta) {
         terrain.addStep(a, b, delta);
       },
       water(x, y, d, width) {

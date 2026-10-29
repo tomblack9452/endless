@@ -172,7 +172,8 @@ describe('lessons', () => {
 
   it('word steering and boost exactly as the tips do', () => {
     for (const c of ['drag', 'sides', 'tilt', 'keys'] as const) expect(lessonText('steer', c)).toBe(tipText('steer', c));
-    for (const how of [{}, { keys: true }, { doubleTap: false }, { side: 'left' as const }]) expect(lessonText('boost', 'drag', how)).toBe(tipText('boost', 'drag', how));
+    for (const how of [{}, { keys: true }, { doubleTap: false }, { side: 'left' as const }])
+      expect(lessonText('boost', 'drag', how)).toBe(tipText('boost', 'drag', how));
   });
 
   it('word them for a keyboard, for boost without double-tap, and say where the boost button is', () => {

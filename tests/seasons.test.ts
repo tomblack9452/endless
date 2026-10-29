@@ -6,7 +6,18 @@ import { freeReward, premiumReward } from '../src/economy/pass';
 import { shopFor } from '../src/economy/shop';
 import { byKey } from '../src/ship/looks';
 import { seasonAt } from '../src/progression/season';
-import { colourDistance, isSeasonShopLook, lab, MIN_DISTANCE, seasonDecalSvg, seasonLooks, seasonLooksThrough, seasonOf, seasonPassKeys, seasonTheme } from '../src/ship/seasonLooks';
+import {
+  colourDistance,
+  isSeasonShopLook,
+  lab,
+  MIN_DISTANCE,
+  seasonDecalSvg,
+  seasonLooks,
+  seasonLooksThrough,
+  seasonOf,
+  seasonPassKeys,
+  seasonTheme,
+} from '../src/ship/seasonLooks';
 
 // Generated season looks: the same for everyone, distinct, readable, and kept for good.
 
@@ -60,7 +71,11 @@ describe('season looks', () => {
       const svg = seasonDecalSvg(s);
       expect(svg).toMatch(/^<svg[^>]*viewBox="0 0 24 24">/);
       expect(svg).toMatch(/currentColor/);
-      for (const n of svg.replace(/xmlns="[^"]*"/, '').match(/-?\d+(\.\d+)?/g)!.map(Number)) expect(Math.abs(n)).toBeLessThanOrEqual(24);
+      for (const n of svg
+        .replace(/xmlns="[^"]*"/, '')
+        .match(/-?\d+(\.\d+)?/g)!
+        .map(Number))
+        expect(Math.abs(n)).toBeLessThanOrEqual(24);
       expect(decalArt(`s${s}-d1`)).toBe(svg);
     }
   });
@@ -145,4 +160,3 @@ describe('following the trusted clock', () => {
     expect(LOOKS).toContain(first);
   });
 });
-

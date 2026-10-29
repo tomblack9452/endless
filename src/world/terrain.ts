@@ -162,7 +162,7 @@ export const terrain = {
 };
 
 function smooth(t: number): number {
-  t = t < 0 ? 0 : t > 1 ? 1 : t;
+  t = t < 0 ? 0 : Math.min(t, 1);
   return t * t * (3 - 2 * t);
 }
 

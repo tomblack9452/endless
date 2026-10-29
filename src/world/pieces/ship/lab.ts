@@ -26,12 +26,27 @@ export const lab1: Piece = {
     [11, '#...................#'],
   ),
   overlays: [
-    {at: 6, kind: 'holo', x: 7, y: 0.9, w: 1.6, h: 0.8},
-    {at: 50, kind: 'holo', x: 7, y: 0.9, w: 1.6, h: 0.8},
+    { at: 6, kind: 'holo', x: 7, y: 0.9, w: 1.6, h: 0.8 },
+    { at: 50, kind: 'holo', x: 7, y: 0.9, w: 1.6, h: 0.8 },
   ],
   routes: [
-    { tag: 'main', points: [[0, 0], [62, 0]] },
-    { tag: 'alt', reward: 'pickups', points: [[0, 0], [20, -5], [42, -5], [62, 0]] },
+    {
+      tag: 'main',
+      points: [
+        [0, 0],
+        [62, 0],
+      ],
+    },
+    {
+      tag: 'alt',
+      reward: 'pickups',
+      points: [
+        [0, 0],
+        [20, -5],
+        [42, -5],
+        [62, 0],
+      ],
+    },
   ],
 };
 
@@ -54,10 +69,16 @@ export const lab2: Piece = {
     [10, '#.................#'],
   ),
   overlays: [
-    {at: 18, kind: 'door', x: 0, half: 2},
-    {at: 36, kind: 'door', x: 0, half: 2},
+    { at: 18, kind: 'door', x: 0, half: 2 },
+    { at: 36, kind: 'door', x: 0, half: 2 },
   ],
   routes: [
-    { tag: 'main', points: [[0, 0], [41, 0]] },
+    {
+      tag: 'main',
+      points: [
+        [0, 0],
+        [41, 0],
+      ],
+    },
   ],
 };
