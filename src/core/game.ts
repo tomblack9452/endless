@@ -20,16 +20,12 @@ import { Ghost, rivalGhost } from '../ship/ghost';
 import { decalArt } from '../ship/decals';
 import { Haptics } from '../platform/haptics';
 import { Capacitor } from '@capacitor/core';
-import { exitChoice } from '../platform/exit';
-import { sendFeedback } from '../platform/feedback';
-import { cancelOpenReport } from '../ui/report';
 import { quickRetryOn, tapRetries } from './retry';
 import { GateTracker, kmText, Milestones, milestonesCount } from './runBonus';
 import { crashMomentOn, crashOverReady, crashTimeScale } from './crashMoment';
 import { distanceText, sparkSvg, summaryRows } from '../ui/runSummary';
 import { type HintId, Hints, tipText } from '../ui/hints';
 import { migrateMissionLooks } from '../progression/legacy';
-import { type Feature, nextStageText } from '../progression/reveal';
 import { type ControlId, hasTouch, type Lesson, type LessonState, Onboarding } from '../ui/onboarding';
 import { TeachView } from '../ui/tutorialView';
 import { Color } from 'three';
@@ -94,6 +90,7 @@ import GOAL_ICON from '../assets/icons/goal.svg?raw';
 import { musicForArea } from '../audio/musicChoice';
 import { musicFor } from '../audio/musicChoice';
 import { REVEAL_KEY } from '../progression/reveal';
+import { Navigation } from './navigation';
 
 type State = 'title' | 'playing' | 'paused' | 'countdown' | 'crashed' | 'finished';
 
@@ -112,7 +109,7 @@ export class Game {
   readonly world: World;
   readonly player: Player;
   readonly input: Input;
-  private readonly speedLines: SpeedLines;
+  readonly speedLines: SpeedLines;
   /** Graphics on auto: drops to low once per session if runs keep going slow. */
   private readonly autoGraphics = new AutoGraphics();
   private readonly sky: Sky;
@@ -121,11 +118,11 @@ export class Game {
   readonly weather: Weather;
   readonly ghost: Ghost;
   /** Ranked: the ghost of the pilot just above you (settings > rival's ghost). */
-  private readonly rival: Ghost;
+  readonly rival: Ghost;
   /** Counts runs, so an answer from the server for an earlier run is ignored. */
   private runSerial = 0;
   /** Zen mode: no score, rewards or boards; a crash respawns (and the next run is one). */
-  private zen = false;
+  zen = false;
   private zenNext = false;
   /** The run's speed, sampled for the summary on the game-over screen. */
   private speeds: number[] = [];
@@ -155,8 +152,6 @@ export class Game {
   readonly hints = new Hints((text, tip) => this.ui.showHint(text, tip));
   /** The Android app (not the web): back can leave it, so "ask before closing" applies. */
   native = Capacitor.getPlatform() === 'android';
-  /** The "close endless space?" dialog is up. */
-  exitAsking = false;
   readonly haptics = new Haptics();
   readonly progress = new Progress();
   // Run mode: ranked (the weekly level), solo (an environment or a set level) or endless.
@@ -260,7 +255,7 @@ export class Game {
   /** The run as it stood at the first crash, when revived: what the boards get (a paid revive never adds to a board score). */
   preRevive: { score: number; seconds: number; distance: number } | null = null;
   revivePending = false;
-  private reviveAsked = false;
+  reviveAsked = false;
   private countdownT = 0; // seconds of 3-2-1 left
   // A set level (courses.ts) being played, if any.
   course: Course | null = null;
@@ -290,7 +285,7 @@ export class Game {
   score = 0; // shown score: distance points + bonus
   distanceScore = 0; // drives levels and difficulty
   private bonus = 0;
-  private chain = 0; // near misses in a row
+  chain = 0; // near misses in a row
   private chainTimer = 0;
   nearMissCount = 0;
   bestChain = 0;
@@ -305,7 +300,7 @@ export class Game {
 
   boostMeter = 0; // 0..1
   boosting = false;
-  private boostLevel = 0; // eased 0..1, scales the speed boost
+  boostLevel = 0; // eased 0..1, scales the speed boost
 
   // Power-ups (see CONFIG.powers).
   shield = false;
@@ -333,7 +328,7 @@ export class Game {
   /** The best line for quick retry's panel. */
   private quickLine = '';
 
-  private lastTime = 0;
+  lastTime = 0;
   private titleTime = 0;
 
   readonly shop = new ShopScreens(this);
@@ -372,6 +367,8 @@ export class Game {
 
   readonly solo = new SoloScreen(this);
 
+  readonly nav = new Navigation(this);
+
   constructor(canvas: HTMLCanvasElement) {
     this.basePalette.set(BASE_PALETTE);
     this.palette.set(BASE_PALETTE);
@@ -391,7 +388,7 @@ export class Game {
     this.input.bindBoostControl(this.ui.boostControl);
     this.input.onTiltDenied = () => this.ui.showNotice('motion access off. drag to steer');
     this.sound.attachUnlock();
-    this.ui.bindMenus(this.onMenu, this.settingsScreen.onSetting);
+    this.ui.bindMenus(this.nav.onMenu, this.settingsScreen.onSetting);
     this.settingsScreen.applySettings();
     this.applyLook(0);
 
@@ -401,8 +398,8 @@ export class Game {
     this.ui.showHud(false);
 
     document.body.addEventListener('pointerdown', this.onTap);
-    window.addEventListener('keydown', this.onKey);
-    this.ui.pauseButton.addEventListener('pointerdown', this.onPauseButton);
+    window.addEventListener('keydown', this.nav.onKey);
+    this.ui.pauseButton.addEventListener('pointerdown', this.nav.onPauseButton);
     this.ui.bindPause(() => this.pause());
     this.ui.bindHintSkip(() => {
       this.hints.skip();
@@ -413,7 +410,7 @@ export class Game {
     this.ui.startButton.addEventListener('click', () => {
       if (this.state === 'title') this.title.startPrimary();
     });
-    this.ui.bindTitleCards(this.onTitleLink);
+    this.ui.bindTitleCards(this.nav.onTitleLink);
     this.ui.bindWelcome({
       control: (id) => this.firstLaunch.chooseControls(id),
       practice: () => this.firstLaunch.startPractice(),
@@ -428,7 +425,7 @@ export class Game {
     this.ui.bindRecordTabs((tab) => this.ui.setRecordTab(tab));
     void storage.get(REVEAL_KEY).then((v) => (this.revealSeen = v === null ? -1 : Number(v) || 0));
     this.ui.titleRank.addEventListener('pointerdown', (e) => e.stopPropagation());
-    this.ui.titleRank.addEventListener('click', () => this.onTitleLink('record'));
+    this.ui.titleRank.addEventListener('click', () => this.nav.onTitleLink('record'));
     document.addEventListener('visibilitychange', () => {
       if (document.hidden) {
         this.pause();
@@ -450,7 +447,7 @@ export class Game {
     window.addEventListener('blur', () => this.pause());
 
     this.ui.bindCelebration();
-    this.ui.bindTitleLinks(this.onTitleLink);
+    this.ui.bindTitleLinks(this.nav.onTitleLink);
     this.ui.bindBoards(
       BOARD_TABS,
       (id) => void this.boards.showBoard(id),
@@ -1177,7 +1174,7 @@ export class Game {
     if (active > cap) {
       // Over the cap: choose which systems to switch off first.
       this.ui.showNotice(`${active} upgrade points on, ${this.leagues.current.name} allows ${cap}. switch some off`);
-      if (this.state === 'crashed') this.toMainMenu();
+      if (this.state === 'crashed') this.nav.toMainMenu();
       this.hangarScreen.openHangar({ upgrades: true });
       return;
     }
@@ -1198,7 +1195,7 @@ export class Game {
   }
 
   /** Zen: endless at a gentle, capped speed; a crash fades and carries on. No score, rewards or boards. */
-  private startZen(): void {
+  startZen(): void {
     this.zenNext = true;
     this.beginRun(0, newSeed(), 'endless');
   }
@@ -1222,41 +1219,6 @@ export class Game {
     else this.startEndless();
   }
 
-  private onTitleLink = (name: string): void => {
-    // Every way in to a part of the game that isn't open yet says when it opens (the cores chip, cards...).
-    const needs: Record<string, Feature> = {
-      solo: 'solo',
-      record: 'record',
-      shop: 'shop',
-      'shop-cores': 'shop',
-      pass: 'shop',
-      boards: 'leaderboard',
-      challenge: 'daily',
-    };
-    const f = needs[name];
-    if (f && !this.title.open(f)) {
-      this.ui.showNotice(nextStageText(this.progress.stats.validRuns, this.onboarding.done) || 'not open yet');
-      return;
-    }
-    if (name === 'endless') this.startEndless();
-    else if (name === 'zen') this.startZen();
-    else if (name === 'challenge') this.courseRuns.startDaily();
-    else if (name === 'solo') this.solo.openSolo();
-    else if (name === 'record') this.record.openRecord();
-    else if (name === 'goals') this.goals.openGoals();
-    else if (name === 'hangar') this.hangarScreen.openHangar();
-    else if (name === 'shop') {
-      this.shopPick = -1;
-      this.preview = null;
-      this.shop.openShop();
-    } else if (name === 'shop-cores') this.shop.openStore(null);
-    else if (name === 'pass') this.shop.openPass(null);
-    else if (name === 'boards') this.boards.openBoards();
-    else if (name === 'daily') this.goals.openGoals('daily');
-    else if (name === 'claim') this.claimLogin();
-    else if (name === 'gift') void this.revives.claimGift();
-  };
-
   // --- first launch ------------------------------------------------------------------------------
 
   /** Dev invincibility, or the practice run (which can't be failed). */
@@ -1276,57 +1238,7 @@ export class Game {
     return !hasTouch() && (this.onboarding.keys ?? true) ? 'keys' : 'drag';
   }
 
-  /**
-   * The Android back button (and Escape): close what's open, pause a run. At the top (the title or
-   * welcome screen) it asks before closing, or returns false to leave the app (see exit.ts).
-   */
-  back(): boolean {
-    if (this.exitAsking) this.closeExitAsk();
-    else if (this.ui.celebrating) this.ui.skipCelebration();
-    else if (this.econ.offerOpen && !(this.state === 'crashed' && this.revivePending))
-      this.econ.declineOffer(); // the reminders offer: no thanks
-    else if (cancelOpenReport()) return true;
-    else if (this.ui.guideOpen) this.firstLaunch.closeGuide();
-    else if (this.settingsOpen) this.settingsScreen.closeSettings();
-    else if (this.infoOpen === 'welcome') return this.backAtTop();
-    else if (this.infoOpen) this.closeInfo();
-    else if (this.state === 'playing' || this.state === 'countdown') this.pause();
-    else if (this.state === 'paused') this.resume();
-    else if (this.state === 'crashed' && this.revivePending) this.declineRevive();
-    else if (this.state === 'crashed' || this.state === 'finished') this.toMainMenu();
-    else return this.backAtTop();
-    return true;
-  }
-
-  /** Back with nothing left to close: ask first (true), or false to leave (Android) or do nothing (web). */
-  private backAtTop(): boolean {
-    if (exitChoice({ native: this.native, ask: this.settings.confirmExit, asking: this.exitAsking }) !== 'ask') return false;
-    this.exitAsking = true;
-    this.econ.offer(
-      { kicker: '', name: 'close endless space?', lines: ['your progress is saved'], yes: 'close', yesEnabled: true, no: 'stay', seconds: 0 },
-      () => {
-        this.exitAsking = false;
-        void import('@capacitor/app').then(({ App }) => App.exitApp());
-      },
-      () => (this.exitAsking = false),
-    );
-    return true;
-  }
-
-  /** "stay" (or back again while the dialog shows). */
-  private closeExitAsk(): void {
-    this.exitAsking = false;
-    this.econ.dismissOffer();
-  }
-
-  /** Back on the revive offer (or before it shows): no thanks, and the game-over screen. */
-  private declineRevive(): void {
-    this.econ.dismissOffer();
-    this.reviveAsked = true;
-    this.settleCrash();
-  }
-
-  private pause(): void {
+  pause(): void {
     if (this.state !== 'playing' && this.state !== 'countdown') return;
     this.econ.setCountdown(0);
     this.state = 'paused';
@@ -1336,7 +1248,7 @@ export class Game {
     this.ui.show('paused');
   }
 
-  private resume(): void {
+  resume(): void {
     if (this.state !== 'paused') return;
     this.lastTime = performance.now();
     this.sound.resume();
@@ -1377,7 +1289,7 @@ export class Game {
     }
   }
 
-  private onTap = (): void => {
+  onTap = (): void => {
     if (this.settingsOpen || this.infoOpen) return;
     switch (this.state) {
       case 'title':
@@ -1401,154 +1313,7 @@ export class Game {
     }
   };
 
-  private onKey = (e: KeyboardEvent): void => {
-    if (e.repeat || (e.target as HTMLElement | null)?.tagName === 'INPUT') return; // typing a name is not a shortcut
-    if ((e.code === 'Space' || e.code === 'Enter') && this.state !== 'paused') {
-      if (this.state === 'title' && !this.settingsOpen && !this.infoOpen) this.title.startPrimary();
-      else this.onTap();
-    } else if (e.code === 'Escape')
-      this.back(); // what Android's back button does
-    else if (e.code === 'KeyP') {
-      if (this.settingsOpen) this.settingsScreen.closeSettings();
-      else if (this.infoOpen) this.closeInfo();
-      else if (this.state === 'playing') this.pause();
-      else if (this.state === 'paused') this.resume();
-    }
-  };
-
-  private onPauseButton = (e: PointerEvent): void => {
-    e.stopPropagation();
-    this.pause();
-  };
-
   // --- menus ---------------------------------------------------------------
-
-  private onMenu = (action: string): void => {
-    if (action === 'resume') this.resume();
-    else if (action === 'settings') this.settingsScreen.openSettings();
-    else if (action === 'delete') void this.account.deleteAccount();
-    else if (action === 'google') void this.account.keepWithGoogle(false);
-    else if (action === 'google-welcome') void this.account.keepWithGoogle(true);
-    else if (action === 'privacy-choices') void this.ads.privacyChoices();
-    else if (action === 'feedback') void sendFeedback(this.settingsScreen.feedbackScreen());
-    else if (action === 'name-later' && this.infoOpen === 'name') this.closeInfo();
-    else if (action === 'tips') {
-      this.hints.replay();
-      this.ui.showNotice('tips are back for your next runs');
-    } else if (action === 'tutorial') {
-      if (this.state !== 'title') this.toMainMenu();
-      this.onboarding.go('replay');
-      this.feelUsed = null;
-      this.settingsScreen.closeSettings();
-      this.firstLaunch.openWelcome();
-    } else if (action === 'guide') this.ui.showGuide('got it');
-    else if (action === 'whats-new') this.settingsScreen.showWhatsNew();
-    else if (action === 'menu') {
-      const practising = this.practice;
-      this.toMainMenu();
-      if (practising) {
-        // Left the practice run: back to the start of onboarding (a trial: back to "how did that feel?").
-        if (practising.kind === 'trial') this.feelUsed = practising.control;
-        this.onboarding.go('quit');
-        this.firstLaunch.openWelcome();
-      }
-    } else if (action === 'share') void this.connection.share();
-    else if (action === 'details') this.ui.showDetails(!this.ui.detailsOpen);
-    else if (action === 'double') void this.revives.doubleCredits();
-    else if (action === 'back') {
-      if (this.infoOpen) this.closeInfo();
-      else this.settingsScreen.closeSettings();
-    }
-  };
-
-  private closeInfo(): void {
-    if (this.infoOpen === 'hangar' && this.hangarFrom === 'shop') {
-      // Back to the shop it was opened from, not all the way out.
-      this.hangarFrom = null;
-      this.preview = null;
-      this.applyLooks();
-      this.shop.openShop();
-      return;
-    }
-    if (this.infoOpen === 'store' && this.storeFrom === 'shop') {
-      this.storeFrom = null;
-      this.shop.openShop();
-      return;
-    }
-    if (this.infoOpen === 'pass' && this.passFrom === 'store') {
-      this.passFrom = null;
-      this.shop.openStore();
-      return;
-    }
-    if (this.infoOpen === 'hangar' || this.infoOpen === 'shop') {
-      // Leaving the hangar takes off anything only being tried on.
-      this.preview = null;
-      this.applyLooks();
-    }
-    if (this.infoOpen === 'name') {
-      // Later (no signal, or no name in mind): asked again next time the game starts, not after every run.
-      this.nameLater = true;
-    } else if (this.infoOpen === 'welcome') return; // it ends by its own buttons
-    if (this.infoOpen === 'boards') this.portraits.release(); // its pictures stay cached; the renderer goes
-    if (this.state === 'title') {
-      // The ship only shows on the screens that show it off (hangar, shop, welcome).
-      this.player.setVisible(false);
-      this.trail.setVisible(false);
-    }
-    this.infoOpen = null;
-    this.ui.show('title');
-  }
-
-  /** Abandon the run and go back to the live title scene. Best score still counts. */
-  toMainMenu(): void {
-    this.ui.showQuickRetry(null);
-    if (this.state === 'paused' && !this.recorded) {
-      // Abandoned mid-run: it still counts, for its best and the stats.
-      this.recordBest(false);
-      this.finishRun(null);
-    }
-    // Left with a revive still on offer: the run ends as it stood, rather than not at all.
-    if (this.state === 'crashed' && this.revivePending) this.settleCrash();
-    if (this.practice) {
-      this.practice = null;
-      this.teach.show(false);
-    }
-    this.econ.setCountdown(0);
-    this.econ.dismissOffer();
-    this.ghost.stop();
-    this.rival.stop();
-    this.zen = false;
-    this.ui.setZen(false);
-
-    this.state = 'title';
-    this.input.enabled = false;
-    this.input.releaseAll();
-    this.boosting = false;
-    this.boostLevel = 0;
-    this.powers.endPowers();
-    this.chain = 0;
-    this.speed = CONFIG.speed.titleDrift;
-    this.stage.pullBack = this.stage.drop = 0;
-    this.stage.shakeX = this.stage.shakeY = 0;
-    this.speedLines.update(0, 0, 0);
-    this.player.reset(); // clears any crash pieces or fall
-    this.player.setVisible(false);
-    this.trail.setVisible(false);
-    this.events.clear();
-    this.sound.setWind(0);
-    this.applyLooks();
-    this.world.reset(0, false);
-    this.level = 1;
-    this.applyLook(0);
-    this.sound.toTitle();
-    this.ui.hideCombo();
-    this.ui.hideBanner();
-    this.ui.showHud(false);
-    this.ui.show('title');
-    this.title.refreshTitle();
-    this.lastTime = performance.now();
-    void this.account.askName();
-  }
 
   /** Low graphics: chosen in settings, or auto after it dropped this session. */
   lowGraphics(): boolean {

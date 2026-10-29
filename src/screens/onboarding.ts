@@ -283,7 +283,7 @@ export class FirstLaunch {
   /** Off the practice course and its indicators, back to the title scene. */
   private endPractice(): void {
     this.g.teach.show(false);
-    this.g.toMainMenu();
+    this.g.nav.toMainMenu();
     this.g.practice = null;
   }
 

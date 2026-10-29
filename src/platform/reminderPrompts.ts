@@ -51,7 +51,7 @@ export class ReminderPrompts {
   async offerReminders(): Promise<void> {
     if (this.reminderOfferChecked || !this.g.settingsLoaded || !remindersAvailable() || this.g.settings.reminders || this.g.progress.stats.validRuns < 5)
       return;
-    if (this.g.state !== 'title' || this.g.infoOpen || this.g.settingsOpen || this.g.econ.offerOpen || this.g.ui.celebrating || this.g.exitAsking) return;
+    if (this.g.state !== 'title' || this.g.infoOpen || this.g.settingsOpen || this.g.econ.offerOpen || this.g.ui.celebrating || this.g.nav.exitAsking) return;
     this.reminderOfferChecked = true;
     if ((await storage.get(REMINDERS_OFFERED_KEY)) !== null) return;
     void storage.set(REMINDERS_OFFERED_KEY, '1');

@@ -48,7 +48,7 @@ void document.fonts.ready.then(() => {
   if (import.meta.env.DEV) (window as unknown as { game: Game }).game = game;
   // Android's back button steps back through the game, and leaves from the title screen.
   if (Capacitor.getPlatform() === 'android')
-    void import('@capacitor/app').then(({ App }) => App.addListener('backButton', () => (game.back() ? undefined : void App.exitApp())));
+    void import('@capacitor/app').then(({ App }) => App.addListener('backButton', () => (game.nav.back() ? undefined : void App.exitApp())));
   // Dev panel (level skip, unlock all etc), on the dev server only (npm run dev).
   if (import.meta.env.DEV) void import('./core/dev').then((m) => m.installDevPanel(game));
 });
