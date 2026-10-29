@@ -8,7 +8,7 @@ import { lateralSpeedAt, speedAt } from '../world/difficulty';
 import { Input } from '../platform/input';
 import { LivePalette } from '../world/palette';
 import { Player, shipGeometry } from '../ship/player';
-import { describeShip, Portraits, type ShipLook } from '../ship/portrait';
+import { Portraits, type ShipLook } from '../ship/portrait';
 import { Stage } from '../world/renderer';
 import { Sky } from '../world/sky';
 import { SpeedLines } from '../world/speedLines';
@@ -78,8 +78,8 @@ import { type Reward, rewardLook, rewardParts, rewardText } from '../economy/rew
 import { DailyShop, vaultAt } from '../economy/shop';
 import { dayKey, formatWait, untilTomorrow } from '../economy/time';
 import { EconomyView } from '../economy/view';
-import { type BoardId, createBackend, type PilotStats, type ReportReason, type RunSubmission, type SubmitResult } from '../server/backend';
-import { BOARD_TABS, boardCaption, boardForRun, boardName, boardQuery } from '../server/boards';
+import { type BoardId, createBackend, type PilotStats, type RunSubmission } from '../server/backend';
+import { BOARD_TABS, boardForRun } from '../server/boards';
 import { Outbox } from '../server/outbox';
 import { CloudSave } from '../server/sync';
 import { shareAvailable, shareCard } from '../platform/share';
@@ -91,7 +91,7 @@ import { fxDistance, fxTime } from '../world/fx';
 import { type Course, COURSES, courseLength, type DailyRun, dailyRun, type Environment, ENVIRONMENTS, type WeeklyRun, weeklyRun } from '../world/courses';
 import { Challenge, streakReward } from '../progression/challenge';
 import { envStatus, nextEnvironment, newlyOpened } from '../progression/unlocks';
-import { DIVISIONS, divisionReward, emblem, LEAGUES, leagueName, leaguePar, Leagues, LP_PER_DIVISION, weekKey } from '../progression/leagues';
+import { emblem, LEAGUES, leagueName, leaguePar, Leagues, LP_PER_DIVISION, weekKey } from '../progression/leagues';
 import { ACHIEVEMENTS, type Achievement, GROUP_NAMES, type Group, type Snapshot, achievement, progressOn, rewardKeys } from '../progression/achievements';
 import { refreshSeasonLooks, SETS, VAULT_ORDER } from '../ship/catalogue';
 import { GoalLog } from '../progression/goals';
@@ -102,7 +102,7 @@ import type { Fin, Marking } from '../ship/looks';
 import { MAX_TIER, type ShipStats, STANDARD, SYSTEMS, type SystemId, TIER_COST, TIER_LEAGUE, Upgrades } from '../ship/upgrades';
 import { newSeed } from './rng';
 import { loadNumber } from './storage';
-import { type Celebration, formatScore, type PilotCardView, type ProgressView, type RankResultView, type TitleCard, UI } from '../ui/ui';
+import { type Celebration, formatScore, type ProgressView, type RankResultView, type TitleCard, UI } from '../ui/ui';
 import type { RoomId } from '../world/interior';
 import { biomeForLevel, type PowerKind, themeForLevel, themeName, World } from '../world/world';
 import { tintBiome } from '../world/biomes';
@@ -110,6 +110,7 @@ import { terrain } from '../world/terrain';
 import { ShowroomSpin } from '../ship/showroom';
 import { ShopScreens } from '../screens/shop';
 import { Purchases } from './purchases';
+import { BoardScreens } from '../screens/boards';
 
 type State = 'title' | 'playing' | 'paused' | 'countdown' | 'crashed' | 'finished';
 
@@ -121,7 +122,7 @@ const REVEAL_KEY = 'endless.reveal';
 const REMINDERS_OFFERED_KEY = 'endless.remindersOffered';
 
 /** A name the server made up for a new account ("pilot-3fa2"): the player hasn't picked one. */
-const GENERATED_NAME = /^pilot-[0-9a-f]{4}$/;
+export const GENERATED_NAME = /^pilot-[0-9a-f]{4}$/;
 /** A name the server takes (see set_pilot_name). */
 const PILOT_NAME = /^[A-Za-z0-9 _-]{3,16}$/;
 
@@ -243,19 +244,19 @@ export class Game {
   /** The "close endless space?" dialog is up. */
   private exitAsking = false;
   readonly haptics = new Haptics();
-  private readonly progress = new Progress();
+  readonly progress = new Progress();
   // Run mode: ranked (the weekly level), solo (an environment or a set level) or endless.
   private mode: RunMode = 'ranked';
   /** Solo: the environment being played, or null (endless, ranked, set levels). */
   private environment: Environment | null = null;
   /** This week's ranked level (rebuilt when the week turns). */
-  private weekly: WeeklyRun = weeklyRun(weekKey(Date.now()));
+  weekly: WeeklyRun = weeklyRun(weekKey(Date.now()));
   /** Today's challenge (rebuilt when the day turns, by the trusted clock). */
-  private today: DailyRun = dailyRun(dayKey(Date.now()));
+  today: DailyRun = dailyRun(dayKey(Date.now()));
   /** The daily challenge being flown (the day it belongs to), or null. */
   private dailyRunNow: DailyRun | null = null;
   /** The daily challenge's bests and streak on this device. */
-  private readonly challenge = new Challenge();
+  readonly challenge = new Challenge();
   private scoreBase = 0; // solo starts: score begins at half the skipped points
   private readonly ranked = new Ranked();
   readonly wallet = new Wallet();
@@ -265,19 +266,18 @@ export class Game {
   readonly backend = createBackend();
   private readonly cloud = new CloudSave(this.backend);
   /** Finished runs on their way to the leaderboards (kept and retried when there's no signal). */
-  private readonly outbox = new Outbox(this.backend);
+  readonly outbox = new Outbox(this.backend);
   /** The last run sent to a board: its notice still shows when the rate limit held it back a moment (not mid-run). */
   private lastSent: RunSubmission | null = null;
-  private boardTab = 'week';
-  private boardSeq = 0;
+  boardTab = 'week';
   readonly store = createStore();
   storeProducts: StoreProduct[] = [];
   /** Shop rows for real-money products, in the order shown ('dev' adds cores in the dev build). */
   private deleteArmed = false;
   private deleteTimer = 0;
-  private portraits = new Portraits(this.palette);
+  portraits = new Portraits(this.palette);
   private shipSent = ''; // the looks last sent to the boards (JSON)
-  private recordSent = ''; // the service record summary last sent (JSON)
+  recordSent = ''; // the service record summary last sent (JSON)
   private shipTimer = 0;
   private nameOk = false; // the player has a pilot name of their own
   private nameLater = false; // the name screen was put off for this session
@@ -367,8 +367,8 @@ export class Game {
   private sectionIdx = -1;
   private hitThisRun = false; // anything hit, even a shield save (course stars)
   private finishMs = 0;
-  private readonly upgrades = new Upgrades();
-  private readonly leagues = new Leagues();
+  readonly upgrades = new Upgrades();
+  readonly leagues = new Leagues();
   /** This run's ship systems (your switched-on upgrades). */
   private ship: ShipStats = STANDARD;
   readonly looks = new Looks();
@@ -443,6 +443,8 @@ export class Game {
   readonly shop = new ShopScreens(this);
 
   readonly purchases = new Purchases(this);
+
+  readonly boards = new BoardScreens(this);
 
   constructor(canvas: HTMLCanvasElement) {
     this.basePalette.set(BASE_PALETTE);
@@ -525,7 +527,7 @@ export class Game {
     this.ui.bindTitleLinks(this.onTitleLink);
     this.ui.bindBoards(
       BOARD_TABS,
-      (id) => void this.showBoard(id),
+      (id) => void this.boards.showBoard(id),
       (name) => void this.savePilotName(name),
     );
     this.ui.bindNameBox('settings', (name) => void this.savePilotName(name, 'settings'));
@@ -577,7 +579,7 @@ export class Game {
       void this.planReminders();
     });
     this.outbox.onLate = (run, res) => {
-      if (run === this.lastSent && this.state !== 'playing' && this.state !== 'countdown') this.boardNotice(run.board, res);
+      if (run === this.lastSent && this.state !== 'playing' && this.state !== 'countdown') this.boards.boardNotice(run.board, res);
     };
     this.econ.bindShop(this.shop.onShopOffer, this.shop.onShopBuy, this.shop.onShopTab, this.shop.onShopSet);
     this.bindShowroomDrag();
@@ -599,7 +601,7 @@ export class Game {
       reroll: (id) => void this.onReroll(id),
     });
     this.ui.titleLeague.addEventListener('pointerdown', (e) => e.stopPropagation());
-    this.ui.titleLeague.addEventListener('click', () => (this.open('ranked') ? this.openLeague() : undefined));
+    this.ui.titleLeague.addEventListener('click', () => (this.open('ranked') ? this.boards.openLeague() : undefined));
     this.ui.bindSolo(
       (i) => this.startCourse(i),
       (i) => this.startSolo(i),
@@ -1261,12 +1263,12 @@ export class Game {
   }
 
   /** There's a server, but it can't be reached right now (no signal, or it's down). Everything on the device carries on. */
-  private offline(): boolean {
+  offline(): boolean {
     return this.backend.online && (!this.backend.reachable || (typeof navigator !== 'undefined' && navigator.onLine === false));
   }
 
   /** Offline: ask the server for the time now and then (it needs no sign-in), and pick everything up again when it answers. */
-  private async recheck(): Promise<void> {
+  async recheck(): Promise<void> {
     if (!this.offline() || this.rechecking) return;
     this.rechecking = true;
     try {
@@ -1284,7 +1286,7 @@ export class Game {
     }
   }
 
-  private refreshBar(now = this.now()): void {
+  refreshBar(now = this.now()): void {
     this.ui.setOffline(this.offline());
     this.econ.setBar(this.wallet.credits, this.wallet.cores);
     this.econ.setNews('goals', this.daily.loginDue(dayKey(now)) >= 0 || this.goalsToClaim() > 0);
@@ -1382,7 +1384,7 @@ export class Game {
   }
 
   /** What reaching league `l` gives. */
-  private leagueGives(l: number): string[] {
+  leagueGives(l: number): string[] {
     const x = LEAGUES[l];
     const out: string[] = [];
     if (x.promotion > 0) out.push(`+${formatScore(x.promotion)} credits`);
@@ -1398,103 +1400,6 @@ export class Game {
   /** The most recent `n` ranked runs, oldest first. */
   private recentRanked(n: number) {
     return this.ranked.history.slice(-n);
-  }
-
-  private openLeague(): void {
-    const lg = this.leagues;
-    const l = lg.league;
-    const next = LEAGUES[l + 1];
-    const owned = this.upgrades.points();
-    const target = this.weekly.target;
-    const lastDivision = DIVISIONS.length - 1;
-    const parNow = leaguePar(l, target);
-    const left = Math.max(0, LP_PER_DIVISION - lg.lp);
-
-    let big = String(left);
-    let goal: string;
-    const checks: ProgressView['checks'] = [];
-    if (lg.top) {
-      big = String(lg.lp);
-      goal = 'lp in the top league';
-    } else if (lg.division < lastDivision) {
-      goal = `lp to ${leagueName(l, lg.division + 1)}`;
-      checks.push({ label: `own ${next.min} upgrade points for ${next.name}`, value: `${owned} owned`, met: owned >= next.min });
-    } else {
-      goal = lg.promotionReady ? `division full: ${next.name} next` : `lp to finish ${leagueName(l, lg.division)}`;
-      checks.push({ label: `fill division ${DIVISIONS[lastDivision]}`, value: `${lg.lp}/${LP_PER_DIVISION} lp`, met: lg.promotionReady });
-      checks.push({ label: `own ${next.min} upgrade points`, value: `${owned} owned`, met: owned >= next.min });
-    }
-    // Roughly how many runs at par that is (+10 LP each).
-    const runs = Math.ceil(left / 10);
-
-    const gives: ProgressView['gives'] = [];
-    if (!lg.top && lg.division < lastDivision) {
-      gives.push({
-        title: `${leagueName(l, lg.division + 1)} gives`,
-        items: [`+${formatScore(divisionReward(l))} credits`, `${formatScore(lg.current.weekly[lg.division + 1])} credits a week`],
-      });
-    }
-    if (next) gives.push({ title: `${next.name} league gives`, items: this.leagueGives(l + 1) });
-
-    const h = lg.history.slice(-20);
-    const net = h.reduce((t, v) => t + v, 0);
-    this.ui.renderProgress('league', {
-      icon: emblem(l, lg.division),
-      name: leagueName(l, lg.division),
-      big,
-      goal,
-      fraction: lg.lp / LP_PER_DIVISION,
-      detail:
-        lg.top || lg.promotionReady
-          ? `par ${formatScore(parNow)} this week`
-          : `${lg.lp} / ${LP_PER_DIVISION} lp · about ${runs} run${runs === 1 ? '' : 's'} at par`,
-      checks,
-      gives,
-      trend: { title: h.length ? `last ${h.length} runs` : 'recent runs', values: h, summary: h.length ? `${net >= 0 ? '+' : ''}${net} lp` : '', unit: 'lp' },
-      rows: [
-        ['par this week', `${formatScore(parNow)} = +10 lp`],
-        ['150% of par', `${formatScore(Math.round(parNow * 1.5))} = +25 lp`],
-        ['active upgrade points', `${this.upgrades.activePoints()} (cap ${lg.current.max})`],
-        ['weekly reward so far', formatScore(lg.weeklySoFar())],
-      ],
-      ladder: LEAGUES.map((y, k) => ({
-        icon: emblem(k, k < l ? 2 : k === l ? lg.division : -1),
-        name: y.name,
-        needs: `${y.min === y.max ? y.max : `${y.min}-${y.max}`} upgrade points · par ${formatScore(leaguePar(k, target))}`,
-        gives: k === 0 ? 'where everyone starts' : this.leagueGives(k).slice(0, 3).join(' · '),
-        state: k < l ? 'done' : k === l ? 'current' : 'locked',
-      })),
-    });
-    this.openInfo('league');
-    void this.loadBoard();
-  }
-
-  /** This week's leaderboard in your league (just your best when offline). */
-  private async loadBoard(): Promise<void> {
-    const lg = this.leagues;
-    const tab = BOARD_TABS[0];
-    const mine = this.progress.weeklyBest(this.weekly.id);
-    const own: [string, string][] = mine > 0 ? [['your best', formatScore(mine)]] : [['no ranked run yet this week', '']];
-    if (this.offline()) {
-      this.ui.renderBoard(own, "you're offline. the board comes back with a connection");
-      return;
-    }
-    this.ui.renderBoard([], this.backend.online ? 'loading' : '');
-    const rows = await this.backend.board(boardQuery(tab, lg.league, this.now()));
-    if (!this.backend.online || rows === null) {
-      this.ui.renderBoard(
-        own,
-        !this.backend.online
-          ? 'the leaderboards need the server'
-          : this.offline()
-            ? "you're offline. the board comes back with a connection"
-            : "couldn't load the board",
-      );
-      this.refreshBar();
-      return;
-    }
-    const view: [string, string][] = rows.map((r) => [`${r.rank}. ${r.you ? 'you' : r.name}`, formatScore(r.score)]);
-    this.ui.renderBoard(view.length > 0 ? view : [['no runs yet this week', '']], LEAGUES[lg.league].name);
   }
 
   // --- leaderboards ----------------------------------------------------------------
@@ -1520,26 +1425,12 @@ export class Game {
     this.lastSent = sub;
     void this.outbox.send(sub).then((res) => {
       if (!res) return; // waiting for a signal
-      this.boardNotice(board, res);
+      this.boards.boardNotice(board, res);
     });
   }
 
-  /** "#4 on the endless board" once a run is on its board. */
-  private boardNotice(board: BoardId, res: SubmitResult): void {
-    if (res.status === 'ok' && res.rank) this.ui.showNotice(`${res.newBest ? 'new best: ' : ''}#${res.rank} on the ${boardName(board)} board`);
-    else if (res.status === 'rejected' && import.meta.env.DEV) console.warn(`leaderboard turned the run down: ${res.message}`);
-  }
-
-  /** Your own best on a tab, for when the board can't be read. */
-  private localBest(id: string): number {
-    if (id === 'week') return this.progress.weeklyBest(this.weekly.id);
-    if (id === 'daily') return this.challenge.bestOn(this.today.day);
-    if (id === 'endless') return this.progress.endlessBest;
-    return this.progress.envBest[id] ?? 0;
-  }
-
   /** The looks you have on, as the boards keep them (with the rank and league your badge decals show). */
-  private shipLook(): ShipLook {
+  shipLook(): ShipLook {
     return { ...this.looks.equipped, rank: this.ranked.rank, league: this.leagues.league, division: this.leagues.division };
   }
 
@@ -1550,7 +1441,7 @@ export class Game {
   }
 
   /** Send your looks to the boards if they've changed since last time. */
-  private async syncShip(): Promise<void> {
+  async syncShip(): Promise<void> {
     if (!this.backend.online) return;
     const ship = this.shipLook();
     const key = JSON.stringify(ship);
@@ -1559,7 +1450,7 @@ export class Game {
   }
 
   /** Your service record's summary, as others see it when they tap you on a board. */
-  private pilotStats(): PilotStats {
+  pilotStats(): PilotStats {
     const s = this.progress.stats;
     return {
       rank: this.ranked.rank,
@@ -1575,121 +1466,6 @@ export class Game {
     };
   }
 
-  /** Send your service record's summary to the boards if it's changed since last time. */
-  private async syncRecord(): Promise<void> {
-    if (!this.backend.online) return;
-    const stats = this.pilotStats();
-    const key = JSON.stringify(stats);
-    if (key === this.recordSent) return;
-    if (await this.backend.setRecord(stats)) this.recordSent = key;
-  }
-
-  /** A pilot's service record for their board row: rank, lifetime stats and bests. */
-  private async pilotCard(pid: string): Promise<PilotCardView | null> {
-    const p = await this.backend.pilotRecord(pid);
-    if (!p) return null;
-    const st = p.stats;
-    const rank = Math.max(0, Math.min(RANKS.length - 1, Math.floor(st.rank ?? 0)));
-    const n = (v: number | undefined): string => formatScore(v ?? 0);
-    const rows: [string, string][] = [];
-    if (st.runs !== undefined) {
-      const secs = st.seconds ?? 0;
-      const hours = Math.floor(secs / 3600);
-      const mins = Math.floor((secs % 3600) / 60);
-      rows.push(
-        ['xp', n(st.xp)],
-        ['runs', n(st.runs)],
-        ['ranked runs', n(st.rankedRuns)],
-        ['time played', hours > 0 ? `${hours}h ${mins}m` : `${mins}m`],
-        ['distance', `${((st.distance ?? 0) / 1000).toFixed(1)} km`],
-      );
-    }
-    const best = (board: string, label: string): void => {
-      if (p.bests[board]) rows.push([label, formatScore(p.bests[board])]);
-    };
-    best('ranked', 'best ranked week');
-    best('daily', 'best daily challenge');
-    best('endless', 'best endless');
-    for (const e of ENVIRONMENTS) best(`solo:${e.id}`, `best solo: ${e.name}`);
-    if (st.runs !== undefined)
-      rows.push(
-        ['furthest level', String(st.bestLevel || 1)],
-        ['best chain', `x${st.bestChain ?? 0}`],
-        ['near misses', n(st.nearMisses)],
-        ['pickups', n(st.pickups)],
-      );
-    const since = p.since ? `since ${new Date(p.since).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' }).toLowerCase()}` : '';
-    const note = [p.premium ? '◆ premium' : '', since, st.runs === undefined ? 'no stats shared yet' : ''].filter(Boolean).join(' · ');
-    return { icon: insignia(rank), rank: st.rank === undefined ? 'rank unknown' : rankName(rank), note, rows };
-  }
-
-  /** A board row for the UI, with a picture of the pilot's ship (yours as you have it on now). */
-  private boardRow(r: { rank: number; name: string; score: number; you: boolean; premium?: boolean; ship?: ShipLook | null; pid?: string }) {
-    const ship = r.you ? this.shipLook() : (r.ship ?? null);
-    const pid = r.pid;
-    return {
-      record: pid ? () => this.pilotCard(pid) : null,
-      report: pid && !r.you ? (reason: ReportReason) => this.backend.reportPilot(pid, reason) : null,
-      rank: r.rank,
-      name: r.name,
-      score: formatScore(r.score),
-      you: r.you,
-      premium: r.premium,
-      picture: ship ? () => this.portraits.get(ship) : null,
-      looks: ship ? describeShip(ship) : '',
-    };
-  }
-
-  private openBoards(): void {
-    this.openInfo('boards');
-    void this.showBoard(this.boardTab);
-    void this.backend.pilotName().then((name) => {
-      // The name is asked for here, when it's first needed: a generated one ("pilot-3fa2") invites a real one.
-      const generated = !name || GENERATED_NAME.test(name);
-      const note = !this.backend.online
-        ? 'names come with the server'
-        : this.offline()
-          ? 'names can be changed with a connection'
-          : generated
-            ? 'pick your pilot name: 3 to 16 letters, numbers, spaces, - or _'
-            : '3 to 16 letters, numbers, spaces, - or _. once an hour';
-      if (this.infoOpen === 'boards') this.ui.setPilotName(name ?? '', note);
-    });
-  }
-
-  private async showBoard(id: string): Promise<void> {
-    const tab = BOARD_TABS.find((t) => t.id === id) ?? BOARD_TABS[0];
-    this.boardTab = tab.id;
-    this.ui.setBoardTab(tab.id);
-    const seq = ++this.boardSeq;
-    const caption = boardCaption(tab, this.leagues.league);
-    const mine = this.localBest(tab.id);
-    const own = mine > 0 ? [this.boardRow({ rank: 0, name: 'you', score: mine, you: true })] : [];
-    if (!this.backend.online) {
-      this.ui.renderLeaderboard(caption, own, 'global boards need the server. this is your best on this device.');
-      return;
-    }
-    const offlineNote = `you're offline. the boards come back when you're connected.${own.length > 0 ? ' this is your best on this device.' : ''}`;
-    if (this.offline()) {
-      this.ui.renderLeaderboard(caption, own, offlineNote);
-      void this.recheck();
-      return;
-    }
-    this.ui.renderLeaderboard(caption, [], 'loading');
-    await Promise.all([this.outbox.flush(), this.syncShip(), this.syncRecord()]); // so a run you just finished, your ship and your record are on the board
-    const rows = await this.backend.board(boardQuery(tab, this.leagues.league, this.now()));
-    if (seq !== this.boardSeq || this.infoOpen !== 'boards') return; // moved on while it loaded
-    this.refreshBar();
-    if (rows === null) this.ui.renderLeaderboard(caption, own, this.offline() ? offlineNote : "couldn't load the board. try again in a moment");
-    else if (rows.length === 0) this.ui.renderLeaderboard(caption, [], 'nobody yet. fly a run to be first');
-    else
-      this.ui.renderLeaderboard(
-        caption,
-        rows.map((r) => this.boardRow(r)),
-        '',
-      );
-  }
-
   private async savePilotName(name: string, box = 'board'): Promise<boolean> {
     if (!this.backend.online) {
       this.ui.setPilotName('', 'names come with the server', box);
@@ -1703,7 +1479,7 @@ export class Game {
     const res = await this.backend.setPilotName(name);
     this.ui.setPilotName(res.ok ? res.message : '', res.ok ? 'saved' : res.message, box);
     if (res.ok) this.nameOk = true;
-    if (res.ok && box === 'board') void this.showBoard(this.boardTab);
+    if (res.ok && box === 'board') void this.boards.showBoard(this.boardTab);
     return res.ok;
   }
 
@@ -2443,7 +2219,7 @@ export class Game {
       this.shop.openShop();
     } else if (name === 'shop-cores') this.shop.openStore(null);
     else if (name === 'pass') this.shop.openPass(null);
-    else if (name === 'boards') this.openBoards();
+    else if (name === 'boards') this.boards.openBoards();
     else if (name === 'daily') this.openGoals('daily');
     else if (name === 'claim') this.claimLogin();
     else if (name === 'gift') void this.claimGift();
