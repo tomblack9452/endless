@@ -43,3 +43,14 @@ test('settings open from the title and close again', async ({ page }) => {
   await expect(page.locator('#screen-title')).toHaveClass(/\bon\b/);
   expect(errors).toEqual([]);
 });
+
+test('a first launch starts the practice run with its first lesson, and skip leaves it', async ({ page }) => {
+  const { errors } = await openGame(page, 'fresh');
+  await page.locator('#welcome-practice').click();
+  await expect(page.locator('#hud')).toHaveClass(/\bon\b/);
+  await expect(page.locator('#tutorial-text')).toContainText(/steer|drag|tap|tilt|lean/i, { timeout: 20_000 });
+  await page.waitForTimeout(3000); // a few seconds of the practice run's loop
+  await page.locator('#tutorial-skip').click();
+  await expect.poll(() => currentScreen(page), { timeout: 20_000 }).not.toBeNull();
+  expect(errors).toEqual([]);
+});
