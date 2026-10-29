@@ -71,9 +71,7 @@ export class ShopScreens {
           : `${so.missing.length} of ${so.items.length} looks left · the lot for ${formatScore(so.price)} cores, ${formatScore(saved)} less than one by one · own the whole set for +${so.set.bonusCores} cores`,
         items: so.items,
         cards: so.items.map((item) => ({ price: priceOf(item), premium: item.unlock.by === 'cores', deal: false })),
-        buy: so.complete
-          ? { text: 'set complete', enabled: false }
-          : { text: `buy the set · ${formatScore(so.price)} cores`, enabled: this.g.wallet.cores >= so.price },
+        buy: so.complete ? { text: 'set complete', enabled: false } : { text: `buy the set · ${formatScore(so.price)} cores`, enabled: true },
       };
     }
     if (this.shopTab === 'vault') {
@@ -85,9 +83,7 @@ export class ShopScreens {
         info: `a rare look, for sale a month at a time. when it goes it's away for ${VAULT_ORDER.length - 1} months`,
         items: [v.item],
         cards: [{ price: priceOf(v.item), premium: true, deal: false }],
-        buy: mine
-          ? { text: `${v.item.name} is yours`, enabled: false }
-          : { text: `buy ${v.item.name} · ${formatScore(v.price)} cores`, enabled: this.g.wallet.cores >= v.price },
+        buy: mine ? { text: `${v.item.name} is yours`, enabled: false } : { text: `buy ${v.item.name} · ${formatScore(v.price)} cores`, enabled: true },
       };
     }
     const offers = this.g.dailyShop.offers(dayKey(now), owned);
@@ -98,7 +94,7 @@ export class ShopScreens {
       else {
         const have = f.currency === 'cores' ? this.g.wallet.cores : this.g.wallet.credits;
         const price = `${formatScore(f.price)} ${f.currency}`;
-        buy = have >= f.price ? { text: `buy ${f.item.name} · ${price}`, enabled: true } : { text: `${price} · you have ${formatScore(have)}`, enabled: false };
+        buy = have >= f.price ? { text: `buy ${f.item.name} · ${price}`, enabled: true } : { text: `${price} · you have ${formatScore(have)}`, enabled: true };
       }
     }
     return {
@@ -186,7 +182,7 @@ export class ShopScreens {
     const tiers = CONFIG.economy.pass.tiers;
     // The biggest pack, with its bonus and (in the app) its price.
     let best: { id: ProductId; cores: number; bonus: number } | null = null;
-    for (const p of CONFIG.economy.store.products) if ('bonus' in p && (!best || p.cores > best.cores)) best = p;
+    for (const p of CONFIG.economy.store.products) if ('cores' in p && 'bonus' in p && (!best || p.cores > best.cores)) best = p;
     const price = best && this.g.storeProducts.find((p) => p.id === best.id)?.price;
     const cores = best ? `up to ${formatScore(best.cores)}${best.bonus ? ` · +${best.bonus}%` : ''}${price ? ` · ${price}` : ''}` : '';
     const hook = this.g.pass.premium
@@ -280,7 +276,12 @@ export class ShopScreens {
     }
 
     const packs: StoreCard[] = [];
+    const creditPacks: StoreCard[] = [];
     const extras: StoreCard[] = [];
+    // Each row's biggest bonus is its best value.
+    const bestOf = (kind: 'cores' | 'credits'): number => Math.max(0, ...CONFIG.economy.store.products.map((p) => (kind in p && 'bonus' in p ? p.bonus : 0)));
+    const tag = (bonus: number, kind: 'cores' | 'credits'): string => (bonus > 0 && bonus === bestOf(kind) ? 'best value' : '');
+    const more = (bonus: number): string => (bonus > 0 ? `+${bonus}% more for the price` : '');
     for (const p of CONFIG.economy.store.products) {
       const img = `store/${p.id}.png`;
       if ('look' in p) {
@@ -303,10 +304,20 @@ export class ShopScreens {
           button: mine ? owned('owned') : money(p.id),
           owned: mine,
         });
-      } else if ('cores' in p) packs.push({ img, name: `${formatScore(p.cores)} cores`, sub: '', tag: '', button: money(p.id), owned: false });
+      } else if ('cores' in p)
+        packs.push({ img, name: `${formatScore(p.cores)} cores`, sub: more(p.bonus), tag: tag(p.bonus, 'cores'), button: money(p.id), owned: false });
+      else if ('credits' in p)
+        creditPacks.push({
+          img,
+          name: `${formatScore(p.credits)} credits`,
+          sub: more(p.bonus),
+          tag: tag(p.bonus, 'credits'),
+          button: money(p.id),
+          owned: false,
+        });
     }
     const packsNote = !app
-      ? 'packs of cores, the starter pack and premium are in the android app'
+      ? 'packs of credits and cores, the starter pack and premium are in the android app'
       : this.g.storeProducts.length === 0
         ? "the store isn't answering. check your connection and come back"
         : '';
@@ -329,6 +340,7 @@ export class ShopScreens {
         buttons: passButtons,
       },
       packs,
+      creditPacks,
       packsNote,
       extras,
       swapNote: `${formatScore(S.creditsPerCore)} credits for every core`,
@@ -424,7 +436,8 @@ export class ShopScreens {
     };
     if (this.shopTab === 'set') {
       const so = setOffer(weekKey(now), owned);
-      if (so.complete || this.g.wallet.cores < so.price) return;
+      if (so.complete) return;
+      if (this.g.wallet.cores < so.price) return this.g.shortOf.show('cores', so.price, so.set.name, () => this.onShopBuy());
       this.confirmCores(so.price, `${so.set.name}: ${so.missing.length} look${so.missing.length === 1 ? '' : 's'}`, () => {
         if (!this.g.wallet.spendCores(so.price)) return;
         for (const item of so.missing) this.g.looks.buy(item);
@@ -433,7 +446,8 @@ export class ShopScreens {
       });
     } else if (this.shopTab === 'vault') {
       const v = vaultAt(now);
-      if (owned(keyOf(v.item)) || this.g.wallet.cores < v.price) return;
+      if (owned(keyOf(v.item))) return;
+      if (this.g.wallet.cores < v.price) return this.g.shortOf.show('cores', v.price, v.item.name, () => this.onShopBuy());
       this.confirmCores(v.price, `${v.item.name} from the vault`, () => {
         if (!this.g.wallet.spendCores(v.price)) return;
         this.g.looks.buy(v.item);
@@ -443,6 +457,8 @@ export class ShopScreens {
     } else {
       const f = this.g.dailyShop.offers(dayKey(now), owned)[this.g.shopPick];
       if (!f || owned(keyOf(f.item))) return;
+      const have = f.currency === 'cores' ? this.g.wallet.cores : this.g.wallet.credits;
+      if (have < f.price) return this.g.shortOf.show(f.currency, f.price, f.item.name, () => this.onShopBuy());
       const buy = (): void => {
         const paid = f.currency === 'cores' ? this.g.wallet.spendCores(f.price) : this.g.wallet.spend(f.price, 'look');
         if (!paid) return;

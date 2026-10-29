@@ -1,11 +1,11 @@
-// RevenueCat webhook: credits cores on the server when a purchase goes through,
+// RevenueCat webhook: pays cores and credit packs on the server when a purchase goes through,
 // and keeps every purchase in store_events (premium and the starter pack are
 // owned by having a row there; the game reads its own rows).
 // The app buys as the player's Supabase account id (appUserID), so the
 // event's app_user_id is the account to pay.
 //
-// Set up (the database first: npm run db:apply, for 0014's purchase time and
-// 0016's pass refunds):
+// Set up (the database first: npm run db:apply, for 0014's purchase time,
+// 0016's pass refunds and 0026's credit packs):
 //   supabase secrets set REVENUECAT_WEBHOOK_SECRET=<any long random string>
 //   supabase functions deploy revenuecat-webhook --no-verify-jwt
 //   RevenueCat > Project > Integrations > Webhooks: the function's URL, with
@@ -20,6 +20,13 @@ const CORES: Record<string, number> = {
   cores_1200: 1200,
   cores_2500: 2500,
   starter_pack: 500,
+};
+
+// Credits per pack: keep in step with CONFIG.economy.store too.
+const CREDITS: Record<string, number> = {
+  credits_5000: 5000,
+  credits_15000: 15000,
+  credits_40000: 40000,
 };
 
 const PAID = new Set(['INITIAL_PURCHASE', 'NON_RENEWING_PURCHASE']);
@@ -64,9 +71,15 @@ Deno.serve(async (req) => {
   // One database call each: keeping the event and paying (or taking back) its
   // cores happen together, so an error leaves nothing half done and the retry
   // RevenueCat makes after a 500 does the whole thing (0011_store_purchases.sql, 0014).
-  const { data, error } = PAID.has(event.type)
-    ? await admin.rpc('store_purchase_at', { p_id: event.id, p_user: user, p_product: event.product_id, p_type: event.type, p_transaction: transaction, p_cores: cores, p_at: at })
-    : await admin.rpc('store_refund', { p_id: event.id, p_user: user, p_product: event.product_id, p_transaction: transaction, p_cores: cores });
+  // A credit pack pays its credits in the same call, once (0026_credit_packs.sql).
+  const credits = CREDITS[event.product_id];
+  const { data, error } = credits
+    ? PAID.has(event.type)
+      ? await admin.rpc('store_credit_purchase', { p_id: event.id, p_user: user, p_product: event.product_id, p_type: event.type, p_transaction: transaction, p_credits: credits, p_at: at })
+      : await admin.rpc('store_credit_refund', { p_id: event.id, p_user: user, p_product: event.product_id, p_transaction: transaction, p_credits: credits })
+    : PAID.has(event.type)
+      ? await admin.rpc('store_purchase_at', { p_id: event.id, p_user: user, p_product: event.product_id, p_type: event.type, p_transaction: transaction, p_cores: cores, p_at: at })
+      : await admin.rpc('store_refund', { p_id: event.id, p_user: user, p_product: event.product_id, p_transaction: transaction, p_cores: cores });
   if (error) return new Response(error.message, { status: 500 });
   return new Response(String(data));
 });

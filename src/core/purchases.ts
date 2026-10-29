@@ -26,6 +26,7 @@ export class Purchases {
       }
     }
     analytics.log('begin_checkout', { item_id: id });
+    const creditsBefore = this.g.wallet.credits;
     const result = await this.g.store.buy(id);
     if (result !== 'failed') analytics.log(result === 'cancelled' ? 'purchase_cancelled' : 'purchase', { item_id: id });
     if (result === 'cancelled') return;
@@ -38,9 +39,17 @@ export class Purchases {
     if ('cores' in p) {
       // With the server, the store's webhook pays the cores there: take its balance.
       if (this.g.backend.online) {
+        const coresTarget = this.g.wallet.cores + p.cores;
         lines.push(`+${formatScore(p.cores)} cores`);
-        void this.awaitPaidCores(this.g.wallet.cores + p.cores);
+        void this.awaitPaid(() => this.g.wallet.cores >= coresTarget);
       } else lines.push(...this.g.grant({ cores: p.cores }));
+    }
+    if ('credits' in p) {
+      // With the server, the webhook pays the credits there and the next sync brings them here.
+      if (this.g.backend.online) {
+        lines.push(`+${formatScore(p.credits)} credits`);
+        void this.awaitPaid(() => this.g.wallet.credits >= creditsBefore + p.credits);
+      } else lines.push(...this.g.grant({ credits: p.credits }, `purchase:${id}`));
     }
     if ('look' in p) lines.push(...this.g.grant({ look: p.look }));
     if ('pass' in p && !this.g.pass.premium) lines.push(...this.g.pass.unlockPremium('money').flatMap((r) => this.g.grant(r)), 'season pass premium');
@@ -55,15 +64,15 @@ export class Purchases {
   }
 
   /**
-   * The store's webhook pays a cores pack on the server a moment after the
-   * purchase goes through. Check the server's balance until it's there (or
-   * about 20 seconds pass), then show it on whichever screen is open.
+   * The store's webhook pays a pack on the server a moment after the purchase
+   * goes through. Check the server's balance until it's there (or about 20
+   * seconds pass), then show it on whichever screen is open.
    */
-  private async awaitPaidCores(target: number): Promise<void> {
+  private async awaitPaid(arrived: () => boolean): Promise<void> {
     for (let i = 0; i < 10; i++) {
       await new Promise((r) => window.setTimeout(r, i === 0 ? 1000 : 2000));
       await this.g.wallet.link(this.g.backend);
-      if (this.g.wallet.cores >= target) break;
+      if (arrived()) break;
     }
     this.g.title.refreshTitle();
     if (this.g.infoOpen === 'shop') this.g.shop.openShop();

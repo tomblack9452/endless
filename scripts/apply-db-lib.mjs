@@ -35,6 +35,7 @@ const MADE = {
   '0023_function_hygiene.sql': "select not has_function_privilege('anon', 'public.on_new_user()', 'execute') as there",
   '0024_spend_once.sql': 'spend_cores_once(integer,text,text)',
   '0025_account_counts.sql': 'account_counts()',
+  '0026_credit_packs.sql': 'store_credit_purchase(text,uuid,text,text,text,integer,timestamp with time zone)',
 };
 
 /**

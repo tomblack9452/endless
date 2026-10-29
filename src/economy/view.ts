@@ -85,6 +85,7 @@ export interface StoreView {
     buttons: StoreButton[];
   };
   packs: StoreCard[];
+  creditPacks: StoreCard[];
   /** A line under the packs: the web build, or the store not answering. */
   packsNote: string;
   extras: StoreCard[];
@@ -296,6 +297,7 @@ export class EconomyView {
       return e;
     };
     $('store-packs').replaceChildren(...v.packs.map(card));
+    $('store-credits').replaceChildren(...v.creditPacks.map(card));
     const note = $('store-packs-note');
     note.textContent = v.packsNote;
     note.hidden = !v.packsNote;

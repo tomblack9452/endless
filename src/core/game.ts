@@ -79,6 +79,7 @@ import { FirstLaunch } from '../screens/onboarding';
 import { RecordScreen } from '../screens/record';
 import { RankKeeper } from '../progression/rankKeeper';
 import { Revives } from './revives';
+import { ShortOfSheet } from '../screens/shortOf';
 import { ResultsScreen } from '../screens/results';
 import { StorePrompts } from '../economy/nudge';
 import { TitleScreen } from '../screens/title';
@@ -357,6 +358,7 @@ export class Game {
   readonly ranks = new RankKeeper(this);
 
   readonly revives = new Revives(this);
+  readonly shortOf = new ShortOfSheet(this);
 
   readonly title = new TitleScreen(this);
   readonly results = new ResultsScreen(this);

@@ -724,6 +724,10 @@ export const CONFIG = {
         { id: 'cores_550', cores: 550, bonus: 10 },
         { id: 'cores_1200', cores: 1200, bonus: 20 },
         { id: 'cores_2500', cores: 2500, bonus: 25 },
+        // Credits, paid on the server by the store's webhook (0026_credit_packs.sql); keep in step with CREDITS there.
+        { id: 'credits_5000', credits: 5000, bonus: 0 },
+        { id: 'credits_15000', credits: 15000, bonus: 20 },
+        { id: 'credits_40000', credits: 40000, bonus: 33 },
         // Once per account: cores and the nova hull.
         { id: 'starter_pack', cores: 500, look: 'hull:nova', once: true },
         // The season pass's premium track, for money instead of cores.

@@ -104,7 +104,8 @@ export class HangarScreen {
     if (d.goal) fill($('hangar-goal-fill'), d.goal.have / d.goal.target);
     const a = $('hangar-action') as HTMLButtonElement;
     a.textContent = d.action.text;
-    a.disabled = !d.action.enabled;
+    a.disabled = !d.action.enabled && !d.action.short;
+    a.classList.toggle('short', !d.action.enabled && !!d.action.short);
     a.dataset.kind = d.action.kind;
   }
 }

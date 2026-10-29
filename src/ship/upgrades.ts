@@ -72,7 +72,8 @@ function statsFor(tiers: Partial<Record<SystemId, number>>): ShipStats {
   };
 }
 
-export type BuyCheck = { ok: true; cost: number } | { ok: false; reason: string };
+/** `need`: the price, when only credits are missing (a tap offers ways to make them up). */
+export type BuyCheck = { ok: true; cost: number } | { ok: false; reason: string; need?: number };
 
 const KEY = 'endless.upgrades';
 
@@ -121,7 +122,7 @@ export class Upgrades {
     const needLeague = TIER_LEAGUE[next - 1];
     if (league < needLeague) return { ok: false, reason: `needs ${LEAGUES[needLeague].name}` };
     const cost = TIER_COST[next - 1];
-    if (credits < cost) return { ok: false, reason: `${cost.toLocaleString('en-US')} credits` };
+    if (credits < cost) return { ok: false, reason: `${cost.toLocaleString('en-US')} credits`, need: cost };
     return { ok: true, cost };
   }
 

@@ -62,6 +62,8 @@ export interface UpgradeRow {
   max: number;
   button: string;
   canBuy: boolean;
+  /** Only credits are missing: the button stays tappable, to offer ways to make them up. */
+  short?: boolean;
   on: boolean | null; // switch state once bought, null before
 }
 
@@ -805,7 +807,7 @@ export class UI {
         b.type = 'button';
         b.className = `pill small${r.canBuy ? ' primary' : ''}`;
         b.dataset.upgrade = r.id;
-        b.disabled = !r.canBuy;
+        b.disabled = !r.canBuy && !r.short;
         b.textContent = r.button;
         row.append(info);
         if (r.on !== null) {

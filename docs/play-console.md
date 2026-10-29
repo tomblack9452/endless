@@ -489,12 +489,15 @@ For each product, **Create one-time product**:
 | `cores_550` | 550 cores | 550 cores to spend in the shop. | £4.99 |
 | `cores_1200` | 1,200 cores | 1,200 cores to spend in the shop. | £9.99 |
 | `cores_2500` | 2,500 cores | 2,500 cores to spend in the shop. | £19.99 |
+| `credits_5000` | 5,000 credits | 5,000 credits for upgrades and the daily shop. | £0.99 |
+| `credits_15000` | 15,000 credits | 15,000 credits for upgrades and the daily shop. | £2.49 |
+| `credits_40000` | 40,000 credits | 40,000 credits for upgrades and the daily shop. | £5.99 |
 | `starter_pack` | Starter pack | 500 cores and the nova hull. Once per account. | £2.99 |
 | `season_pass` | Season pass | The premium track of this season's pass. | £4.99 |
 | `premium` | Premium | No ads, ad rewards without the ad, the halo hull, regalia paint, crown flame, an extra free revive a day and a board badge. | £4.99 |
 
 - Play has no "consumable" switch: whether a product can be bought again is
-  decided when it's **consumed**. In RevenueCat, set the cores and the season
+  decided when it's **consumed**. In RevenueCat, set the cores, the credit packs and the season
   pass as **consumable**, the starter pack and premium as **non-consumable**.
 - The IDs must match `CONFIG.economy.store.products` in `src/core/config.ts` and the
   webhook (`supabase/functions/revenuecat-webhook`). They already do for the

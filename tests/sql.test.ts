@@ -639,6 +639,69 @@ describe('credits on the server', () => {
   });
 });
 
+describe('credit packs (0026)', () => {
+  const sync = async (credits: number, last: number | null) =>
+    Number((await db.query<{ sync_credits: string }>('select public.sync_credits($1, $2)', [credits, last])).rows[0].sync_credits);
+  const buy = async (id: string, user: string, credits: number) => {
+    await admin();
+    return (
+      await db.query<{ r: string }>("select public.store_credit_purchase($1, $2, 'credits_5000', 'NON_RENEWING_PURCHASE', $3, $4, now()) as r", [
+        id,
+        user,
+        `tx-${id}`,
+        credits,
+      ])
+    ).rows[0].r;
+  };
+
+  it('pay a pack once, however often the webhook sends it', async () => {
+    const a = await newUser();
+    await as(a);
+    expect(await sync(1000, null)).toBe(1000);
+    expect(await buy('cp-1', a, 5000)).toBe('paid');
+    expect(await buy('cp-1', a, 5000)).toBe('duplicate'); // RevenueCat again after a timeout
+    await as(a);
+    expect(await sync(1200, 1000)).toBe(6200); // earned 200 meanwhile, and the pack once
+    expect(await sync(6200, 6200)).toBe(6200);
+    expect(await buy('cp-2', a, 5000)).toBe('paid'); // a second pack is a new purchase
+    await as(a);
+    expect(await sync(6200, 6200)).toBe(11200);
+  });
+
+  it('keep a pack bought before the first sync until it', async () => {
+    const a = await newUser();
+    expect(await buy('cp-early', a, 5000)).toBe('paid');
+    await as(a);
+    expect(await sync(300, null)).toBe(5300);
+    expect(await sync(5300, 5300)).toBe(5300); // paid once, not again
+  });
+
+  it('take a refunded pack back, never below zero', async () => {
+    const a = await newUser();
+    await as(a);
+    await sync(100, null);
+    await buy('cp-r', a, 5000);
+    await as(a);
+    expect(await sync(100, 100)).toBe(5100);
+    expect(await sync(2100, 5100)).toBe(2100); // spent 3000 of it
+    await admin();
+    const refund = async () =>
+      (await db.query<{ r: string }>("select public.store_credit_refund('rf-1', $1, 'credits_5000', 'tx-cp-r', 5000) as r", [a])).rows[0].r;
+    expect(await refund()).toBe('refunded');
+    expect(await refund()).toBe('duplicate');
+    await as(a);
+    expect(await sync(2100, 2100)).toBe(0);
+  });
+
+  it("can't be called by a player", async () => {
+    const a = await newUser();
+    await as(a);
+    await rejects(db.query(`select public.store_credit_purchase('x', '${a}', 'credits_5000', 'INITIAL_PURCHASE', 'x', 5000, now())`), /permission denied/);
+    await rejects(db.query(`select public.store_credit_refund('x', '${a}', 'credits_5000', 'x', 5000)`), /permission denied/);
+    await rejects(db.query(`select public.give_credits('${a}', 5000)`), /permission denied/);
+  });
+});
+
 describe('cores', () => {
   const earn = async (amount: number, reason: string) =>
     (await db.query<{ earn_cores: number }>('select public.earn_cores($1, $2)', [amount, reason])).rows[0].earn_cores;

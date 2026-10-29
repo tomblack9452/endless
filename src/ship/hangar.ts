@@ -38,7 +38,8 @@ interface DetailView {
   slotName: string;
   status: string;
   goal: { have: number; target: number } | null;
-  action: { kind: 'equip' | 'buy' | 'none'; text: string; enabled: boolean };
+  /** `short`: the price, when the wallet can't cover it (a tap offers ways to make it up). */
+  action: { kind: 'equip' | 'buy' | 'none'; text: string; enabled: boolean; short?: { currency: 'credits' | 'cores'; need: number } };
 }
 
 export interface HangarView {
@@ -154,14 +155,29 @@ export function buildHangar(st: HangarState, d: HangarDeps): HangarView {
     action = equipped ? { kind: 'none', text: 'on your ship', enabled: false } : { kind: 'equip', text: `put on ${shown.name}`, enabled: true };
   } else if (u.by === 'credits') {
     status = `${fmt(u.cost)} credits`;
-    action = { kind: 'buy', text: `buy · ${fmt(u.cost)} credits`, enabled: d.credits >= u.cost };
+    action = {
+      kind: 'buy',
+      text: `buy · ${fmt(u.cost)} credits`,
+      enabled: d.credits >= u.cost,
+      ...(d.credits < u.cost ? { short: { currency: 'credits', need: u.cost } } : {}),
+    };
   } else if (u.by === 'cores') {
     status = `${fmt(u.cost)} cores`;
-    action = { kind: 'buy', text: `buy · ${fmt(u.cost)} cores`, enabled: d.cores >= u.cost };
+    action = {
+      kind: 'buy',
+      text: `buy · ${fmt(u.cost)} cores`,
+      enabled: d.cores >= u.cost,
+      ...(d.cores < u.cost ? { short: { currency: 'cores', need: u.cost } } : {}),
+    };
   } else if (u.by === 'vault') {
     if (keyOf(shown) === d.vault.key) {
       status = 'in the vault now';
-      action = { kind: 'buy', text: `buy from the vault · ${fmt(u.cost)} cores`, enabled: d.cores >= u.cost };
+      action = {
+        kind: 'buy',
+        text: `buy from the vault · ${fmt(u.cost)} cores`,
+        enabled: d.cores >= u.cost,
+        ...(d.cores < u.cost ? { short: { currency: 'cores', need: u.cost } } : {}),
+      };
     } else {
       const m = d.vault.monthsUntil(keyOf(shown));
       status = 'the vault sells one look a month';

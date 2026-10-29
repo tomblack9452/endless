@@ -80,9 +80,11 @@ export class HangarScreens {
     }
     const u = item.unlock;
     if (u.by === 'credits') {
+      if (this.g.wallet.credits < u.cost) return this.g.shortOf.show('credits', u.cost, item.name, () => this.onHangarAction());
       if (!this.g.wallet.spend(u.cost, 'look')) return;
     } else if (u.by === 'cores' || u.by === 'vault') {
-      if (this.g.wallet.cores < u.cost || (u.by === 'vault' && keyOf(item) !== keyOf(vaultAt(this.g.now()).item))) return;
+      if (u.by === 'vault' && keyOf(item) !== keyOf(vaultAt(this.g.now()).item)) return;
+      if (this.g.wallet.cores < u.cost) return this.g.shortOf.show('cores', u.cost, item.name, () => this.onHangarAction());
       this.g.shop.confirmCores(u.cost, item.name, () => {
         if (!this.g.wallet.spendCores(u.cost)) return;
         this.g.looks.buy(item);
@@ -99,6 +101,8 @@ export class HangarScreens {
   onBuyUpgrade = (id: string): void => {
     const sys = id as SystemId;
     const check = this.g.upgrades.check(sys, this.g.wallet.credits, this.g.leagues.league);
+    if (!check.ok && check.need)
+      return this.g.shortOf.show('credits', check.need, `${SYSTEMS.find((s) => s.id === sys)?.name ?? 'upgrade'} upgrade`, () => this.onBuyUpgrade(id));
     if (!check.ok || !this.g.wallet.spend(check.cost, `upgrade ${sys}`)) return;
     this.g.upgrades.raise(sys);
     this.g.wallet.add(this.g.ranks.promoteLeague(null), 'promotion'); // buying the last points may complete a promotion
@@ -127,6 +131,7 @@ export class HangarScreens {
           max: MAX_TIER,
           button: check.ok ? formatScore(TIER_COST[tier]) : check.reason,
           canBuy: check.ok,
+          short: !check.ok && !!check.need,
           on: tier > 0 ? this.g.upgrades.isOn(s.id) : null,
         };
       }),

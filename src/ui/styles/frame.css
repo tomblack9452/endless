@@ -261,3 +261,11 @@ body.contrast .pill.small.primary {
   margin-left: auto;
   margin-right: auto;
 }
+
+/* A buy the wallet can't cover yet: still tappable (it says how short), but not lit. */
+#hangar-action.short {
+  color: inherit;
+  background: none;
+  border-color: color-mix(in srgb, currentColor 55%, transparent);
+  box-shadow: none;
+}
