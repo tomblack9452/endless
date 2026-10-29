@@ -20,7 +20,7 @@ export interface GhostRun {
 const KEY = 'endless.ghost';
 
 /**
- * A rival's run as a ghost (1.0.9): the server keeps a ranked run's path but
+ * A rival's run as a ghost: the server keeps a ranked run's path but
  * not its times, so the times are rebuilt from how the course speeds up
  * (speedAt, by distance) and scaled to the run's own length in seconds. Close
  * enough to race: it's where they were, at about the time they were there.

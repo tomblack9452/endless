@@ -1,4 +1,4 @@
-// The run summary on the game-over screen (1.0.9): a small line of the ship's
+// The run summary on the game-over screen: a small line of the ship's
 // speed over the run (its shape, not numbers), where it ended (distance and level), near misses and the
 // best chain. It folds away behind "details" so the screen stays clean.
 

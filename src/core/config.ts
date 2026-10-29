@@ -687,11 +687,11 @@ export const CONFIG = {
   // Rank (ranks.ts): XP from every run, ranked paying the most, and from goals.
   rank: { pointsPerXp: 4000, rankedPointsPerXp: 800, goalXp: 30 },
 
-  // The economy (src/economy/): two currencies, ranked tickets, revives, daily
-  // rewards and quests, the shop and the season pass. Credits are earned by
-  // playing; cores are the premium currency (bought later; for now earned from
-  // daily rewards, quests and the pass). Nothing here can make a ship stronger
-  // in ranked: purchases are looks, revives and the pass.
+  // The economy (src/economy/): two currencies, revives, daily rewards and
+  // goals, the shop and the season pass. Credits are earned by playing; cores
+  // are the premium currency, bought in the store or earned from daily rewards,
+  // goals and the pass. Nothing here can make a ship stronger in ranked:
+  // purchases are looks, revives and the pass.
   economy: {
     // Ranked is unlimited; saves from when it took tickets get 30 cores for each spare one (legacy.ts).
     ticketCores: 30,
@@ -700,7 +700,7 @@ export const CONFIG = {
     // Revive (not in ranked): once a run, free once a day, otherwise cores. The ship
     // moves onto the lane, the way ahead is cleared, and a countdown starts it again.
     revive: { coreCost: 50, clearAhead: 34, countdown: 3, graceSeconds: 2.5 },
-    // Spending this many cores or more asks first (1.0.11): the set, the vault, the pass,
+    // Spending this many cores or more asks first: the set, the vault, the pass,
     // dearer looks and swaps. A revive (50) never asks: its offer is already the question.
     confirmCores: 100,
     // The 7-day login calendar: one claim a day (UTC), looping after day 7. A

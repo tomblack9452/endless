@@ -1,6 +1,6 @@
 import { CONFIG } from './config';
 
-// The crash moment (1.0.9): outside ranked, a crash plays out in slow motion
+// The crash moment: outside ranked, a crash plays out in slow motion
 // for a second, on what you hit, before the game-over screen. Reduce motion
 // and its own setting leave it out. The revive offer waits for the moment to
 // end and then gets its whole timer: the moment never eats into it.
