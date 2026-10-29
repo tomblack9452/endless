@@ -24,6 +24,7 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - run: npm run lint
       - run: npm test
       # The server keys are baked into the build. Add them as repository secrets
       # (Settings > Secrets and variables > Actions); without them the live site runs offline.

@@ -9,7 +9,10 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview --host",
     "typecheck": "tsc --noEmit",
+    "lint": "biome check .",
+    "fix": "biome check --write .",
     "test": "vitest run",
+    "check": "biome check . && tsc --noEmit && vitest run && vite build",
     "db:setup": "node scripts/build-setup-sql.mjs",
     "check-server": "node scripts/check-server.mjs",
     "db:apply": "node scripts/apply-db.mjs",
@@ -30,6 +33,7 @@
     "three": "^0.186.1"
   },
   "devDependencies": {
+    "@biomejs/biome": "2.6.4",
     "@capacitor/cli": "^8.5.2",
     "@electric-sql/pglite": "^0.5.8",
     "@types/three": "^0.186.0",
