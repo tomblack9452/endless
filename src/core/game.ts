@@ -34,26 +34,10 @@ import { distanceText, sparkSvg, summaryRows } from '../ui/runSummary';
 import { type HintId, Hints, tipText } from '../ui/hints';
 import { migrateMissionLooks, migrateTickets } from '../progression/legacy';
 import { type Feature, isOpen, nextStageText, STAGES, stageFor } from '../progression/reveal';
-import {
-  CONTROL_CARDS,
-  controlChoices,
-  type ControlId,
-  freshLesson,
-  hasTouch,
-  type Lesson,
-  lessonMet,
-  lessonOver,
-  type LessonState,
-  LESSONS,
-  lessonText,
-  Onboarding,
-  PRACTICE_SEED,
-  STARTER,
-  TRIAL_SECONDS,
-} from '../ui/onboarding';
+import { type ControlId, hasTouch, type Lesson, type LessonState, Onboarding } from '../ui/onboarding';
 import { itemCard, powerItem } from '../ui/guide';
-import { type Mark, TeachView } from '../ui/tutorialView';
-import { Color, Vector3 } from 'three';
+import { TeachView } from '../ui/tutorialView';
+import { Color } from 'three';
 import { Ads, createAdNetwork, type RewardedPlacement } from '../ads/ads';
 import { entitlementFor, Entitlements } from '../store/entitlements';
 import { Progress } from '../progression/progress';
@@ -74,7 +58,6 @@ import { CloudSave } from '../server/sync';
 import { shareAvailable, shareCard } from '../platform/share';
 import { createStore, type StoreProduct } from '../store/store';
 import { storage } from './storage';
-import { googleAvailable } from '../platform/account';
 import { fxDistance, fxTime } from '../world/fx';
 import { type Course, COURSES, courseLength, type DailyRun, dailyRun, type Environment, ENVIRONMENTS, type WeeklyRun, weeklyRun } from '../world/courses';
 import { Challenge, streakReward } from '../progression/challenge';
@@ -84,7 +67,7 @@ import { ACHIEVEMENTS, type Snapshot, achievement, progressOn } from '../progres
 import { refreshSeasonLooks, SETS } from '../ship/catalogue';
 import { GoalLog } from '../progression/goals';
 import { HangarScreen } from '../ui/hangarView';
-import { byKey, find, keyOf, LOOKS, Looks, type LookItem, type Owner, type ShipId, type Slot, type TrailId, SLOT_NAMES } from '../ship/looks';
+import { find, keyOf, LOOKS, Looks, type LookItem, type Owner, type ShipId, type Slot, type TrailId, SLOT_NAMES } from '../ship/looks';
 import type { Fin, Marking } from '../ship/looks';
 import { MAX_TIER, type ShipStats, STANDARD, SYSTEMS, type SystemId, TIER_LEAGUE, Upgrades } from '../ship/upgrades';
 import { newSeed } from './rng';
@@ -102,6 +85,7 @@ import { GoalScreens } from '../screens/goals';
 import { HangarScreens } from '../screens/hangar';
 import { ReminderPrompts } from '../platform/reminderPrompts';
 import { AccountScreens } from '../screens/account';
+import { FirstLaunch } from '../screens/onboarding';
 
 type State = 'title' | 'playing' | 'paused' | 'countdown' | 'crashed' | 'finished';
 
@@ -137,16 +121,6 @@ function musicFor(level: number): MusicId {
 
 /** Where the boost button sits, by the boostSide setting (0 right, 1 left, 2 middle). */
 const BOOST_SIDES = ['right', 'left', 'middle'] as const;
-/** The practice run puts each pickup and power-up this far ahead (about 2.5 s at its speed). */
-const ITEM_AHEAD = 95;
-/** How long a picked-up item's "on" line stays before the next. */
-const CONFIRM_SECONDS = 1.8;
-/** After the practice magnet: pickups this far ahead, this far to the side of the lane, for it to pull in. */
-const MAGNET_DEMO: [number, number][] = [
-  [36, 1.6],
-  [50, -1.6],
-  [64, 1.6],
-];
 
 /** A wrapped present, for the daily reward. */
 export const GIFT_ICON =
@@ -181,10 +155,10 @@ export class Game {
   private readonly palette = new LivePalette(); // after time of day, read by materials
   private shownTextHex = -1;
   private shownPageHex = -1;
-  private readonly stage: Stage;
-  private readonly world: World;
+  readonly stage: Stage;
+  readonly world: World;
   readonly player: Player;
-  private readonly input: Input;
+  readonly input: Input;
   private readonly speedLines: SpeedLines;
   /** Graphics on auto: drops to low once per session if runs keep going slow. */
   private readonly autoGraphics = new AutoGraphics();
@@ -209,7 +183,7 @@ export class Game {
   private hitWhat = '';
   private onIce = false;
   /** This run counts towards opening solo environments: ranked or endless, from the start (not solo, set levels or dev starts). */
-  private unlockable = false;
+  unlockable = false;
   readonly sound = new Sound();
   private readonly audio: AudioState = {
     playing: false,
@@ -225,7 +199,7 @@ export class Game {
   settings = { ...DEFAULT_SETTINGS };
   settingsOpen = false; // settings screen showing (from the title or pause)
   readonly ui = new UI();
-  private readonly hints = new Hints((text, tip) => this.ui.showHint(text, tip));
+  readonly hints = new Hints((text, tip) => this.ui.showHint(text, tip));
   /** The Android app (not the web): back can leave it, so "ask before closing" applies. */
   private native = Capacitor.getPlatform() === 'android';
   /** The "close endless space?" dialog is up. */
@@ -278,7 +252,7 @@ export class Game {
    * lesson it's on, what the player has done in it, the controls flown, the
    * lessons done, and the pickup or power-up coming up (and those still to come).
    */
-  private practice: {
+  practice: {
     kind: 'lessons' | 'trial';
     lesson: number;
     s: LessonState;
@@ -290,11 +264,10 @@ export class Game {
     confirmT: number;
   } | null = null;
   /** The next run is the practice course (its own pickups and power-ups). */
-  private practiceNext = false;
+  practiceNext = false;
   /** "how did that feel?": the controls the last practice or trial was flown with. */
-  private feelUsed: ControlId | null = null;
-  private readonly teach = new TeachView();
-  private readonly markV = new Vector3();
+  feelUsed: ControlId | null = null;
+  readonly teach = new TeachView();
   /** Obstacles flown past this run (the practice run's obstacle lesson). */
   private passCount = 0;
   /** The reveal stage last announced (null until read from storage). */
@@ -351,7 +324,7 @@ export class Game {
   /** A locked look being tried on in the hangar (not yet owned). */
   preview: Partial<Record<Slot, string>> | null = null;
   private pickupCount = 0;
-  private recorded = false; // this run's stats are saved
+  recorded = false; // this run's stats are saved
   private assisted = false; // assist mode was on at some point this run
   /** Which info screen is open from the title (stats, goals, hangar), if any. */
   infoOpen: InfoScreen | null = null;
@@ -379,8 +352,8 @@ export class Game {
   /** Dev-only switches, set from the dev panel (never shown in production builds). */
   readonly dev = { invincible: false, fullBoost: false, autopilot: false };
 
-  private boostMeter = 0; // 0..1
-  private boosting = false;
+  boostMeter = 0; // 0..1
+  boosting = false;
   private boostLevel = 0; // eased 0..1, scales the speed boost
 
   // Power-ups (see CONFIG.powers).
@@ -430,6 +403,8 @@ export class Game {
 
   readonly account = new AccountScreens(this);
 
+  readonly firstLaunch = new FirstLaunch(this);
+
   constructor(canvas: HTMLCanvasElement) {
     this.basePalette.set(BASE_PALETTE);
     this.palette.set(BASE_PALETTE);
@@ -473,15 +448,15 @@ export class Game {
     });
     this.ui.bindTitleCards(this.onTitleLink);
     this.ui.bindWelcome({
-      control: (id) => this.chooseControls(id),
-      practice: () => this.startPractice(),
-      skip: () => this.skipPractice(),
-      pick: (key) => this.pickStarter(key),
-      done: () => this.finishOnboarding(),
-      feel: (id) => this.chooseControls(id),
-      tryIt: () => this.startTrial(),
-      keep: () => this.keepControls(),
-      guideClose: () => this.closeGuide(),
+      control: (id) => this.firstLaunch.chooseControls(id),
+      practice: () => this.firstLaunch.startPractice(),
+      skip: () => this.firstLaunch.skipPractice(),
+      pick: (key) => this.firstLaunch.pickStarter(key),
+      done: () => this.firstLaunch.finishOnboarding(),
+      feel: (id) => this.firstLaunch.chooseControls(id),
+      tryIt: () => this.firstLaunch.startTrial(),
+      keep: () => this.firstLaunch.keepControls(),
+      guideClose: () => this.firstLaunch.closeGuide(),
     });
     this.ui.bindRecordTabs((tab) => this.ui.setRecordTab(tab));
     void storage.get(REVEAL_KEY).then((v) => (this.revealSeen = v === null ? -1 : Number(v) || 0));
@@ -557,7 +532,7 @@ export class Game {
       this.refreshTitle();
       // A new player starts with the welcome; the first daily reward waits for the end of it.
       if (this.onboarding.done) this.claimLogin();
-      else this.openWelcome();
+      else this.firstLaunch.openWelcome();
       void this.checkWhatsNew();
       void this.connect();
       void this.reminders.planReminders();
@@ -620,7 +595,7 @@ export class Game {
    * `startScore` > 0 starts part-way along (dev skip). `seed` replays a
    * known course; otherwise every run gets a fresh one.
    */
-  private beginRun(
+  beginRun(
     startScore = 0,
     seed = newSeed(),
     mode: RunMode = 'endless',
@@ -923,7 +898,7 @@ export class Game {
   // --- economy screens -------------------------------------------------------
 
   /** Today's login reward, if it's not claimed yet: paid and shown. */
-  private claimLogin(): void {
+  claimLogin(): void {
     const day = dayKey(this.now());
     const step = this.daily.loginDue(day);
     if (step < 0) return;
@@ -1797,310 +1772,15 @@ export class Game {
   }
 
   /** Double-tap and hold boosts: the setting, and never with tap-sides steering (quick taps there are steering). */
-  private doubleTapOn(): boolean {
+  doubleTapOn(): boolean {
     return this.settings.doubleTapBoost && this.settings.touch !== 1;
   }
 
   /** How the player steers now (keys: a computer, with the keys chosen over the mouse). */
-  private controlsNow(): ControlId {
+  controlsNow(): ControlId {
     if (this.settings.tilt) return 'tilt';
     if (this.settings.touch === 1) return 'sides';
     return !hasTouch() && (this.onboarding.keys ?? true) ? 'keys' : 'drag';
-  }
-
-  /** The ways to steer this device offers (tilt where the phone can tell its lean). */
-  private controlChoices(): ControlId[] {
-    return controlChoices({ touch: hasTouch(), tilt: typeof DeviceOrientationEvent !== 'undefined' });
-  }
-
-  /** The welcome screen, on the step onboarding is at (choosing controls, "how did that feel?", or dressing the ship). */
-  private openWelcome(): void {
-    const step = this.onboarding.step === 'dress' ? 'dress' : this.onboarding.step === 'feel' ? 'feel' : 'controls';
-    if (!hasTouch() && this.settings.tilt) {
-      this.settings.tilt = false; // no tilt without a phone
-      void saveSettings(this.settings);
-    }
-    const c = this.controlsNow();
-    const used = this.feelUsed ?? c;
-    const cards = this.controlChoices().map((id) => ({ id, on: id === c, used: step === 'feel' && id === used }));
-    const name = (id: ControlId) => CONTROL_CARDS[id].name;
-    const feel =
-      step === 'feel'
-        ? {
-            note:
-              c === used
-                ? `you flew with ${name(used)}. keep it, or tap another card to try it for ${TRIAL_SECONDS} s.`
-                : `${name(c)} it is. try it for ${TRIAL_SECONDS} s first, or keep it.`,
-            tryLabel: c === used ? null : `try ${name(c)} · ${TRIAL_SECONDS} s`,
-            keepLabel: `keep ${name(c)}`,
-          }
-        : null;
-    const eq = this.looks.equipped;
-    const chips = (slot: 'hull' | 'paint' | 'engine'): [string, string, boolean][] =>
-      STARTER[slot].map((key) => [key, byKey(key)?.name ?? key, `${slot}:${eq[slot]}` === key]);
-    this.ui.renderWelcome(step, cards, { hull: chips('hull'), paint: chips('paint'), engine: chips('engine') }, feel);
-    const google = document.getElementById('welcome-google');
-    if (google) google.hidden = !(googleAvailable() && this.backend.online);
-    this.player.reset();
-    this.player.setVisible(true);
-    this.trail.setVisible(true);
-    this.openInfo('welcome');
-  }
-
-  /** A control card: saved to settings straight away. */
-  private chooseControls(id: string): void {
-    if (!(this.controlChoices() as string[]).includes(id)) return;
-    this.settings.tilt = id === 'tilt';
-    this.settings.touch = id === 'sides' ? 1 : 0;
-    if (!hasTouch()) this.onboarding.setKeys(id === 'keys');
-    void saveSettings(this.settings);
-    this.applySettings();
-    this.haptics.pickup();
-    this.openWelcome();
-  }
-
-  /** The practice run: a fixed course you can't fail, one lesson at a time. */
-  private startPractice(): void {
-    this.onboarding.go('practice');
-    this.beginPractice('lessons');
-  }
-
-  /** "try another": a short steering-only run with the controls just picked. */
-  private startTrial(): void {
-    this.onboarding.go('try');
-    this.beginPractice('trial');
-  }
-
-  private beginPractice(kind: 'lessons' | 'trial'): void {
-    this.ui.showGuide(null);
-    this.infoOpen = null;
-    this.practiceNext = true;
-    this.beginRun(0, PRACTICE_SEED, 'endless');
-    this.ui.hideBanner(); // the lesson card has the top band
-    this.recorded = true; // nothing from it counts: no stats, no bests, no boards
-    this.unlockable = false; // ...and no unlocks
-    this.practice = { kind, lesson: 0, s: freshLesson(), control: this.controlsNow(), learned: [], item: null, coming: false, queue: [], confirmT: 0 };
-    this.teach.show(true);
-    this.showLesson();
-  }
-
-  /** Put the lesson (or the trial) up: the card in the top band and its indicator. */
-  private showLesson(): void {
-    const p = this.practice;
-    if (!p) return;
-    // Steering is worded for the controls chosen (keys only if the keys were); boost for the device.
-    const keys = { keys: !hasTouch(), doubleTap: this.doubleTapOn(), side: this.boostSide() };
-    const steerHow = { ...keys, keys: false };
-    if (p.kind === 'trial') {
-      this.teach.setStep(`trying ${CONTROL_CARDS[p.control].name} · ${Math.max(0, Math.ceil(TRIAL_SECONDS - p.s.t))} s`, 0, 0);
-      this.teach.setItem(null);
-      this.teach.setText(lessonText('steer', p.control, steerHow));
-      this.teach.point(null);
-      return;
-    }
-    const lesson = LESSONS[p.lesson];
-    if (lesson === 'boost') this.boostMeter = 1; // a full meter, so boost works straight away
-    if (lesson === 'pickup') p.queue = ['pickup'];
-    if (lesson === 'power') p.queue = [0, 1, 2];
-    p.item = null;
-    this.teach.setStep(`practice · ${p.lesson + 1} of ${LESSONS.length}`, p.lesson, LESSONS.length);
-    this.teach.setItem(null);
-    this.teach.setText(lessonText(lesson, p.control, lesson === 'boost' ? keys : steerHow));
-    this.teach.point(lesson === 'nearMiss' ? 'score' : lesson === 'boost' ? 'boost' : null);
-    this.teach.setArt(lesson === 'steer' ? p.control : null);
-    this.teach.setMarks([]);
-  }
-
-  /** Has the player done what the lesson asks? Then the next, and after the last, the recap and "how did that feel?". */
-  private practiceTick(dt: number): void {
-    const p = this.practice!;
-    const s = p.s;
-    s.t += dt;
-    const steer = this.input.steering();
-    if (steer < -0.35) s.left += dt;
-    if (steer > 0.35) s.right += dt;
-    if (this.boosting) s.boostT += dt;
-    if (p.kind === 'trial') {
-      this.teach.setArt(p.control, this.laneDir());
-      this.showLesson(); // the countdown
-      if (s.t >= TRIAL_SECONDS) this.endTrial();
-      return;
-    }
-    const lesson: Lesson = LESSONS[p.lesson];
-    if (lesson === 'steer') this.teach.setArt(p.control, this.laneDir());
-    if (lesson === 'pickup' || lesson === 'power') this.runItems(dt);
-    this.updateMarks(lesson);
-    // An item's "on" line stays up for a moment before the lesson moves on.
-    if (!lessonOver(lesson, s) || p.confirmT > 0) return;
-    if (lessonMet(lesson, s)) {
-      p.learned.push(lesson);
-      this.sound.pickup();
-      this.haptics.pickup();
-    }
-    p.lesson++;
-    p.s = freshLesson();
-    if (p.lesson < LESSONS.length) {
-      this.showLesson();
-      return;
-    }
-    this.finishPractice();
-  }
-
-  /** Which way the steering diagram leans: towards the safe lane a little ahead (0 when it's straight on). */
-  private laneDir(): number {
-    const off = this.world.laneOffset(26);
-    return off === null || Math.abs(off) < 0.8 ? 0 : Math.sign(off);
-  }
-
-  /**
-   * The pickup and power-up lessons: place the next one on the lane ahead, put
-   * its card up as it comes, say what it did once it's picked up, and place it
-   * again if it's missed.
-   */
-  private runItems(dt: number): void {
-    const p = this.practice!;
-    if (p.confirmT > 0) {
-      p.confirmT -= dt;
-      if (p.confirmT > 0) return;
-      p.item = null;
-    }
-    if (p.item === null) {
-      if (p.queue.length === 0) return;
-      const next = p.queue[0];
-      this.world.place(next, ITEM_AHEAD);
-      p.item = next;
-      p.coming = true;
-      this.teach.setItem(next === 'pickup' ? 'pickup' : powerItem(next));
-      this.teach.setText(itemCard(next === 'pickup' ? 'pickup' : powerItem(next)).does);
-      return;
-    }
-    if (p.coming && !this.world.itemAhead(p.item, -2, ITEM_AHEAD + 40)) {
-      // Flown past: another one.
-      this.world.place(p.item, ITEM_AHEAD);
-      this.teach.setText(`missed it. here's another. ${itemCard(p.item === 'pickup' ? 'pickup' : powerItem(p.item)).does}`);
-    }
-  }
-
-  /** The practice run saw a pickup (or power-up) collected: say what it did. */
-  private practiceGot(item: 'pickup' | PowerKind): void {
-    const p = this.practice;
-    if (!p || p.kind === 'trial' || p.item !== item || !p.coming) return;
-    p.coming = false;
-    p.queue.shift();
-    p.confirmT = CONFIRM_SECONDS;
-    const id = item === 'pickup' ? 'pickup' : powerItem(item);
-    this.teach.setText(itemCard(id).on);
-    if (item === 'pickup') p.s.pickups++;
-    else {
-      p.s.powers++;
-      // The magnet pulls in pickups: a few to the side of the lane show it.
-      if (item === 1) for (const [ahead, side] of MAGNET_DEMO) this.world.place('pickup', ahead, side);
-    }
-  }
-
-  /** Markers on the world: the next obstacle and the gap, or the item coming up. */
-  private updateMarks(lesson: Lesson): void {
-    const p = this.practice!;
-    const marks: Mark[] = [];
-    if (lesson === 'avoid') {
-      const o = this.world.obstacleAhead(12, 70, 6);
-      if (o) {
-        const a = this.toScreen(o.x, o.y, o.z);
-        const g = this.toScreen(o.gap, 1.4, o.z);
-        if (a) marks.push({ ...a, label: 'obstacle', color: '' });
-        if (g && Math.abs(o.gap - o.x) > 1.2) marks.push({ ...g, label: 'gap', color: '' });
-      }
-    } else if ((lesson === 'pickup' || lesson === 'power') && p.item !== null && p.coming) {
-      const it = this.world.itemAhead(p.item, 6, ITEM_AHEAD + 40);
-      const id = p.item === 'pickup' ? 'pickup' : powerItem(p.item);
-      const at = it && this.toScreen(it.x, it.y + 0.7, it.z);
-      if (at) marks.push({ ...at, label: itemCard(id).name, color: itemCard(id).color });
-    }
-    this.teach.setMarks(marks);
-  }
-
-  /** A point in the scene, in pixels over the play area; null if it's behind the camera or off screen. */
-  private toScreen(x: number, y: number, z: number): { x: number; y: number } | null {
-    const v = this.markV.set(x, y, z).project(this.stage.camera);
-    if (v.z > 1 || v.x < -1.1 || v.x > 1.1 || v.y < -1.1 || v.y > 1.1) return null;
-    const canvas = this.stage.renderer.domElement;
-    return { x: ((v.x + 1) / 2) * canvas.clientWidth, y: ((1 - v.y) / 2) * canvas.clientHeight };
-  }
-
-  /** The last lesson done: the recap of the pickups and power-ups, then "how did that feel?". */
-  private finishPractice(): void {
-    const p = this.practice!;
-    // The walkthrough needn't say any of it again (a lesson only timed out still showed what it's about).
-    this.hints.learned(LESSONS);
-    this.feelUsed = p.control;
-    this.endPractice();
-    this.onboarding.go('finished');
-    this.openWelcome();
-    this.ui.showGuide('next');
-  }
-
-  /** The trial's time is up (or skipped): back to "how did that feel?". */
-  private endTrial(): void {
-    const p = this.practice!;
-    this.feelUsed = p.control;
-    this.endPractice();
-    this.onboarding.go('finished');
-    this.openWelcome();
-  }
-
-  /** Off the practice course and its indicators, back to the title scene. */
-  private endPractice(): void {
-    this.teach.show(false);
-    this.toMainMenu();
-    this.practice = null;
-  }
-
-  /** "skip" during the practice run ends the tutorial; during a trial it goes back to "how did that feel?". */
-  private skipPractice(): void {
-    if (this.practice?.kind === 'trial') this.endTrial();
-    else this.finishOnboarding();
-  }
-
-  /** "keep": on to dressing the ship. */
-  private keepControls(): void {
-    this.feelUsed = null;
-    this.onboarding.go('keep');
-    this.openWelcome();
-  }
-
-  /** The recap's button: closes it (over "how did that feel?" or settings). */
-  private closeGuide(): void {
-    this.ui.showGuide(null);
-  }
-
-  /** Try a look from the starter set on (owned or not; the hull chosen is given at the end). */
-  private pickStarter(key: string): void {
-    const [slot, id] = key.split(':') as [Slot, string];
-    this.looks.equip(slot, id);
-    this.applyLooks();
-    this.haptics.pickup();
-    this.openWelcome();
-  }
-
-  /** Done (or skipped): keep the hull chosen, and on to the front page. */
-  private finishOnboarding(): void {
-    if (this.practice) {
-      // Skipped part way: the tips still cover what the practice run didn't get to.
-      this.hints.learned(this.practice.learned);
-      this.endPractice();
-    }
-    this.ui.showGuide(null);
-    this.feelUsed = null;
-    const hull = `hull:${this.looks.equipped.hull}`;
-    if (STARTER.hull.includes(hull) && !this.looks.owns(byKey(hull)!, this.owner())) this.looks.give(hull);
-    this.onboarding.set('done');
-    this.infoOpen = null;
-    this.player.setVisible(false);
-    this.trail.setVisible(false);
-    this.ui.show('title');
-    this.refreshTitle();
-    this.claimLogin();
-    void this.account.askName();
   }
 
   /** How much of the game is open to this player (new players see it in stages: reveal.ts). */
@@ -2239,7 +1919,7 @@ export class Game {
     else if (this.econ.offerOpen && !(this.state === 'crashed' && this.revivePending))
       this.econ.declineOffer(); // the reminders offer: no thanks
     else if (cancelOpenReport()) return true;
-    else if (this.ui.guideOpen) this.closeGuide();
+    else if (this.ui.guideOpen) this.firstLaunch.closeGuide();
     else if (this.settingsOpen) this.closeSettings();
     else if (this.infoOpen === 'welcome') return this.backAtTop();
     else if (this.infoOpen) this.closeInfo();
@@ -2393,7 +2073,7 @@ export class Game {
       this.onboarding.go('replay');
       this.feelUsed = null;
       this.closeSettings();
-      this.openWelcome();
+      this.firstLaunch.openWelcome();
     } else if (action === 'guide') this.ui.showGuide('got it');
     else if (action === 'whats-new') this.showWhatsNew();
     else if (action === 'menu') {
@@ -2403,7 +2083,7 @@ export class Game {
         // Left the practice run: back to the start of onboarding (a trial: back to "how did that feel?").
         if (practising.kind === 'trial') this.feelUsed = practising.control;
         this.onboarding.go('quit');
-        this.openWelcome();
+        this.firstLaunch.openWelcome();
       }
     } else if (action === 'share') void this.share();
     else if (action === 'details') this.ui.showDetails(!this.ui.detailsOpen);
@@ -2460,7 +2140,7 @@ export class Game {
     else if (key === 'reminders' || key === 'reminderTime') void this.reminders.planReminders();
   };
 
-  private applySettings(): void {
+  applySettings(): void {
     const s = this.settings;
     this.sound.setMuted(!s.sound);
     this.sound.setLevels(LEVEL_GAIN[s.music], LEVEL_GAIN[s.effects]);
@@ -2489,7 +2169,7 @@ export class Game {
   }
 
   /** Where the boost button sits: the setting, mirrored for the left hand (right and left swap; the middle stays). */
-  private boostSide(): (typeof BOOST_SIDES)[number] {
+  boostSide(): (typeof BOOST_SIDES)[number] {
     const side = BOOST_SIDES[this.settings.boostSide] ?? 'right';
     if (!this.settings.leftHanded || side === 'middle') return side;
     return side === 'right' ? 'left' : 'right';
@@ -2543,7 +2223,7 @@ export class Game {
   }
 
   /** Abandon the run and go back to the live title scene. Best score still counts. */
-  private toMainMenu(): void {
+  toMainMenu(): void {
     this.ui.showQuickRetry(null);
     if (this.state === 'paused' && !this.recorded) {
       // Abandoned mid-run: it still counts, for its best and the stats.
@@ -2824,7 +2504,7 @@ export class Game {
     // Swing back from the showroom orbit to the chase view (a run started from the welcome screen).
     this.stage.showroom *= Math.exp(-CONFIG.camera.showroom.ease * 2 * dt);
     if (this.stage.showroom < 0.001) this.stage.showroom = 0;
-    if (this.practice) this.practiceTick(dt);
+    if (this.practice) this.firstLaunch.practiceTick(dt);
     else this.offerHints();
     // A set level runs at its sections' difficulty; otherwise speed follows the score.
     const section = this.course ? this.world.sectionAt(this.world.distance) : null;
@@ -2882,7 +2562,7 @@ export class Game {
       this.bonus += got * CONFIG.score.pickupPoints;
       this.pickupCount += got;
       this.tip('pickup');
-      if (this.practice) this.practiceGot('pickup');
+      if (this.practice) this.firstLaunch.practiceGot('pickup');
       this.ui.flashBoost();
       this.sound.pickup();
       this.haptics.pickup();
@@ -3351,7 +3031,7 @@ export class Game {
     else this.doubleT = p.double.seconds;
     this.pickupCount++;
     if (this.practice)
-      this.practiceGot(kind); // the lesson card says it
+      this.firstLaunch.practiceGot(kind); // the lesson card says it
     else this.ui.showNotice(itemCard(powerItem(kind)).on);
     this.sound.power();
     this.haptics.pickup();
