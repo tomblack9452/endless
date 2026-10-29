@@ -73,11 +73,11 @@ import { Wallet } from '../progression/wallet';
 import { Daily, type Quest, questText } from '../economy/daily';
 import { Weekly } from '../economy/weekly';
 import { type GoalsTab, GoalsScreen, type TaskRow } from '../ui/goalsView';
-import { Pass, passBought, passRefunded, premiumReward, freeReward, runXp, seasonAt } from '../economy/pass';
+import { Pass, passBought, passRefunded, runXp } from '../economy/pass';
 import { type Reward, rewardLook, rewardParts, rewardText } from '../economy/reward';
-import { asksBeforeSpending, DailyShop, setOffer, vaultAt } from '../economy/shop';
+import { DailyShop, vaultAt } from '../economy/shop';
 import { dayKey, formatWait, untilTomorrow } from '../economy/time';
-import { EconomyView, type StoreButton, type StoreCard } from '../economy/view';
+import { EconomyView } from '../economy/view';
 import { type BoardId, createBackend, type PilotStats, type Purchase, type ReportReason, type RunSubmission, type SubmitResult } from '../server/backend';
 import { BOARD_TABS, boardCaption, boardForRun, boardName, boardQuery } from '../server/boards';
 import { Outbox } from '../server/outbox';
@@ -95,7 +95,7 @@ import { DIVISIONS, divisionReward, emblem, LEAGUES, leagueName, leaguePar, Leag
 import { ACHIEVEMENTS, type Achievement, GROUP_NAMES, type Group, type Snapshot, achievement, progressOn, rewardKeys } from '../progression/achievements';
 import { refreshSeasonLooks, SETS, VAULT_ORDER } from '../ship/catalogue';
 import { GoalLog } from '../progression/goals';
-import { buildHangar, type HangarState, lookIcon, lookSwatch, monthsUntilVault } from '../ship/hangar';
+import { buildHangar, type HangarState, monthsUntilVault } from '../ship/hangar';
 import { type HangarTab, HangarScreen } from '../ui/hangarView';
 import { byKey, find, keyOf, LOOKS, Looks, type LookItem, type Owner, type ShipId, type Slot, type TrailId, SLOT_NAMES } from '../ship/looks';
 import type { Fin, Marking } from '../ship/looks';
@@ -108,6 +108,7 @@ import { biomeForLevel, type PowerKind, themeForLevel, themeName, World } from '
 import { tintBiome } from '../world/biomes';
 import { terrain } from '../world/terrain';
 import { ShowroomSpin } from '../ship/showroom';
+import { ShopScreens } from '../screens/shop';
 
 type State = 'title' | 'playing' | 'paused' | 'countdown' | 'crashed' | 'finished';
 
@@ -117,9 +118,6 @@ const FIRST_PLAYED_KEY = 'endless.firstPlayed';
 const REVEAL_KEY = 'endless.reveal';
 /** The reminders were offered once (after the 5th valid run): kept on this device only. */
 const REMINDERS_OFFERED_KEY = 'endless.remindersOffered';
-
-/** The shop's tabs: looks as cards (today, the set, the vault), then lists (the pass, cores, premium). */
-type ShopTab = 'today' | 'set' | 'vault';
 
 /** A name the server made up for a new account ("pilot-3fa2"): the player hasn't picked one. */
 const GENERATED_NAME = /^pilot-[0-9a-f]{4}$/;
@@ -173,14 +171,21 @@ const NEW_ICON =
 /** The daily challenge: a flag at the finish line. */
 const FLAG_ICON =
   '<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round"><path d="M16 58V8"/><path d="M16 10h34l-7 10 7 10H16"/><path d="M27 10v20M38 10v20M16 20h34"/></svg>';
-/** Credits and cores side by side (the wallet's two chips), for the first look at the shop. */
-const WALLET_ICON =
-  '<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round"><circle cx="22" cy="34" r="15"/><path d="M27.5 28.5a8 8 0 1 0 0 11"/><path d="M44 16l13 7.5v15L44 46l-13-7.5v-15z"/><path d="M44 25l6 3.5v7L44 39l-6-3.5v-7z"/></svg>';
-/** The first look at the shop or the store says what credits and cores are for (once, on this save). */
-const WALLET_EXPLAINED_KEY = 'endless.walletExplained';
 /** A season pass badge. */
-const PASS_ICON =
+export const PASS_ICON =
   '<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round"><path d="M32 6l22 10v16c0 13-9 22-22 26C19 54 10 45 10 32V16z"/><path d="M32 20l4 8 9 1-7 6 2 9-8-5-8 5 2-9-7-6 9-1z"/></svg>';
+
+/** "+250 credits" lines from several promotions at once, added into one. */
+export function mergeCredits(lines: string[]): string[] {
+  let credits = 0;
+  const rest: string[] = [];
+  for (const l of lines) {
+    const m = /^\+([\d,]+) credits$/.exec(l);
+    if (m) credits += Number(m[1].replace(/,/g, ''));
+    else if (!rest.includes(l)) rest.push(l);
+  }
+  return credits > 0 ? [`+${formatScore(credits)} credits`, ...rest] : rest;
+}
 
 export class Game {
   private readonly basePalette = new LivePalette(); // the level's palette
@@ -189,13 +194,13 @@ export class Game {
   private shownPageHex = -1;
   private readonly stage: Stage;
   private readonly world: World;
-  private readonly player: Player;
+  readonly player: Player;
   private readonly input: Input;
   private readonly speedLines: SpeedLines;
   /** Graphics on auto: drops to low once per session if runs keep going slow. */
   private readonly autoGraphics = new AutoGraphics();
   private readonly sky: Sky;
-  private readonly trail: Trail;
+  readonly trail: Trail;
   private readonly events: Events;
   private readonly weather: Weather;
   private readonly ghost: Ghost;
@@ -216,7 +221,7 @@ export class Game {
   private onIce = false;
   /** This run counts towards opening solo environments: ranked or endless, from the start (not solo, set levels or dev starts). */
   private unlockable = false;
-  private readonly sound = new Sound();
+  readonly sound = new Sound();
   private readonly audio: AudioState = {
     playing: false,
     speed: 0,
@@ -230,13 +235,13 @@ export class Game {
   };
   private settings = { ...DEFAULT_SETTINGS };
   private settingsOpen = false; // settings screen showing (from the title or pause)
-  private readonly ui = new UI();
+  readonly ui = new UI();
   private readonly hints = new Hints((text, tip) => this.ui.showHint(text, tip));
   /** The Android app (not the web): back can leave it, so "ask before closing" applies. */
   private native = Capacitor.getPlatform() === 'android';
   /** The "close endless space?" dialog is up. */
   private exitAsking = false;
-  private readonly haptics = new Haptics();
+  readonly haptics = new Haptics();
   private readonly progress = new Progress();
   // Run mode: ranked (the weekly level), solo (an environment or a set level) or endless.
   private mode: RunMode = 'ranked';
@@ -252,10 +257,10 @@ export class Game {
   private readonly challenge = new Challenge();
   private scoreBase = 0; // solo starts: score begins at half the skipped points
   private readonly ranked = new Ranked();
-  private readonly wallet = new Wallet();
+  readonly wallet = new Wallet();
   private readonly daily = new Daily();
-  private readonly pass = new Pass();
-  private readonly econ = new EconomyView();
+  readonly pass = new Pass();
+  readonly econ = new EconomyView();
   private readonly backend = createBackend();
   private readonly cloud = new CloudSave(this.backend);
   /** Finished runs on their way to the leaderboards (kept and retried when there's no signal). */
@@ -264,8 +269,8 @@ export class Game {
   private lastSent: RunSubmission | null = null;
   private boardTab = 'week';
   private boardSeq = 0;
-  private readonly store = createStore();
-  private storeProducts: StoreProduct[] = [];
+  readonly store = createStore();
+  storeProducts: StoreProduct[] = [];
   /** Shop rows for real-money products, in the order shown ('dev' adds cores in the dev build). */
   private deleteArmed = false;
   private deleteTimer = 0;
@@ -275,15 +280,14 @@ export class Game {
   private shipTimer = 0;
   private nameOk = false; // the player has a pilot name of their own
   private nameLater = false; // the name screen was put off for this session
-  private walletExplained = false; // looked at this session whether the wallet card was shown
   private googleEmail: string | null = null; // the Google account this account is kept with ('' none, null unknown)
   private googleBusy = false;
   private googleArmed = false; // asked once to switch to the account a Google login keeps
   private nameWords: Promise<Set<string>> | null = null; // the profanity list, once loaded
-  private storeFrom: 'shop' | null = null; // where Back goes from the store
-  private passFrom: 'store' | null = null; // and from the season pass
+  storeFrom: 'shop' | null = null; // where Back goes from the store
+  passFrom: 'store' | null = null; // and from the season pass
   /** One-time products already bought. */
-  private readonly entitlements = new Entitlements();
+  readonly entitlements = new Entitlements();
   private firstPlayed = Date.now();
   /** The saved days, weeks and pass are loaded (retime waits for them). */
   private economyLoaded = false;
@@ -320,8 +324,8 @@ export class Game {
     () => this.firstPlayed,
   );
   /** The shop card tapped (on the ship to try), or -1. */
-  private shopPick = -1;
-  private readonly dailyShop = new DailyShop();
+  shopPick = -1;
+  readonly dailyShop = new DailyShop();
   private readonly goalLog = new GoalLog();
   private readonly weeklyGoals = new Weekly();
   private readonly goalsUi = new GoalsScreen();
@@ -366,20 +370,20 @@ export class Game {
   private readonly leagues = new Leagues();
   /** This run's ship systems (your switched-on upgrades). */
   private ship: ShipStats = STANDARD;
-  private readonly looks = new Looks();
+  readonly looks = new Looks();
   /** A locked look being tried on in the hangar (not yet owned). */
-  private preview: Partial<Record<Slot, string>> | null = null;
+  preview: Partial<Record<Slot, string>> | null = null;
   private pickupCount = 0;
   private recorded = false; // this run's stats are saved
   private assisted = false; // assist mode was on at some point this run
   /** Which info screen is open from the title (stats, goals, hangar), if any. */
-  private infoOpen: InfoScreen | null = null;
+  infoOpen: InfoScreen | null = null;
   private boostSeconds = 0;
   private roomsEntered = 0;
   private shownSky = -1;
   private runTime = 0; // seconds into the current run
 
-  private state: State = 'title';
+  state: State = 'title';
   private speed: number = CONFIG.speed.titleDrift;
   private runStart = 0; // field distance when the run began
   private score = 0; // shown score: distance points + bonus
@@ -434,6 +438,8 @@ export class Game {
 
   private lastTime = 0;
   private titleTime = 0;
+
+  readonly shop = new ShopScreens(this);
 
   constructor(canvas: HTMLCanvasElement) {
     this.basePalette.set(BASE_PALETTE);
@@ -570,16 +576,16 @@ export class Game {
     this.outbox.onLate = (run, res) => {
       if (run === this.lastSent && this.state !== 'playing' && this.state !== 'countdown') this.boardNotice(run.board, res);
     };
-    this.econ.bindShop(this.onShopOffer, this.onShopBuy, this.onShopTab, this.onShopSet);
+    this.econ.bindShop(this.shop.onShopOffer, this.shop.onShopBuy, this.shop.onShopTab, this.shop.onShopSet);
     this.bindShowroomDrag();
-    this.econ.bindStore(this.onStoreAct);
+    this.econ.bindStore(this.shop.onStoreAct);
     this.hangarUi.bindHangar({
       tab: (tab) => this.onHangarTab(tab),
       pick: (id) => this.onHangarPick(id),
       action: () => this.onHangarAction(),
       open: () => this.openHangar({ from: 'shop' }),
     });
-    this.econ.bindPass(this.onPassPremium, () => void this.buyProduct('season_pass'));
+    this.econ.bindPass(this.shop.onPassPremium, () => void this.buyProduct('season_pass'));
     this.goalsUi.bind({
       tab: (tab) => {
         this.goalsTab = tab;
@@ -921,7 +927,7 @@ export class Game {
   }
 
   /** Pay a reward into the wallet or looks; returns it in words. `source` names cores for the server (earn_cores). */
-  private grant(r: Reward, source?: string): string[] {
+  grant(r: Reward, source?: string): string[] {
     if (r.credits) {
       this.wallet.add(r.credits);
       this.econ.bump('credits');
@@ -950,523 +956,6 @@ export class Game {
     this.haptics.pickup();
     this.refreshTitle();
     if (this.infoOpen === 'goals') this.renderGoals();
-  }
-
-  private shopTab: ShopTab = 'today';
-  /** The weekly set shown all at once (a grid), not as a row. */
-  private shopGrid = false;
-  /** The whole weekly set is on the ship to try. */
-  private shopTrying = false;
-
-  /** The cards for the open shop tab, and the line, heading and buy button that go with them. */
-  private shopTabView(
-    now: number,
-    owned: (key: string) => boolean,
-  ): {
-    heading: string;
-    reset: string;
-    info: string;
-    items: LookItem[];
-    cards: { price: string; premium: boolean; deal: boolean }[];
-    buy: { text: string; enabled: boolean };
-  } {
-    const priceOf = (item: LookItem): string => {
-      const u = item.unlock;
-      return u.by === 'credits' ? `${formatScore(u.cost)} credits` : u.by === 'cores' || u.by === 'vault' ? `${formatScore(u.cost)} cores` : '';
-    };
-    if (this.shopTab === 'set') {
-      const week = weekKey(now);
-      const so = setOffer(week, owned);
-      const left = Date.parse(`${week}T00:00:00Z`) + 7 * 86_400_000 - now;
-      const saved = so.full - so.price;
-      return {
-        heading: so.set.name,
-        reset: `this week · new in ${formatWait(left)}`,
-        info: so.complete
-          ? `you have the whole set. its bonus of ${so.set.bonusCores} cores is yours`
-          : `${so.missing.length} of ${so.items.length} looks left · the lot for ${formatScore(so.price)} cores, ${formatScore(saved)} less than one by one · own the whole set for +${so.set.bonusCores} cores`,
-        items: so.items,
-        cards: so.items.map((item) => ({ price: priceOf(item), premium: item.unlock.by === 'cores', deal: false })),
-        buy: so.complete
-          ? { text: 'set complete', enabled: false }
-          : { text: `buy the set · ${formatScore(so.price)} cores`, enabled: this.wallet.cores >= so.price },
-      };
-    }
-    if (this.shopTab === 'vault') {
-      const v = vaultAt(now);
-      const mine = owned(keyOf(v.item));
-      return {
-        heading: 'the vault',
-        reset: `leaves in ${formatWait(v.leaves)}`,
-        info: `a rare look, for sale a month at a time. when it goes it's away for ${VAULT_ORDER.length - 1} months`,
-        items: [v.item],
-        cards: [{ price: priceOf(v.item), premium: true, deal: false }],
-        buy: mine
-          ? { text: `${v.item.name} is yours`, enabled: false }
-          : { text: `buy ${v.item.name} · ${formatScore(v.price)} cores`, enabled: this.wallet.cores >= v.price },
-      };
-    }
-    const offers = this.dailyShop.offers(dayKey(now), owned);
-    const f = offers[this.shopPick];
-    let buy: { text: string; enabled: boolean } = { text: 'tap a look to try it on', enabled: false };
-    if (f) {
-      if (owned(keyOf(f.item))) buy = { text: `${f.item.name} is on your ship`, enabled: false };
-      else {
-        const have = f.currency === 'cores' ? this.wallet.cores : this.wallet.credits;
-        const price = `${formatScore(f.price)} ${f.currency}`;
-        buy = have >= f.price ? { text: `buy ${f.item.name} · ${price}`, enabled: true } : { text: `${price} · you have ${formatScore(have)}`, enabled: false };
-      }
-    }
-    return {
-      heading: "today's looks",
-      reset: `new in ${formatWait(untilTomorrow(now))}`,
-      info: '',
-      items: offers.map((o) => o.item),
-      cards: offers.map((o) => ({ price: `${formatScore(o.price)} ${o.currency}`, premium: o.currency === 'cores', deal: o.deal })),
-      buy,
-    };
-  }
-
-  private openShop(tab?: ShopTab): void {
-    const now = this.now();
-    if (tab) {
-      this.shopTab = tab;
-      this.shopPick = -1;
-      this.shopTrying = false;
-      this.preview = null;
-      this.applyLooks();
-    }
-    const tabs = this.shopTabs();
-    if (!tabs.some((t) => t.id === this.shopTab)) this.shopTab = 'today';
-    const o = this.owner();
-    const owned = (key: string): boolean => {
-      const it = byKey(key);
-      return !!it && this.looks.owns(it, o);
-    };
-    const v = this.shopTabView(now, owned);
-    this.econ.renderShop({
-      wallet: `${formatScore(this.wallet.credits)} credits · ${formatScore(this.wallet.cores)} cores`,
-      reset: v.reset,
-      tabs: tabs.map((t) => ({ ...t, note: this.shopTabNote(t.id, now), on: t.id === this.shopTab })),
-      store: this.storeAd(now),
-      heading: v.heading,
-      kicker: this.shopTab === 'vault' ? 'rare · one month only' : '',
-      info: v.info,
-      offers: v.items.map((item, i) => ({
-        name: item.name,
-        slot: item.slot,
-        slotName: SLOT_NAMES[item.slot],
-        swatch: lookSwatch(item),
-        icon: lookIcon(item),
-        price: v.cards[i].price,
-        premium: v.cards[i].premium,
-        deal: v.cards[i].deal,
-        owned: owned(keyOf(item)),
-        picked: i === this.shopPick,
-      })),
-      set: this.shopTab === 'set' ? { grid: this.shopGrid, trying: this.shopTrying && this.preview !== null } : null,
-      buy: v.buy,
-    });
-    this.player.reset();
-    this.player.setVisible(true);
-    this.trail.setVisible(true);
-    this.openInfo('shop');
-    void this.explainWallet();
-  }
-
-  /** The first time the shop or the store opens: what credits and cores are, and where each comes from (once). */
-  private async explainWallet(): Promise<void> {
-    if (this.walletExplained) return;
-    this.walletExplained = true;
-    if ((await storage.get(WALLET_EXPLAINED_KEY)) !== null) return;
-    void storage.set(WALLET_EXPLAINED_KEY, '1');
-    this.ui.celebrate([
-      {
-        kicker: 'your wallet',
-        icon: WALLET_ICON,
-        name: 'credits and cores',
-        lines: [
-          'credits: every run pays them. for looks and upgrades',
-          'cores: rarer. from daily rewards, goals, the pass and the store',
-          'for premium looks, the vault, revives and the pass',
-        ],
-      },
-    ]);
-  }
-
-  /** The store's ad on the shop: the season's countdown, the pass's hook, and the best pack of cores. */
-  private storeAd(now: number): { pass: { title: string; left: string; hook: string; tier: string; fraction: number }; cores: string } {
-    this.pass.turn(now);
-    const s = seasonAt(now);
-    const tier = this.pass.tier;
-    const tiers = CONFIG.economy.pass.tiers;
-    // The biggest pack, with its bonus and (in the app) its price.
-    let best: { id: ProductId; cores: number; bonus: number } | null = null;
-    for (const p of CONFIG.economy.store.products) if ('bonus' in p && (!best || p.cores > best.cores)) best = p;
-    const price = best && this.storeProducts.find((p) => p.id === best.id)?.price;
-    const cores = best ? `up to ${formatScore(best.cores)}${best.bonus ? ` · +${best.bonus}%` : ''}${price ? ` · ${price}` : ''}` : '';
-    const hook = this.pass.premium
-      ? 'premium · every reward is yours'
-      : tier > 0
-        ? `${tier} premium reward${tier === 1 ? '' : 's'} waiting`
-        : 'premium rewards on every tier';
-    return {
-      pass: {
-        title: `season ${s.season} pass`,
-        left: `${s.end - now > 2 * 86_400_000 ? `${Math.ceil((s.end - now) / 86_400_000)}d` : formatWait(s.end - now)} left`,
-        hook,
-        tier: `${tier}/${tiers}`,
-        fraction: tier / tiers,
-      },
-      cores,
-    };
-  }
-
-  /** Under each tab: when it turns over. */
-  private shopTabNote(id: ShopTab, now: number): string {
-    if (id === 'set') return formatWait(Date.parse(`${weekKey(now)}T00:00:00Z`) + 7 * 86_400_000 - now);
-    if (id === 'vault') return formatWait(vaultAt(now).leaves);
-    return formatWait(untilTomorrow(now));
-  }
-
-  /** The looks shop's tabs (the store, for cores and the pass, is its own screen). */
-  private shopTabs(): { id: ShopTab; label: string }[] {
-    return [
-      { id: 'today', label: 'today' },
-      { id: 'set', label: 'weekly set' },
-      { id: 'vault', label: 'vault' },
-    ];
-  }
-
-  private onShopTab = (id: string): void => {
-    if (id === 'store' || id === 'store-cores') {
-      this.openStore('shop');
-      // Buy cores: straight to the packs, past the pass.
-      if (id === 'store-cores') requestAnimationFrame(() => document.getElementById('store-packs-head')?.scrollIntoView({ block: 'start' }));
-      return;
-    }
-    if (!this.shopTabs().some((t) => t.id === id)) return;
-    this.openShop(id as ShopTab);
-  };
-
-  /** The store: the season pass first, then cores, the starter pack and premium, swaps, and restore. */
-  private openStore(from?: 'shop' | null): void {
-    if (from !== undefined) this.storeFrom = from;
-    const now = this.now();
-    this.pass.turn(now);
-    const P = CONFIG.economy.pass;
-    const s = seasonAt(now);
-    const tier = this.pass.tier;
-    const price = new Map(this.storeProducts.map((p) => [p.id, p.price]));
-    const app = this.store.available;
-    // A real-money button: the store's price, or why it can't be bought here.
-    const money = (id: ProductId): StoreButton => {
-      const p = price.get(id);
-      return p ? { act: id, text: p, enabled: true, primary: true } : { act: id, text: app ? 'unavailable' : 'in the app', enabled: false };
-    };
-    const owned = (text: string): StoreButton => ({ act: '', text, enabled: false });
-
-    const passButtons: StoreButton[] = [];
-    const perks: string[] = [];
-    if (this.pass.premium) {
-      perks.push(`season ${s.season}'s premium track is yours`, 'premium rewards are paid at every tier you reach');
-      passButtons.push({ act: 'pass-open', text: 'see the tiers', enabled: true });
-    } else {
-      const next = Math.min(tier + 1, P.tiers);
-      perks.push(
-        'more at every tier, on top of the free track',
-        "the season's new looks",
-        `next up: ${rewardText(premiumReward(next, s.season))} at tier ${next}`,
-      );
-      if (tier > 0) perks.push(`the ${tier} tier${tier === 1 ? '' : 's'} you've reached pay out as you unlock`);
-      passButtons.push({
-        act: 'pass-cores',
-        text: `unlock · ${formatScore(P.premiumCores)} cores`,
-        enabled: this.wallet.cores >= P.premiumCores,
-        primary: this.wallet.cores >= P.premiumCores,
-      });
-      const m = price.get('season_pass');
-      if (m) passButtons.push({ act: 'season_pass', text: `unlock · ${m}`, enabled: true });
-      passButtons.push({ act: 'pass-open', text: 'see the tiers', enabled: true });
-    }
-
-    const packs: StoreCard[] = [];
-    const extras: StoreCard[] = [];
-    for (const p of CONFIG.economy.store.products) {
-      const img = `store/${p.id}.png`;
-      if ('look' in p) {
-        const mine = this.ownsProduct(p.id);
-        extras.push({
-          img,
-          name: 'starter pack',
-          sub: `${formatScore(p.cores)} cores and ${rewardText({ look: p.look })}`,
-          tag: 'once',
-          button: mine ? owned('owned') : money(p.id),
-          owned: mine,
-        });
-      } else if ('premium' in p) {
-        const mine = this.entitlements.has('premium');
-        extras.push({
-          img,
-          name: 'premium',
-          sub: mine ? 'yours. thank you' : 'no ads, ad rewards without the ad, three premium looks, an extra free revive a day, a badge on the boards',
-          tag: '',
-          button: mine ? owned('owned') : money(p.id),
-          owned: mine,
-        });
-      } else if ('cores' in p) packs.push({ img, name: `${formatScore(p.cores)} cores`, sub: '', tag: '', button: money(p.id), owned: false });
-    }
-    const packsNote = !app
-      ? 'packs of cores, the starter pack and premium are in the android app'
-      : this.storeProducts.length === 0
-        ? "the store isn't answering. check your connection and come back"
-        : '';
-
-    const S = CONFIG.economy.shop;
-    const foot: { label: string; button: StoreButton }[] = [];
-    if (app) foot.push({ label: 'bought on another device?', button: { act: 'restore', text: 'restore', enabled: true } });
-    if (import.meta.env.DEV) {
-      foot.push({ label: 'dev: add cores (purchases stand-in)', button: { act: 'dev', text: '+500', enabled: true } });
-      foot.push({ label: 'dev: premium on/off', button: { act: 'dev-premium', text: 'toggle', enabled: true } });
-    }
-    this.econ.renderStore({
-      wallet: `${formatScore(this.wallet.credits)} credits · ${formatScore(this.wallet.cores)} cores`,
-      pass: {
-        title: `season ${s.season}`,
-        left: `ends in ${formatWait(s.end - now)}`,
-        tier: `tier ${tier} of ${P.tiers}`,
-        fraction: Math.min(1, (tier + (tier >= P.tiers ? 0 : this.pass.tierFraction)) / P.tiers),
-        perks,
-        buttons: passButtons,
-      },
-      packs,
-      packsNote,
-      extras,
-      swapNote: `${formatScore(S.creditsPerCore)} credits for every core`,
-      swaps: S.swaps.map((n) => ({
-        act: `swap-${n}`,
-        text: `${formatScore(n)} cores → ${formatScore(n * S.creditsPerCore)} credits`,
-        enabled: this.wallet.cores >= n,
-      })),
-      foot,
-    });
-    if (this.state === 'title') {
-      // No showroom here: the ship only shows on the screens that show it off.
-      this.preview = null;
-      this.shopPick = -1;
-      this.applyLooks();
-      this.player.setVisible(false);
-      this.trail.setVisible(false);
-    }
-    this.openInfo('store');
-    void this.explainWallet();
-  }
-
-  /** Tap a look: it goes on the ship to try (owned ones are just put on). Tap again to take it off. */
-  private onShopOffer = (i: number): void => {
-    const now = this.now();
-    const o = this.owner();
-    const owned = (key: string): boolean => {
-      const it = byKey(key);
-      return !!it && this.looks.owns(it, o);
-    };
-    const item = this.shopTabView(now, owned).items[i];
-    if (!item) return;
-    this.shopTrying = false; // one look again, not the whole set
-    if (this.shopPick === i && !owned(keyOf(item))) {
-      this.shopPick = -1;
-      this.preview = null;
-    } else {
-      this.shopPick = i;
-      if (owned(keyOf(item))) {
-        this.preview = null;
-        this.looks.equip(item.slot, item.id);
-      } else this.preview = { [item.slot]: item.id };
-    }
-    this.haptics.pickup();
-    this.applyLooks();
-    this.openShop();
-  };
-
-  /** The weekly set's buttons: every look at once or back to a row, and the whole set on the ship (tap again to take it off). */
-  private onShopSet = (act: 'grid' | 'try'): void => {
-    if (this.shopTab !== 'set') return;
-    if (act === 'grid') this.shopGrid = !this.shopGrid;
-    else if (this.shopTrying && this.preview) {
-      this.shopTrying = false;
-      this.preview = null;
-    } else {
-      const o = this.owner();
-      const items = setOffer(weekKey(this.now()), (key) => {
-        const it = byKey(key);
-        return !!it && this.looks.owns(it, o);
-      }).items;
-      // One look per slot, all on at once. Nothing is put on for keeps.
-      const all: Partial<Record<Slot, string>> = {};
-      for (const item of items) all[item.slot] ??= item.id;
-      this.preview = all;
-      this.shopTrying = true;
-      this.shopPick = -1;
-      this.haptics.pickup();
-    }
-    this.applyLooks();
-    this.openShop();
-  };
-
-  /** Something was bought: put it on, play the sound, and see whether it finished a goal or a set. */
-  private afterBuy(items: LookItem[], notice: string): void {
-    for (const item of items) this.looks.equip(item.slot, item.id);
-    this.preview = null;
-    this.shopTrying = false;
-    this.sound.pickup();
-    this.haptics.pickup();
-    this.ui.showNotice(notice);
-    this.applyLooks();
-    this.refreshTitle();
-    this.checkGoals();
-  }
-
-  private onShopBuy = (): void => {
-    const now = this.now();
-    const o = this.owner();
-    const owned = (key: string): boolean => {
-      const it = byKey(key);
-      return !!it && this.looks.owns(it, o);
-    };
-    if (this.shopTab === 'set') {
-      const so = setOffer(weekKey(now), owned);
-      if (so.complete || this.wallet.cores < so.price) return;
-      this.confirmCores(so.price, `${so.set.name}: ${so.missing.length} look${so.missing.length === 1 ? '' : 's'}`, () => {
-        if (!this.wallet.spendCores(so.price)) return;
-        for (const item of so.missing) this.looks.buy(item);
-        this.afterBuy(so.items, `${so.set.name} bought and on your ship`);
-        this.openShop();
-      });
-    } else if (this.shopTab === 'vault') {
-      const v = vaultAt(now);
-      if (owned(keyOf(v.item)) || this.wallet.cores < v.price) return;
-      this.confirmCores(v.price, `${v.item.name} from the vault`, () => {
-        if (!this.wallet.spendCores(v.price)) return;
-        this.looks.buy(v.item);
-        this.afterBuy([v.item], `${v.item.name} from the vault is on your ship`);
-        this.openShop();
-      });
-    } else {
-      const f = this.dailyShop.offers(dayKey(now), owned)[this.shopPick];
-      if (!f || owned(keyOf(f.item))) return;
-      const buy = (): void => {
-        const paid = f.currency === 'cores' ? this.wallet.spendCores(f.price) : this.wallet.spend(f.price);
-        if (!paid) return;
-        this.looks.buy(f.item);
-        this.afterBuy([f.item], `${f.item.name} bought and on your ship`);
-        this.openShop();
-      };
-      if (f.currency === 'cores') this.confirmCores(f.price, f.item.name, buy);
-      else buy();
-    }
-  };
-
-  /** Spend cores on `what`: straight away for small amounts, after a "spend N cores?" for larger ones (CONFIG.economy.confirmCores). */
-  private confirmCores(cost: number, what: string, go: () => void): void {
-    if (!asksBeforeSpending(cost)) return go();
-    this.econ.offer(
-      {
-        kicker: '',
-        name: `spend ${formatScore(cost)} cores?`,
-        lines: [what, `you have ${formatScore(this.wallet.cores)} cores`],
-        yes: `buy · ${formatScore(cost)} cores`,
-        yesEnabled: this.wallet.cores >= cost,
-        no: 'not now',
-        seconds: 0,
-      },
-      go,
-      () => undefined,
-    );
-  }
-
-  /** A store button (its data-act): the pass, a real purchase, a swap, restore, or a dev stand-in. */
-  private onStoreAct = (act: string): void => {
-    if (act === 'dev' && import.meta.env.DEV) {
-      this.devAddCores(500);
-      this.openStore();
-    } else if (act === 'dev-premium' && import.meta.env.DEV) {
-      this.devTogglePremium();
-      this.openStore();
-    } else if (act === 'pass-cores') this.onPassPremium();
-    else if (act === 'pass-open') this.openPass('store');
-    else if (act === 'restore') void this.restorePurchases();
-    else if (act.startsWith('swap-')) this.swapCores(Number(act.slice(5)));
-    else if (CONFIG.economy.store.products.some((p) => p.id === act)) void this.buyProduct(act as ProductId);
-  };
-
-  /** Cores into credits, at the shop's rate. */
-  private swapCores(n: number): void {
-    if (this.wallet.cores < n) {
-      this.ui.showNotice('not enough cores');
-      return;
-    }
-    this.confirmCores(n, `for ${formatScore(n * CONFIG.economy.shop.creditsPerCore)} credits`, () => {
-      if (!this.wallet.spendCores(n, 'swap')) return;
-      const lines = this.grant({ credits: n * CONFIG.economy.shop.creditsPerCore });
-      this.ui.showNotice(lines.join(' · '));
-      this.sound.pickup();
-      this.refreshTitle();
-      if (this.infoOpen === 'store') this.openStore();
-    });
-  }
-
-  /** The season pass's tiers. `from: 'store'` makes Back return to the store. */
-  private openPass(from?: 'store' | null): void {
-    if (from !== undefined) this.passFrom = from;
-    const now = this.now();
-    this.pass.turn(now);
-    const P = CONFIG.economy.pass;
-    const tier = this.pass.tier;
-    const s = seasonAt(now);
-    const maxed = tier >= P.tiers;
-    const passPrice = this.storeProducts.find((p) => p.id === 'season_pass')?.price;
-    this.econ.renderPass({
-      big: maxed ? 'complete' : String(P.xpPerTier - (this.pass.xp % P.xpPerTier)),
-      goal: maxed ? `all ${P.tiers} tiers` : `xp to tier ${tier + 1}`,
-      fraction: this.pass.tierFraction,
-      detail: `season ${s.season} · tier ${tier} of ${P.tiers} · ends in ${formatWait(s.end - now)}`,
-      premium: this.pass.premium ? null : { text: `unlock premium · ${formatScore(P.premiumCores)} cores`, enabled: this.wallet.cores >= P.premiumCores },
-      buy: passPrice ? `or unlock for ${passPrice}` : null,
-      premiumOwned: this.pass.premium,
-      tiers: Array.from({ length: P.tiers }, (_, i) => ({
-        tier: i + 1,
-        free: rewardText(freeReward(i + 1, s.season)),
-        premium: rewardText(premiumReward(i + 1, s.season)),
-        reached: i < tier,
-        current: i === tier || (maxed && i === P.tiers - 1),
-      })),
-    });
-    this.openInfo('pass');
-  }
-
-  private onPassPremium = (): void => {
-    const cost = CONFIG.economy.pass.premiumCores;
-    if (this.pass.premium || this.wallet.cores < cost) return;
-    this.confirmCores(cost, `season ${this.pass.season} pass: the premium track`, () => this.unlockPassWithCores());
-  };
-
-  private unlockPassWithCores(): void {
-    // The reason tells the server this season's premium was paid in cores (a refund never touches it).
-    if (this.pass.premium || !this.wallet.spendCores(CONFIG.economy.pass.premiumCores, `pass-premium:${this.pass.season}`)) return;
-    const paid = this.pass.unlockPremium('cores');
-    const lines = paid.flatMap((r) => this.grant(r));
-    this.ui.celebrate([
-      {
-        kicker: 'season pass',
-        icon: PASS_ICON,
-        name: 'premium unlocked',
-        lines: lines.length > 0 ? mergeCredits(lines) : ['premium rewards from every tier you reach'],
-      },
-    ]);
-    this.sound.power();
-    this.refreshTitle();
-    if (this.infoOpen === 'store') this.openStore();
-    else this.openPass();
   }
 
   // --- revive ----------------------------------------------------------------
@@ -1674,7 +1163,7 @@ export class Game {
   }
 
   /** The time for rewards, streaks, days and weeks: the server's clock when known, the device's offline. */
-  private now(): number {
+  now(): number {
     return this.backend.now();
   }
 
@@ -1714,7 +1203,7 @@ export class Game {
       if (row) row.hidden = !this.ads.privacyRequired; // Google asks for a way back to the consent form here
     });
     this.storeProducts = await this.store.products();
-    if (this.infoOpen === 'store') this.openStore();
+    if (this.infoOpen === 'store') this.shop.openStore();
   }
 
   /**
@@ -1739,7 +1228,7 @@ export class Game {
   }
 
   /** Buy a real-money product through the app store, then deliver it. */
-  private async buyProduct(id: ProductId): Promise<void> {
+  async buyProduct(id: ProductId): Promise<void> {
     // With the server, a purchase is paid to the account (the webhook): no account known, no sale.
     if (this.backend.online) {
       if (!this.backend.userId) await this.backend.signIn();
@@ -1771,9 +1260,9 @@ export class Game {
     this.ui.celebrate([{ kicker: 'thank you', icon: GIFT_ICON, name: 'purchase complete', lines: mergeCredits(lines) }]);
     this.sound.power();
     this.refreshTitle();
-    if (this.infoOpen === 'shop') this.openShop();
-    else if (this.infoOpen === 'store') this.openStore();
-    else if (this.infoOpen === 'pass') this.openPass();
+    if (this.infoOpen === 'shop') this.shop.openShop();
+    else if (this.infoOpen === 'store') this.shop.openStore();
+    else if (this.infoOpen === 'pass') this.shop.openPass();
   }
 
   /**
@@ -1788,14 +1277,14 @@ export class Game {
       if (this.wallet.cores >= target) break;
     }
     this.refreshTitle();
-    if (this.infoOpen === 'shop') this.openShop();
-    else if (this.infoOpen === 'store') this.openStore();
-    else if (this.infoOpen === 'pass') this.openPass();
+    if (this.infoOpen === 'shop') this.shop.openShop();
+    else if (this.infoOpen === 'store') this.shop.openStore();
+    else if (this.infoOpen === 'pass') this.shop.openPass();
     else if (this.infoOpen === 'hangar') this.renderHangar(true);
   }
 
   /** True if a one-time product is owned (premium, the starter pack). */
-  private ownsProduct(id: string): boolean {
+  ownsProduct(id: string): boolean {
     const e = entitlementFor(id);
     return e !== null && this.entitlements.has(e);
   }
@@ -1824,19 +1313,19 @@ export class Game {
       this.ui.showNotice('your season pass was refunded, so its premium track is closed');
       void this.wallet.refresh(); // the server took back the cores its premium tiers paid
       this.refreshTitle();
-      if (this.infoOpen === 'pass') this.openPass();
+      if (this.infoOpen === 'pass') this.shop.openPass();
       return null;
     }
     if (this.pass.premium || !passBought(records, now)) return null;
     const lines = this.pass.unlockPremium('money').flatMap((r) => this.grant(r));
     this.refreshTitle();
-    if (this.infoOpen === 'pass') this.openPass();
-    else if (this.infoOpen === 'store') this.openStore();
+    if (this.infoOpen === 'pass') this.shop.openPass();
+    else if (this.infoOpen === 'store') this.shop.openStore();
     return lines.length > 0 ? mergeCredits(lines) : ['premium rewards from every tier you reach'];
   }
 
   /** Restore one-time purchases on a new install (cores come back with the cloud save). */
-  private async restorePurchases(): Promise<void> {
+  async restorePurchases(): Promise<void> {
     this.ui.showNotice('checking your purchases…');
     // Google Play's records for the Google account on this phone, and the server's for this game account.
     // At least two seconds, so the answer doesn't flash past the "checking" note.
@@ -1855,9 +1344,9 @@ export class Game {
     else if (owned) this.ui.showNotice('all your purchases are here');
     else if (googleAvailable() && !this.googleEmail) this.ui.showNotice('nothing to restore. bought on another phone? sign in with google');
     else this.ui.showNotice('nothing to restore');
-    if (this.infoOpen === 'shop') this.openShop();
-    else if (this.infoOpen === 'store') this.openStore();
-    else if (this.infoOpen === 'pass') this.openPass();
+    if (this.infoOpen === 'shop') this.shop.openShop();
+    else if (this.infoOpen === 'store') this.shop.openStore();
+    else if (this.infoOpen === 'pass') this.shop.openPass();
   }
 
   /** The end screen's share button: for a new personal best in any mode, and every ranked run. */
@@ -2601,12 +2090,12 @@ export class Game {
   }
 
   /** What the player has, for unlocking looks. */
-  private owner(): Owner {
+  owner(): Owner {
     return this.ownerFor(this.snapshot());
   }
 
   /** Put the equipped looks (plus any preview) on the ship. */
-  private applyLooks(): void {
+  applyLooks(): void {
     const eq = { ...this.looks.equipped };
     if (this.preview) Object.assign(eq, this.preview);
     this.player.setShape(eq.hull as ShipId);
@@ -2691,16 +2180,16 @@ export class Game {
       if (!this.wallet.spend(u.cost)) return;
     } else if (u.by === 'cores' || u.by === 'vault') {
       if (this.wallet.cores < u.cost || (u.by === 'vault' && keyOf(item) !== keyOf(vaultAt(this.now()).item))) return;
-      this.confirmCores(u.cost, item.name, () => {
+      this.shop.confirmCores(u.cost, item.name, () => {
         if (!this.wallet.spendCores(u.cost)) return;
         this.looks.buy(item);
-        this.afterBuy([item], `${item.name} bought and on your ship`);
+        this.shop.afterBuy([item], `${item.name} bought and on your ship`);
         this.renderHangar(true);
       });
       return;
     } else return;
     this.looks.buy(item);
-    this.afterBuy([item], `${item.name} bought and on your ship`);
+    this.shop.afterBuy([item], `${item.name} bought and on your ship`);
     this.renderHangar(true);
   }
 
@@ -2865,7 +2354,7 @@ export class Game {
    * Pay and announce goals finished since last time, and any set a purchase just made whole.
    * Goals can unlock looks and looks can finish goals ("own 25 looks"), so go round until nothing new.
    */
-  private checkGoals(): void {
+  checkGoals(): void {
     const party: Celebration[] = [];
     for (let pass = 0; pass < 4; pass++) {
       const snap = this.snapshot();
@@ -2943,7 +2432,7 @@ export class Game {
     this.openInfo('goals');
   }
 
-  private openInfo(which: InfoScreen): void {
+  openInfo(which: InfoScreen): void {
     this.infoOpen = which;
     this.ui.show(which);
   }
@@ -3070,9 +2559,9 @@ export class Game {
     else if (name === 'shop') {
       this.shopPick = -1;
       this.preview = null;
-      this.openShop();
-    } else if (name === 'shop-cores') this.openStore(null);
-    else if (name === 'pass') this.openPass(null);
+      this.shop.openShop();
+    } else if (name === 'shop-cores') this.shop.openStore(null);
+    else if (name === 'pass') this.shop.openPass(null);
     else if (name === 'boards') this.openBoards();
     else if (name === 'daily') this.openGoals('daily');
     else if (name === 'claim') this.claimLogin();
@@ -3509,7 +2998,7 @@ export class Game {
     return cards;
   }
 
-  private refreshTitle(): void {
+  refreshTitle(): void {
     const colour = rankColour(this.ranked.rank);
     const dark = this.settings.dark;
     this.ui.setAccent(
@@ -3756,17 +3245,17 @@ export class Game {
       this.hangarFrom = null;
       this.preview = null;
       this.applyLooks();
-      this.openShop();
+      this.shop.openShop();
       return;
     }
     if (this.infoOpen === 'store' && this.storeFrom === 'shop') {
       this.storeFrom = null;
-      this.openShop();
+      this.shop.openShop();
       return;
     }
     if (this.infoOpen === 'pass' && this.passFrom === 'store') {
       this.passFrom = null;
-      this.openStore();
+      this.shop.openStore();
       return;
     }
     if (this.infoOpen === 'hangar' || this.infoOpen === 'shop') {
@@ -4862,16 +4351,4 @@ export class Game {
       this.ui.show('over');
     }
   }
-}
-
-/** "+250 credits" lines from several promotions at once, added into one. */
-function mergeCredits(lines: string[]): string[] {
-  let credits = 0;
-  const rest: string[] = [];
-  for (const l of lines) {
-    const m = /^\+([\d,]+) credits$/.exec(l);
-    if (m) credits += Number(m[1].replace(/,/g, ''));
-    else if (!rest.includes(l)) rest.push(l);
-  }
-  return credits > 0 ? [`+${formatScore(credits)} credits`, ...rest] : rest;
 }
