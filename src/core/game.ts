@@ -5,6 +5,7 @@ import { createBlockTextures } from '../world/blockTextures';
 import { AutoGraphics } from './autoGraphics';
 import { BASE_PALETTE, CONFIG } from './config';
 import { lateralSpeedAt, speedAt } from '../world/difficulty';
+import { analytics } from '../platform/analytics';
 import { Input } from '../platform/input';
 import { LivePalette } from '../world/palette';
 import { Player, shipGeometry } from '../ship/player';
@@ -273,6 +274,8 @@ export class Game {
   preview: Partial<Record<Slot, string>> | null = null;
   pickupCount = 0;
   recorded = false; // this run's stats are saved
+  /** What this run counts as in usage stats; null for the practice course, which isn't counted. */
+  private runKind: string | null = null;
   assisted = false; // assist mode was on at some point this run
   /** Which info screen is open from the title (stats, goals, hangar), if any. */
   infoOpen: InfoScreen | null = null;
@@ -606,6 +609,8 @@ export class Game {
     this.environment = env;
     this.world.setCourse(course);
     this.world.setEnvironment(env);
+    this.runKind = this.practiceNext ? null : this.zen ? 'zen' : daily ? 'daily' : course ? 'level' : mode;
+    if (this.runKind) analytics.log('run_start', { mode: this.runKind });
     this.world.scripted = this.practiceNext; // the practice course places its own pickups and power-ups
     this.world.gateRuns = mode === 'endless' && !course && !env && !this.zen && !this.practiceNext; // gate runs: endless only
     this.practiceNext = false;
@@ -773,6 +778,18 @@ export class Game {
 
   /** Save this run into the lifetime stats (once). Returns a line for the game-over screen. */
   finishRun(crashedIn: string | null): string {
+    if (this.runKind) {
+      const outcome = this.state === 'finished' ? 'finished' : this.state === 'paused' ? 'quit' : 'crashed';
+      analytics.log('run_end', {
+        mode: this.runKind,
+        score: Math.floor(this.score),
+        distance: Math.floor(this.world.distance - this.runStart),
+        seconds: Math.round(this.runTime),
+        level: this.level,
+        outcome,
+      });
+      this.runKind = null;
+    }
     if (this.recorded) return '';
     this.recorded = true;
     this.progress.recordRun({
@@ -792,10 +809,12 @@ export class Game {
     let credits = creditsFor(score, this.mode === 'ranked') + fromPickups + this.bonusCredits;
     credits += this.ranks.recordRank(this.state === 'finished');
     if (this.assisted) lines.push('assist mode. not counted as a best');
-    this.wallet.add(credits);
+    this.wallet.add(credits, 'run');
     this.lastRunCredits = credits;
     this.results.afterRun(credits);
-    this.ui.showDouble(credits > 0 && this.ads.offers('doubleCredits') ? `double +${formatScore(credits)} credits · ${this.ads.label()}` : null);
+    const double = credits > 0 && this.ads.offers('doubleCredits');
+    this.ui.showDouble(double ? `double +${formatScore(credits)} credits · ${this.ads.label()}` : null);
+    if (double) this.revives.adShown('doubleCredits');
     this.ads.afterRun(Date.now(), false); // the device clock, like the first-played time it is measured from
     this.ads.preload(); // an ad ready for the offers after a run (none for premium)
     const from = [
@@ -853,7 +872,7 @@ export class Game {
   /** Pay a reward into the wallet or looks; returns it in words. `source` names cores for the server (earn_cores). */
   grant(r: Reward, source?: string): string[] {
     if (r.credits) {
-      this.wallet.add(r.credits);
+      this.wallet.add(r.credits, r.source ?? source);
       this.econ.bump('credits');
     }
     if (r.cores) {
@@ -953,7 +972,7 @@ export class Game {
   payLeagueWeek(now: number): void {
     const weekly = this.leagues.rollWeek(now);
     if (weekly <= 0) return;
-    this.wallet.add(weekly);
+    this.wallet.add(weekly, 'weekly');
     this.ui.showNotice(`weekly league reward +${formatScore(weekly)} credits`);
   }
 

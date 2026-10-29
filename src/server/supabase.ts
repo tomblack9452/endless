@@ -1,4 +1,5 @@
 import { storage } from '../core/storage';
+import { analytics } from '../platform/analytics';
 import { reportError } from '../platform/errors';
 import type { ShipLook } from '../ship/portrait';
 import type {
@@ -112,7 +113,9 @@ export class SupabaseBackend implements Backend {
         // server has turned down for good starts a new account (the old one can't be reached again).
         if (!r.refused) return false;
       }
-      return (await this.auth('signup', { data: {} })) !== null;
+      const made = (await this.auth('signup', { data: {} })) !== null;
+      if (made) analytics.log('sign_up', { method: 'anonymous' });
+      return made;
     } catch {
       return false;
     }

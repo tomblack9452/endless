@@ -64,6 +64,8 @@ export class GoalScreens {
       state: claimed ? 'claimed' : ready ? 'claim' : 'open',
     });
     const qs = this.g.daily.quests;
+    const swap = this.g.daily.canReroll(day) && this.g.ads.offers('rerollQuest');
+    if (swap && qs.some((q) => !q.done)) this.g.revives.adShown('rerollQuest');
     this.g.goalsUi.renderDaily({
       calendar: login.map((r, i) => ({
         day: i + 1,
@@ -75,11 +77,7 @@ export class GoalScreens {
       claim: due >= 0 ? { text: `claim day ${step + 1}`, enabled: true } : { text: `next reward in ${formatWait(untilTomorrow(now))}`, enabled: false },
       reset: `new in ${formatWait(untilTomorrow(now))}`,
       rows: [
-        ...taskRows(qs, 'q', Q.passXp).map((r) =>
-          r.state === 'open' && this.g.daily.canReroll(day) && this.g.ads.offers('rerollQuest')
-            ? { ...r, reroll: `swap for another goal · ${this.g.ads.label()}` }
-            : r,
-        ),
+        ...taskRows(qs, 'q', Q.passXp).map((r) => (r.state === 'open' && swap ? { ...r, reroll: `swap for another goal · ${this.g.ads.label()}` } : r)),
         bonusRow('qall', 'claim all three', Q.allDoneCores, this.g.daily.bonusReady, this.g.daily.bonusClaimed, qs),
       ],
     });

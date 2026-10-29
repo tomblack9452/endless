@@ -1,5 +1,6 @@
 /// <reference types="vitest/config" />
 import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import basicSsl from '@vitejs/plugin-basic-ssl';
 import { defineConfig } from 'vite';
 
@@ -11,6 +12,9 @@ const pkg = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 
 export default defineConfig(({ mode }) => ({
   // Relative base so the build works from any path (GitHub Pages, Capacitor webview).
   base: './',
+  resolve: {
+    alias: { 'firebase/analytics': fileURLToPath(new URL('./src/platform/stubs/firebase-analytics.ts', import.meta.url)) },
+  },
   plugins: mode === 'https' ? [basicSsl()] : [],
   server: {
     host: true,

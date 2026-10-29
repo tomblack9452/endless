@@ -75,7 +75,7 @@ export class CourseRuns {
     this.g.fillSummary(false);
     const extra = this.g.finishRun(null);
     this.g.connection.offerShare(this.g.score > before);
-    this.g.wallet.add(starCredits);
+    this.g.wallet.add(starCredits, 'stars');
     const starText = [1, 2, 4].map((b) => (stars & b ? '★' : '☆')).join('');
     const lines = [`${starText}  ${formatTime(time)}${res.bestTime ? ' (best)' : ` · best ${formatTime(best.time)}`}`];
     if (starCredits > 0) lines.push(`+${starCredits} credits for new stars`);

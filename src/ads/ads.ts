@@ -31,11 +31,14 @@ export interface AdNetwork {
   privacyChoices(): Promise<void>;
   /** Google's consent rules ask for a way back to the form where the player is (the EU and UK). */
   readonly privacyRequired: boolean;
+  /** The player agreed on the consent form, or wasn't asked because the law where they are doesn't need it. */
+  readonly consented: boolean;
 }
 
 class NoAds implements AdNetwork {
   readonly available = false;
   readonly privacyRequired = false;
+  readonly consented = false;
   async start(): Promise<void> {}
   async loadRewarded(): Promise<boolean> {
     return false;
@@ -53,6 +56,7 @@ class AdMobAds implements AdNetwork {
   readonly available = true;
   private m: AdMobModule | null = null;
   private npa = true; // non-personalised until consent says otherwise
+  private tracking = false;
   privacyRequired = false;
 
   constructor(private readonly ids: { rewarded: string; interstitial: string }) {}
@@ -65,11 +69,11 @@ class AdMobAds implements AdNetwork {
       // Apple's tracking prompt (iOS only; resolves at once elsewhere).
       const tracking = await AdMob.trackingAuthorizationStatus();
       if (tracking.status === 'notDetermined') await AdMob.requestTrackingAuthorization();
-      const allowed = (await AdMob.trackingAuthorizationStatus()).status === 'authorized' || Capacitor.getPlatform() !== 'ios';
+      this.tracking = (await AdMob.trackingAuthorizationStatus()).status === 'authorized' || Capacitor.getPlatform() !== 'ios';
       // Google's consent form, where the law asks for it.
       let consent = await AdMob.requestConsentInfo();
       if (consent.isConsentFormAvailable && consent.status === AdmobConsentStatus.REQUIRED) consent = await AdMob.showConsentForm();
-      this.npa = !(allowed && (consent.status === AdmobConsentStatus.OBTAINED || consent.status === AdmobConsentStatus.NOT_REQUIRED));
+      this.npa = !(this.tracking && (consent.status === AdmobConsentStatus.OBTAINED || consent.status === AdmobConsentStatus.NOT_REQUIRED));
       this.privacyRequired = String(consent.privacyOptionsRequirementStatus) === 'REQUIRED';
     } catch (e) {
       reportError('ads start', e);
@@ -141,9 +145,17 @@ class AdMobAds implements AdNetwork {
     }
   }
 
+  get consented(): boolean {
+    return this.m !== null && !this.npa;
+  }
+
   async privacyChoices(): Promise<void> {
+    if (!this.m) return;
+    const { AdMob, AdmobConsentStatus } = this.m;
     try {
-      await this.m?.AdMob.showPrivacyOptionsForm();
+      await AdMob.showPrivacyOptionsForm();
+      const consent = await AdMob.requestConsentInfo();
+      this.npa = !(this.tracking && (consent.status === AdmobConsentStatus.OBTAINED || consent.status === AdmobConsentStatus.NOT_REQUIRED));
     } catch {
       // Not needed where the player is.
     }
@@ -314,6 +326,11 @@ export class Ads {
 
   get hasNetwork(): boolean {
     return this.network.available;
+  }
+
+  /** What the consent form said (usage stats follow it too). */
+  get consented(): boolean {
+    return this.network.consented;
   }
 
   /** Settings shows "ad privacy choices" when this is true. */

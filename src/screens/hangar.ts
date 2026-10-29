@@ -80,7 +80,7 @@ export class HangarScreens {
     }
     const u = item.unlock;
     if (u.by === 'credits') {
-      if (!this.g.wallet.spend(u.cost)) return;
+      if (!this.g.wallet.spend(u.cost, 'look')) return;
     } else if (u.by === 'cores' || u.by === 'vault') {
       if (this.g.wallet.cores < u.cost || (u.by === 'vault' && keyOf(item) !== keyOf(vaultAt(this.g.now()).item))) return;
       this.g.shop.confirmCores(u.cost, item.name, () => {
@@ -99,9 +99,9 @@ export class HangarScreens {
   onBuyUpgrade = (id: string): void => {
     const sys = id as SystemId;
     const check = this.g.upgrades.check(sys, this.g.wallet.credits, this.g.leagues.league);
-    if (!check.ok || !this.g.wallet.spend(check.cost)) return;
+    if (!check.ok || !this.g.wallet.spend(check.cost, `upgrade ${sys}`)) return;
     this.g.upgrades.raise(sys);
-    this.g.wallet.add(this.g.ranks.promoteLeague(null)); // buying the last points may complete a promotion
+    this.g.wallet.add(this.g.ranks.promoteLeague(null), 'promotion'); // buying the last points may complete a promotion
     this.g.sound.pickup();
     this.g.haptics.pickup();
     this.g.title.refreshTitle();

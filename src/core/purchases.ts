@@ -1,3 +1,4 @@
+import { analytics } from '../platform/analytics';
 import { CONFIG } from './config';
 import { entitlementFor } from '../store/entitlements';
 import { passBought, passRefunded } from '../economy/pass';
@@ -24,7 +25,9 @@ export class Purchases {
         return;
       }
     }
+    analytics.log('begin_checkout', { item_id: id });
     const result = await this.g.store.buy(id);
+    if (result !== 'failed') analytics.log(result === 'cancelled' ? 'purchase_cancelled' : 'purchase', { item_id: id });
     if (result === 'cancelled') return;
     if (result === 'failed') {
       this.g.ui.showNotice("purchase didn't go through. nothing was charged");

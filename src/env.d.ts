@@ -8,6 +8,8 @@ interface ImportMetaEnv {
   readonly VITE_REVENUECAT_APPLE_KEY?: string;
   readonly VITE_REVENUECAT_GOOGLE_KEY?: string;
   readonly VITE_GOOGLE_WEB_CLIENT_ID?: string;
+  /** "1" in a build with Firebase set up (google-services.json in android/app): see docs/analytics.md. */
+  readonly VITE_ANALYTICS?: string;
 }
 
 interface ImportMeta {

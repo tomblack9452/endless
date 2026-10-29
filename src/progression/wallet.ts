@@ -1,3 +1,4 @@
+import { analytics, type Currency } from '../platform/analytics';
 import type { Backend } from '../server/backend';
 import { storage } from '../core/storage';
 
@@ -32,6 +33,13 @@ function spendId(): string {
   const c = globalThis.crypto as Crypto | undefined;
   if (c?.randomUUID) return c.randomUUID();
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}-${Math.random().toString(36).slice(2, 12)}`;
+}
+
+/** A wallet change, for usage stats. Reasons can carry a day or a season after a colon: only the kind is sent. */
+function stat(event: 'earn_virtual_currency' | 'spend_virtual_currency', currency: Currency, value: number, what: string): void {
+  const kind = what.split(':')[0];
+  if (event === 'earn_virtual_currency') analytics.log(event, { virtual_currency_name: currency, value, source: kind });
+  else analytics.log(event, { virtual_currency_name: currency, value, item_name: kind });
 }
 
 export class Wallet {
@@ -84,8 +92,10 @@ export class Wallet {
     this.syncTimer = setTimeout(() => void this.syncCredits(), 3000) as unknown as number;
   }
 
-  add(n: number): void {
+  /** `what` paid it, for usage stats ("run", "goal", ...). */
+  add(n: number, what = 'reward'): void {
     if (n <= 0) return;
+    stat('earn_virtual_currency', 'credits', n, what);
     this.credits += n;
     this.earned += n;
     this.save();
@@ -93,8 +103,9 @@ export class Wallet {
   }
 
   /** Spend `n` if there's enough; returns whether it went through. */
-  spend(n: number): boolean {
+  spend(n: number, what = 'spend'): boolean {
     if (n > this.credits) return false;
+    stat('spend_virtual_currency', 'credits', n, what);
     this.credits -= n;
     this.save();
     this.queueSync();
@@ -103,6 +114,7 @@ export class Wallet {
 
   addCores(n: number, reason = 'reward'): void {
     if (n <= 0) return;
+    stat('earn_virtual_currency', 'cores', n, reason);
     this.cores += n;
     this.coresEarned += n;
     this.save();
@@ -112,6 +124,7 @@ export class Wallet {
 
   spendCores(n: number, reason = 'spend'): boolean {
     if (n > this.cores) return false;
+    stat('spend_virtual_currency', 'cores', n, reason);
     this.cores -= n;
     this.save();
     // The server has the last word: if it refuses, take its balance.

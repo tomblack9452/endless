@@ -266,6 +266,8 @@ match what the app and its libraries actually do; Google checks.
 | Device or other IDs | Yes | **Yes** (AdMob) | No | Required | Advertising or marketing |
 | Location > **Approximate location** | Yes | Yes (AdMob, from the IP address) | No | Required | Advertising or marketing |
 | App info and performance > **Crash logs**, **Diagnostics** | Yes | Yes (AdMob only) | No | Required | App functionality, Analytics (the game's own error reports); Advertising or marketing (AdMob) |
+| App activity > **App interactions** (usage stats, 1.0.13) | Yes | No | No | **Optional** (consent form and settings > share usage stats) | Analytics |
+| Device or other IDs (Firebase's app instance id, 1.0.13) | Yes | No | No | Optional | Analytics |
 
 Notes:
 - The pilot name, ship and service record summary (rank, XP, runs, time
@@ -281,6 +283,19 @@ Notes:
   beyond the account id; if the form asks whether the data is linked to the
   user, the account id makes it **yes**. Reports about other pilots (from the
   boards) are app interactions, already ticked.
+- Since 1.0.13, in a build made with Firebase (docs/analytics.md), usage
+  stats go to Google Analytics for Firebase: screens, runs, the tutorial, ad
+  offers, store views and purchases, credits and cores. They're tied to
+  Firebase's app instance id only, with the advertising id switched off
+  (`google_analytics_adid_collection_enabled` false in the manifest), and sent
+  only with consent and the setting on, so they're **optional**. Firebase
+  Analytics works for you under Google's data processing terms (turn off
+  "data sharing with Google" for benchmarking and the rest in Firebase's
+  project settings), so it's **not shared**. App interactions is already
+  ticked as required for the leaderboards: add **Analytics** to its purposes
+  rather than ticking it twice, if the form only allows one row. If you later
+  link Firebase to Google Ads (docs/analytics.md), Google uses the events for
+  advertising: then tick **Shared** and **Advertising or marketing** too.
 - "Shared" means sent to a **third party for its own use**. Supabase and
   RevenueCat work for you (service providers), so what goes to them isn't
   "shared". AdMob uses data for Google's advertising, so it is.

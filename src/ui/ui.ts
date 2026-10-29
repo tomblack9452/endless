@@ -1,3 +1,4 @@
+import { analytics } from '../platform/analytics';
 import { CONFIG } from '../core/config';
 import { label, levelOf, type SettingKey, type Settings } from '../core/settings';
 import { SHOW_MS as HINT_MS } from './hints';
@@ -221,6 +222,7 @@ export class UI {
     }
     // Every screen but the title is a menu panel: the HUD hides behind it.
     document.getElementById('ui')?.classList.toggle('menu-open', screen !== null && screen !== 'title');
+    if (screen && screen !== this.screen) analytics.screen(screen);
     this.screen = screen;
     this.bars.sync(screen, this.dark, this.textColor);
   }
@@ -1166,9 +1168,10 @@ export class UI {
   }
 
   /** Settings that only mean something in the Android app ("ask before closing"). */
-  setNative(native: boolean, reminders = native): void {
+  setNative(native: boolean, reminders = native, usageStats = false): void {
     $('confirm-exit-row').hidden = !native;
     $('reminder-group').hidden = !reminders;
+    $('usage-group').hidden = !usageStats;
   }
 
   /** A celebration card is up (or waiting): offers wait until it's gone. */

@@ -31,6 +31,7 @@ export interface Settings {
   reminderTime: number; // REMINDER_TIMES: when, on the phone's own clock
   crashMoment: boolean; // a second of slow motion on what you hit, before the game-over screen (not ranked)
   rivalGhost: boolean; // ranked: also race the ghost of the pilot just above you (off until turned on)
+  usageStats: boolean; // usage stats to Firebase, when the consent form allows it too (docs/analytics.md)
 }
 
 export type SettingKey = keyof Settings;
@@ -102,6 +103,7 @@ export const DEFAULT_SETTINGS: Settings = {
   reminderTime: 3,
   crashMoment: true,
   rivalGhost: false,
+  usageStats: true,
 };
 
 const KEY = 'endless.settings';

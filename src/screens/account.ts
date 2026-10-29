@@ -1,3 +1,4 @@
+import { analytics } from '../platform/analytics';
 import { reportError } from '../platform/errors';
 import { storage } from '../core/storage';
 import { SESSION_KEY } from '../server/supabase';
@@ -114,6 +115,7 @@ export class AccountScreens {
       }
       const res = await this.g.backend.linkGoogle(token.idToken, token.nonce);
       if (res === 'linked') {
+        analytics.log('sign_up', { method: 'google' });
         this.g.ui.showNotice('signed in. your account is kept with google now');
         this.g.cloud.push();
         this.refreshAccount();
@@ -149,6 +151,7 @@ export class AccountScreens {
         this.refreshAccount(); // it was this account all along
         return;
       }
+      analytics.log('login', { method: 'google' });
       // Start again as that account: forget this phone's save (keeping the new
       // session), and the cloud save comes down on the reload.
       const session = await storage.get(SESSION_KEY);

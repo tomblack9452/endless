@@ -69,6 +69,7 @@ describe('entitlements', () => {
 
 class FakeNetwork implements AdNetwork {
   privacyRequired = false;
+  consented = false;
   shown = 0;
   loads = 0;
   interstitials = 0;

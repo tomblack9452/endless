@@ -30,6 +30,10 @@
         <meta-data
             android:name="com.google.android.gms.ads.APPLICATION_ID"
             android:value="ca-app-pub-4447582079973716~3555140115" />
+        <!-- Usage stats stay off until the game turns them on (consent and the setting): docs/analytics.md -->
+        <meta-data android:name="firebase_analytics_collection_enabled" android:value="false" />
+        <meta-data android:name="google_analytics_adid_collection_enabled" android:value="false" />
+        <meta-data android:name="google_analytics_default_allow_ad_personalization_signals" android:value="false" />
 
         <provider
             android:name="androidx.core.content.FileProvider"

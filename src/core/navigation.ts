@@ -1,4 +1,5 @@
 import { CONFIG } from './config';
+import { analytics } from '../platform/analytics';
 import { exitChoice } from '../platform/exit';
 import { sendFeedback } from '../platform/feedback';
 import { cancelOpenReport } from '../ui/report';
@@ -38,7 +39,7 @@ export class Navigation {
       this.g.shopPick = -1;
       this.g.preview = null;
       this.g.shop.openShop();
-    } else if (name === 'shop-cores') this.g.shop.openStore(null);
+    } else if (name === 'shop-cores') this.g.shop.openStore(null, 'wallet');
     else if (name === 'pass') this.g.shop.openPass(null);
     else if (name === 'boards') this.g.boards.openBoards();
     else if (name === 'daily') this.g.goals.openGoals('daily');
@@ -122,7 +123,7 @@ export class Navigation {
     else if (action === 'delete') void this.g.account.deleteAccount();
     else if (action === 'google') void this.g.account.keepWithGoogle(false);
     else if (action === 'google-welcome') void this.g.account.keepWithGoogle(true);
-    else if (action === 'privacy-choices') void this.g.ads.privacyChoices();
+    else if (action === 'privacy-choices') void this.g.ads.privacyChoices().then(() => analytics.setConsent(this.g.ads.consented));
     else if (action === 'feedback') void sendFeedback(this.g.settingsScreen.feedbackScreen());
     else if (action === 'name-later' && this.g.infoOpen === 'name') this.closeInfo();
     else if (action === 'tips') {
@@ -196,9 +197,9 @@ export class Navigation {
   /** Abandon the run and go back to the live title scene. Best score still counts. */
   toMainMenu(): void {
     this.g.ui.showQuickRetry(null);
-    if (this.g.state === 'paused' && !this.g.recorded) {
+    if (this.g.state === 'paused') {
       // Abandoned mid-run: it still counts, for its best and the stats.
-      this.g.recordBest(false);
+      if (!this.g.recorded) this.g.recordBest(false);
       this.g.finishRun(null);
     }
     // Left with a revive still on offer: the run ends as it stood, rather than not at all.

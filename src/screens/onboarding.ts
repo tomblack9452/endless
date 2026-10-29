@@ -15,6 +15,7 @@ import {
   TRIAL_SECONDS,
 } from '../ui/onboarding';
 import { itemCard, powerItem } from '../ui/guide';
+import { analytics } from '../platform/analytics';
 import type { Mark } from '../ui/tutorialView';
 import { Vector3 } from 'three';
 import { googleAvailable } from '../platform/account';
@@ -264,6 +265,7 @@ export class FirstLaunch {
     const p = this.g.practice!;
     // The walkthrough needn't say any of it again (a lesson only timed out still showed what it's about).
     this.g.hints.learned(LESSONS);
+    analytics.log('tutorial_complete', { controls: p.control });
     this.g.feelUsed = p.control;
     this.endPractice();
     this.g.onboarding.go('finished');
@@ -317,6 +319,7 @@ export class FirstLaunch {
   /** Done (or skipped): keep the hull chosen, and on to the front page. */
   finishOnboarding(): void {
     if (this.g.practice) {
+      if (this.g.practice.kind !== 'trial') analytics.log('tutorial_skip', { step: `lesson ${this.g.practice.lesson + 1}` });
       // Skipped part way: the tips still cover what the practice run didn't get to.
       this.g.hints.learned(this.g.practice.learned);
       this.endPractice();

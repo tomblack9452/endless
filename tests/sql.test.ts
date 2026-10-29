@@ -26,10 +26,10 @@ const SUPABASE_STANDIN = `
   create role authenticated nologin;
   create role service_role nologin;
   create schema auth;
-  create table auth.users (id uuid primary key default gen_random_uuid());
+  create table auth.users (id uuid primary key default gen_random_uuid(), is_anonymous boolean not null default true, created_at timestamptz not null default now());
   create function auth.uid() returns uuid language sql stable
     as $$ select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $$;
-  grant usage on schema public, auth to anon, authenticated;
+  grant usage on schema public, auth to anon, authenticated, service_role;
   alter default privileges in schema public grant all on tables to anon, authenticated;
   alter default privileges in schema public grant all on functions to anon, authenticated;
 `;
@@ -732,6 +732,27 @@ describe('cores', () => {
   it("can't be spent by someone signed out", async () => {
     await as(null);
     await rejects(db.query("select public.spend_cores_once(5, 'look', 'id')"), /permission denied/);
+  });
+
+  it('counts accounts for the service role only (0025)', async () => {
+    const a = await newUser();
+    await newUser();
+    await db.query('update auth.users set is_anonymous = false where id = $1', [a]);
+    await db.query("update auth.users set created_at = now() - interval '60 days' where id = $1", [a]);
+    await db.exec('set role service_role');
+    const c = (await db.query<{ accounts: string; anonymous: string; google: string; new_30d: string }>('select * from public.account_counts()')).rows[0];
+    await admin();
+    const all = Number((await db.query<{ n: string }>('select count(*) as n from auth.users')).rows[0].n);
+    const old = Number((await db.query<{ n: string }>("select count(*) as n from auth.users where created_at <= now() - interval '30 days'")).rows[0].n);
+    expect(Number(c.accounts)).toBe(all);
+    expect(Number(c.anonymous) + Number(c.google)).toBe(all);
+    expect(Number(c.google)).toBeGreaterThanOrEqual(1);
+    expect(Number(c.new_30d)).toBe(all - old);
+    for (const who of [a, null]) {
+      await as(who);
+      await rejects(db.query('select * from public.account_counts()'), /permission denied/);
+    }
+    await admin();
   });
 });
 

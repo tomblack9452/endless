@@ -1,3 +1,4 @@
+import { analytics } from '../platform/analytics';
 import { CONFIG } from '../core/config';
 import { premiumReward, freeReward, seasonAt } from '../economy/pass';
 import { rewardText } from '../economy/reward';
@@ -223,7 +224,7 @@ export class ShopScreens {
 
   onShopTab = (id: string): void => {
     if (id === 'store' || id === 'store-cores') {
-      this.openStore('shop');
+      this.openStore('shop', 'shop');
       // Buy cores: straight to the packs, past the pass.
       if (id === 'store-cores') requestAnimationFrame(() => document.getElementById('store-packs-head')?.scrollIntoView({ block: 'start' }));
       return;
@@ -233,9 +234,13 @@ export class ShopScreens {
   };
 
   /** The store: the season pass first, then cores, the starter pack and premium, swaps, and restore. */
-  openStore(from?: 'shop' | null, source: StoreSource = 'dock'): void {
+  /** `source` says what opened it (for usage stats); left out, it's the open store redrawn. */
+  openStore(from?: 'shop' | null, source?: StoreSource): void {
     if (from !== undefined) this.g.storeFrom = from;
-    this.source = source;
+    if (source) {
+      this.source = source;
+      analytics.log('view_store', { source });
+    }
     const now = this.g.now();
     this.g.pass.turn(now);
     const P = CONFIG.economy.pass;
@@ -439,7 +444,7 @@ export class ShopScreens {
       const f = this.g.dailyShop.offers(dayKey(now), owned)[this.g.shopPick];
       if (!f || owned(keyOf(f.item))) return;
       const buy = (): void => {
-        const paid = f.currency === 'cores' ? this.g.wallet.spendCores(f.price) : this.g.wallet.spend(f.price);
+        const paid = f.currency === 'cores' ? this.g.wallet.spendCores(f.price) : this.g.wallet.spend(f.price, 'look');
         if (!paid) return;
         this.g.looks.buy(f.item);
         this.afterBuy([f.item], `${f.item.name} bought and on your ship`);
@@ -501,7 +506,10 @@ export class ShopScreens {
 
   /** The season pass's tiers. `from: 'store'` makes Back return to the store. */
   openPass(from?: 'store' | null): void {
-    if (from !== undefined) this.g.passFrom = from;
+    if (from !== undefined) {
+      this.g.passFrom = from;
+      analytics.log('view_item', { item_id: 'season_pass', source: from ?? 'dock' });
+    }
     const now = this.g.now();
     this.g.pass.turn(now);
     const P = CONFIG.economy.pass;

@@ -1,3 +1,4 @@
+import { analytics } from '../platform/analytics';
 import { errorLog } from '../platform/errors';
 import { migrateTickets } from '../progression/legacy';
 import { entitlementFor } from '../store/entitlements';
@@ -44,6 +45,7 @@ export class Connection {
     void this.g.ads.start().then(() => {
       const row = document.getElementById('privacy-choices');
       if (row) row.hidden = !this.g.ads.privacyRequired; // Google asks for a way back to the consent form here
+      void analytics.setConsent(this.g.ads.consented);
     });
     this.g.storeProducts = await this.g.store.products();
     if (this.g.infoOpen === 'store') this.g.shop.openStore();

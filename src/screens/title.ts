@@ -132,7 +132,10 @@ export class TitleScreen {
     const day = dayKey(now);
     const due = this.g.daily.loginDue(day);
     if (due >= 0) cards.push({ id: 'claim', kicker: 'daily reward', title: `day ${due + 1} ready to claim`, hot: true });
-    if (this.g.daily.giftReady(day) && this.g.ads.offers('dailyGift')) cards.push({ id: 'gift', kicker: 'free gift', title: this.g.ads.label(), hot: true });
+    if (this.g.daily.giftReady(day) && this.g.ads.offers('dailyGift')) {
+      cards.push({ id: 'gift', kicker: 'free gift', title: this.g.ads.label(), hot: true });
+      this.g.revives.adShown('dailyGift');
+    }
     if (this.open('daily')) {
       // Today's challenge: your best (or a new course), the time left, the streak in the kicker.
       const best = this.g.challenge.bestOn(this.g.today.day);

@@ -1,13 +1,33 @@
 import { CONFIG } from './config';
 import type { RewardedPlacement } from '../ads/ads';
 import { questText } from '../economy/daily';
+import { type AdPlacement, analytics } from '../platform/analytics';
 import { dayKey } from '../economy/time';
 import { formatScore } from '../ui/ui';
 import type { Game } from './game';
 import GIFT_ICON from '../assets/icons/gift.svg?raw';
 
+const PLACEMENT: Record<RewardedPlacement, AdPlacement> = {
+  revive: 'revive',
+  doubleCredits: 'double_credits',
+  dailyGift: 'daily_gift',
+  rerollQuest: 'goal_swap',
+};
+
 export class Revives {
+  private shownOnce = new Set<RewardedPlacement>();
+
   constructor(private readonly g: Game) {}
+
+  /** An ad offer is on screen. The gift and goal swap sit there for a while, so they count once a session. */
+  adShown(p: RewardedPlacement): void {
+    if (!this.g.ads.showsAds) return;
+    if (p === 'dailyGift' || p === 'rerollQuest') {
+      if (this.shownOnce.has(p)) return;
+      this.shownOnce.add(p);
+    }
+    analytics.log('ad_offer_shown', { placement: PLACEMENT[p] });
+  }
 
   /** A revive is offered once a run, outside ranked, where the lane is known. */
   canRevive(): boolean {
@@ -21,6 +41,7 @@ export class Revives {
     const byAd = !free && this.g.ads.offers('revive');
     const cost = CONFIG.economy.revive.coreCost;
     const cores = `revive · ${cost} cores`;
+    if (byAd) this.adShown('revive');
     const byCores = (): void => {
       if (!this.g.wallet.spendCores(cost)) return this.g.settleCrash();
       this.revive();
@@ -62,8 +83,11 @@ export class Revives {
    * no ad loaded in time, or closed early. The offer is the caller's to keep.
    */
   private async watchAd(p: RewardedPlacement): Promise<boolean> {
-    if (this.g.ads.showsAds && !this.g.ads.adReady) this.g.ui.showNotice('loading an ad…');
+    const real = this.g.ads.showsAds;
+    if (real && !this.g.ads.adReady) this.g.ui.showNotice('loading an ad…');
+    if (real) analytics.log('ad_offer_tapped', { placement: PLACEMENT[p] });
     const r = await this.g.ads.watch(p);
+    if (real && r !== 'busy') analytics.log(r === 'rewarded' ? 'ad_rewarded' : r === 'skipped' ? 'ad_skipped' : 'ad_unavailable', { placement: PLACEMENT[p] });
     if (r === 'unavailable') this.g.ui.showNotice('no ad available right now. try again in a moment');
     else if (r === 'skipped') this.g.ui.showNotice('ad closed early, so no reward. try again any time');
     return r === 'rewarded';

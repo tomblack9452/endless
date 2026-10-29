@@ -1,6 +1,7 @@
 import { CONFIG } from '../core/config';
 import { cycle, LEVEL_GAIN, saveSettings, type SettingKey, STEERING_RANGE, TEXT_SCALE, TILT_GAIN } from '../core/settings';
 import { SAFE, setSafeColours } from '../world/itemColours';
+import { analytics } from '../platform/analytics';
 import { remindersAvailable } from '../platform/reminders';
 import { latestNotes, SEEN_KEY, whatsNewOnLaunch } from '../ui/whatsNew';
 import { storage } from '../core/storage';
@@ -45,6 +46,7 @@ export class SettingsScreen {
     for (const p of [this.g.basePalette, this.g.palette]) p.pickup.set(s.colourBlind ? SAFE.pickup : CONFIG.boost.pickup.color);
     this.g.applyLook(this.g.distanceScore / CONFIG.score.levelLength);
     this.g.ui.setDark(s.dark);
+    void analytics.setSetting(s.usageStats);
     this.g.title.refreshTitle(); // the rank colour has a light and a dark version
     this.g.ui.renderSettings(s);
   }
@@ -90,7 +92,7 @@ export class SettingsScreen {
 
   openSettings(): void {
     this.g.settingsOpen = true;
-    this.g.ui.setNative(this.g.native, remindersAvailable());
+    this.g.ui.setNative(this.g.native, remindersAvailable(), analytics.available);
     this.g.ui.show('settings');
     this.g.account.refreshAccount();
     void this.g.backend
