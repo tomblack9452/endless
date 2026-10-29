@@ -63,7 +63,7 @@ export class Purchases {
     if (this.g.infoOpen === 'shop') this.g.shop.openShop();
     else if (this.g.infoOpen === 'store') this.g.shop.openStore();
     else if (this.g.infoOpen === 'pass') this.g.shop.openPass();
-    else if (this.g.infoOpen === 'hangar') this.g.renderHangar(true);
+    else if (this.g.infoOpen === 'hangar') this.g.hangarScreen.renderHangar(true);
   }
 
   /** True if a one-time product is owned (premium, the starter pack). */

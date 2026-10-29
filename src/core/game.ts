@@ -75,7 +75,7 @@ import { Weekly } from '../economy/weekly';
 import { type GoalsTab, GoalsScreen } from '../ui/goalsView';
 import { Pass, runXp } from '../economy/pass';
 import { type Reward, rewardLook, rewardParts, rewardText } from '../economy/reward';
-import { DailyShop, vaultAt } from '../economy/shop';
+import { DailyShop } from '../economy/shop';
 import { dayKey, formatWait, untilTomorrow } from '../economy/time';
 import { EconomyView } from '../economy/view';
 import { type BoardId, createBackend, type PilotStats, type RunSubmission } from '../server/backend';
@@ -93,13 +93,12 @@ import { Challenge, streakReward } from '../progression/challenge';
 import { envStatus, nextEnvironment, newlyOpened } from '../progression/unlocks';
 import { emblem, LEAGUES, leagueName, leaguePar, Leagues, LP_PER_DIVISION, weekKey } from '../progression/leagues';
 import { ACHIEVEMENTS, type Snapshot, achievement, progressOn } from '../progression/achievements';
-import { refreshSeasonLooks, SETS, VAULT_ORDER } from '../ship/catalogue';
+import { refreshSeasonLooks, SETS } from '../ship/catalogue';
 import { GoalLog } from '../progression/goals';
-import { buildHangar, type HangarState, monthsUntilVault } from '../ship/hangar';
-import { type HangarTab, HangarScreen } from '../ui/hangarView';
+import { HangarScreen } from '../ui/hangarView';
 import { byKey, find, keyOf, LOOKS, Looks, type LookItem, type Owner, type ShipId, type Slot, type TrailId, SLOT_NAMES } from '../ship/looks';
 import type { Fin, Marking } from '../ship/looks';
-import { MAX_TIER, type ShipStats, STANDARD, SYSTEMS, type SystemId, TIER_COST, TIER_LEAGUE, Upgrades } from '../ship/upgrades';
+import { MAX_TIER, type ShipStats, STANDARD, SYSTEMS, type SystemId, TIER_LEAGUE, Upgrades } from '../ship/upgrades';
 import { newSeed } from './rng';
 import { loadNumber } from './storage';
 import { type Celebration, formatScore, type ProgressView, type RankResultView, type TitleCard, UI } from '../ui/ui';
@@ -112,6 +111,7 @@ import { ShopScreens } from '../screens/shop';
 import { Purchases } from './purchases';
 import { BoardScreens } from '../screens/boards';
 import { GoalScreens } from '../screens/goals';
+import { HangarScreens } from '../screens/hangar';
 
 type State = 'title' | 'playing' | 'paused' | 'countdown' | 'crashed' | 'finished';
 
@@ -336,10 +336,8 @@ export class Game {
   private beatPar = false;
   /** Credits the last run paid (for doubling with a rewarded ad). */
   private lastRunCredits = 0;
-  private readonly hangarUi = new HangarScreen();
-  private hangar: HangarState = { slot: 'hull', pick: null };
-  private hangarUpgrades = false; // the upgrades chip is open, not a slot of looks
-  private hangarFrom: 'shop' | null = null; // where Back goes
+  readonly hangarUi = new HangarScreen();
+  hangarFrom: 'shop' | null = null; // where Back goes
   // Ranked: the ship's sideways position every PATH_STEP units (the leaderboard check, and later the ghost).
   private path: number[] = [];
   private pathTimes: number[] = [];
@@ -448,6 +446,8 @@ export class Game {
   readonly boards = new BoardScreens(this);
 
   readonly goals = new GoalScreens(this);
+
+  readonly hangarScreen = new HangarScreens(this);
 
   constructor(canvas: HTMLCanvasElement) {
     this.basePalette.set(BASE_PALETTE);
@@ -588,10 +588,10 @@ export class Game {
     this.bindShowroomDrag();
     this.econ.bindStore(this.shop.onStoreAct);
     this.hangarUi.bindHangar({
-      tab: (tab) => this.onHangarTab(tab),
-      pick: (id) => this.onHangarPick(id),
-      action: () => this.onHangarAction(),
-      open: () => this.openHangar({ from: 'shop' }),
+      tab: (tab) => this.hangarScreen.onHangarTab(tab),
+      pick: (id) => this.hangarScreen.onHangarPick(id),
+      action: () => this.hangarScreen.onHangarAction(),
+      open: () => this.hangarScreen.openHangar({ from: 'shop' }),
     });
     this.econ.bindPass(this.shop.onPassPremium, () => void this.purchases.buyProduct('season_pass'));
     this.goalsUi.bind({
@@ -609,10 +609,10 @@ export class Game {
       (i) => this.startCourse(i),
       (i) => this.startSolo(i),
     );
-    this.ui.bindUpgrades(this.onBuyUpgrade, (id) => {
+    this.ui.bindUpgrades(this.hangarScreen.onBuyUpgrade, (id) => {
       this.upgrades.toggle(id as SystemId);
       this.haptics.pickup();
-      this.renderHangar(true);
+      this.hangarScreen.renderHangar(true);
     });
     void looksReady.then(() => this.applyLooks());
     void loadSettings().then((s) => {
@@ -1134,7 +1134,7 @@ export class Game {
     this.refreshBar(now);
     // The season looks by the trusted clock (start-up had only the phone's); owned or worn ones stay.
     const keep = (l: LookItem) => this.looks.has(keyOf(l)) || this.looks.equipped[l.slot] === l.id;
-    if (refreshSeasonLooks(now, keep) && this.infoOpen === 'hangar') this.renderHangar(true);
+    if (refreshSeasonLooks(now, keep) && this.infoOpen === 'hangar') this.hangarScreen.renderHangar(true);
   }
 
   /** The week by the trusted clock: this week's ranked run, and last week's league reward paid. Not mid-run. */
@@ -1345,7 +1345,7 @@ export class Game {
   }
 
   /** Promote to the next league if ready and enough upgrade points are owned. Returns credits. */
-  private promoteLeague(lines: string[] | null, party: Celebration[] = []): number {
+  promoteLeague(lines: string[] | null, party: Celebration[] = []): number {
     const lg = this.leagues;
     this.payLeagueWeek(this.now());
     const credits = lg.tryPromote(this.upgrades.points(), this.now());
@@ -1761,88 +1761,6 @@ export class Game {
 
   // --- the hangar: looks by slot, and the ship's upgrades ---------------------------------------
 
-  /** Open the hangar on a slot of looks (or on the upgrades). `from: 'shop'` makes Back return to the shop. */
-  private openHangar(opts: { slot?: Slot; upgrades?: boolean; from?: 'shop' } = {}): void {
-    this.hangar = { slot: opts.slot ?? this.hangar.slot, pick: null };
-    this.hangarUpgrades = opts.upgrades ?? false;
-    this.hangarFrom = opts.from ?? null;
-    this.preview = null;
-    this.applyLooks();
-    this.renderHangar(false);
-    // Show the ship (and its engine) over the title scene while choosing.
-    this.player.reset();
-    this.player.setVisible(true);
-    this.trail.setVisible(true);
-    this.openInfo('hangar');
-  }
-
-  renderHangar(keepScroll: boolean): void {
-    const now = new Date(this.now());
-    const v = vaultAt(now.getTime());
-    const month = now.getUTCFullYear() * 12 + now.getUTCMonth();
-    const view = buildHangar(this.hangar, {
-      looks: this.looks,
-      owner: this.owner(),
-      credits: this.wallet.credits,
-      cores: this.wallet.cores,
-      vault: { key: keyOf(v.item), monthsUntil: (key) => monthsUntilVault(key, VAULT_ORDER, month) },
-    });
-    this.renderUpgrades();
-    const credits = `${formatScore(this.wallet.credits)} credits`;
-    this.hangarUi.renderHangar(view, keepScroll, {
-      upgrades: this.hangarUpgrades,
-      upgradeTag: `${this.upgrades.points()}/${SYSTEMS.length * MAX_TIER}`,
-      summary: this.hangarUpgrades ? credits : `${view.summary} · ${credits} · ${formatScore(this.wallet.cores)} cores`,
-    });
-  }
-
-  private onHangarTab(tab: HangarTab): void {
-    this.hangarUpgrades = tab === 'upgrades';
-    this.hangar = { slot: tab === 'upgrades' ? this.hangar.slot : tab, pick: null };
-    this.preview = null;
-    this.applyLooks();
-    this.renderHangar(false);
-  }
-
-  /** Tap a look: it goes on the ship to see (owned or not); the button underneath puts it on for good, or buys it. */
-  private onHangarPick(id: string): void {
-    this.hangar.pick = id;
-    this.preview = { [this.hangar.slot]: id };
-    this.haptics.pickup();
-    this.applyLooks();
-    this.renderHangar(true);
-  }
-
-  private onHangarAction(): void {
-    const id = this.hangar.pick;
-    if (!id) return;
-    const item = find(this.hangar.slot, id);
-    if (this.looks.owns(item, this.owner())) {
-      this.looks.equip(item.slot, item.id);
-      this.preview = null;
-      this.sound.pickup();
-      this.applyLooks();
-      this.renderHangar(true);
-      return;
-    }
-    const u = item.unlock;
-    if (u.by === 'credits') {
-      if (!this.wallet.spend(u.cost)) return;
-    } else if (u.by === 'cores' || u.by === 'vault') {
-      if (this.wallet.cores < u.cost || (u.by === 'vault' && keyOf(item) !== keyOf(vaultAt(this.now()).item))) return;
-      this.shop.confirmCores(u.cost, item.name, () => {
-        if (!this.wallet.spendCores(u.cost)) return;
-        this.looks.buy(item);
-        this.shop.afterBuy([item], `${item.name} bought and on your ship`);
-        this.renderHangar(true);
-      });
-      return;
-    } else return;
-    this.looks.buy(item);
-    this.shop.afterBuy([item], `${item.name} bought and on your ship`);
-    this.renderHangar(true);
-  }
-
   // --- goals ---------------------------------------------------------------------------------------
 
   /**
@@ -1886,43 +1804,6 @@ export class Game {
       this.refreshTitle();
       this.haptics.level(false);
     }
-  }
-
-  private onBuyUpgrade = (id: string): void => {
-    const sys = id as SystemId;
-    const check = this.upgrades.check(sys, this.wallet.credits, this.leagues.league);
-    if (!check.ok || !this.wallet.spend(check.cost)) return;
-    this.upgrades.raise(sys);
-    this.wallet.add(this.promoteLeague(null)); // buying the last points may complete a promotion
-    this.sound.pickup();
-    this.haptics.pickup();
-    this.refreshTitle();
-    this.renderHangar(true);
-  };
-
-  private renderUpgrades(): void {
-    const lg = this.leagues.current;
-    const active = this.upgrades.activePoints();
-    this.ui.setUpgradeNote(
-      `${active} of ${this.upgrades.points()} points on · ${lg.name} league cap ${lg.max}${active > lg.max ? ' (over: switch some off for ranked)' : ''}. solo, levels and endless have no cap.`,
-    );
-    this.ui.renderUpgrades(
-      SYSTEMS.map((s) => {
-        const tier = this.upgrades.tier(s.id);
-        const check = this.upgrades.check(s.id, this.wallet.credits, this.leagues.league);
-        const next = Math.min(MAX_TIER, tier + 1);
-        return {
-          id: s.id,
-          name: s.name,
-          effect: tier >= MAX_TIER ? s.effect(tier) : `next: ${s.effect(next)}`,
-          tier,
-          max: MAX_TIER,
-          button: check.ok ? formatScore(TIER_COST[tier]) : check.reason,
-          canBuy: check.ok,
-          on: tier > 0 ? this.upgrades.isOn(s.id) : null,
-        };
-      }),
-    );
   }
 
   openInfo(which: InfoScreen): void {
@@ -1976,7 +1857,7 @@ export class Game {
       // Over the cap: choose which systems to switch off first.
       this.ui.showNotice(`${active} upgrade points on, ${this.leagues.current.name} allows ${cap}. switch some off`);
       if (this.state === 'crashed') this.toMainMenu();
-      this.openHangar({ upgrades: true });
+      this.hangarScreen.openHangar({ upgrades: true });
       return;
     }
     // The week may have turned since the game started.
@@ -2048,7 +1929,7 @@ export class Game {
     else if (name === 'solo') this.openSolo();
     else if (name === 'record') this.openRecord();
     else if (name === 'goals') this.goals.openGoals();
-    else if (name === 'hangar') this.openHangar();
+    else if (name === 'hangar') this.hangarScreen.openHangar();
     else if (name === 'shop') {
       this.shopPick = -1;
       this.preview = null;
