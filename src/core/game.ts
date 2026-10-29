@@ -70,9 +70,9 @@ import { entitlementFor, Entitlements } from '../store/entitlements';
 import { Progress } from '../progression/progress';
 import { creditsFor, insignia, promotionBonus, RANK_COLOURS, rankColour, Ranked, rankName, RANKS, type RunMode, xpToRank } from '../progression/ranks';
 import { Wallet } from '../progression/wallet';
-import { Daily, type Quest, questText } from '../economy/daily';
+import { Daily, questText } from '../economy/daily';
 import { Weekly } from '../economy/weekly';
-import { type GoalsTab, GoalsScreen, type TaskRow } from '../ui/goalsView';
+import { type GoalsTab, GoalsScreen } from '../ui/goalsView';
 import { Pass, runXp } from '../economy/pass';
 import { type Reward, rewardLook, rewardParts, rewardText } from '../economy/reward';
 import { DailyShop, vaultAt } from '../economy/shop';
@@ -92,7 +92,7 @@ import { type Course, COURSES, courseLength, type DailyRun, dailyRun, type Envir
 import { Challenge, streakReward } from '../progression/challenge';
 import { envStatus, nextEnvironment, newlyOpened } from '../progression/unlocks';
 import { emblem, LEAGUES, leagueName, leaguePar, Leagues, LP_PER_DIVISION, weekKey } from '../progression/leagues';
-import { ACHIEVEMENTS, type Achievement, GROUP_NAMES, type Group, type Snapshot, achievement, progressOn, rewardKeys } from '../progression/achievements';
+import { ACHIEVEMENTS, type Snapshot, achievement, progressOn } from '../progression/achievements';
 import { refreshSeasonLooks, SETS, VAULT_ORDER } from '../ship/catalogue';
 import { GoalLog } from '../progression/goals';
 import { buildHangar, type HangarState, monthsUntilVault } from '../ship/hangar';
@@ -111,6 +111,7 @@ import { ShowroomSpin } from '../ship/showroom';
 import { ShopScreens } from '../screens/shop';
 import { Purchases } from './purchases';
 import { BoardScreens } from '../screens/boards';
+import { GoalScreens } from '../screens/goals';
 
 type State = 'title' | 'playing' | 'paused' | 'countdown' | 'crashed' | 'finished';
 
@@ -165,7 +166,7 @@ const MAGNET_DEMO: [number, number][] = [
 export const GIFT_ICON =
   '<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round"><rect x="12" y="26" width="40" height="28" rx="3"/><rect x="8" y="18" width="48" height="10" rx="2"/><path d="M32 18v36"/><path d="M32 18c-4-8-14-10-14-4s10 4 14 4c4 0 14 2 14-4s-10-4-14 4z"/></svg>';
 /** A goal badge: a star in a ring. */
-const GOAL_ICON =
+export const GOAL_ICON =
   '<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round"><circle cx="32" cy="32" r="26"/><path d="M32 14l5.4 11.4 12.1 1.6-8.9 8.4 2.3 12.3L32 41.7l-10.9 6 2.3-12.3-8.9-8.4 12.1-1.6z"/></svg>';
 /** What's new: a four-point sparkle. */
 const NEW_ICON =
@@ -258,9 +259,9 @@ export class Game {
   /** The daily challenge's bests and streak on this device. */
   readonly challenge = new Challenge();
   private scoreBase = 0; // solo starts: score begins at half the skipped points
-  private readonly ranked = new Ranked();
+  readonly ranked = new Ranked();
   readonly wallet = new Wallet();
-  private readonly daily = new Daily();
+  readonly daily = new Daily();
   readonly pass = new Pass();
   readonly econ = new EconomyView();
   readonly backend = createBackend();
@@ -319,7 +320,7 @@ export class Game {
   private passCount = 0;
   /** The reveal stage last announced (null until read from storage). */
   private revealSeen: number | null = null;
-  private readonly ads = new Ads(
+  readonly ads = new Ads(
     createAdNetwork(),
     () => this.entitlements.has('premium'),
     () => this.firstPlayed,
@@ -327,10 +328,10 @@ export class Game {
   /** The shop card tapped (on the ship to try), or -1. */
   shopPick = -1;
   readonly dailyShop = new DailyShop();
-  private readonly goalLog = new GoalLog();
-  private readonly weeklyGoals = new Weekly();
-  private readonly goalsUi = new GoalsScreen();
-  private goalsTab: GoalsTab = 'daily';
+  readonly goalLog = new GoalLog();
+  readonly weeklyGoals = new Weekly();
+  readonly goalsUi = new GoalsScreen();
+  goalsTab: GoalsTab = 'daily';
   /** This ranked run scored at least the league's par (a weekly goal counts these). */
   private beatPar = false;
   /** Credits the last run paid (for doubling with a rewarded ad). */
@@ -445,6 +446,8 @@ export class Game {
   readonly purchases = new Purchases(this);
 
   readonly boards = new BoardScreens(this);
+
+  readonly goals = new GoalScreens(this);
 
   constructor(canvas: HTMLCanvasElement) {
     this.basePalette.set(BASE_PALETTE);
@@ -597,7 +600,7 @@ export class Game {
         this.goalsUi.setTab(tab);
       },
       claimLogin: () => this.claimLogin(),
-      claim: (id) => this.onClaim(id),
+      claim: (id) => this.goals.onClaim(id),
       reroll: (id) => void this.onReroll(id),
     });
     this.ui.titleLeague.addEventListener('pointerdown', (e) => e.stopPropagation());
@@ -921,16 +924,6 @@ export class Game {
     return out;
   }
 
-  /** Add pass XP from anywhere (a claimed goal); pays any tiers reached. Returns lines. */
-  private passXp(xp: number): string[] {
-    const before = this.pass.tier;
-    const paid = this.pass.addXp(this.now(), xp);
-    const lines = [`+${formatScore(xp)} pass xp`];
-    for (const r of paid) lines.push(...this.grant(r));
-    if (this.pass.tier > before) lines.push(`season pass tier ${this.pass.tier}`);
-    return lines;
-  }
-
   /** Pay a reward into the wallet or looks; returns it in words. `source` names cores for the server (earn_cores). */
   grant(r: Reward, source?: string): string[] {
     if (r.credits) {
@@ -960,7 +953,7 @@ export class Game {
     this.sound.power();
     this.haptics.pickup();
     this.refreshTitle();
-    if (this.infoOpen === 'goals') this.renderGoals();
+    if (this.infoOpen === 'goals') this.goals.renderGoals();
   }
 
   // --- revive ----------------------------------------------------------------
@@ -1062,7 +1055,7 @@ export class Game {
     if (!/^q\d$/.test(id) || !this.daily.canReroll(day) || !(await this.watchAd('rerollQuest')) || !this.daily.canReroll(day)) return;
     const q = this.daily.reroll(i, day);
     if (q) this.ui.showNotice(`new goal: ${questText(q, this.open('ranked'))}`);
-    this.renderGoals();
+    this.goals.renderGoals();
     this.refreshTitle();
   }
 
@@ -1289,7 +1282,7 @@ export class Game {
   refreshBar(now = this.now()): void {
     this.ui.setOffline(this.offline());
     this.econ.setBar(this.wallet.credits, this.wallet.cores);
-    this.econ.setNews('goals', this.daily.loginDue(dayKey(now)) >= 0 || this.goalsToClaim() > 0);
+    this.econ.setNews('goals', this.daily.loginDue(dayKey(now)) >= 0 || this.goals.goalsToClaim() > 0);
   }
 
   /** Fold a run into the rank (every mode) and, for ranked, the league; fills the game-over block. Returns bonus credits. */
@@ -1376,7 +1369,7 @@ export class Game {
   }
 
   /** What reaching rank `k` gives: its promotion credits, any looks, a new insignia. */
-  private rankGives(k: number): string[] {
+  rankGives(k: number): string[] {
     const out = [`+${formatScore(promotionBonus(k))} credits`];
     if (k > 0 && RANKS[k].tier !== RANKS[k - 1].tier) out.push('new insignia');
     for (const l of LOOKS) if (l.unlock.by === 'rank' && l.unlock.rank === k) out.push(`${l.name} ${SLOT_NAMES[l.slot]}`);
@@ -1703,7 +1696,7 @@ export class Game {
   }
 
   /** The player as the goals see them (everything here is already saved: nothing extra is tracked). */
-  private snapshot(): Snapshot {
+  snapshot(): Snapshot {
     const base = this.baseSnapshot();
     // "Own N looks" counts the looks goals unlock too, so count once without it and then again with.
     base.looksOwned = this.looks.count(this.ownerFor(base));
@@ -1852,161 +1845,6 @@ export class Game {
 
   // --- goals ---------------------------------------------------------------------------------------
 
-  /** What finishing a goal gives, in words. */
-  private goalRewardText(a: Achievement): string {
-    const looks = rewardKeys(a.id)
-      .map((k) => byKey(k))
-      .filter((l): l is LookItem => !!l);
-    return [`+${a.credits.toLocaleString('en-US')} credits`, ...looks.map((l) => `${l.name} ${SLOT_NAMES[l.slot]}`)].join(' · ');
-  }
-
-  /** The goals screen's three tabs. */
-  private renderGoals(): void {
-    const now = this.now();
-    const day = dayKey(now);
-    this.daily.turn(day);
-    this.weeklyGoals.turn(weekKey(now));
-    // Daily: the login calendar and today's goals.
-    const due = this.daily.loginDue(day);
-    const step = this.daily.loginStep;
-    const login = CONFIG.economy.login as readonly Reward[];
-    const claimedUpTo = due >= 0 ? step : step === 0 ? login.length : step;
-    const Q = CONFIG.economy.quests;
-    const W = CONFIG.economy.weekly;
-    const taskRows = (list: readonly Quest[], prefix: string, passXp: number): TaskRow[] =>
-      list.map((q, i) => ({
-        id: `${prefix}${i}`,
-        name: questText(q, this.open('ranked')),
-        progress: `${formatScore(q.progress)} / ${formatScore(q.target)}`,
-        fraction: q.progress / q.target,
-        reward: `+${formatScore(q.credits)} credits · +${formatScore(passXp)} pass xp`,
-        state: q.claimed ? 'claimed' : q.done ? 'claim' : 'open',
-      }));
-    const bonusRow = (id: string, name: string, cores: number, ready: boolean, claimed: boolean, list: readonly Quest[]): TaskRow => ({
-      id,
-      name,
-      progress: `${list.filter((q) => q.claimed).length} / ${list.length}`,
-      fraction: list.filter((q) => q.claimed).length / Math.max(1, list.length),
-      reward: `+${cores} cores`,
-      state: claimed ? 'claimed' : ready ? 'claim' : 'open',
-    });
-    const qs = this.daily.quests;
-    this.goalsUi.renderDaily({
-      calendar: login.map((r, i) => ({
-        day: i + 1,
-        reward: rewardParts(r)
-          .map((p) => p.replace(/^\+/, ''))
-          .join(', '),
-        state: i < claimedUpTo ? 'claimed' : i === step && due >= 0 ? 'today' : 'next',
-      })),
-      claim: due >= 0 ? { text: `claim day ${step + 1}`, enabled: true } : { text: `next reward in ${formatWait(untilTomorrow(now))}`, enabled: false },
-      reset: `new in ${formatWait(untilTomorrow(now))}`,
-      rows: [
-        ...taskRows(qs, 'q', Q.passXp).map((r) =>
-          r.state === 'open' && this.daily.canReroll(day) && this.ads.offers('rerollQuest')
-            ? { ...r, reroll: `swap for another goal · ${this.ads.label()}` }
-            : r,
-        ),
-        bonusRow('qall', 'claim all three', Q.allDoneCores, this.daily.bonusReady, this.daily.bonusClaimed, qs),
-      ],
-    });
-    // Weekly.
-    const wg = this.weeklyGoals.goals;
-    const weekEnd = Date.parse(`${weekKey(now)}T00:00:00Z`) + 7 * 86_400_000;
-    this.goalsUi.renderWeekly(`new in ${formatWait(weekEnd - now)}`, [
-      ...taskRows(wg, 'w', W.passXp),
-      bonusRow('wall', 'claim all five', W.allDoneCores, this.weeklyGoals.bonusReady, this.weeklyGoals.bonusClaimed, wg),
-    ]);
-    // Achievements.
-    const snap = this.snapshot();
-    const groups = (Object.keys(GROUP_NAMES) as Group[]).map((g) => ({
-      name: GROUP_NAMES[g],
-      rows: ACHIEVEMENTS.filter((a) => a.group === g).map((a): TaskRow => {
-        const p = progressOn(a, snap);
-        const claimed = this.goalLog.has(a.id);
-        return {
-          id: `a:${a.id}`,
-          name: a.name,
-          text: a.text,
-          progress: `${formatScore(p.have)} / ${formatScore(p.target)}`,
-          fraction: p.have / p.target,
-          reward: `${this.goalRewardText(a)} · +${CONFIG.rank.goalXp} xp`,
-          state: claimed ? 'claimed' : p.done ? 'claim' : 'open',
-        };
-      }),
-    }));
-    const doneCount = ACHIEVEMENTS.filter((a) => progressOn(a, snap).done).length;
-    this.goalsUi.renderAchievements(
-      `${doneCount} of ${ACHIEVEMENTS.length} done. each pays credits and rank xp, and unlocks a look to wear. they count everything you've done, from the start.`,
-      groups,
-    );
-    this.goalsUi.setTabNews({
-      daily: due >= 0 || this.daily.claimable > 0,
-      weekly: this.weeklyGoals.claimable > 0,
-      achievements: this.achievementsToClaim() > 0,
-    });
-  }
-
-  /** Finished achievements not yet claimed. */
-  private achievementsToClaim(): number {
-    const snap = this.snapshot();
-    return ACHIEVEMENTS.filter((a) => !this.goalLog.has(a.id) && progressOn(a, snap).done).length;
-  }
-
-  /** Everything waiting to be claimed on the goals screen (the bar's dot). */
-  private goalsToClaim(): number {
-    return this.daily.claimable + this.weeklyGoals.claimable + this.achievementsToClaim();
-  }
-
-  /** Claim a finished goal ("q1", "qall", "w3", "wall", "a:<id>"): pay it, with a small moment. */
-  private onClaim(id: string): void {
-    let lines: string[] = [];
-    let name = '';
-    if (/^q\d$/.test(id)) {
-      const q = this.daily.claim(Number(id.slice(1)));
-      if (!q) return;
-      name = questText(q, this.open('ranked'));
-      lines = [...this.grant({ credits: q.credits }), ...this.passXp(CONFIG.economy.quests.passXp)];
-    } else if (/^w\d$/.test(id)) {
-      const q = this.weeklyGoals.claim(Number(id.slice(1)));
-      if (!q) return;
-      name = questText(q, this.open('ranked'));
-      lines = [...this.grant({ credits: q.credits }), ...this.passXp(CONFIG.economy.weekly.passXp)];
-    } else if (id === 'qall' || id === 'wall') {
-      // Named for the day or week the goals belong to (not the clock now: it may have turned since), so the server pays it once.
-      const source = id === 'qall' ? `goals:${this.daily.day}` : `weekly:${this.weeklyGoals.week}`;
-      const cores = id === 'qall' ? this.daily.claimBonus() : this.weeklyGoals.claimBonus();
-      if (cores <= 0) return;
-      this.ui.celebrate([
-        { kicker: id === 'qall' ? "today's goals" : "this week's goals", icon: GOAL_ICON, name: 'all done', lines: this.grant({ cores }, source) },
-      ]);
-    } else if (id.startsWith('a:')) {
-      const a = achievement(id.slice(2));
-      if (!a || this.goalLog.has(a.id) || !progressOn(a, this.snapshot()).done) return;
-      this.goalLog.add(a.id);
-      this.goalLog.save();
-      name = a.name;
-      const promo = this.ranked.addXp(CONFIG.rank.goalXp);
-      lines = [...this.grant({ credits: a.credits + promo.credits }), `+${CONFIG.rank.goalXp} xp`];
-      if (promo.rankAfter > promo.rankBefore) {
-        this.ui.celebrate([
-          {
-            kicker: 'promoted',
-            icon: insignia(promo.rankAfter),
-            name: rankName(promo.rankAfter),
-            lines: mergeCredits(Array.from({ length: promo.rankAfter - promo.rankBefore }, (_, k) => this.rankGives(promo.rankBefore + 1 + k)).flat()),
-            color: '#d4a63a',
-          },
-        ]);
-      }
-    } else return;
-    if (name) this.ui.showNotice(`${name}: ${mergeCredits(lines).join(' · ')}`);
-    this.sound.pickup();
-    this.haptics.pickup();
-    this.renderGoals();
-    this.refreshTitle();
-  }
-
   /**
    * Pay and announce goals finished since last time, and any set a purchase just made whole.
    * Goals can unlock looks and looks can finish goals ("own 25 looks"), so go round until nothing new.
@@ -2029,7 +1867,12 @@ export class Game {
         });
       } else {
         for (const a of fresh)
-          party.push({ kicker: 'goal complete', icon: GOAL_ICON, name: a.name, lines: [a.text, ...this.goalRewardText(a).split(' · '), 'claim it in goals'] });
+          party.push({
+            kicker: 'goal complete',
+            icon: GOAL_ICON,
+            name: a.name,
+            lines: [a.text, ...this.goals.goalRewardText(a).split(' · '), 'claim it in goals'],
+          });
       }
       for (const id of sets) {
         const set = SETS.find((x) => x.id === id);
@@ -2080,13 +1923,6 @@ export class Game {
         };
       }),
     );
-  }
-
-  private openGoals(tab: GoalsTab = this.goalsTab): void {
-    this.goalsTab = tab;
-    this.goalsUi.setTab(tab);
-    this.renderGoals();
-    this.openInfo('goals');
   }
 
   openInfo(which: InfoScreen): void {
@@ -2211,7 +2047,7 @@ export class Game {
     else if (name === 'challenge') this.startDaily();
     else if (name === 'solo') this.openSolo();
     else if (name === 'record') this.openRecord();
-    else if (name === 'goals') this.openGoals();
+    else if (name === 'goals') this.goals.openGoals();
     else if (name === 'hangar') this.openHangar();
     else if (name === 'shop') {
       this.shopPick = -1;
@@ -2220,7 +2056,7 @@ export class Game {
     } else if (name === 'shop-cores') this.shop.openStore(null);
     else if (name === 'pass') this.shop.openPass(null);
     else if (name === 'boards') this.boards.openBoards();
-    else if (name === 'daily') this.openGoals('daily');
+    else if (name === 'daily') this.goals.openGoals('daily');
     else if (name === 'claim') this.claimLogin();
     else if (name === 'gift') void this.claimGift();
   };
@@ -2590,7 +2426,7 @@ export class Game {
     return stageFor(this.progress.stats.validRuns, this.onboarding.done);
   }
 
-  private open(f: Feature): boolean {
+  open(f: Feature): boolean {
     return this.allOpen || isOpen(f, this.revealStage());
   }
 
@@ -2636,7 +2472,7 @@ export class Game {
     }
     const quests = this.daily.quests;
     const done = quests.filter((q) => q.done).length;
-    const toClaim = this.goalsToClaim();
+    const toClaim = this.goals.goalsToClaim();
     cards.push({
       id: 'daily',
       kicker: "today's goals",
