@@ -24,7 +24,7 @@ import { remindersAvailable } from '../platform/reminders';
 import { Capacitor } from '@capacitor/core';
 import { exitChoice } from '../platform/exit';
 import { sendFeedback } from '../platform/feedback';
-import { errorLog, reportError } from '../platform/errors';
+import { errorLog } from '../platform/errors';
 import { latestNotes, SEEN_KEY, whatsNewOnLaunch } from '../ui/whatsNew';
 import { cancelOpenReport } from '../ui/report';
 import { quickRetryOn, tapRetries } from './retry';
@@ -74,8 +74,7 @@ import { CloudSave } from '../server/sync';
 import { shareAvailable, shareCard } from '../platform/share';
 import { createStore, type StoreProduct } from '../store/store';
 import { storage } from './storage';
-import { SESSION_KEY } from '../server/supabase';
-import { googleAvailable, googleSignIn } from '../platform/account';
+import { googleAvailable } from '../platform/account';
 import { fxDistance, fxTime } from '../world/fx';
 import { type Course, COURSES, courseLength, type DailyRun, dailyRun, type Environment, ENVIRONMENTS, type WeeklyRun, weeklyRun } from '../world/courses';
 import { Challenge, streakReward } from '../progression/challenge';
@@ -102,6 +101,7 @@ import { BoardScreens } from '../screens/boards';
 import { GoalScreens } from '../screens/goals';
 import { HangarScreens } from '../screens/hangar';
 import { ReminderPrompts } from '../platform/reminderPrompts';
+import { AccountScreens } from '../screens/account';
 
 type State = 'title' | 'playing' | 'paused' | 'countdown' | 'crashed' | 'finished';
 
@@ -112,8 +112,6 @@ const REVEAL_KEY = 'endless.reveal';
 
 /** A name the server made up for a new account ("pilot-3fa2"): the player hasn't picked one. */
 export const GENERATED_NAME = /^pilot-[0-9a-f]{4}$/;
-/** A name the server takes (see set_pilot_name). */
-const PILOT_NAME = /^[A-Za-z0-9 _-]{3,16}$/;
 
 type InfoScreen = 'welcome' | 'name' | 'goals' | 'hangar' | 'record' | 'solo' | 'league' | 'shop' | 'store' | 'pass' | 'boards';
 
@@ -253,7 +251,7 @@ export class Game {
   readonly pass = new Pass();
   readonly econ = new EconomyView();
   readonly backend = createBackend();
-  private readonly cloud = new CloudSave(this.backend);
+  readonly cloud = new CloudSave(this.backend);
   /** Finished runs on their way to the leaderboards (kept and retried when there's no signal). */
   readonly outbox = new Outbox(this.backend);
   /** The last run sent to a board: its notice still shows when the rate limit held it back a moment (not mid-run). */
@@ -261,19 +259,12 @@ export class Game {
   boardTab = 'week';
   readonly store = createStore();
   storeProducts: StoreProduct[] = [];
-  /** Shop rows for real-money products, in the order shown ('dev' adds cores in the dev build). */
-  private deleteArmed = false;
-  private deleteTimer = 0;
   portraits = new Portraits(this.palette);
   private shipSent = ''; // the looks last sent to the boards (JSON)
   recordSent = ''; // the service record summary last sent (JSON)
   private shipTimer = 0;
-  private nameOk = false; // the player has a pilot name of their own
-  private nameLater = false; // the name screen was put off for this session
+  nameLater = false; // the name screen was put off for this session
   googleEmail: string | null = null; // the Google account this account is kept with ('' none, null unknown)
-  private googleBusy = false;
-  private googleArmed = false; // asked once to switch to the account a Google login keeps
-  private nameWords: Promise<Set<string>> | null = null; // the profanity list, once loaded
   storeFrom: 'shop' | null = null; // where Back goes from the store
   passFrom: 'store' | null = null; // and from the season pass
   /** One-time products already bought. */
@@ -281,7 +272,7 @@ export class Game {
   private firstPlayed = Date.now();
   /** The saved days, weeks and pass are loaded (retime waits for them). */
   economyLoaded = false;
-  private readonly onboarding = new Onboarding();
+  readonly onboarding = new Onboarding();
   /**
    * The practice run in progress (onboarding), or a trial of other controls: the
    * lesson it's on, what the player has done in it, the controls flown, the
@@ -437,6 +428,8 @@ export class Game {
 
   readonly reminders = new ReminderPrompts(this);
 
+  readonly account = new AccountScreens(this);
+
   constructor(canvas: HTMLCanvasElement) {
     this.basePalette.set(BASE_PALETTE);
     this.palette.set(BASE_PALETTE);
@@ -519,10 +512,10 @@ export class Game {
     this.ui.bindBoards(
       BOARD_TABS,
       (id) => void this.boards.showBoard(id),
-      (name) => void this.savePilotName(name),
+      (name) => void this.account.savePilotName(name),
     );
-    this.ui.bindNameBox('settings', (name) => void this.savePilotName(name, 'settings'));
-    this.ui.bindNameBox('name', (name) => void this.saveNameScreen(name));
+    this.ui.bindNameBox('settings', (name) => void this.account.savePilotName(name, 'settings'));
+    this.ui.bindNameBox('name', (name) => void this.account.saveNameScreen(name));
     window.addEventListener('online', () => {
       void this.outbox.flush();
       void this.recheck();
@@ -1208,7 +1201,7 @@ export class Game {
     await this.checkMaxOut();
     this.refreshTitle();
     this.queueShip();
-    void this.askName();
+    void this.account.askName();
     void this.outbox.flush(); // runs that couldn't be sent last time
     return true;
   }
@@ -1445,140 +1438,6 @@ export class Game {
       pickups: s.pickups,
       rankedRuns: this.ranked.history.length,
     };
-  }
-
-  private async savePilotName(name: string, box = 'board'): Promise<boolean> {
-    if (!this.backend.online) {
-      this.ui.setPilotName('', 'names come with the server', box);
-      return false;
-    }
-    const problem = await this.nameProblem(name);
-    if (problem) {
-      this.ui.setPilotName('', problem, box);
-      return false;
-    }
-    const res = await this.backend.setPilotName(name);
-    this.ui.setPilotName(res.ok ? res.message : '', res.ok ? 'saved' : res.message, box);
-    if (res.ok) this.nameOk = true;
-    if (res.ok && box === 'board') void this.boards.showBoard(this.boardTab);
-    return res.ok;
-  }
-
-  /** Delete the account (server and device) and start again as a new player. Asks twice. */
-  private async deleteAccount(): Promise<void> {
-    const row = document.getElementById('delete-account');
-    const value = row?.querySelector('.value');
-    if (!this.deleteArmed) {
-      this.deleteArmed = true;
-      if (value) value.textContent = 'tap again';
-      this.ui.showNotice("tap again to delete everything. this can't be undone");
-      this.deleteTimer = window.setTimeout(() => {
-        this.deleteArmed = false;
-        if (value) value.textContent = 'delete';
-      }, 5000);
-      return;
-    }
-    window.clearTimeout(this.deleteTimer); // a slow delete keeps saying "deleting"
-    this.deleteArmed = false;
-    if (value) value.textContent = 'deleting';
-    if (!(await this.backend.deleteAccount())) {
-      if (value) value.textContent = 'delete';
-      this.ui.showNotice("couldn't reach the server. try again with a connection");
-      return;
-    }
-    await storage.clear('endless.');
-    location.reload();
-  }
-
-  /**
-   * Settings' account row: whether this account is kept with Google (account.ts).
-   * Only in the Android app, with the server.
-   */
-  private refreshAccount(): void {
-    const show = googleAvailable() && this.backend.online;
-    const group = document.getElementById('account-group');
-    if (group) group.hidden = !show;
-    if (!show) return;
-    const value = document.querySelector('#google-account .value');
-    const note = document.getElementById('google-note');
-    const set = (v: string, n: string): void => {
-      if (value) value.textContent = v;
-      if (note) note.textContent = n;
-    };
-    set('checking', '');
-    void this.backend.googleAccount().then((email) => {
-      this.googleEmail = email;
-      if (email === null) set('sign in', "couldn't check just now. you can still sign in");
-      else if (email) set(email, 'kept with this google account. sign in with it on another phone to carry on there');
-      else set('sign in', 'your progress is only on this phone. sign in with google to get it back if you lose or change phones');
-    });
-  }
-
-  /**
-   * Keep this account with Google, or (when that Google login already keeps
-   * another account, e.g. on a new phone) switch to that account. Switching
-   * replaces this phone's progress, so it asks twice unless there's nothing to lose.
-   */
-  private async keepWithGoogle(fromWelcome: boolean): Promise<void> {
-    if (this.googleBusy) return;
-    if (!fromWelcome && this.googleEmail) {
-      this.ui.showNotice(`kept with ${this.googleEmail}`);
-      return;
-    }
-    this.googleBusy = true;
-    try {
-      const token = await googleSignIn();
-      if ('error' in token) {
-        // A wrongly set up build can also look like a cancel, so say so either way.
-        this.ui.showNotice(token.error === 'cancelled' ? 'google sign-in was cancelled' : `google sign-in didn't work: ${token.error}`);
-        return;
-      }
-      const res = await this.backend.linkGoogle(token.idToken, token.nonce);
-      if (res === 'linked') {
-        this.ui.showNotice('signed in. your account is kept with google now');
-        this.cloud.push();
-        this.refreshAccount();
-        if (fromWelcome) document.getElementById('welcome-google')?.setAttribute('hidden', '');
-        return;
-      }
-      if (res === 'failed') {
-        reportError('google link', this.backend.authError || 'unknown error');
-        this.ui.showNotice(`couldn't sign in: ${this.backend.authError || 'unknown error'}`);
-        return;
-      }
-      // That Google login keeps another account: switch to it.
-      const nothingToLose = fromWelcome || this.progress.stats.runs === 0;
-      if (!nothingToLose && !this.googleArmed) {
-        this.googleArmed = true;
-        const value = document.querySelector('#google-account .value');
-        if (value) value.textContent = 'tap again';
-        this.ui.showNotice("that google account already has a pilot. tap again to switch to it: it replaces this phone's progress");
-        window.setTimeout(() => {
-          this.googleArmed = false;
-          this.refreshAccount();
-        }, 8000);
-        return;
-      }
-      this.googleArmed = false;
-      const before = this.backend.userId;
-      if (!(await this.backend.signInGoogle(token.idToken, token.nonce))) {
-        reportError('google switch', this.backend.authError || 'unknown error');
-        this.ui.showNotice(`couldn't switch accounts: ${this.backend.authError || 'unknown error'}`);
-        return;
-      }
-      if (this.backend.userId === before) {
-        this.refreshAccount(); // it was this account all along
-        return;
-      }
-      // Start again as that account: forget this phone's save (keeping the new
-      // session), and the cloud save comes down on the reload.
-      const session = await storage.get(SESSION_KEY);
-      await storage.clear('endless.');
-      if (session) await storage.set(SESSION_KEY, session);
-      location.reload();
-    } finally {
-      this.googleBusy = false;
-    }
   }
 
   /** How far through the current rank's XP band the player is (0..1). */
@@ -2241,53 +2100,7 @@ export class Game {
     this.ui.show('title');
     this.refreshTitle();
     this.claimLogin();
-    void this.askName();
-  }
-
-  /**
-   * Everyone picks a pilot name once ranked and the leaderboards open (before
-   * that nobody sees it, so new players can just fly): a player still on a
-   * made-up one ("pilot-3fa2") then gets the name screen on the title, and it
-   * stays until a name is saved. Only with the server (names live there).
-   */
-  private async askName(): Promise<void> {
-    if (this.nameOk || this.nameLater || !this.backend.online || !this.onboarding.done || !this.open('leaderboard')) return;
-    const name = await this.backend.pilotName();
-    if (name === null) return; // no answer (no signal): ask another time
-    if (!GENERATED_NAME.test(name)) {
-      this.nameOk = true;
-      return;
-    }
-    if (this.state !== 'title' || this.infoOpen === 'welcome' || this.infoOpen === 'name') return;
-    this.settingsOpen = false;
-    this.ui.setPilotName('', '', 'name');
-    this.openInfo('name');
-  }
-
-  /** Why this name can't be had (shape or profanity: nameFilter.ts), or null if it's fine to send. */
-  private async nameProblem(name: string): Promise<string | null> {
-    if (!PILOT_NAME.test(name.trim())) return '3 to 16 letters, numbers, spaces, - or _';
-    // The word list loads the first time it's needed (it's its own file).
-    this.nameWords ??= import('../platform/nameWords.json').then((m) => new Set(m.default as string[]));
-    const [{ nameBlocked }, words] = await Promise.all([import('../platform/nameFilter'), this.nameWords]);
-    return nameBlocked(name.trim(), words) ? "that name isn't allowed. try another" : null;
-  }
-
-  private async saveNameScreen(name: string): Promise<void> {
-    const problem = await this.nameProblem(name);
-    if (problem) {
-      this.ui.setPilotName('', problem, 'name');
-      return;
-    }
-    const res = await this.backend.setPilotName(name.trim());
-    if (!res.ok) {
-      this.ui.setPilotName('', res.message, 'name');
-      return;
-    }
-    this.nameOk = true;
-    this.infoOpen = null;
-    this.ui.show('title');
-    this.ui.showNotice(`welcome, ${res.message}`);
+    void this.account.askName();
   }
 
   /** How much of the game is open to this player (new players see it in stages: reveal.ts). */
@@ -2566,9 +2379,9 @@ export class Game {
   private onMenu = (action: string): void => {
     if (action === 'resume') this.resume();
     else if (action === 'settings') this.openSettings();
-    else if (action === 'delete') void this.deleteAccount();
-    else if (action === 'google') void this.keepWithGoogle(false);
-    else if (action === 'google-welcome') void this.keepWithGoogle(true);
+    else if (action === 'delete') void this.account.deleteAccount();
+    else if (action === 'google') void this.account.keepWithGoogle(false);
+    else if (action === 'google-welcome') void this.account.keepWithGoogle(true);
     else if (action === 'privacy-choices') void this.ads.privacyChoices();
     else if (action === 'feedback') void sendFeedback(this.feedbackScreen());
     else if (action === 'name-later' && this.infoOpen === 'name') this.closeInfo();
@@ -2716,7 +2529,7 @@ export class Game {
     this.settingsOpen = true;
     this.ui.setNative(this.native, remindersAvailable());
     this.ui.show('settings');
-    this.refreshAccount();
+    this.account.refreshAccount();
     void this.backend
       .pilotName()
       .then((name) =>
@@ -2777,7 +2590,7 @@ export class Game {
     this.ui.show('title');
     this.refreshTitle();
     this.lastTime = performance.now();
-    void this.askName();
+    void this.account.askName();
   }
 
   /** Dev: renderer stats for the FPS readout. */
