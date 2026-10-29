@@ -54,7 +54,7 @@ import { createStore, type StoreProduct } from '../store/store';
 import { storage } from './storage';
 import { fxDistance, fxTime } from '../world/fx';
 import { type Course, COURSES, courseLength, type DailyRun, dailyRun, type Environment, ENVIRONMENTS, type WeeklyRun, weeklyRun } from '../world/courses';
-import { Challenge, streakReward } from '../progression/challenge';
+import { Challenge } from '../progression/challenge';
 import { envStatus, nextEnvironment, newlyOpened } from '../progression/unlocks';
 import { emblem, leaguePar, Leagues, weekKey } from '../progression/leagues';
 import { ACHIEVEMENTS, type Snapshot, achievement, progressOn } from '../progression/achievements';
@@ -87,6 +87,7 @@ import { SettingsScreen } from '../screens/settings';
 import { Powers } from './powers';
 import { Connection } from './connection';
 import { DevTools } from './devTools';
+import { CourseRuns } from './courseRuns';
 
 type State = 'title' | 'playing' | 'paused' | 'countdown' | 'crashed' | 'finished';
 
@@ -102,14 +103,14 @@ type InfoScreen = 'welcome' | 'name' | 'goals' | 'hangar' | 'record' | 'solo' | 
 
 /** "5 oct": the Monday this week's ranked course started. */
 /** "1:23.4" */
-function formatTime(seconds: number): string {
+export function formatTime(seconds: number): string {
   const m = Math.floor(seconds / 60);
   const s = seconds - m * 60;
   return `${m}:${s < 10 ? '0' : ''}${s.toFixed(1)}`;
 }
 
 /** Music for an area of a set level. */
-function musicForArea(theme: 'land' | 'canyon' | 'interior', biome?: string): MusicId {
+export function musicForArea(theme: 'land' | 'canyon' | 'interior', biome?: string): MusicId {
   if (biome === 'ice' || biome === 'volcanic' || biome === 'asteroids') return biome;
   return theme;
 }
@@ -126,9 +127,6 @@ export const GIFT_ICON =
 /** A goal badge: a star in a ring. */
 export const GOAL_ICON =
   '<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round"><circle cx="32" cy="32" r="26"/><path d="M32 14l5.4 11.4 12.1 1.6-8.9 8.4 2.3 12.3L32 41.7l-10.9 6 2.3-12.3-8.9-8.4 12.1-1.6z"/></svg>';
-/** The daily challenge: a flag at the finish line. */
-const FLAG_ICON =
-  '<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round"><path d="M16 58V8"/><path d="M16 10h34l-7 10 7 10H16"/><path d="M27 10v20M38 10v20M16 20h34"/></svg>';
 /** A season pass badge. */
 export const PASS_ICON =
   '<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round"><path d="M32 6l22 10v16c0 13-9 22-22 26C19 54 10 45 10 32V16z"/><path d="M32 20l4 8 9 1-7 6 2 9-8-5-8 5 2-9-7-6 9-1z"/></svg>';
@@ -159,7 +157,7 @@ export class Game {
   private readonly autoGraphics = new AutoGraphics();
   private readonly sky: Sky;
   readonly trail: Trail;
-  private readonly events: Events;
+  readonly events: Events;
   readonly weather: Weather;
   readonly ghost: Ghost;
   /** Ranked: the ghost of the pilot just above you (settings > rival's ghost). */
@@ -305,10 +303,10 @@ export class Game {
   private reviveAsked = false;
   private countdownT = 0; // seconds of 3-2-1 left
   // A set level (courses.ts) being played, if any.
-  private course: Course | null = null;
-  private sectionIdx = -1;
+  course: Course | null = null;
+  sectionIdx = -1;
   hitThisRun = false; // anything hit, even a shield save (course stars)
-  private finishMs = 0;
+  finishMs = 0;
   readonly upgrades = new Upgrades();
   readonly leagues = new Leagues();
   /** This run's ship systems (your switched-on upgrades). */
@@ -327,15 +325,15 @@ export class Game {
   runTime = 0; // seconds into the current run
 
   state: State = 'title';
-  private speed: number = CONFIG.speed.titleDrift;
+  speed: number = CONFIG.speed.titleDrift;
   runStart = 0; // field distance when the run began
   score = 0; // shown score: distance points + bonus
   distanceScore = 0; // drives levels and difficulty
   private bonus = 0;
   private chain = 0; // near misses in a row
   private chainTimer = 0;
-  private nearMissCount = 0;
-  private bestChain = 0;
+  nearMissCount = 0;
+  bestChain = 0;
   private nudgeMs = 0;
   private shownRoom = '';
   level = 1;
@@ -365,13 +363,13 @@ export class Game {
   private crashMs = 0;
   private shattered = false;
   private fell = false;
-  private overShown = false;
+  overShown = false;
   /** This crash skips the game-over screen (the quick retry setting, outside ranked). */
   private quick = false;
   /** crashMs when the crashed run was settled (after any revive offer). */
   private settledMs = 0;
   /** The daily run's streak line for the end screen. */
-  private dailyLine = '';
+  dailyLine = '';
   /** The best line for quick retry's panel. */
   private quickLine = '';
 
@@ -409,6 +407,8 @@ export class Game {
   readonly connection = new Connection(this);
 
   readonly devTools = new DevTools(this);
+
+  readonly courseRuns = new CourseRuns(this);
 
   constructor(canvas: HTMLCanvasElement) {
     this.basePalette.set(BASE_PALETTE);
@@ -567,7 +567,7 @@ export class Game {
     this.ui.titleLeague.addEventListener('pointerdown', (e) => e.stopPropagation());
     this.ui.titleLeague.addEventListener('click', () => (this.title.open('ranked') ? this.boards.openLeague() : undefined));
     this.ui.bindSolo(
-      (i) => this.startCourse(i),
+      (i) => this.courseRuns.startCourse(i),
       (i) => this.startSolo(i),
     );
     this.ui.bindUpgrades(this.hangarScreen.onBuyUpgrade, (id) => {
@@ -785,7 +785,7 @@ export class Game {
    * Each mode keeps its own best: ranked (this week's level), each solo
    * environment, each set level, and endless. Assisted runs never count.
    */
-  private recordBest(finished: boolean): { best: number; isNew: boolean } {
+  recordBest(finished: boolean): { best: number; isNew: boolean } {
     const p = this.progress;
     const score = this.assisted ? 0 : this.score;
     if (this.mode === 'ranked') {
@@ -793,7 +793,7 @@ export class Game {
       if (isNew && this.path.length > 1) this.ghost.save({ week: this.weekly.id, step: PATH_STEP, xs: [...this.path], ts: [...this.pathTimes] });
       return { best: p.weeklyBest(this.weekly.id), isNew };
     }
-    if (this.dailyRunNow) return this.recordDaily(this.state === 'finished');
+    if (this.dailyRunNow) return this.courseRuns.recordDaily(this.state === 'finished');
     if (this.course) {
       const before = p.course(this.course.id).score;
       if (!finished) p.recordCourse(this.course.id, 0, this.runTime, score);
@@ -808,7 +808,7 @@ export class Game {
   }
 
   /** Save this run into the lifetime stats (once). Returns a line for the game-over screen. */
-  private finishRun(crashedIn: string | null): string {
+  finishRun(crashedIn: string | null): string {
     if (this.recorded) return '';
     this.recorded = true;
     this.progress.recordRun({
@@ -977,7 +977,7 @@ export class Game {
   }
 
   /** Today's challenge by the trusted clock; true if the day turned. Not mid-run (the run keeps its own). */
-  private turnDay(now: number): boolean {
+  turnDay(now: number): boolean {
     const day = dayKey(now);
     if (this.today.day === day) return false;
     this.today = dailyRun(day);
@@ -1288,17 +1288,11 @@ export class Game {
     this.ui.showNotice(`racing ${r.name}'s ghost · ${formatScore(r.score)}`);
   }
 
-  /** The daily challenge: today's course (by the trusted clock), the standard ship, one board for everyone. */
-  private startDaily(): void {
-    this.turnDay(this.now());
-    this.beginRun(0, this.today.course.seed, 'solo', this.today.course, null, this.today);
-  }
-
   /** Retry in the same mode (and environment, or level) as the run that just ended. */
   private retry(): void {
     if (this.mode === 'ranked') this.startRanked();
-    else if (this.dailyRunNow) this.startDaily();
-    else if (this.course) this.startCourse(COURSES.indexOf(this.course));
+    else if (this.dailyRunNow) this.courseRuns.startDaily();
+    else if (this.course) this.courseRuns.startCourse(COURSES.indexOf(this.course));
     else if (this.environment) this.startSolo(ENVIRONMENTS.indexOf(this.environment));
     else if (this.zen) this.startZen();
     else this.startEndless();
@@ -1322,7 +1316,7 @@ export class Game {
     }
     if (name === 'endless') this.startEndless();
     else if (name === 'zen') this.startZen();
-    else if (name === 'challenge') this.startDaily();
+    else if (name === 'challenge') this.courseRuns.startDaily();
     else if (name === 'solo') this.openSolo();
     else if (name === 'record') this.record.openRecord();
     else if (name === 'goals') this.goals.openGoals();
@@ -1710,7 +1704,7 @@ export class Game {
         this.updateCrashed(dt);
         break;
       case 'finished':
-        this.updateFinished(dt);
+        this.courseRuns.updateFinished(dt);
         break;
       case 'countdown':
         this.updateCountdown(dt);
@@ -1874,7 +1868,7 @@ export class Game {
     const progress = distancePoints / CONFIG.score.levelLength;
     const level = Math.floor(progress) + 1;
     if (this.course && section) {
-      this.updateCourse();
+      this.courseRuns.updateCourse();
     } else if (level !== this.level) {
       const themeChange = this.areaName(level) !== this.areaName(this.level) || themeForLevel(level) !== themeForLevel(this.level);
       this.level = level;
@@ -2040,7 +2034,7 @@ export class Game {
   }
 
   /** Hand the frame's state to the sound engine (reused object, no allocation). */
-  private feedAudio(dt: number, playing: boolean, speed: number): void {
+  feedAudio(dt: number, playing: boolean, speed: number): void {
     const a = this.audio;
     a.playing = playing;
     a.speed = speed;
@@ -2064,139 +2058,6 @@ export class Game {
     const outside = (1 - w.insideMix) * (1 - w.asteroidMix);
     const grass: Record<string, number> = { alien: 1, ice: 0.25, volcanic: 0.4, canyon: 0.15 };
     return [(grass[w.biome] ?? 0) * outside, outside, w.canyonMix * outside];
-  }
-
-  /** A set level, each frame: section changes (banner, event), progress, look, and the finish. */
-  private updateCourse(): void {
-    const c = this.course!;
-    // The section the ship is in now (it may have just moved into the next one this frame).
-    const i = this.world.sectionIndexAt(this.world.distance);
-    const section = c.sections[i];
-    if (i !== this.sectionIdx) {
-      const prev = this.sectionIdx >= 0 ? c.sections[this.sectionIdx] : null;
-      const areaChange = !prev || prev.theme !== section.theme || (prev.biome ?? '') !== (section.biome ?? '');
-      this.sectionIdx = i;
-      if (prev) {
-        this.ui.showRoom(section.name);
-        this.sound.level(areaChange, musicForArea(section.theme, section.biome));
-        this.haptics.level(areaChange);
-      } else this.sound.setTheme(musicForArea(section.theme, section.biome));
-      if (section.event) {
-        // For the whole section (at its speed), not the usual 22 seconds.
-        this.events.start(section.event, section.length / speedAt(section.difficulty) + 2);
-        this.ui.showNotice(section.name);
-      }
-    }
-    const length = courseLength(c);
-    const done = (this.world.distance - this.world.finishAt + length) / length;
-    this.ui.setProgress(Math.max(0, Math.min(1, done)));
-    // Time of day comes from how hard the section is: later levels run into evening.
-    this.applyLook(section.difficulty / CONFIG.score.levelLength);
-    if (this.world.distance >= this.world.finishAt) this.finishCourse();
-  }
-
-  /** Crossed the finish line of a set level (or the daily challenge). */
-  private finishCourse(): void {
-    const c = this.course!;
-    if (this.dailyRunNow) {
-      this.finishDaily();
-      return;
-    }
-    this.state = 'finished';
-    this.ghost.stop();
-    this.finishMs = 0;
-    this.input.enabled = false;
-    this.boosting = false;
-    this.sound.level(true, musicFor(1));
-    this.haptics.level(true);
-    let stars = 1;
-    if (!this.hitThisRun && !this.assisted) stars |= 2;
-    if (!this.assisted && this.score >= c.target) stars |= 4;
-    const time = this.runTime;
-    const before = this.progress.course(c.id).score;
-    const res = this.progress.recordCourse(c.id, stars, time, this.score);
-    const starCredits = res.newStars * CONFIG.courses.starCredits;
-    const best = this.progress.course(c.id);
-    this.ui.setOverHeading('level complete');
-    this.ui.setGameOver(this.score, best.score, this.score >= best.score, this.nearMissCount, this.bestChain, this.seed);
-    this.fillSummary(false);
-    const extra = this.finishRun(null);
-    this.connection.offerShare(this.score > before);
-    this.wallet.add(starCredits);
-    const starText = [1, 2, 4].map((b) => (stars & b ? '★' : '☆')).join('');
-    const lines = [`${starText}  ${formatTime(time)}${res.bestTime ? ' (best)' : ` · best ${formatTime(best.time)}`}`];
-    if (starCredits > 0) lines.push(`+${starCredits} credits for new stars`);
-    if (!(stars & 2)) lines.push('hit something: no second star');
-    if (!(stars & 4)) lines.push(`score ${formatScore(c.target)} for the third star`);
-    lines.push(extra);
-    this.ui.setGameOverExtra(lines.join(' · '));
-    this.title.refreshTitle();
-  }
-
-  /** Crossed the daily challenge's finish line. */
-  private finishDaily(): void {
-    this.state = 'finished';
-    this.ghost.stop();
-    this.finishMs = 0;
-    this.input.enabled = false;
-    this.boosting = false;
-    this.sound.level(true, musicFor(1));
-    this.haptics.level(true);
-    const { best, isNew } = this.recordBest(true);
-    this.ui.setOverHeading('finished');
-    this.ui.setGameOver(this.score, best, isNew, this.nearMissCount, this.bestChain, this.seed);
-    this.fillSummary(false);
-    const extra = this.finishRun(null);
-    this.connection.offerShare(isNew);
-    this.ui.setGameOverExtra([formatTime(this.runTime), this.dailyLine, extra].filter(Boolean).join(' · '));
-    this.title.refreshTitle();
-  }
-
-  /** The daily run as it ended: today's best and the streak, and the streak's reward on a new day. */
-  private recordDaily(finished: boolean): { best: number; isNew: boolean } {
-    const d = this.dailyRunNow!;
-    const counts = finished || this.runTime >= CONFIG.daily.countsAfter;
-    const r = this.challenge.record(d.day, this.score, counts);
-    void this.reminders.planReminders(); // today's done: no reminder today
-    this.dailyLine = r.streak > 0 ? `${r.streak} day streak` : '';
-    if (r.reward) {
-      const lines = this.grant(r.reward); // on the card that follows, not the end screen as well
-      this.ui.celebrate([
-        {
-          kicker: `${r.streak} day${r.streak === 1 ? '' : 's'} in a row`,
-          icon: FLAG_ICON,
-          name: 'daily streak',
-          lines: [
-            ...lines,
-            r.streak < CONFIG.daily.streak.length ? `tomorrow: ${rewardText(streakReward(r.streak + 1))}` : 'the top of the ladder: keep it going',
-          ],
-        },
-      ]);
-    }
-    return { best: r.best, isNew: r.isNew };
-  }
-
-  /** Coast on for a moment after the finish, then show the results. */
-  private updateFinished(dt: number): void {
-    this.finishMs += dt * 1000;
-    this.speed *= 1 - Math.min(1, dt * 1.5);
-    this.world.advance(dt, this.speed, 0);
-    this.world.sync();
-    this.trail.update(dt, 0, this.player.engineHalfSpan);
-    this.player.update(dt, 0, 0, 0);
-    this.feedAudio(dt, false, this.speed);
-    if (!this.overShown && this.finishMs > 900) {
-      this.overShown = true;
-      this.ui.showHud(false);
-      this.ui.hideBanner();
-      this.ui.show('over');
-    }
-  }
-
-  private startCourse(index: number): void {
-    const c = COURSES[index];
-    if (!c) return;
-    this.beginRun(0, c.seed, 'solo', c);
   }
 
   private openCourses(): void {
@@ -2305,7 +2166,7 @@ export class Game {
   }
 
   /** The run summary behind "details" on the end screen. */
-  private fillSummary(crashed: boolean): void {
+  fillSummary(crashed: boolean): void {
     const view = {
       speeds: this.speeds,
       distance: this.world.distance - this.runStart,
