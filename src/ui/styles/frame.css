@@ -1,86 +1,48 @@
-/* The sci-fi details, used sparingly: cut corners and a soft glow on each
-   screen's main button and on its key card, segmented meters for progress,
+/* The sci-fi details, used sparingly: a soft glow on each screen's main
+   button and an accent edge on its key card, segmented meters for progress,
    hex icons on the title's bar. Everything else stays plain.
 
-   The shapes are drawn on a pseudo-element masked to the cut, so a filter on
-   the element itself can glow round the real shape (a mask or clip-path on the
-   element would clip its own glow). */
+   Buttons and cards are gently rounded (--round), not full pills. */
 
-/* Main buttons: the accent, cut at the top-left and bottom-right. */
-.pill.primary,
-.frame {
-  --cut: 10px;
-  position: relative;
-  isolation: isolate;
-  border-radius: 0;
+:root {
+  --round: 10px;
 }
 
+.pill,
+.tab,
+.chip,
+.shop-tool,
+.name-input,
+.title-rank,
+.setting-row .value {
+  border-radius: var(--round);
+}
+
+/* Main buttons: the accent, with a soft glow. */
 .pill.primary {
-  background: none;
-  border-color: transparent;
-  filter: drop-shadow(0 0 9px color-mix(in srgb, var(--accent) 45%, transparent));
-}
-
-.pill.primary::before,
-.frame::before,
-.frame::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  -webkit-mask:
-    linear-gradient(135deg, transparent var(--cut), #000 calc(var(--cut) + 0.5px)) left / 51% 100% no-repeat,
-    linear-gradient(-45deg, transparent var(--cut), #000 calc(var(--cut) + 0.5px)) right / 51% 100% no-repeat;
-  mask:
-    linear-gradient(135deg, transparent var(--cut), #000 calc(var(--cut) + 0.5px)) left / 51% 100% no-repeat,
-    linear-gradient(-45deg, transparent var(--cut), #000 calc(var(--cut) + 0.5px)) right / 51% 100% no-repeat;
-}
-
-.pill.primary::before {
-  background: var(--accent);
-  transition: background-color 600ms;
+  box-shadow: 0 0 14px color-mix(in srgb, var(--accent) 40%, transparent);
 }
 
 .pill.small.primary {
-  --cut: 6px;
-  filter: drop-shadow(0 0 5px color-mix(in srgb, var(--accent) 35%, transparent));
+  box-shadow: 0 0 8px color-mix(in srgb, var(--accent) 32%, transparent);
 }
 
 .pill.primary:disabled {
-  filter: none;
+  box-shadow: none;
   opacity: 0.45;
 }
 
-/* Generals: the sheen moves to the masked shape. */
-.rank-top .pill.primary {
-  background: none;
-  animation: none;
-}
-
-.rank-top .pill.primary::before {
-  background: linear-gradient(110deg, var(--accent) 35%, color-mix(in srgb, var(--accent) 60%, #fff3c4) 50%, var(--accent) 65%) 0 0 / 300% 100%;
-  animation: rank-sheen 5s linear infinite;
-}
-
-.rank-top.reduce-motion .pill.primary::before {
-  animation: none;
-}
-
 /* Key cards: a 1px edge in the accent round a panel, with a faint inner glow. */
-.frame::before {
-  background: color-mix(in srgb, var(--accent) 60%, transparent);
-}
-
-.frame::after {
-  inset: 1px;
-  --cut: 9.6px;
+.frame {
+  position: relative;
+  border: 1px solid color-mix(in srgb, var(--accent) 60%, transparent);
+  border-radius: calc(var(--round) + 4px);
   background: var(--ui-bg);
   box-shadow: inset 0 0 28px color-mix(in srgb, var(--accent) 16%, transparent);
 }
 
 /* Framed modals (pause, the offer card) sit over the frozen course. */
 .frame.modal {
-  --cut: 14px;
   padding: 28px 24px 24px;
 }
 
@@ -174,6 +136,7 @@
 
 .mode-chip {
   min-height: 44px;
+  border-radius: calc(var(--round) - 2px);
   padding: 0 4px;
   font: inherit;
   font-family: var(--font-mono);
@@ -200,7 +163,7 @@
 /* High contrast: shapes stay, the glow goes. */
 body.contrast .pill.primary,
 body.contrast .pill.small.primary {
-  filter: none;
+  box-shadow: none;
 }
 
 /* Pause: a framed card in the middle (the panel behind it dims the course). */
@@ -227,7 +190,6 @@ body.contrast .pill.small.primary {
   min-width: 200px;
   margin: 10px auto 4px;
   padding: 10px 30px 14px;
-  --cut: 12px;
 }
 
 .over-menu {
