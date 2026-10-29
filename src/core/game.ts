@@ -38,7 +38,7 @@ import { type ControlId, hasTouch, type Lesson, type LessonState, Onboarding } f
 import { itemCard, powerItem } from '../ui/guide';
 import { TeachView } from '../ui/tutorialView';
 import { Color } from 'three';
-import { Ads, createAdNetwork, type RewardedPlacement } from '../ads/ads';
+import { Ads, createAdNetwork } from '../ads/ads';
 import { entitlementFor, Entitlements } from '../store/entitlements';
 import { Progress } from '../progression/progress';
 import { creditsFor, insignia, RANK_COLOURS, rankColour, Ranked, rankName, RANKS, type RunMode, xpToRank } from '../progression/ranks';
@@ -88,6 +88,7 @@ import { AccountScreens } from '../screens/account';
 import { FirstLaunch } from '../screens/onboarding';
 import { RecordScreen } from '../screens/record';
 import { RankKeeper } from '../progression/rankKeeper';
+import { Revives } from './revives';
 
 type State = 'title' | 'playing' | 'paused' | 'countdown' | 'crashed' | 'finished';
 
@@ -217,7 +218,7 @@ export class Game {
   /** Today's challenge (rebuilt when the day turns, by the trusted clock). */
   today: DailyRun = dailyRun(dayKey(Date.now()));
   /** The daily challenge being flown (the day it belongs to), or null. */
-  private dailyRunNow: DailyRun | null = null;
+  dailyRunNow: DailyRun | null = null;
   /** The daily challenge's bests and streak on this device. */
   readonly challenge = new Challenge();
   private scoreBase = 0; // solo starts: score begins at half the skipped points
@@ -289,7 +290,7 @@ export class Game {
   /** This ranked run scored at least the league's par (a weekly goal counts these). */
   beatPar = false;
   /** Credits the last run paid (for doubling with a rewarded ad). */
-  private lastRunCredits = 0;
+  lastRunCredits = 0;
   readonly hangarUi = new HangarScreen();
   hangarFrom: 'shop' | null = null; // where Back goes
   // Ranked: the ship's sideways position every PATH_STEP units (the leaderboard check, and later the ghost).
@@ -307,16 +308,16 @@ export class Game {
   /** Turns the showroom camera: on its own, or by a drag on the open scene. */
   private readonly showroomSpin = new ShowroomSpin({ spin: CONFIG.camera.showroom.spin });
   // Revive (not in ranked): once a run. While the offer is up the run isn't recorded yet.
-  private revived = false;
+  revived = false;
   /** The run as it stood at the first crash, when revived: what the boards get (a paid revive never adds to a board score). */
-  private preRevive: { score: number; seconds: number; distance: number } | null = null;
-  private revivePending = false;
+  preRevive: { score: number; seconds: number; distance: number } | null = null;
+  revivePending = false;
   private reviveAsked = false;
   private countdownT = 0; // seconds of 3-2-1 left
   // A set level (courses.ts) being played, if any.
   private course: Course | null = null;
   private sectionIdx = -1;
-  private hitThisRun = false; // anything hit, even a shield save (course stars)
+  hitThisRun = false; // anything hit, even a shield save (course stars)
   private finishMs = 0;
   readonly upgrades = new Upgrades();
   readonly leagues = new Leagues();
@@ -333,11 +334,11 @@ export class Game {
   private boostSeconds = 0;
   private roomsEntered = 0;
   private shownSky = -1;
-  private runTime = 0; // seconds into the current run
+  runTime = 0; // seconds into the current run
 
   state: State = 'title';
   private speed: number = CONFIG.speed.titleDrift;
-  private runStart = 0; // field distance when the run began
+  runStart = 0; // field distance when the run began
   score = 0; // shown score: distance points + bonus
   private distanceScore = 0; // drives levels and difficulty
   private bonus = 0;
@@ -359,8 +360,8 @@ export class Game {
   private boostLevel = 0; // eased 0..1, scales the speed boost
 
   // Power-ups (see CONFIG.powers).
-  private shield = false;
-  private graceT = 0; // seconds of passing through things after a shield hit
+  shield = false;
+  graceT = 0; // seconds of passing through things after a shield hit
   private magnetT = 0;
   private slowT = 0;
   private slowLevel = 0; // eased 0..1
@@ -410,6 +411,8 @@ export class Game {
   readonly record = new RecordScreen(this);
 
   readonly ranks = new RankKeeper(this);
+
+  readonly revives = new Revives(this);
 
   constructor(canvas: HTMLCanvasElement) {
     this.basePalette.set(BASE_PALETTE);
@@ -563,7 +566,7 @@ export class Game {
       },
       claimLogin: () => this.claimLogin(),
       claim: (id) => this.goals.onClaim(id),
-      reroll: (id) => void this.onReroll(id),
+      reroll: (id) => void this.revives.onReroll(id),
     });
     this.ui.titleLeague.addEventListener('pointerdown', (e) => e.stopPropagation());
     this.ui.titleLeague.addEventListener('click', () => (this.open('ranked') ? this.boards.openLeague() : undefined));
@@ -755,7 +758,7 @@ export class Game {
     this.sound.setWind(0);
     this.player.setShield(false);
     this.ui.setPower('');
-    this.revivePending = this.canRevive();
+    this.revivePending = this.revives.canRevive();
     this.reviveAsked = false;
     this.quick = quickRetryOn(this.settings.quickRetry, this.mode, this.practice !== null);
     this.settledMs = 0;
@@ -763,7 +766,7 @@ export class Game {
   }
 
   /** Record a crashed run and fill the game-over screen (after any revive offer is turned down). */
-  private settleCrash(): void {
+  settleCrash(): void {
     this.revivePending = false;
     this.settledMs = this.crashMs;
     const { best, isNew } = this.recordBest(false);
@@ -920,137 +923,8 @@ export class Game {
 
   // --- revive ----------------------------------------------------------------
 
-  /** A revive is offered once a run, outside ranked, where the lane is known. */
-  private canRevive(): boolean {
-    return this.mode !== 'ranked' && !this.dailyRunNow && !this.revived && this.world.laneAt(this.world.distance) !== null;
-  }
-
-  private offerRevive(): void {
-    const day = dayKey(this.now());
-    const free = this.daily.freeRevivesLeft(day, this.freeRevivesADay()) > 0;
-    // Out of free ones: a rewarded ad (free with premium) or cores, the player's pick.
-    const byAd = !free && this.ads.offers('revive');
-    const cost = CONFIG.economy.revive.coreCost;
-    const cores = `revive · ${cost} cores`;
-    const byCores = (): void => {
-      if (!this.wallet.spendCores(cost)) return this.settleCrash();
-      this.revive();
-    };
-    this.econ.offer(
-      {
-        kicker: 'crashed',
-        name: 'keep going?',
-        lines: [free ? 'your free revive today' : `you have ${formatScore(this.wallet.cores)} cores`, `score so far ${formatScore(this.score)}`],
-        yes: free ? 'revive · free' : byAd ? `revive · ${this.ads.label()}` : cores,
-        yesEnabled: free || byAd || this.wallet.cores >= cost,
-        alt: byAd ? cores : '',
-        altEnabled: this.wallet.cores >= cost,
-        no: 'no thanks',
-        seconds: 6,
-      },
-      () => {
-        if (free) {
-          this.daily.useFreeRevive(day);
-          this.revive();
-        } else if (byAd) void this.reviveByAd();
-        else byCores();
-      },
-      () => this.settleCrash(),
-      byCores,
-    );
-  }
-
-  /** Revive for a rewarded ad; without one the offer comes back, to try again or turn down. */
-  private async reviveByAd(): Promise<void> {
-    const ok = await this.watchAd('revive');
-    if (this.state !== 'crashed' || !this.revivePending) return; // moved on meanwhile
-    if (ok) this.revive();
-    else this.offerRevive();
-  }
-
-  /**
-   * Earn a reward by ad (at once for premium and on the web). Says why not:
-   * no ad loaded in time, or closed early. The offer is the caller's to keep.
-   */
-  private async watchAd(p: RewardedPlacement): Promise<boolean> {
-    if (this.ads.showsAds && !this.ads.adReady) this.ui.showNotice('loading an ad…');
-    const r = await this.ads.watch(p);
-    if (r === 'unavailable') this.ui.showNotice('no ad available right now. try again in a moment');
-    else if (r === 'skipped') this.ui.showNotice('ad closed early, so no reward. try again any time');
-    return r === 'rewarded';
-  }
-
-  /** Double the last run's credits for a rewarded ad (free with premium), once. */
-  private async doubleCredits(): Promise<void> {
-    const n = this.lastRunCredits;
-    if (n <= 0) return;
-    this.lastRunCredits = 0;
-    this.ui.showDouble(null);
-    if (!(await this.watchAd('doubleCredits'))) {
-      // No reward (the ad didn't load or was closed early): the offer stays, unless another run has ended since.
-      if (this.lastRunCredits > 0) return;
-      this.lastRunCredits = n;
-      this.ui.showDouble(`double +${formatScore(n)} credits · ${this.ads.label()}`);
-      return;
-    }
-    this.grant({ credits: n });
-    this.ui.markDoubled(formatScore(n), formatScore(n * 2));
-    this.ui.showNotice(`doubled: +${formatScore(n * 2)} credits this run · ${formatScore(this.wallet.credits)} credits now`);
-    this.sound.power();
-    this.refreshTitle();
-  }
-
-  /** The free daily gift (a rewarded ad, or free with premium). */
-  private async claimGift(): Promise<void> {
-    const day = dayKey(this.now());
-    if (!this.daily.giftReady(day) || !(await this.watchAd('dailyGift')) || !this.daily.giftReady(day)) return;
-    this.daily.takeGift(day);
-    const lines = this.grant(CONFIG.ads.dailyGift, `gift:${day}`);
-    this.ui.celebrate([{ kicker: 'free gift', icon: GIFT_ICON, name: 'daily gift', lines }]);
-    this.refreshTitle();
-  }
-
-  /** Swap an unfinished daily goal for another (a rewarded ad, or free with premium), once a day. */
-  private async onReroll(id: string): Promise<void> {
-    const i = Number(id.slice(1));
-    const day = dayKey(this.now());
-    if (!/^q\d$/.test(id) || !this.daily.canReroll(day) || !(await this.watchAd('rerollQuest')) || !this.daily.canReroll(day)) return;
-    const q = this.daily.reroll(i, day);
-    if (q) this.ui.showNotice(`new goal: ${questText(q, this.open('ranked'))}`);
-    this.goals.renderGoals();
-    this.refreshTitle();
-  }
-
-  /** Free revives a day: one for everyone, more with premium. */
-  private freeRevivesADay(): number {
-    return 1 + (this.entitlements.has('premium') ? CONFIG.premium.extraFreeRevives : 0);
-  }
-
-  /** Back on the lane with the way ahead cleared, a shield on, and a 3-2-1. */
-  private revive(): void {
-    const R = CONFIG.economy.revive;
-    this.revivePending = false;
-    this.revived = true;
-    this.preRevive = { score: Math.floor(this.score), seconds: this.runTime, distance: this.world.distance - this.runStart };
-    this.hitThisRun = true;
-    this.world.revive(R.clearAhead);
-    this.world.sync();
-    this.player.reset();
-    this.player.setVisible(true);
-    this.trail.setVisible(true);
-    this.shield = true;
-    this.player.setShield(true);
-    this.graceT = R.graceSeconds;
-    this.stage.shakeX = this.stage.shakeY = 0;
-    this.stage.roll = 0;
-    this.refreshTitle();
-    this.ui.show(null);
-    this.ui.showHud(true);
-    this.startCountdown();
-  }
-
   /** Hold everything still for a 3-2-1, then play. */
-  private startCountdown(): void {
+  startCountdown(): void {
     this.state = 'countdown';
     this.speedLines.update(0, 0, 0);
     this.countdownT = CONFIG.economy.revive.countdown;
@@ -1573,7 +1447,7 @@ export class Game {
     else if (name === 'boards') this.boards.openBoards();
     else if (name === 'daily') this.goals.openGoals('daily');
     else if (name === 'claim') this.claimLogin();
-    else if (name === 'gift') void this.claimGift();
+    else if (name === 'gift') void this.revives.claimGift();
   };
 
   // --- first launch ------------------------------------------------------------------------------
@@ -1877,7 +1751,7 @@ export class Game {
       }
     } else if (action === 'share') void this.share();
     else if (action === 'details') this.ui.showDetails(!this.ui.detailsOpen);
-    else if (action === 'double') void this.doubleCredits();
+    else if (action === 'double') void this.revives.doubleCredits();
     else if (action === 'back') {
       if (this.infoOpen) this.closeInfo();
       else this.closeSettings();
@@ -2918,7 +2792,7 @@ export class Game {
       if (this.revivePending) {
         if (!this.reviveAsked) {
           this.reviveAsked = true;
-          this.offerRevive();
+          this.revives.offerRevive();
         }
         return;
       }
