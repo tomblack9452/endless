@@ -151,7 +151,7 @@ APIs, and the portrait lock on large screens. What the app does now:
 - **Edge to edge:** `MainActivity` calls `EdgeToEdge.enable`, so the game draws
   under the status bar and the gesture bar on every Android version.
   Capacitor's SystemBars (`capacitor.config.ts`) hands the insets to the CSS,
-  and `style.css` keeps everything clear of them (`--safe-*`). The bars' icons
+  and the styles (`src/ui/styles/base.css`) keep everything clear of them (`--safe-*`). The bars' icons
   are set from the game (`src/ui/systemBars.ts`): dark over a light sky, light
   over a night sky or a dark-mode panel.
 - **Deprecated APIs:** none in the game's own code or resources. If Play still

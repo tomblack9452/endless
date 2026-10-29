@@ -56,6 +56,9 @@ Accept the certificate warning once on the phone.
 | `npm run build` | Typecheck, then build into `dist/` |
 | `npm run preview` | Serve the built `dist/` |
 | `npm run typecheck` | TypeScript only |
+| `npm run lint` | Biome: lint and format check (`npm run fix` applies the fixes) |
+| `npm run check` | Lint, typecheck, unit tests and build: what every change must pass |
+| `npm run test:browser` | Playwright browser tests (`tests/browser/`) at phone and tablet sizes |
 | `npm test` | Fairness, collision, database and server tests (see [docs/development.md](docs/development.md#testing)) |
 | `npm run db:setup` | Rebuild `supabase/setup.sql` from the migrations, and write `supabase/parts/` (the same in small pieces to paste; not committed) |
 | `npm run db:apply` | Set up or update the Supabase database from your terminal (needs `SUPABASE_DB_URL`) |
@@ -77,19 +80,21 @@ endless/
 ├── src/
 │   ├── main.ts           entry point: fonts, styles, starts the game
 │   ├── env.d.ts          types for the .env keys and build constants
-│   ├── core/             the game loop and state machine, CONFIG, seeded RNG, storage, settings, dev panel
+│   ├── core/             the game loop and run state machine (game.ts) and the parts it hands off: navigation, revives, power-ups, finish-line runs, purchases, sign-in and sync; CONFIG, seeded RNG, storage, settings, dev panel
+│   ├── screens/          one module per screen's logic: title, settings, shop, hangar, goals, boards, record, solo, account, onboarding
 │   ├── world/            course generation and drawing: terrain, biomes, rooms, props, sky, weather, renderer
 │   │   └── pieces/       the hand-made ship sections, drawn as text grids
 │   ├── ship/             the player's ship: shapes, trails, looks and the catalogue, upgrades, hangar, ghost
 │   ├── progression/      stats, ranks, leagues, goals and achievements, the daily challenge's streak, unlocks, seasons, the wallet
 │   ├── economy/          daily rewards, weekly goals, the shop, the season pass and their screens
-│   ├── ui/               screens and HUD (ui.ts, style.css), onboarding, tips, the tutorial, the goals and hangar views
+│   ├── ui/               the view layer: HUD and screens (ui.ts), styles (style.css and styles/), tips, the tutorial, the goals and hangar views
+│   ├── assets/icons/     the UI's line icons as SVG files
 │   ├── platform/         the device: input, haptics, share, reminders, feedback, back button, Google account, the name filter
 │   ├── audio/            sound engine, synth helpers, generative music
 │   ├── server/           Supabase or the device alone behind one interface: cloud save, the run outbox, boards
 │   ├── store/            in-app purchases (RevenueCat) and what's owned for good
 │   └── ads/              rewarded ads (AdMob) and their rules
-├── tests/                Vitest: fairness, courses, collisions, the database (PGlite), economy, UI models
+├── tests/                Vitest: fairness, courses, collisions, the database (PGlite), economy, UI models; browser/: Playwright
 ├── public/               icons, web manifest, service worker, store icons, privacy and support pages
 ├── supabase/
 │   ├── migrations/       the database, one numbered file per change

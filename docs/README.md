@@ -7,6 +7,8 @@ guides, one line each.
 
 - [game.md](game.md): how the game plays (controls, themes, modes, ranked, leagues, the daily challenge, looks, cores, settings, sound) and how it works inside.
 - [development.md](development.md): working on the code: every file in a table, where to tune numbers, the dev tools, the tests, deploying.
+- [architecture.md](architecture.md): how the code fits together (Game, the feature modules, models and views) and the rules for new code.
+- [refactor-plan.md](refactor-plan.md): the restructuring done so far and the next steps.
 - [server.md](server.md): what the server, store and ads do for the game, and every setting the Supabase dashboard needs.
 - [leaderboards.md](leaderboards.md): turning the leaderboards on, what the server checks, and changing the database.
 - [store.md](store.md): setting up Supabase, the stores, RevenueCat, AdMob, Google sign-in and the app builds.

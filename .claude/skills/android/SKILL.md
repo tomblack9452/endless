@@ -220,7 +220,7 @@ These are external steps; ask Tom where each stands rather than assuming.
 - Edge to edge everywhere: `EdgeToEdge.enable` in `MainActivity`. Capacitor's
   SystemBars (`capacitor.config.ts`, `insetsHandling: 'css'`) passes the insets
   to `env()` on WebView 140+ and sets `--safe-area-inset-*` on older ones;
-  `style.css` reads both into `--safe-top/bottom/left/right`. Anything placed
+  `src/ui/styles/base.css` reads both into `--safe-top/bottom/left/right`. Anything placed
   against a screen edge uses those.
 - The bar icons follow what's behind them, not the phone's theme:
   `src/ui/systemBars.ts`, from the open screen, dark mode and the scene's text

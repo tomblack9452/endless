@@ -413,7 +413,7 @@ plain ink.
 each rank colour switches to its light twin (`dark` in `RANK_COLOURS`). The
 scene and the HUD don't change. Type is Host Grotesk for text and Geist Mono
 for numbers, buttons and labels (both free, OFL), behind `--font-sans` and
-`--font-mono` in `src/ui/style.css`.
+`--font-mono` in `src/ui/styles/base.css`.
 
 ## Leagues
 

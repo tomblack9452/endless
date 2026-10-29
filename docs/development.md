@@ -21,7 +21,15 @@ The folder map is in the [README](../README.md#project-layout). File by file:
 | `src/main.ts` | Entry point: fonts and styles, blocks browser gestures, starts the game (and the dev panel in dev) |
 | `src/core/config.ts` | Every tunable value |
 | `src/core/dev.ts` | Dev-only panel |
-| `src/core/game.ts` | State machine, main loop, scoring, boost, power-ups, menus |
+| `src/core/game.ts` | Start-up, the run's state machine and the main loop (scoring, boost, near misses, the camera); owns the shared state the modules below reach through `this.g` |
+| `src/core/navigation.ts` | Back (Android's button and Escape), pause, the menu actions, title links and keys |
+| `src/core/revives.ts` | The revive offer (free, ad, cores), rewarded ads, the daily gift and goal swaps |
+| `src/core/powers.ts` | Power-ups: picking one up, their timers, ending them |
+| `src/core/courseRuns.ts` | Runs with a finish line: set levels and the daily challenge |
+| `src/core/purchases.ts` | Store purchases, waiting for paid cores, restore |
+| `src/core/connection.ts` | Signing in, syncing, the offline recheck and sharing a best |
+| `src/core/devTools.ts` | The dev panel's helpers (stats, unlock all, start at a level) |
+| `src/screens/*.ts` | One module per screen's logic: `title`, `settings`, `shop` (shop, store, pass), `hangar` (looks, upgrades), `goals`, `boards` (leaderboards, league), `record`, `solo`, `account` (names, Google, deleting), `onboarding` (welcome, practice, trial, dress) |
 | `src/core/rng.ts` | Seeded random numbers (mulberry32): `rand()`, and `featureRand()`, a second stream from the same seed for risk lanes and gate runs |
 | `src/core/runBonus.ts` | Distance milestones and gate run bookkeeping (when one is ahead, clean or spoilt) |
 | `src/core/crashMoment.ts` | The crash moment: when it plays, its slowed clock, and when the revive offer or end screen may come |
@@ -74,7 +82,11 @@ The folder map is in the [README](../README.md#project-layout). File by file:
 | `src/ui/report.ts`, `src/ui/whatsNew.ts` | The report link on a pilot's card; the "what's new" lines for each version |
 | `src/ui/onboarding.ts` | First launch: the steps, the control cards, the practice run's lessons, the starter set |
 | `src/ui/scrollHint.ts`, `src/ui/systemBars.ts` | The always-visible scroll bar under sideways rows; Android's status and gesture bar icon colours per screen |
-| `src/ui/ui.ts`, `src/ui/style.css`, `index.html` | HUD and screens |
+| `src/ui/ui.ts`, `index.html` | HUD and screens (the markup, and the view that fills it) |
+| `src/ui/style.css`, `src/ui/styles/*.css` | The styles, one file per area, imported by `style.css` in cascade order |
+| `src/ui/format.ts` | Text formats shared by several screens (times, merged credit lines) |
+| `src/assets/icons/*.svg` | The UI's line icons, imported as text (`?raw`) so they take the text colour |
+| `src/audio/musicChoice.ts` | Which music plays for a level or a set level's area |
 | `src/platform/account.ts` | Keeping an account: Google sign-in and linking it to the anonymous player |
 | `src/platform/exit.ts`, `src/platform/feedback.ts` | Android back on the title screen (ask before closing); the feedback mail |
 | `src/platform/errors.ts` | Error reports: caught on the device, scrubbed, kept and sent a batch at a time (`log_errors`) |
@@ -195,6 +207,21 @@ The store has a free "+500" and a premium on/off toggle in dev. `window.game` is
 exposed in dev for poking at state from the console.
 
 ## Testing
+
+`npm run check` runs everything a change must pass: Biome (lint and format),
+the typecheck, the unit tests and the build. `npm run fix` applies Biome's
+safe fixes and formatting. `npm run test:browser` runs the Playwright tests
+in `tests/browser/` against the dev server, at a phone and a tablet size:
+a first launch (skipping the tutorial, and starting the practice run), every
+menu on the title bar and back, settings kept after a reload, and an endless
+run with pause, a revive and game over. They fail on any page error. They use
+`window.game` (dev server only) just to hold the ship clear and crash it on
+cue. CI runs lint, the typecheck and the unit tests on every push, and the
+browser tests on branches and pull requests.
+
+The database tests (`tests/sql.test.ts`, PGlite) can time out when the whole
+suite runs on a busy machine; run them alone (`npx vitest run tests/sql.test.ts`)
+before treating that as a failure.
 
 `npm test` runs `tests/fairness.test.ts` headlessly with Vitest. For 8
 seeds, an autopilot follows the recorded safe lane from the start of every
