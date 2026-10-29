@@ -67,7 +67,6 @@ import { MAX_TIER, type ShipStats, STANDARD, SYSTEMS, type SystemId, Upgrades } 
 import { newSeed } from './rng';
 import { loadNumber } from './storage';
 import { type Celebration, formatScore, UI } from '../ui/ui';
-import type { RoomId } from '../world/interior';
 import { biomeForLevel, type PowerKind, themeForLevel, themeName, World } from '../world/world';
 import { tintBiome } from '../world/biomes';
 import { terrain } from '../world/terrain';
@@ -87,6 +86,7 @@ import { TitleScreen } from '../screens/title';
 import { SettingsScreen } from '../screens/settings';
 import { Powers } from './powers';
 import { Connection } from './connection';
+import { DevTools } from './devTools';
 
 type State = 'title' | 'playing' | 'paused' | 'countdown' | 'crashed' | 'finished';
 
@@ -407,6 +407,8 @@ export class Game {
   readonly powers = new Powers(this);
 
   readonly connection = new Connection(this);
+
+  readonly devTools = new DevTools(this);
 
   constructor(canvas: HTMLCanvasElement) {
     this.basePalette.set(BASE_PALETTE);
@@ -1630,19 +1632,6 @@ export class Game {
     void this.account.askName();
   }
 
-  /** Dev: renderer stats for the FPS readout. */
-  devStats(): { ratio: number; calls: number; triangles: number; textures: number; geometries: number; low: boolean } {
-    const info = this.stage.renderer.info;
-    return {
-      ratio: this.stage.pixelRatio,
-      calls: info.render.calls,
-      triangles: info.render.triangles,
-      textures: info.memory.textures,
-      geometries: info.memory.geometries,
-      low: this.lowGraphics(),
-    };
-  }
-
   /** Low graphics: chosen in settings, or auto after it dropped this session. */
   lowGraphics(): boolean {
     const g = this.settings.graphics;
@@ -1661,29 +1650,8 @@ export class Game {
     this.ui.showNotice('graphics on low to keep things smooth. settings can change it');
   }
 
-  /** Dev: force every interior room to be `id` (null = random). */
-  devSetRoom(id: RoomId | null): void {
-    this.world.devRoom = id;
-  }
-
-  /** Dev: build this hand-made section everywhere it fits (null: as normal). */
-  devSetPiece(id: string | null): void {
-    this.world.devPieces = id ? [id] : [];
-  }
-
-  /** Dev: draw sections' routes on the floor. */
-  devShowRoutes(on: boolean): void {
-    this.world.showRoutes = on;
-  }
-
-  /** Dev: unlock everything: top rank, every sector and star, all looks and upgrades, plenty of credits. */
-  devUnlockAll(): void {
-    this.maxOut();
-    this.ui.showNotice('dev: everything unlocked');
-  }
-
   /** The top rank and league, every look, every upgrade at its top tier and 100,000 credits. */
-  private maxOut(): void {
+  maxOut(): void {
     this.ranked.addXp(Math.max(0, RANKS[RANKS.length - 1].xp - this.ranked.xp));
     this.looks.buyAll();
     this.leagues.devTop();
@@ -1706,39 +1674,9 @@ export class Game {
     this.ui.showNotice('maxed out: every look, upgrade and level, top rank and league');
   }
 
-  /** Dev: cores, standing in for purchases until the store is in. */
-  /** Dev: premium on or off (as if bought, or never bought). */
-  devTogglePremium(): boolean {
-    if (this.entitlements.has('premium')) this.entitlements.clear();
-    else this.entitlements.grant('premium');
-    this.applyLooks();
-    this.title.refreshTitle();
-    return this.entitlements.has('premium');
-  }
-
-  devAddCores(n: number): void {
-    this.wallet.addCores(n);
-    this.econ.bump('cores');
-    this.title.refreshTitle();
-  }
-
   /** The launch splash has gone (main.ts). */
   splashGone(): void {
     this.ui.splashGone();
-  }
-
-  /** Dev: replay the last run's course from where it started (same seed). */
-  devReplay(): void {
-    this.beginRun(this.devStart, this.seed);
-  }
-
-  private devStart = 0;
-
-  /** Dev: start a run a little before `level` begins. */
-  devStartAt(level: number): void {
-    const lead = 60; // points before the level starts, so you see the change
-    this.devStart = Math.max(0, (level - 1) * CONFIG.score.levelLength - lead);
-    this.beginRun(this.devStart);
   }
 
   // --- loop ----------------------------------------------------------------

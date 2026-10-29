@@ -465,10 +465,10 @@ export class ShopScreens {
   /** A store button (its data-act): the pass, a real purchase, a swap, restore, or a dev stand-in. */
   onStoreAct = (act: string): void => {
     if (act === 'dev' && import.meta.env.DEV) {
-      this.g.devAddCores(500);
+      this.g.devTools.devAddCores(500);
       this.openStore();
     } else if (act === 'dev-premium' && import.meta.env.DEV) {
-      this.g.devTogglePremium();
+      this.g.devTools.devTogglePremium();
       this.openStore();
     } else if (act === 'pass-cores') this.onPassPremium();
     else if (act === 'pass-open') this.openPass('store');

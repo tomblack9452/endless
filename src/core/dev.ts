@@ -60,7 +60,7 @@ function install(game: Game, title: HTMLElement): void {
     b.textContent = `${level} ${themeForLevel(level).slice(0, 4)}`;
     b.addEventListener('click', () => {
       show(false);
-      game.devStartAt(level);
+      game.devTools.devStartAt(level);
     });
     grid.appendChild(b);
   }
@@ -89,7 +89,7 @@ function install(game: Game, title: HTMLElement): void {
   const renderReplay = () => (replay.textContent = `replay seed ${game.seed}`);
   replay.addEventListener('click', () => {
     show(false);
-    game.devReplay();
+    game.devTools.devReplay();
   });
   renderReplay();
   renders.push(renderReplay);
@@ -103,7 +103,7 @@ function install(game: Game, title: HTMLElement): void {
   const renderRoom = () => (roomBtn.textContent = `ship room ${forcedRoom ?? 'random'}`);
   roomBtn.addEventListener('click', () => {
     forcedRoom = rooms[(rooms.indexOf(forcedRoom) + 1) % rooms.length];
-    game.devSetRoom(forcedRoom);
+    game.devTools.devSetRoom(forcedRoom);
     for (const r of renders) r();
   });
   renderRoom();
@@ -118,7 +118,7 @@ function install(game: Game, title: HTMLElement): void {
   const renderPiece = () => (pieceBtn.textContent = `section ${forcedPiece ?? 'random'}`);
   pieceBtn.addEventListener('click', () => {
     forcedPiece = pieces[(pieces.indexOf(forcedPiece) + 1) % pieces.length];
-    game.devSetPiece(forcedPiece);
+    game.devTools.devSetPiece(forcedPiece);
     for (const r of renders) r();
   });
   renderPiece();
@@ -132,7 +132,7 @@ function install(game: Game, title: HTMLElement): void {
   const renderRoutes = () => (routesBtn.textContent = `show routes ${showRoutes ? 'on' : 'off'}`);
   routesBtn.addEventListener('click', () => {
     showRoutes = !showRoutes;
-    game.devShowRoutes(showRoutes);
+    game.devTools.devShowRoutes(showRoutes);
     for (const r of renders) r();
   });
   renderRoutes();
@@ -149,10 +149,10 @@ function install(game: Game, title: HTMLElement): void {
     panel.appendChild(b);
   };
   // Stand-ins for purchases until the store is in.
-  action('add 500 cores', () => game.devAddCores(500));
-  action('premium on/off', () => game.devTogglePremium());
+  action('add 500 cores', () => game.devTools.devAddCores(500));
+  action('premium on/off', () => game.devTools.devTogglePremium());
   action('unlock all', () => {
-    game.devUnlockAll();
+    game.devTools.devUnlockAll();
     show(false);
   });
   action('reset all progress', () => {
@@ -188,7 +188,7 @@ function installFps(game: Game): void {
   let lastFrame = performance.now();
   let last = lastFrame;
   const all: number[] = [];
-  (window as unknown as { __frameStats: () => unknown }).__frameStats = () => ({ frames: all.slice(), ...game.devStats() });
+  (window as unknown as { __frameStats: () => unknown }).__frameStats = () => ({ frames: all.slice(), ...game.devTools.devStats() });
   const y = (ms: number) => H - Math.min(H, (ms / 50) * H);
   const draw = () => {
     if (!g) return;
@@ -214,7 +214,7 @@ function installFps(game: Game): void {
       const sorted = recent.slice().sort((a, b) => a - b);
       const avg = sorted.reduce((t, v) => t + v, 0) / sorted.length;
       const p95 = sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * 0.95))];
-      const s = game.devStats();
+      const s = game.devTools.devStats();
       text.textContent =
         `${fps} fps  ${avg.toFixed(1)}/${p95.toFixed(1)} ms  x${s.ratio.toFixed(2)}${s.low ? ' low' : ''}\n` +
         `${s.calls} calls  ${(s.triangles / 1000).toFixed(1)}k tris  ${s.textures} tex  ${s.geometries} geo`;
