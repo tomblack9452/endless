@@ -55,7 +55,7 @@ import { storage } from './storage';
 import { fxDistance, fxTime } from '../world/fx';
 import { type Course, COURSES, courseLength, type DailyRun, dailyRun, type Environment, ENVIRONMENTS, type WeeklyRun, weeklyRun } from '../world/courses';
 import { Challenge } from '../progression/challenge';
-import { envStatus, nextEnvironment, newlyOpened } from '../progression/unlocks';
+import { nextEnvironment } from '../progression/unlocks';
 import { emblem, leaguePar, Leagues, weekKey } from '../progression/leagues';
 import { ACHIEVEMENTS, type Snapshot, achievement, progressOn } from '../progression/achievements';
 import { refreshSeasonLooks, SETS } from '../ship/catalogue';
@@ -88,6 +88,7 @@ import { Powers } from './powers';
 import { Connection } from './connection';
 import { DevTools } from './devTools';
 import { CourseRuns } from './courseRuns';
+import { SoloScreen } from '../screens/solo';
 
 type State = 'title' | 'playing' | 'paused' | 'countdown' | 'crashed' | 'finished';
 
@@ -409,6 +410,8 @@ export class Game {
   readonly devTools = new DevTools(this);
 
   readonly courseRuns = new CourseRuns(this);
+
+  readonly solo = new SoloScreen(this);
 
   constructor(canvas: HTMLCanvasElement) {
     this.basePalette.set(BASE_PALETTE);
@@ -1208,44 +1211,6 @@ export class Game {
     this.ui.show(which);
   }
 
-  /** A ranked or endless run reached `level`: remember it, and say so when it opens a solo environment. */
-  private noteReached(level: number): void {
-    const before = this.progress.reachedLevel(level);
-    const opened = newlyOpened(before, level);
-    if (opened.length > 0) this.ui.showNotice(`solo unlocked: ${opened.map((e) => e.name).join(', ')}`);
-  }
-
-  /** Is this solo environment open to fly? */
-  private envOpen(env: Environment): boolean {
-    return this.allOpen || envStatus(env, this.progress.furthest).open;
-  }
-
-  /** Solo: pick an environment (endless in it, with a high score each) or a set level. */
-  private openSolo(): void {
-    const furthest = this.progress.furthest;
-    const next = this.allOpen ? null : nextEnvironment(furthest);
-    this.ui.renderEnvironments(
-      ENVIRONMENTS.map((e, i) => {
-        const st = envStatus(e, furthest);
-        const locked = !this.envOpen(e);
-        return {
-          index: i,
-          name: e.name,
-          best: this.progress.envBest[e.id] ?? 0,
-          locked,
-          need: locked ? `reach level ${st.level} in ranked or endless` : '',
-          toGo: locked ? `${st.toGo} level${st.toGo === 1 ? '' : 's'} to go` : '',
-          fraction: st.fraction,
-        };
-      }),
-      next
-        ? `next to unlock: ${next.env.name}, ${next.status.toGo} level${next.status.toGo === 1 ? '' : 's'} to go. environments open as you reach them in ranked or endless (you're furthest at level ${furthest}).`
-        : 'every environment is open. pick a place and see how far you get: it stays there and keeps getting harder.',
-    );
-    this.openCourses();
-    this.openInfo('solo');
-  }
-
   /** Ranked: this week's level (the same for everyone), your upgrades up to the league's cap. */
   startRanked(): void {
     const active = this.upgrades.activePoints();
@@ -1265,7 +1230,7 @@ export class Game {
   /** Solo in one environment: endless there, getting harder. */
   private startSolo(index: number): void {
     const env = ENVIRONMENTS[index];
-    if (env && this.envOpen(env)) this.beginRun(0, newSeed(), 'solo', null, env);
+    if (env && this.solo.envOpen(env)) this.beginRun(0, newSeed(), 'solo', null, env);
   }
 
   /** Endless: open ground, then every area and biome in turn, forever. */
@@ -1317,7 +1282,7 @@ export class Game {
     if (name === 'endless') this.startEndless();
     else if (name === 'zen') this.startZen();
     else if (name === 'challenge') this.courseRuns.startDaily();
-    else if (name === 'solo') this.openSolo();
+    else if (name === 'solo') this.solo.openSolo();
     else if (name === 'record') this.record.openRecord();
     else if (name === 'goals') this.goals.openGoals();
     else if (name === 'hangar') this.hangarScreen.openHangar();
@@ -1873,7 +1838,7 @@ export class Game {
       const themeChange = this.areaName(level) !== this.areaName(this.level) || themeForLevel(level) !== themeForLevel(this.level);
       this.level = level;
       this.ui.setLevel(level);
-      if (this.unlockable) this.noteReached(level);
+      if (this.unlockable) this.solo.noteReached(level);
       if (this.zen) {
         if (themeChange) this.ui.showRoom(this.areaName(level)); // zen: only the area's name, quietly
       } else if (!this.practice) this.ui.announceLevel(level, this.areaName(level)); // in practice the lesson card has the top band
@@ -2058,23 +2023,6 @@ export class Game {
     const outside = (1 - w.insideMix) * (1 - w.asteroidMix);
     const grass: Record<string, number> = { alien: 1, ice: 0.25, volcanic: 0.4, canyon: 0.15 };
     return [(grass[w.biome] ?? 0) * outside, outside, w.canyonMix * outside];
-  }
-
-  private openCourses(): void {
-    const tiles = COURSES.map((c, i) => {
-      const r = this.progress.course(c.id);
-      const prev = i === 0 ? null : this.progress.course(COURSES[i - 1].id);
-      const locked = !(i === 0 || (prev && prev.stars & 1)) && !this.allOpen;
-      return {
-        index: i,
-        name: c.name,
-        stars: r.stars,
-        time: locked ? `finish ${COURSES[i - 1].name}` : r.time > 0 ? formatTime(r.time) : '',
-        locked,
-      };
-    });
-    const stars = COURSES.reduce((n, c) => n + [1, 2, 4].filter((b) => this.progress.course(c.id).stars & b).length, 0);
-    this.ui.renderCourses(tiles, `${stars} of ${COURSES.length * 3} stars`);
   }
 
   /** Forward speed including boost and slow-mo. */
