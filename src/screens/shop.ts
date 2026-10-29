@@ -22,8 +22,14 @@ type ShopTab = 'today' | 'set' | 'vault';
 /** The first look at the shop or the store says what credits and cores are for (once, on this save). */
 const WALLET_EXPLAINED_KEY = 'endless.walletExplained';
 
+/** Where the store was opened from, for the analytics funnel. */
+export type StoreSource = 'dock' | 'wallet' | 'shop' | 'short' | 'results' | 'hub';
+
 export class ShopScreens {
   constructor(private readonly g: Game) {}
+
+  /** How the store was reached this time. */
+  source: StoreSource = 'dock';
 
   private walletExplained = false; // looked at this session whether the wallet card was shown
 
@@ -227,8 +233,9 @@ export class ShopScreens {
   };
 
   /** The store: the season pass first, then cores, the starter pack and premium, swaps, and restore. */
-  openStore(from?: 'shop' | null): void {
+  openStore(from?: 'shop' | null, source: StoreSource = 'dock'): void {
     if (from !== undefined) this.g.storeFrom = from;
+    this.source = source;
     const now = this.g.now();
     this.g.pass.turn(now);
     const P = CONFIG.economy.pass;

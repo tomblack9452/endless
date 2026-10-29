@@ -227,35 +227,37 @@
         <div class="screen-foot">
           <div id="title-cards" class="live-cards"></div>
           <button id="title-start" class="pill primary title-ranked" type="button">
-            <span id="title-ranked-name" class="title-ranked-name">ranked</span>
+            <span id="title-ranked-name" class="title-ranked-name">fly</span>
             <span id="title-ranked-sub" class="title-ranked-sub"></span>
           </button>
-          <div class="title-modes">
-            <button class="pill" type="button" data-title="solo" data-feature="solo">solo</button>
-            <button class="pill" type="button" data-title="endless" data-feature="endless">endless</button>
-            <button class="pill" type="button" data-title="zen" data-feature="zen">zen</button>
+          <div class="mode-chips" role="group" aria-label="mode">
+            <button class="mode-chip" type="button" data-mode="ranked" data-feature="ranked" aria-pressed="false">ranked</button>
+            <button class="mode-chip" type="button" data-mode="solo" data-feature="solo" aria-pressed="false">solo</button>
+            <button class="mode-chip" type="button" data-mode="endless" data-feature="endless" aria-pressed="false">endless</button>
+            <button class="mode-chip" type="button" data-mode="daily" data-feature="daily" aria-pressed="false">daily</button>
+            <button class="mode-chip" type="button" data-mode="zen" data-feature="zen" aria-pressed="false">zen</button>
           </div>
           <div id="title-next" class="label dim title-next"></div>
           <nav class="title-bar" aria-label="menu">
             <button class="bar-btn" type="button" data-title="hangar" data-feature="hangar">
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 20V10l9-6 9 6v10" /><path d="M7 20v-6h10v6" /><path d="M12 14v3M9.5 17.5h5" /></svg>
+              <span class="hex"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 20V10l9-6 9 6v10" /><path d="M7 20v-6h10v6" /><path d="M12 14v3M9.5 17.5h5" /></svg></span>
               <span>hangar</span><i class="news"></i>
             </button>
             <button class="bar-btn" type="button" data-title="shop" data-feature="shop">
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 8h14l-1.2 12H6.2z" /><path d="M9 8V6.5a3 3 0 0 1 6 0V8" /></svg>
+              <span class="hex"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 8h14l-1.2 12H6.2z" /><path d="M9 8V6.5a3 3 0 0 1 6 0V8" /></svg></span>
               <span>shop</span><i class="news"></i>
             </button>
             <button class="bar-btn" type="button" data-title="goals" data-feature="goals">
-              <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5" /><circle cx="12" cy="12" r="4.5" /><circle cx="12" cy="12" r="0.8" /></svg>
+              <span class="hex"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5" /><circle cx="12" cy="12" r="4.5" /><circle cx="12" cy="12" r="0.8" /></svg></span>
               <span>goals</span><i class="news"></i>
             </button>
             <button class="bar-btn" type="button" data-title="boards" data-feature="boards">
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20v-6h5v6M9.5 20V9h5v11M15 20v-8h5v8" /><path d="M12 3.5l.9 1.8 2 .3-1.4 1.4.3 2-1.8-.9-1.8.9.3-2-1.4-1.4 2-.3z" /></svg>
-              <span>leaderboard</span><i class="news"></i>
+              <span class="hex"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20v-6h5v6M9.5 20V9h5v11M15 20v-8h5v8" /><path d="M12 3.5l.9 1.8 2 .3-1.4 1.4.3 2-1.8-.9-1.8.9.3-2-1.4-1.4 2-.3z" /></svg></span>
+              <span>ranks</span><i class="news"></i>
             </button>
             <button class="bar-btn" type="button" data-title="record" data-feature="record">
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 4h12v6l-6 4-6-4z" /><path d="M6 13l6 4 6-4M6 17l6 4 6-4" /></svg>
-              <span>service record</span><i class="news"></i>
+              <span class="hex"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 4h12v6l-6 4-6-4z" /><path d="M6 13l6 4 6-4M6 17l6 4 6-4" /></svg></span>
+              <span>record</span><i class="news"></i>
             </button>
           </nav>
         </div>
@@ -327,7 +329,7 @@
       </div>
 
       <div id="screen-paused" class="layer screen panel">
-        <div class="screen-center">
+        <div class="screen-center frame modal pause-card">
           <div class="screen-heading">paused</div>
           <div class="menu">
             <button class="pill primary" type="button" data-action="resume">resume</button>
@@ -668,8 +670,10 @@
         <div class="screen-center">
           <div id="over-heading" class="screen-heading">crashed</div>
           <div id="over-mode" class="label dim"></div>
-          <div id="over-score" class="score big">0</div>
-          <div id="over-best" class="label"></div>
+          <div class="frame over-card">
+            <div id="over-score" class="score big">0</div>
+            <div id="over-best" class="label"></div>
+          </div>
           <div id="over-stats" class="label dim"></div>
           <button id="over-details-toggle" class="label link over-details-toggle" type="button" data-action="details" aria-expanded="false" aria-controls="over-details">details</button>
           <div id="over-details" class="over-details" hidden>
@@ -679,11 +683,14 @@
           <div id="over-extra" class="label dim"></div>
           <div id="over-rank" class="over-rank"></div>
           <div id="over-rewards" class="label over-rewards"></div>
-          <div class="menu">
-            <div class="pill primary">tap to retry</div>
-            <button id="over-share" class="pill" type="button" data-action="share" hidden>share</button>
-            <button id="over-double" class="pill" type="button" data-action="double" hidden></button>
-            <button class="pill" type="button" data-action="menu">main menu</button>
+          <button id="over-next" class="label link over-next" type="button" data-action="next" hidden></button>
+          <div class="menu over-menu">
+            <div class="pill primary over-again">fly again</div>
+            <div class="over-row">
+              <button id="over-double" class="pill" type="button" data-action="double" hidden></button>
+              <button id="over-share" class="pill" type="button" data-action="share" hidden>share</button>
+            </div>
+            <button class="label link over-menu-link" type="button" data-action="menu">main menu</button>
           </div>
         </div>
       </div>
@@ -701,7 +708,7 @@
     </div>
 
     <div id="offer" class="promo offer" role="dialog" aria-live="assertive">
-      <div class="promo-card offer-card">
+      <div class="promo-card offer-card frame modal">
         <div id="offer-kicker" class="label promo-kicker"></div>
         <div id="offer-ring" class="offer-ring"><span id="offer-count"></span></div>
         <div id="offer-name" class="promo-name"></div>

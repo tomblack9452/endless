@@ -106,12 +106,15 @@ export class BoardScreens {
       this.g.refreshBar();
       return;
     }
+    const me = rows.find((r) => r.you);
+    if (me) this.g.title.notePlace(me.rank);
     const view: [string, string][] = rows.map((r) => [`${r.rank}. ${r.you ? 'you' : r.name}`, formatScore(r.score)]);
     this.g.ui.renderBoard(view.length > 0 ? view : [['no runs yet this week', '']], LEAGUES[lg.league].name);
   }
 
   /** "#4 on the endless board" once a run is on its board. */
   boardNotice(board: BoardId, res: SubmitResult): void {
+    if (res.status === 'ok' && res.rank && board === 'ranked') this.g.title.notePlace(res.rank);
     if (res.status === 'ok' && res.rank) this.g.ui.showNotice(`${res.newBest ? 'new best: ' : ''}#${res.rank} on the ${boardName(board)} board`);
     else if (res.status === 'rejected' && import.meta.env.DEV) console.warn(`leaderboard turned the run down: ${res.message}`);
   }

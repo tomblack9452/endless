@@ -78,6 +78,8 @@ import { FirstLaunch } from '../screens/onboarding';
 import { RecordScreen } from '../screens/record';
 import { RankKeeper } from '../progression/rankKeeper';
 import { Revives } from './revives';
+import { ResultsScreen } from '../screens/results';
+import { StorePrompts } from '../economy/nudge';
 import { TitleScreen } from '../screens/title';
 import { SettingsScreen } from '../screens/settings';
 import { Powers } from './powers';
@@ -354,6 +356,8 @@ export class Game {
   readonly revives = new Revives(this);
 
   readonly title = new TitleScreen(this);
+  readonly results = new ResultsScreen(this);
+  readonly storePrompts = new StorePrompts();
 
   readonly settingsScreen = new SettingsScreen(this);
 
@@ -411,6 +415,7 @@ export class Game {
       if (this.state === 'title') this.title.startPrimary();
     });
     this.ui.bindTitleCards(this.nav.onTitleLink);
+    this.ui.bindModeChips((m) => this.title.pickMode(m));
     this.ui.bindWelcome({
       control: (id) => this.firstLaunch.chooseControls(id),
       practice: () => this.firstLaunch.startPractice(),
@@ -789,6 +794,7 @@ export class Game {
     if (this.assisted) lines.push('assist mode. not counted as a best');
     this.wallet.add(credits);
     this.lastRunCredits = credits;
+    this.results.afterRun(credits);
     this.ui.showDouble(credits > 0 && this.ads.offers('doubleCredits') ? `double +${formatScore(credits)} credits · ${this.ads.label()}` : null);
     this.ads.afterRun(Date.now(), false); // the device clock, like the first-played time it is measured from
     this.ads.preload(); // an ad ready for the offers after a run (none for premium)
@@ -1184,9 +1190,11 @@ export class Game {
   }
 
   /** Solo in one environment: endless there, getting harder. */
-  private startSolo(index: number): void {
+  startSolo(index: number): void {
     const env = ENVIRONMENTS[index];
-    if (env && this.solo.envOpen(env)) this.beginRun(0, newSeed(), 'solo', null, env);
+    if (!env || !this.solo.envOpen(env)) return;
+    this.title.noteSolo(index);
+    this.beginRun(0, newSeed(), 'solo', null, env);
   }
 
   /** Endless: open ground, then every area and biome in turn, forever. */

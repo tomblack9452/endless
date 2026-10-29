@@ -14,7 +14,8 @@ const canRevive = (page: Page) => page.evaluate(`(() => { const g = (${dev})(); 
 test('an endless run: score climbs, pause and resume, a free revive, then game over and back to the menu', async ({ page }) => {
   const { errors } = await openGame(page);
   await dismissCards(page);
-  await page.locator('[data-title="endless"]').click();
+  await page.locator('[data-mode="endless"]').click();
+  await page.locator('#title-start').click();
   await expect(page.locator('#hud')).toHaveClass(/\bon\b/);
   await holdClear(page);
   await expect.poll(() => score(page), { timeout: 30_000 }).toBeGreaterThan(20);

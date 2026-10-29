@@ -148,6 +148,7 @@ export class Navigation {
     } else if (action === 'share') void this.g.connection.share();
     else if (action === 'details') this.g.ui.showDetails(!this.g.ui.detailsOpen);
     else if (action === 'double') void this.g.revives.doubleCredits();
+    else if (action === 'next') this.g.results.onNext();
     else if (action === 'back') {
       if (this.g.infoOpen) this.closeInfo();
       else this.g.settingsScreen.closeSettings();

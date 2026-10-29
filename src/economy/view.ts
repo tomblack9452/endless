@@ -163,6 +163,7 @@ export class EconomyView {
   /** A dot on a title chip: something there to claim or see. */
   setNews(name: string, on: boolean): void {
     document.querySelector(`[data-title="${name}"] .news`)?.classList.toggle('on', on);
+    document.querySelector(`[data-title="${name}"] .hex`)?.classList.toggle('lit', on);
   }
 
   /** A counter in the bar bumps when something lands in it. */

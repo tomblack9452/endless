@@ -8,9 +8,63 @@ import { formatScore, type TitleCard } from '../ui/ui';
 import type { Game } from '../core/game';
 import GOAL_ICON from '../assets/icons/goal.svg?raw';
 import { REVEAL_KEY } from '../progression/reveal';
+import { type HubMode, hubMode, LAST_MODE_KEY, LAST_SOLO_KEY } from '../ui/hubMode';
+import { ENVIRONMENTS } from '../world/courses';
+
+/** Your place on this week's league board, as the server last said it. */
+const LEAGUE_PLACE_KEY = 'endless.leaguePlace';
 
 export class TitleScreen {
-  constructor(private readonly g: Game) {}
+  constructor(private readonly g: Game) {
+    void storage.get(LAST_MODE_KEY).then((v) => (this.saved = v));
+    void storage.get(LAST_SOLO_KEY).then((v) => (this.lastSolo = Number(v) || 0));
+    void storage.get(LEAGUE_PLACE_KEY).then((v) => {
+      try {
+        if (v) this.place = JSON.parse(v);
+      } catch {
+        // Unreadable: no place yet.
+      }
+    });
+  }
+
+  private saved: string | null = null;
+  private lastSolo = 0;
+  private place: { week: string; rank: number } | null = null;
+
+  /** The mode the big button flies now. */
+  get mode(): HubMode {
+    return hubMode(this.saved, (m) => this.open(m === 'zen' || m === 'endless' ? 'ranked' : m));
+  }
+
+  /** A chip: pick its mode. Solo picked again opens the areas to choose another. */
+  pickMode(m: string): void {
+    if (m === 'solo' && this.mode === 'solo') {
+      this.g.nav.onTitleLink('solo');
+      return;
+    }
+    this.saved = m;
+    void storage.set(LAST_MODE_KEY, m);
+    this.g.haptics.pickup();
+    this.refreshTitle();
+  }
+
+  /** The solo area flown last, for the big button. */
+  noteSolo(index: number): void {
+    this.lastSolo = index;
+    void storage.set(LAST_SOLO_KEY, String(index));
+  }
+
+  /** The league board's place for this week (from a ranked run's result or the board). */
+  notePlace(rank: number): void {
+    this.place = { week: this.g.weekly.id, rank };
+    void storage.set(LEAGUE_PLACE_KEY, JSON.stringify(this.place));
+  }
+
+  /** The solo area the big button flies: the last one, if it's still open, else the first. */
+  private soloIndex(): number {
+    const e = ENVIRONMENTS[this.lastSolo];
+    return e && this.g.solo.envOpen(e) ? this.lastSolo : 0;
+  }
 
   /** How much of the game is open to this player (new players see it in stages: reveal.ts). */
   private revealStage(): number {
@@ -21,10 +75,40 @@ export class TitleScreen {
     return this.g.allOpen || isOpen(f, this.revealStage());
   }
 
-  /** The big button: ranked once it's open, endless before. */
+  /** The big button: the mode on show. */
   startPrimary(): void {
-    if (this.open('ranked')) this.g.startRanked();
+    const m = this.mode;
+    if (m === 'ranked') this.g.startRanked();
+    else if (m === 'solo') this.g.startSolo(this.soloIndex());
+    else if (m === 'daily') this.g.courseRuns.startDaily();
+    else if (m === 'zen') this.g.startZen();
     else this.g.startEndless();
+  }
+
+  /** The big button's name and the line under it, for the mode on show. */
+  private primary(now: number): [string, string] {
+    const best = (n: number, rest: string) => (n > 0 ? `best ${formatScore(n)}${rest ? ` · ${rest}` : ''}` : rest);
+    switch (this.mode) {
+      case 'ranked': {
+        const lg = this.g.leagues;
+        const place = this.place?.week === this.g.weekly.id ? `#${this.place.rank} in ` : '';
+        const league = `${place}${leagueName(lg.league, lg.division)}`;
+        const wb = this.g.progress.weeklyBest(this.g.weekly.id);
+        return ['ranked', wb > 0 ? `this week ${formatScore(wb)} · ${league}` : `the same run for everyone · ${league}`];
+      }
+      case 'solo': {
+        const e = ENVIRONMENTS[this.soloIndex()];
+        return ['solo', best(this.g.progress.envBest[e.id] ?? 0, e.name)];
+      }
+      case 'daily': {
+        const b = this.g.challenge.bestOn(this.g.today.day);
+        return ['daily', `${b > 0 ? `today ${formatScore(b)}` : 'a new course'} · ${formatWait(untilTomorrow(now))} left`];
+      }
+      case 'zen':
+        return ['zen', 'just fly: no score, crashes fade'];
+      default:
+        return ['endless', this.g.progress.endlessBest > 0 ? `best ${formatScore(this.g.progress.endlessBest)}` : 'every area in turn'];
+    }
   }
 
   /** Say so, once, when a new part of the game opens. */
@@ -95,21 +179,17 @@ export class TitleScreen {
     this.g.ui.setTitleLeague(emblem(lg.league, lg.division), `${leagueName(lg.league, lg.division)} · ${lg.lp} lp`, lg.lp / LP_PER_DIVISION);
     const next = RANKS[i + 1];
     this.g.ui.setTitleRank(insignia(i), rankName(i), next ? `${formatScore(xpToRank(this.g.ranked.xp, i + 1))} xp to ${rankName(i + 1)}` : 'the top rank');
-    const wb = this.g.progress.weeklyBest(this.g.weekly.id);
     const now = this.g.now();
     const runs = this.g.progress.stats.validRuns;
-    if (this.open('ranked')) this.g.ui.setPrimary('ranked', wb > 0 ? `your best this week ${formatScore(wb)}` : 'the same run for everyone, all week');
-    else
-      this.g.ui.setPrimary(
-        'fly',
-        this.g.progress.endlessBest > 0 ? `endless · best ${formatScore(this.g.progress.endlessBest)}` : 'endless: every area in turn',
-      );
+    const [name, sub] = this.primary(now);
+    this.g.ui.setPrimary(name, sub);
+    this.g.ui.setModeChip(this.mode);
     this.g.ui.setFeatures((f) =>
-      f === 'endless' || f === 'zen' || f === 'league'
+      f === 'endless' || f === 'zen' || f === 'league' || f === 'ranked'
         ? this.open('ranked')
         : f === 'boards'
           ? this.open('leaderboard')
-          : f === 'solo' || f === 'shop' || f === 'record'
+          : f === 'solo' || f === 'shop' || f === 'record' || f === 'daily'
             ? this.open(f)
             : true,
     );
