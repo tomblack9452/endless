@@ -273,7 +273,7 @@ export class ShopScreens {
     for (const p of CONFIG.economy.store.products) {
       const img = `store/${p.id}.png`;
       if ('look' in p) {
-        const mine = this.g.ownsProduct(p.id);
+        const mine = this.g.purchases.ownsProduct(p.id);
         extras.push({
           img,
           name: 'starter pack',
@@ -472,9 +472,9 @@ export class ShopScreens {
       this.openStore();
     } else if (act === 'pass-cores') this.onPassPremium();
     else if (act === 'pass-open') this.openPass('store');
-    else if (act === 'restore') void this.g.restorePurchases();
+    else if (act === 'restore') void this.g.purchases.restorePurchases();
     else if (act.startsWith('swap-')) this.swapCores(Number(act.slice(5)));
-    else if (CONFIG.economy.store.products.some((p) => p.id === act)) void this.g.buyProduct(act as ProductId);
+    else if (CONFIG.economy.store.products.some((p) => p.id === act)) void this.g.purchases.buyProduct(act as ProductId);
   };
 
   /** Cores into credits, at the shop's rate. */
