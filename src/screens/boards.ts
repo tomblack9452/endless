@@ -126,7 +126,7 @@ export class BoardScreens {
   /** Send your service record's summary to the boards if it's changed since last time. */
   private async syncRecord(): Promise<void> {
     if (!this.g.backend.online) return;
-    const stats = this.g.pilotStats();
+    const stats = this.g.record.pilotStats();
     const key = JSON.stringify(stats);
     if (key === this.g.recordSent) return;
     if (await this.g.backend.setRecord(stats)) this.g.recordSent = key;

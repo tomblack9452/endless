@@ -51,7 +51,7 @@ import { type Reward, rewardLook, rewardParts, rewardText } from '../economy/rew
 import { DailyShop } from '../economy/shop';
 import { dayKey, formatWait, untilTomorrow } from '../economy/time';
 import { EconomyView } from '../economy/view';
-import { type BoardId, createBackend, type PilotStats, type RunSubmission } from '../server/backend';
+import { type BoardId, createBackend, type RunSubmission } from '../server/backend';
 import { BOARD_TABS, boardForRun } from '../server/boards';
 import { Outbox } from '../server/outbox';
 import { CloudSave } from '../server/sync';
@@ -72,7 +72,7 @@ import type { Fin, Marking } from '../ship/looks';
 import { MAX_TIER, type ShipStats, STANDARD, SYSTEMS, type SystemId, TIER_LEAGUE, Upgrades } from '../ship/upgrades';
 import { newSeed } from './rng';
 import { loadNumber } from './storage';
-import { type Celebration, formatScore, type ProgressView, type RankResultView, type TitleCard, UI } from '../ui/ui';
+import { type Celebration, formatScore, type RankResultView, type TitleCard, UI } from '../ui/ui';
 import type { RoomId } from '../world/interior';
 import { biomeForLevel, type PowerKind, themeForLevel, themeName, World } from '../world/world';
 import { tintBiome } from '../world/biomes';
@@ -86,6 +86,7 @@ import { HangarScreens } from '../screens/hangar';
 import { ReminderPrompts } from '../platform/reminderPrompts';
 import { AccountScreens } from '../screens/account';
 import { FirstLaunch } from '../screens/onboarding';
+import { RecordScreen } from '../screens/record';
 
 type State = 'title' | 'playing' | 'paused' | 'countdown' | 'crashed' | 'finished';
 
@@ -404,6 +405,8 @@ export class Game {
   readonly account = new AccountScreens(this);
 
   readonly firstLaunch = new FirstLaunch(this);
+
+  readonly record = new RecordScreen(this);
 
   constructor(canvas: HTMLCanvasElement) {
     this.basePalette.set(BASE_PALETTE);
@@ -1287,7 +1290,7 @@ export class Game {
       icon: insignia(r.rankAfter),
       rank: rankName(r.rankAfter),
       promoted,
-      xpFraction: this.xpFraction(),
+      xpFraction: this.record.xpFraction(),
       lines,
     };
     this.ui.setGameOverRank(view);
@@ -1346,11 +1349,6 @@ export class Game {
     return out;
   }
 
-  /** The most recent `n` ranked runs, oldest first. */
-  private recentRanked(n: number) {
-    return this.ranked.history.slice(-n);
-  }
-
   // --- leaderboards ----------------------------------------------------------------
 
   /** Send a finished run to its board. Assisted and dev runs never go. */
@@ -1396,90 +1394,6 @@ export class Game {
     const key = JSON.stringify(ship);
     if (key === this.shipSent) return;
     if (await this.backend.setShip(ship)) this.shipSent = key;
-  }
-
-  /** Your service record's summary, as others see it when they tap you on a board. */
-  pilotStats(): PilotStats {
-    const s = this.progress.stats;
-    return {
-      rank: this.ranked.rank,
-      xp: Math.floor(this.ranked.xp),
-      runs: s.runs,
-      seconds: Math.floor(s.seconds),
-      distance: Math.floor(s.distance),
-      bestLevel: s.bestLevel,
-      bestChain: s.bestChain,
-      nearMisses: s.nearMisses,
-      pickups: s.pickups,
-      rankedRuns: this.ranked.history.length,
-    };
-  }
-
-  /** How far through the current rank's XP band the player is (0..1). */
-  private xpFraction(): number {
-    const i = this.ranked.rank;
-    if (i >= RANKS.length - 1) return 1;
-    const lo = RANKS[i].xp;
-    const hi = RANKS[i + 1].xp;
-    return Math.max(0, Math.min(1, (this.ranked.xp - lo) / (hi - lo)));
-  }
-
-  /** The service record: your rank (and the ladder), and your lifetime stats. */
-  private openRecord(tab: 'rank' | 'stats' = 'rank'): void {
-    this.renderStats();
-    this.ui.setRecordTab(tab);
-    const rk = this.ranked;
-    const i = rk.rank;
-    const next = RANKS[i + 1];
-    const xpLeft = next ? xpToRank(rk.xp, i + 1) : 0;
-    const checks: ProgressView['checks'] = [];
-    if (next) {
-      checks.push({ label: `${formatScore(next.xp)} xp`, value: `${formatScore(rk.xp)} now`, met: xpLeft === 0 });
-    }
-    const big = formatScore(next ? xpLeft : rk.xp);
-    const goal = next ? `xp to ${rankName(i + 1)}` : 'xp. top rank reached';
-
-    const recent = this.recentRanked(20);
-    const xpSum = recent.reduce((t, h) => t + h.xp, 0);
-    const avg = recent.length ? Math.round(xpSum / recent.length) : 0;
-    const runsToGo = avg > 0 ? Math.ceil(xpLeft / avg) : 0;
-    const b = rk.bests(this.now());
-
-    this.ui.renderProgress('record', {
-      icon: insignia(i),
-      name: rankName(i),
-      big,
-      goal,
-      fraction: this.xpFraction(),
-      detail: next
-        ? `${formatScore(rk.xp - RANKS[i].xp)} / ${formatScore(next.xp - RANKS[i].xp)} xp this rank${runsToGo ? ` · about ${runsToGo} run${runsToGo === 1 ? '' : 's'}` : ''}`
-        : 'general grade 4: the top',
-      checks,
-      gives: next ? [{ title: `${rankName(i + 1)} gives`, items: this.rankGives(i + 1) }] : [],
-      trend: {
-        title: recent.length ? `last ${recent.length} runs` : 'recent runs',
-        values: recent.map((h) => h.xp),
-        summary: recent.length ? `+${formatScore(xpSum)} xp · avg ${avg}` : '',
-        unit: 'xp',
-      },
-      rows: [
-        ['xp in ranked', `1 per ${formatScore(CONFIG.rank.rankedPointsPerXp)} points`],
-        ['xp in other modes', `1 per ${formatScore(CONFIG.rank.pointsPerXp)} points`],
-        ['xp for a goal', String(CONFIG.rank.goalXp)],
-        ['double xp runs left today', String(rk.bonusRunsLeft(this.now()))],
-        ['best this week', formatScore(b.week)],
-        ['best ever', formatScore(b.all)],
-        ['ranked runs', formatScore(rk.history.length)],
-      ],
-      ladder: RANKS.map((r, k) => ({
-        icon: insignia(k),
-        name: rankName(k),
-        needs: `${formatScore(r.xp)} xp`,
-        gives: k === 0 ? '' : this.rankGives(k).join(' · '),
-        state: k < i ? 'done' : k === i ? 'current' : 'locked',
-      })),
-    });
-    this.openInfo('record');
   }
 
   /** Dev: steer down the safe lane, as the fairness tests do. */
@@ -1749,7 +1663,7 @@ export class Game {
     else if (name === 'zen') this.startZen();
     else if (name === 'challenge') this.startDaily();
     else if (name === 'solo') this.openSolo();
-    else if (name === 'record') this.openRecord();
+    else if (name === 'record') this.record.openRecord();
     else if (name === 'goals') this.goals.openGoals();
     else if (name === 'hangar') this.hangarScreen.openHangar();
     else if (name === 'shop') {
@@ -1885,28 +1799,6 @@ export class Game {
     this.refreshBar(now);
     this.announceReveal();
     this.cloud.push(); // most changes end here: keep the cloud save current
-  }
-
-  private renderStats(): void {
-    const s = this.progress.stats;
-    const hours = Math.floor(s.seconds / 3600);
-    const mins = Math.floor((s.seconds % 3600) / 60);
-    const worst = this.progress.worstPlace();
-    this.ui.renderStats([
-      ['runs', formatScore(s.runs)],
-      ['time played', hours > 0 ? `${hours}h ${mins}m` : `${mins}m`],
-      ['distance', `${(s.distance / 1000).toFixed(1)} km`],
-      ['best this week (ranked)', formatScore(this.progress.weeklyBest(this.weekly.id))],
-      ['best today (daily)', formatScore(this.challenge.bestOn(this.today.day))],
-      ['daily streak', `${this.challenge.streakOn(this.today.day)} (longest ${this.challenge.longest})`],
-      ['best endless', formatScore(this.progress.endlessBest)],
-      ...ENVIRONMENTS.map((e): [string, string] => [`best solo: ${e.name}`, formatScore(this.progress.envBest[e.id] ?? 0)]),
-      ['furthest level', String(s.bestLevel || 1)],
-      ['best chain', `x${s.bestChain}`],
-      ['near misses', formatScore(s.nearMisses)],
-      ['pickups', formatScore(s.pickups)],
-      ['crash most in', worst ? `${worst} (${s.crashes[worst]})` : '-'],
-    ]);
   }
 
   /**
