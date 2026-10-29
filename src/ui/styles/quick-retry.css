@@ -1,0 +1,53 @@
+/* Quick retry: a small panel over the frozen scene in place of the game-over screen. */
+.quick-retry {
+  position: absolute;
+  left: 16px;
+  right: 16px;
+  top: 50%;
+  z-index: 90;
+  width: fit-content;
+  max-width: min(440px, calc(100% - 32px));
+  margin: 0 auto;
+  padding: 12px 20px 10px;
+  border-radius: 16px;
+  background: var(--ui-bg);
+  color: var(--ui-fg);
+  border: 1px solid color-mix(in srgb, var(--ui-fg) 18%, transparent);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  text-align: center;
+  text-shadow: none;
+  animation: quick-retry 240ms ease-out both;
+}
+
+.quick-retry[hidden] {
+  display: none;
+}
+
+.quick-retry-menu {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  padding: 6px 14px;
+  margin: -2px 0 -6px;
+}
+
+@keyframes quick-retry {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+.reduce-motion .quick-retry {
+  animation-name: quick-retry-fade;
+}
+
+@keyframes quick-retry-fade {
+  from {
+    opacity: 0;
+  }
+}

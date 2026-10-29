@@ -1,0 +1,90 @@
+/* The offer dialog (revive): the promotion card's look. */
+.offer {
+  cursor: default;
+}
+
+.offer-ring {
+  --left: 1;
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 84px;
+  height: 84px;
+  margin: 18px 0 8px;
+  border-radius: 50%;
+  background: conic-gradient(var(--text) calc(var(--left) * 360deg), color-mix(in srgb, var(--text) 14%, transparent) 0);
+  font-size: calc(28px * var(--ui-scale));
+}
+
+.offer-ring::before {
+  content: "";
+  position: absolute;
+  inset: 5px;
+  border-radius: 50%;
+  background: var(--ui-bg);
+}
+
+.offer-ring span {
+  position: relative;
+}
+
+.offer-ring[hidden] {
+  display: none;
+}
+
+.pill.offer-yes {
+  margin-top: 22px;
+  min-width: 220px;
+}
+
+.pill.offer-alt {
+  margin-top: 10px;
+  min-width: 220px;
+}
+
+.offer-no {
+  margin-top: 16px;
+  padding: 8px 16px;
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+
+/* 3-2-1 before a revived (or resumed) run carries on. */
+.countdown {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  place-items: center;
+  font-size: calc(96px * var(--ui-scale));
+  font-weight: 300;
+  pointer-events: none;
+  text-shadow:
+    0 0 2px var(--sky, transparent),
+    0 0 18px var(--sky, transparent);
+}
+
+.countdown:empty {
+  display: none;
+}
+
+.countdown.tick {
+  animation: count-tick 1s ease-out;
+}
+
+@keyframes count-tick {
+  0% {
+    transform: scale(1.5);
+  }
+  25% {
+    transform: none;
+  }
+}
+
+.reduce-motion .countdown.tick,
+.reduce-motion .coin.bump {
+  animation: none;
+}

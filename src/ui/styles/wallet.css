@@ -1,0 +1,89 @@
+/* --- Economy ----------------------------------------------------------------- */
+
+/* Wallet bar, top right of the title: credits and cores. */
+.wallet-bar {
+  position: absolute;
+  top: calc(var(--safe-top) + 12px);
+  right: calc(var(--safe-right) + 16px);
+  z-index: 2;
+  display: flex;
+  gap: 6px;
+}
+
+/* No connection to the server: a quiet word beside the wallet. */
+.offline-mark {
+  align-self: center;
+  margin-right: 2px;
+  color: var(--ui-fg);
+  font-size: calc(10px * var(--ui-scale));
+  letter-spacing: 0.16em;
+  opacity: 0.6;
+  border-bottom-style: dashed;
+  pointer-events: none;
+}
+
+.coin {
+  color: var(--ui-fg);
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: calc(30px * var(--ui-scale));
+  padding: 0 10px 0 7px;
+  font: inherit;
+  font-size: calc(12px * var(--ui-scale));
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  background: color-mix(in srgb, var(--ui-bg) 70%, transparent);
+  border: 1px solid color-mix(in srgb, currentColor 30%, transparent);
+  border-radius: 999px;
+  pointer-events: auto;
+  cursor: pointer;
+}
+
+.coin svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linejoin: round;
+}
+
+.coin.premium svg {
+  stroke: #8a63d2;
+}
+
+.coin.bump {
+  animation: coin-bump 420ms ease-out;
+}
+
+@keyframes coin-bump {
+  30% {
+    transform: scale(1.18);
+  }
+  100% {
+    transform: none;
+  }
+}
+
+/* A dot on a title chip: something to claim. */
+.chip .news {
+  display: none;
+  width: 6px;
+  height: 6px;
+  margin-left: 5px;
+  vertical-align: 2px;
+  border-radius: 50%;
+  background: #e0503f;
+}
+
+.chip .news.on {
+  display: inline-block;
+}
+
+.group-note {
+  float: right;
+  text-transform: none;
+  letter-spacing: 0.06em;
+  font-weight: 400;
+}

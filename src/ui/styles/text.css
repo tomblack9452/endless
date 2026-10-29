@@ -1,0 +1,85 @@
+/* Text */
+
+.label {
+  font-size: calc(14px * var(--ui-scale));
+  font-weight: 400;
+  letter-spacing: 0.03em;
+  text-transform: lowercase;
+  line-height: 1.7;
+}
+
+.dim {
+  opacity: 0.72;
+}
+
+/* Text over the live scene (HUD, hints, combo, banners): a soft halo in the
+   sky colour keeps it readable when a tree or a light passes behind it. */
+#hud,
+.notice,
+.hint,
+.combo,
+.banner,
+#screen-title {
+  text-shadow:
+    0 0 2px var(--sky, transparent),
+    0 0 10px var(--sky, transparent);
+}
+
+.score {
+  font-size: calc(36px * var(--ui-scale));
+  font-weight: 300;
+  letter-spacing: 0.04em;
+  line-height: 1;
+}
+
+.link {
+  pointer-events: auto;
+  cursor: pointer;
+  padding: 10px 0 10px 16px;
+  margin: -10px 0 -10px -16px;
+}
+
+/* Text-only button: no fill, 1px underline, generous invisible hit area. */
+.button {
+  display: block;
+  font: inherit;
+  font-size: calc(13px * var(--ui-scale));
+  color: inherit;
+  background: none;
+  border: 0;
+  border-bottom: 1px solid currentColor;
+  border-radius: 0;
+  padding: 0 0 3px;
+  margin-bottom: 14px;
+  position: relative;
+  pointer-events: auto;
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.button::after {
+  content: "";
+  position: absolute;
+  inset: -16px -20px;
+}
+
+.button:focus {
+  outline: none;
+}
+
+.button:focus-visible {
+  border-bottom-width: 2px;
+  padding-bottom: 2px;
+}
+
+.button:active {
+  opacity: 0.55;
+}
+
+.rule {
+  display: inline-block;
+  margin-top: 26px;
+  padding-bottom: 3px;
+  border-bottom: 1px solid currentColor;
+}

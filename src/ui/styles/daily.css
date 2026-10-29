@@ -1,0 +1,54 @@
+/* Daily: a week of login rewards, then quests. */
+.calendar {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.cal-day {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 6px;
+  text-align: center;
+  border: 1px solid color-mix(in srgb, currentColor 25%, transparent);
+  border-radius: 12px;
+}
+
+.cal-day:last-child {
+  grid-column: span 2;
+}
+
+.cal-day.claimed {
+  opacity: 0.45;
+}
+
+.cal-day.today {
+  border-color: currentColor;
+  background: color-mix(in srgb, currentColor 8%, transparent);
+}
+
+.cal-num {
+  font-size: calc(10px * var(--ui-scale));
+  letter-spacing: 0.16em;
+}
+
+.cal-reward {
+  font-size: calc(11px * var(--ui-scale));
+  line-height: 1.3;
+}
+
+.pill.daily-claim {
+  width: 100%;
+  margin-top: 12px;
+}
+
+.over-rewards {
+  margin-top: 12px;
+  line-height: 1.8;
+}
+
+.over-rewards:empty {
+  display: none;
+}

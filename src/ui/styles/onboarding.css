@@ -1,0 +1,418 @@
+/* First launch: the welcome sheet, and the practice run's prompt. */
+.settings.welcome-sheet {
+  height: auto; /* as tall as what it holds, up to the max */
+  max-height: 60%;
+  padding-top: 16px;
+}
+
+/* Choosing controls: the cards need the room more than the ship above does. */
+.welcome-sheet:has([data-welcome="controls"]:not([hidden])),
+.welcome-sheet:has([data-welcome="feel"]:not([hidden])) {
+  max-height: 78%;
+}
+
+/* A short phone (360 x 640): dressing the ship needs its "ready" in view more than the ship above needs the room. */
+@media (max-height: 700px) {
+  .settings.welcome-sheet {
+    max-height: 68%;
+  }
+}
+
+.welcome-sheet .pill.sheet-buy + .pill.sheet-buy {
+  margin-top: 8px;
+}
+
+.welcome-skip {
+  display: block;
+  margin: 14px auto 0;
+  padding: 6px;
+  font: inherit;
+  font-size: calc(12px * var(--ui-scale));
+  color: inherit;
+  background: none;
+  border: none;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+/* The control cards (welcome and "how did that feel?"): one column each, a
+   moving diagram over the name, how it works and what it's good for. */
+.ctl-cards {
+  display: grid;
+  grid-template-columns: repeat(var(--cards, 3), minmax(0, 1fr));
+  gap: 8px;
+  margin: 12px 0 4px;
+}
+
+.ctl-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+  padding: 10px 6px 10px;
+  font: inherit;
+  color: inherit;
+  text-align: center;
+  background: color-mix(in srgb, currentColor 4%, transparent);
+  border: 1px solid color-mix(in srgb, currentColor 22%, transparent);
+  border-radius: 16px;
+  cursor: pointer;
+  text-shadow: none;
+  transition:
+    border-color 150ms ease-out,
+    background-color 150ms ease-out;
+}
+
+.ctl-card.on {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 9%, transparent);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+.ctl-card:active {
+  transform: scale(0.98);
+}
+
+.ctl-card:focus {
+  outline: none;
+}
+
+.ctl-card:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+}
+
+.ctl-art {
+  display: block;
+  width: calc(56px * var(--ui-scale));
+  max-width: 100%;
+}
+
+.ctl-svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+
+.ctl-name {
+  margin-top: 4px;
+  font-family: var(--font-mono);
+  font-size: calc(12px * var(--ui-scale));
+  letter-spacing: 0.12em;
+}
+
+.ctl-card.on .ctl-name {
+  font-weight: 500;
+}
+
+.ctl-line {
+  font-size: calc(11.5px * var(--ui-scale));
+  line-height: 1.35;
+  opacity: 0.85;
+  text-wrap: balance;
+}
+
+.ctl-good {
+  margin-top: 3px;
+  font-size: calc(10.5px * var(--ui-scale));
+  line-height: 1.3;
+  opacity: 0.6;
+  text-wrap: balance;
+}
+
+/* "used": the controls the last run was flown with. */
+.ctl-tag {
+  position: absolute;
+  top: -8px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 1px 8px;
+  font-family: var(--font-mono);
+  font-size: calc(10px * var(--ui-scale));
+  letter-spacing: 0.14em;
+  color: var(--ui-bg);
+  background: var(--ui-fg);
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.welcome-later {
+  text-align: center;
+}
+
+/* Control diagrams (controlArt.ts): a loop each way, in step with the card's
+   name. data-dir holds one way and pulses (the steering lesson); reduce motion
+   stands them still, with arrows each way. */
+.ctl-svg .art-fill,
+.ctl-svg .art-press {
+  fill: currentColor;
+  fill-opacity: 0.22;
+}
+
+.ctl-svg .art-half {
+  fill: currentColor;
+  fill-opacity: 0;
+  stroke: none;
+}
+
+.ctl-svg .art-key rect {
+  fill: currentColor;
+  fill-opacity: 0;
+}
+
+.ctl-svg .art-text {
+  fill: currentColor;
+  stroke: none;
+  font-family: var(--font-mono);
+  font-size: 7px;
+  text-anchor: middle;
+}
+
+.ctl-svg .art-ship-shape {
+  fill: currentColor;
+}
+
+.ctl-svg .art-trail,
+.ctl-svg .art-arc {
+  opacity: 0.45;
+}
+
+.ctl-svg .art-rm {
+  display: none;
+}
+
+.ctl-svg .art-move-t {
+  animation: art-swing 2.8s ease-in-out infinite;
+}
+
+.ctl-svg .art-move-s {
+  animation: art-follow 2.8s ease-in-out infinite;
+}
+
+.ctl-svg .art-phone {
+  transform-box: view-box;
+  transform-origin: 32px 40px;
+  animation: art-rock 2.8s ease-in-out infinite;
+}
+
+.ctl-svg .art-half-l,
+.ctl-svg .art-key-l rect {
+  animation: art-on-first 2.8s step-end infinite;
+}
+
+.ctl-svg .art-half-r,
+.ctl-svg .art-key-r rect {
+  animation: art-on-second 2.8s step-end infinite;
+}
+
+.ctl-svg .art-press-l {
+  animation: art-show-first 2.8s step-end infinite;
+}
+
+.ctl-svg .art-press-r {
+  animation: art-show-second 2.8s step-end infinite;
+}
+
+/* Tap sides and keys: the ship goes left while the left is held, then right. */
+.ctl-art:has(.art-half) .art-move-s,
+.ctl-art:has(.art-key) .art-move-s {
+  animation-name: art-step;
+}
+
+@keyframes art-swing {
+  0%,
+  100% {
+    transform: translateX(-12px);
+  }
+  50% {
+    transform: translateX(12px);
+  }
+}
+
+@keyframes art-follow {
+  0%,
+  100% {
+    transform: translateX(-11px);
+  }
+  50% {
+    transform: translateX(11px);
+  }
+}
+
+@keyframes art-step {
+  0% {
+    transform: translateX(11px);
+  }
+  15%,
+  50% {
+    transform: translateX(-11px);
+  }
+  65%,
+  100% {
+    transform: translateX(11px);
+  }
+}
+
+@keyframes art-rock {
+  0%,
+  100% {
+    transform: rotate(-13deg);
+  }
+  50% {
+    transform: rotate(13deg);
+  }
+}
+
+@keyframes art-on-first {
+  0% {
+    fill-opacity: 0.24;
+  }
+  50% {
+    fill-opacity: 0;
+  }
+}
+
+@keyframes art-on-second {
+  0% {
+    fill-opacity: 0;
+  }
+  50% {
+    fill-opacity: 0.24;
+  }
+}
+
+@keyframes art-show-first {
+  0% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0;
+  }
+}
+
+@keyframes art-show-second {
+  0% {
+    opacity: 0;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes art-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+/* Held one way: everything leans that way and the part to use pulses. */
+.ctl-art[data-dir] .ctl-svg * {
+  animation: none;
+}
+
+.ctl-art[data-dir="l"] .art-move-t {
+  transform: translateX(-12px);
+}
+.ctl-art[data-dir="r"] .art-move-t {
+  transform: translateX(12px);
+}
+.ctl-art[data-dir="l"] .art-move-s {
+  transform: translateX(-11px);
+}
+.ctl-art[data-dir="r"] .art-move-s {
+  transform: translateX(11px);
+}
+.ctl-art[data-dir="l"] .art-phone {
+  transform: rotate(-13deg);
+}
+.ctl-art[data-dir="r"] .art-phone {
+  transform: rotate(13deg);
+}
+.ctl-art[data-dir] .art-press {
+  opacity: 0;
+}
+
+.ctl-art[data-dir="l"] :is(.art-half-l, .art-key-l rect),
+.ctl-art[data-dir="r"] :is(.art-half-r, .art-key-r rect) {
+  fill-opacity: 0.26;
+}
+
+.ctl-art[data-dir="l"] :is(.art-move-t, .art-half-l, .art-key-l, .art-press-l),
+.ctl-art[data-dir="r"] :is(.art-move-t, .art-half-r, .art-key-r, .art-press-r) {
+  opacity: 1;
+  animation: art-pulse 0.9s ease-in-out infinite;
+}
+
+/* Still: no loop, the ship in the middle, arrows each way (or the one way to go). */
+.reduce-motion .ctl-svg *,
+.reduce-motion .ctl-art[data-dir] .ctl-svg * {
+  animation: none !important;
+}
+
+.reduce-motion .ctl-art:not([data-dir]) .art-move-t,
+.reduce-motion .ctl-art:not([data-dir]) .art-move-s,
+.reduce-motion .ctl-art:not([data-dir]) .art-phone {
+  transform: none;
+}
+
+.reduce-motion .ctl-art:not([data-dir]) .art-half,
+.reduce-motion .ctl-art:not([data-dir]) .art-key rect {
+  fill-opacity: 0.1;
+}
+
+.reduce-motion .ctl-art:not([data-dir]) .art-press {
+  opacity: 0;
+}
+
+.reduce-motion .ctl-art:not([data-dir]) .art-rm {
+  display: inline;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ctl-svg * {
+    animation: none !important;
+  }
+  .ctl-art:not([data-dir]) .art-move-t,
+  .ctl-art:not([data-dir]) .art-move-s,
+  .ctl-art:not([data-dir]) .art-phone {
+    transform: none;
+  }
+  .ctl-art:not([data-dir]) .art-press {
+    opacity: 0;
+  }
+  .ctl-art:not([data-dir]) .art-rm {
+    display: inline;
+  }
+}
+
+/* The practice run's lesson card: the top band, under the score. */
+.tutorial {
+  color: var(--ui-fg);
+  position: absolute;
+  left: calc(var(--safe-left) + 20px);
+  right: calc(var(--safe-right) + 20px);
+  top: calc(var(--safe-top) + 92px);
+  z-index: 5;
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  max-width: 440px;
+  margin: 0 auto;
+  padding: 10px 16px 6px;
+  text-align: center;
+  background: color-mix(in srgb, var(--ui-bg) 90%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ui-fg) 12%, transparent);
+  border-radius: 16px;
+  pointer-events: auto;
+}
+
+.tutorial[hidden] {
+  display: none;
+}

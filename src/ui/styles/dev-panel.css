@@ -1,0 +1,197 @@
+/* Dev panel (dev server only). */
+.dev-fps {
+  position: absolute;
+  text-align: right;
+  white-space: pre;
+  right: calc(var(--safe-right) + 22px);
+  top: calc(var(--safe-top) + 64px);
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+.dev-link {
+  position: absolute;
+  left: calc(var(--safe-left) + 66px);
+  top: calc(var(--safe-top) + 18px);
+}
+
+.dev-panel {
+  position: absolute;
+  left: calc(var(--safe-left) + 22px);
+  right: calc(var(--safe-right) + 22px);
+  top: calc(var(--safe-top) + 56px);
+  pointer-events: auto;
+}
+
+.dev-open .title-mark,
+.dev-open .screen-center {
+  visibility: hidden;
+}
+
+.dev-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px 12px;
+  margin: 8px 0 14px;
+}
+
+.dev-level,
+.dev-toggle {
+  font: inherit;
+  font-size: calc(11px * var(--ui-scale));
+  color: inherit;
+  background: none;
+  border: 0;
+  border-bottom: 1px solid currentColor;
+  border-radius: 0;
+  padding: 8px 0 4px;
+  text-align: left;
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.dev-toggle {
+  display: block;
+  margin-top: 6px;
+}
+
+/* Room name under the progress line as you enter a room in the ship. */
+.room-label {
+  margin-top: 8px;
+  min-height: 1.9em;
+  opacity: 0;
+}
+
+.room-label.show {
+  animation: room-label 2400ms ease-out both;
+}
+
+@keyframes room-label {
+  0% {
+    opacity: 0;
+  }
+  12%,
+  75% {
+    opacity: 0.6;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+/* Short notices (e.g. tilt unavailable): low on screen, fade in and out. */
+/* Notices sit above every screen and panel (the shop's sheet used to hide
+   them), in a small pill so they read over the game or a menu alike. */
+.notice {
+  position: absolute;
+  left: 16px;
+  right: 16px;
+  bottom: calc(var(--safe-bottom) + 120px);
+  z-index: 100;
+  width: fit-content;
+  max-width: min(440px, calc(100% - 32px));
+  margin: 0 auto;
+  padding: 8px 14px;
+  border-radius: 14px;
+  background: var(--ui-bg);
+  color: var(--ui-fg);
+  border: 1px solid color-mix(in srgb, var(--ui-fg) 18%, transparent);
+  text-align: center;
+  text-shadow: none;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.notice.show {
+  animation: notice 4500ms ease-out both;
+}
+
+@keyframes notice {
+  0% {
+    opacity: 0;
+  }
+  8%,
+  80% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+/* First-run hints: between the horizon and the ship, above the combo. */
+.hint {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  text-align: center;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.hint.show {
+  animation: hint 3600ms ease-out both;
+}
+
+/* The walkthrough's tips wrap clear of the edges, and grow upwards from the middle so a
+   long one (or large text) never runs into the near-miss chain below. */
+.hint {
+  top: auto;
+  bottom: 50%;
+  padding: 0 calc(var(--safe-right) + 28px) 0 calc(var(--safe-left) + 28px);
+}
+
+#hint-text {
+  text-wrap: balance;
+}
+
+/* "skip tips" under a tip: small, and the only part of the hint that takes a tap. */
+.hint-skip {
+  display: inline-block;
+  margin: 2px 0 0;
+  padding: 8px 14px;
+  font: inherit;
+  font-size: calc(11px * var(--ui-scale));
+  letter-spacing: 0.08em;
+  color: inherit;
+  background: none;
+  border: none;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  opacity: 0.8;
+}
+
+.hint-skip[hidden] {
+  display: none;
+}
+
+/* "send feedback" under the pause menu. */
+.pause-feedback {
+  margin: 28px 0 0;
+  padding: 10px 16px;
+  font: inherit;
+  font-size: calc(12px * var(--ui-scale));
+  color: inherit;
+  background: none;
+  border: none;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  opacity: 0.8;
+}
+
+@keyframes hint {
+  0% {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  10%,
+  80% {
+    opacity: 0.9;
+    transform: none;
+  }
+  100% {
+    opacity: 0;
+  }
+}

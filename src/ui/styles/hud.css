@@ -1,0 +1,340 @@
+/* HUD */
+
+.hud-top {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: start;
+}
+
+.hud-side {
+  padding-top: 2px;
+}
+
+.level-num {
+  font-size: calc(22px * var(--ui-scale));
+  font-weight: 400;
+  line-height: 1;
+  letter-spacing: 0.04em;
+}
+
+.hud-centre {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+/* Progress to the next level: a 1px track with a solid fill. */
+.progress {
+  position: relative;
+  width: 64px;
+  height: 1px;
+  margin-top: 10px;
+  overflow: hidden;
+}
+
+.progress::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: currentColor;
+  opacity: 0.22;
+}
+
+.progress-fill {
+  position: absolute;
+  inset: 0;
+  background: currentColor;
+  transform-origin: left center;
+  transform: scaleX(0);
+}
+
+/* Boost control: hold in this corner. Large invisible hit area. */
+/* Boost button: a dial whose ring fills with the meter. Its touch area is
+   bigger than it looks. Bottom right by default; left or middle in settings. */
+.hud-boost {
+  --meter: 0;
+  position: absolute;
+  right: calc(var(--safe-right) + 18px);
+  bottom: calc(var(--safe-bottom) + 22px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 24px 18px 14px 30px;
+  margin: -24px -18px -14px -30px;
+  pointer-events: auto;
+  cursor: pointer;
+  opacity: 0.55;
+  transition: opacity 150ms ease-out;
+  touch-action: none;
+}
+
+.hud-boost.ready {
+  opacity: 1;
+}
+
+.boost-dial {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: calc(72px * var(--ui-scale));
+  height: calc(72px * var(--ui-scale));
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--sky, #f1ede4) 55%, transparent);
+  transition:
+    transform 120ms ease-out,
+    background 150ms ease-out;
+}
+
+/* The meter ring. */
+.boost-dial::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: conic-gradient(currentColor calc(var(--meter) * 360deg), color-mix(in srgb, currentColor 18%, transparent) 0);
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 5px), #000 calc(100% - 4px));
+  mask: radial-gradient(farthest-side, transparent calc(100% - 5px), #000 calc(100% - 4px));
+}
+
+.boost-dial svg {
+  width: 24px;
+  height: 24px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.boost-num {
+  font-size: calc(11px * var(--ui-scale));
+  letter-spacing: 0.06em;
+  line-height: 1;
+  margin-top: 2px;
+}
+
+.boost-caption {
+  font-size: calc(10px * var(--ui-scale));
+  letter-spacing: 0.24em;
+  margin-right: -0.24em;
+}
+
+.hud-boost.active .boost-dial {
+  transform: scale(1.1);
+  color: var(--sky, #f1ede4);
+  background: var(--text);
+}
+
+.hud-boost.active .boost-dial::before {
+  background: conic-gradient(var(--sky, #f1ede4) calc(var(--meter) * 360deg), transparent 0);
+}
+
+.boost-left .hud-boost {
+  right: auto;
+  left: calc(var(--safe-left) + 18px);
+  padding: 24px 30px 14px 18px;
+  margin: -24px -30px -14px -18px;
+}
+
+.boost-middle .hud-boost {
+  right: auto;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 24px 30px 14px;
+  margin: -24px 0 -14px;
+}
+
+.boost-left .boost-fill {
+  transform-origin: right center;
+}
+
+/* Reduce motion: fades stay, movement goes. */
+.reduce-motion .layer,
+.reduce-motion .layer.on {
+  transform: none;
+}
+
+.reduce-motion .banner.show,
+.reduce-motion .hint.show {
+  animation-name: fade-only;
+}
+
+.reduce-motion .combo.pop .combo-count {
+  animation: none;
+}
+
+@keyframes fade-only {
+  0%,
+  100% {
+    opacity: 0;
+  }
+  12%,
+  80% {
+    opacity: 1;
+  }
+}
+
+/* Boost meter: full width along the bottom edge of the play area. */
+.boost-bar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: var(--safe-bottom);
+  height: 6px;
+  transition: height 150ms ease-out;
+}
+
+.boost-bar::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: currentColor;
+  opacity: 0.16;
+}
+
+.boost-fill {
+  position: absolute;
+  inset: 0;
+  background: currentColor;
+  opacity: 0.4;
+  transform-origin: left center;
+  transform: scaleX(0);
+  transition: opacity 150ms ease-out;
+}
+
+.boost-bar.ready .boost-fill {
+  opacity: 0.9;
+}
+
+/* Full and unused: breathe gently so it asks to be used. */
+.boost-bar.full .boost-fill {
+  animation: boost-full 1400ms ease-in-out infinite;
+}
+
+.boost-bar.active {
+  height: 14px;
+}
+
+.boost-bar.active .boost-fill {
+  opacity: 1;
+  animation: none;
+}
+
+.boost-bar.flash {
+  animation: boost-flash 450ms ease-out;
+}
+
+@keyframes boost-full {
+  0%,
+  100% {
+    opacity: 0.9;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+@keyframes boost-flash {
+  0% {
+    height: 16px;
+  }
+  100% {
+    height: 6px;
+  }
+}
+
+/* Active power-up: bottom left, or bottom right when the boost button is on the left. */
+.power-label {
+  position: absolute;
+  left: calc(var(--safe-left) + 22px);
+  bottom: calc(var(--safe-bottom) + 26px);
+}
+
+.boost-left .power-label {
+  left: auto;
+  right: calc(var(--safe-right) + 22px);
+}
+/* Stacked text buttons (pause menu, settings back). */
+.menu {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  margin-top: 32px;
+}
+
+.menu.left {
+  align-items: flex-start;
+  margin-top: 34px;
+}
+
+.menu .button {
+  margin: 0;
+}
+
+/* Settings: plain rows, label left, value right, hairline between. */
+.settings {
+  position: absolute;
+  left: calc(var(--safe-left) + 24px);
+  right: calc(var(--safe-right) + 24px);
+  top: calc(var(--safe-top) + 84px);
+  bottom: calc(var(--safe-bottom) + 16px);
+  padding-bottom: 24px;
+  overflow-x: hidden; /* the chip rows' edge bleed mustn't make the panel wobble sideways */
+  overflow-y: auto;
+  touch-action: pan-y; /* the only scrollable thing in the game */
+  overscroll-behavior: contain;
+  pointer-events: auto;
+}
+
+.settings-group {
+  margin: 26px 0 4px;
+  font-size: calc(11px * var(--ui-scale));
+  font-weight: 500;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  opacity: 0.6;
+}
+
+.settings-group:first-child {
+  margin-top: 6px;
+}
+
+.setting-row {
+  display: flex;
+  flex-shrink: 0;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+  min-height: calc(52px * var(--ui-scale));
+  padding: 8px 0;
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  border-bottom: 1px solid color-mix(in srgb, currentColor 25%, transparent);
+  border-radius: 0;
+  text-align: left;
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+/* Current value: a small outlined chip, so it reads as something you can change. */
+.setting-row .value {
+  flex-shrink: 0;
+  font-size: calc(12px * var(--ui-scale));
+  letter-spacing: 0.1em;
+  padding: 5px 12px;
+  border: 1px solid color-mix(in srgb, currentColor 45%, transparent);
+  border-radius: 999px;
+  line-height: 1.4;
+}
+
+.setting-row:active .value {
+  background: color-mix(in srgb, currentColor 12%, transparent);
+}

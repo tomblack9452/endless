@@ -1,0 +1,147 @@
+/* The bottom bar: the five places off the title screen. */
+.title-bar {
+  display: flex;
+  justify-content: space-around;
+  gap: 2px;
+  margin: 12px -14px 0;
+}
+
+.bar-btn {
+  position: relative;
+  flex: 1 1 0;
+  max-width: 25%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 4px;
+  min-height: 54px;
+  padding: 6px 2px 2px;
+  font: inherit;
+  min-width: 0;
+  font-size: min(calc(10px * var(--ui-scale)), 2.6vw); /* the five labels fit a narrow phone at any text size */
+  letter-spacing: 0.04em;
+  line-height: 1.2;
+  text-align: center;
+  color: inherit;
+  background: none;
+  border: none;
+  border-radius: 12px;
+  pointer-events: auto;
+  cursor: pointer;
+}
+
+.bar-btn svg {
+  width: 24px;
+  height: 24px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.bar-btn:active {
+  background: color-mix(in srgb, currentColor 8%, transparent);
+}
+
+.bar-btn:focus-visible {
+  outline: 2px solid currentColor;
+}
+
+.bar-btn .news {
+  position: absolute;
+  top: 4px;
+  left: calc(50% + 10px);
+  display: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #e0503f;
+}
+
+.bar-btn .news.on {
+  display: block;
+}
+
+[data-feature][hidden] {
+  display: none !important;
+}
+
+.title-modes .pill {
+  min-width: 0;
+}
+
+/* Rank badge under the wordmark: opens the service record. */
+.title-rank {
+  color: var(--ui-fg);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 14px 6px 6px;
+  font: inherit;
+  text-align: left;
+  background: color-mix(in srgb, var(--ui-bg) 60%, transparent);
+  border: 1px solid color-mix(in srgb, currentColor 30%, transparent);
+  border-radius: 999px;
+  pointer-events: auto;
+  cursor: pointer;
+  text-shadow: none;
+}
+
+.lp-track {
+  display: block;
+  width: 120px;
+  height: 3px;
+  margin-top: 5px;
+  border-radius: 2px;
+  background: color-mix(in srgb, currentColor 18%, transparent);
+  overflow: hidden;
+}
+
+.lp-fill {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  transform-origin: left center;
+  transform: scaleX(0);
+}
+
+.title-rank-text {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.3;
+}
+
+.title-rank-text .label {
+  line-height: 1.4;
+}
+
+.insignia {
+  display: inline-block;
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+}
+
+.insignia svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.insignia.big {
+  width: 84px;
+  height: 84px;
+}
+
+.insignia.small {
+  width: 28px;
+  height: 28px;
+}
+
+.hud-mode {
+  font-size: calc(10px * var(--ui-scale));
+  letter-spacing: 0.2em;
+  margin-top: 4px;
+}

@@ -1,0 +1,160 @@
+/* Game over: rank result. */
+.over-rank {
+  margin: 18px auto 0;
+  max-width: 320px;
+}
+
+.over-rank:empty {
+  display: none;
+}
+
+.over-rank-head {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+}
+
+.over-rank.promoted .over-rank-head {
+  animation: promoted 900ms ease-out;
+}
+
+.reduce-motion .over-rank.promoted .over-rank-head {
+  animation-name: fade-only;
+}
+
+.promoted-label {
+  font-size: calc(12px * var(--ui-scale));
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+}
+
+@keyframes promoted {
+  0% {
+    transform: scale(1.3);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(0.97);
+    opacity: 1;
+  }
+  100% {
+    transform: none;
+  }
+}
+
+.over-rank .xp-track {
+  margin: 10px 0 4px;
+}
+
+/* Smaller outlined links (title screen). */
+.chip {
+  color: var(--ui-fg);
+  display: block;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: calc(12px * var(--ui-scale));
+  letter-spacing: 0.12em;
+  line-height: 1.4;
+  padding: 11px 6px;
+  border: 1px solid color-mix(in srgb, currentColor 35%, transparent);
+  border-radius: 999px;
+  text-shadow: none;
+  background: color-mix(in srgb, var(--ui-bg) 60%, transparent);
+}
+
+.chip.link {
+  margin: 0;
+}
+
+.chip:active {
+  background: color-mix(in srgb, currentColor 12%, transparent);
+}
+
+/* Menu screens sit on a frosted panel in the sky colour, so their text never
+   lands on the moving scene. */
+.screen.panel {
+  color: var(--ui-fg);
+  background: color-mix(in srgb, var(--ui-bg) 88%, transparent);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+}
+
+/* No HUD behind a menu. */
+.menu-open #hud,
+.menu-open .combo,
+.menu-open .hint,
+.menu-open .banner {
+  visibility: hidden;
+}
+
+.panel-head {
+  position: absolute;
+  left: calc(var(--safe-left) + 24px);
+  right: calc(var(--safe-right) + 24px);
+  top: calc(var(--safe-top) + 14px);
+  height: 60px;
+  display: flex;
+  align-items: center;
+  border-bottom: 1px solid color-mix(in srgb, currentColor 25%, transparent);
+}
+
+.panel-title {
+  position: absolute;
+  left: 0;
+  right: 0;
+  text-align: center;
+  font-size: calc(17px * var(--ui-scale));
+  letter-spacing: 0.18em;
+  pointer-events: none;
+}
+
+.back {
+  position: relative;
+  z-index: 1;
+  font: inherit;
+  font-size: calc(13px * var(--ui-scale));
+  color: inherit;
+  background: none;
+  border: 0;
+  padding: 14px 18px 14px 16px;
+  margin-left: -16px;
+}
+
+.back::before {
+  content: "\2039  "; /* single left angle quote */
+  white-space: pre;
+}
+
+.screen-heading {
+  font-size: calc(15px * var(--ui-scale));
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  opacity: 0.75;
+}
+
+.score.big {
+  font-size: calc(56px * var(--ui-scale));
+}
+
+.stat-value {
+  flex: 0 1 auto;
+  min-width: 0;
+  text-align: right;
+  opacity: 0.8;
+}
+
+.stat-row > :first-child {
+  flex-shrink: 0;
+}
+
+/* Scrolls by touch; no scrollbar over the value chips. */
+.settings {
+  scrollbar-width: none;
+}
+
+.settings::-webkit-scrollbar {
+  display: none;
+}

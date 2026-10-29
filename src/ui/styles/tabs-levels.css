@@ -1,0 +1,236 @@
+/* Tabs under a screen's title (goals, solo). */
+.tabs {
+  position: absolute;
+  left: calc(var(--safe-left) + 24px);
+  right: calc(var(--safe-right) + 24px);
+  top: calc(var(--safe-top) + 86px);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow-x: auto; /* big text: the last tab scrolls into view, not off the edge */
+  scrollbar-width: none;
+  touch-action: pan-x;
+  pointer-events: auto;
+}
+
+.tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.tabs .tab {
+  flex: none;
+  white-space: nowrap;
+}
+
+@media (max-width: 380px) {
+  .tabs .tab {
+    padding: 8px 12px;
+    letter-spacing: 0.1em;
+  }
+}
+
+.tab {
+  font: inherit;
+  font-size: calc(12px * var(--ui-scale));
+  letter-spacing: 0.14em;
+  color: inherit;
+  padding: 8px 16px;
+  background: none;
+  border: 1px solid color-mix(in srgb, currentColor 30%, transparent);
+  border-radius: 999px;
+  cursor: pointer;
+  text-shadow: none;
+}
+
+.tab.on {
+  color: var(--on-accent);
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.settings.tabbed {
+  top: calc(var(--safe-top) + 138px);
+}
+
+.settings[hidden] {
+  display: none;
+}
+
+.setting-row .value.locked {
+  border-style: dashed;
+  opacity: 0.75;
+}
+
+/* Upgrade rows: name and effect on the left, tier pips and a buy button on the right. */
+.upgrade-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid color-mix(in srgb, currentColor 22%, transparent);
+}
+
+.upgrade-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.upgrade-effect {
+  font-size: calc(11px * var(--ui-scale));
+  line-height: 1.5;
+}
+
+.pips {
+  font-size: calc(11px * var(--ui-scale));
+  letter-spacing: 0.18em;
+  margin-top: 2px;
+}
+
+.pill.small {
+  min-width: 0;
+  min-height: 36px;
+  padding: 0 14px;
+  font-size: calc(11px * var(--ui-scale));
+  letter-spacing: 0.08em;
+  flex-shrink: 0;
+}
+
+/* On/off switch for a bought upgrade. */
+.pill.toggle {
+  min-width: 48px;
+}
+
+.pill.toggle.on {
+  background: color-mix(in srgb, currentColor 14%, transparent);
+}
+
+.upgrade-row.switched-off .upgrade-info {
+  opacity: 0.45;
+}
+
+.pill:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+/* Set levels: a grid of tiles with stars and best times. */
+.course-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.course-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  min-height: 104px;
+  padding: 10px;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  background: color-mix(in srgb, currentColor 5%, transparent);
+  border: 1px solid color-mix(in srgb, currentColor 28%, transparent);
+  border-radius: 14px;
+  cursor: pointer;
+}
+
+.course-tile.locked {
+  opacity: 0.35;
+  cursor: default;
+}
+
+#env-grid .course-tile.locked {
+  opacity: 0.62;
+}
+
+.course-need {
+  font-size: calc(10px * var(--ui-scale));
+  line-height: 1.35;
+  opacity: 0.75;
+}
+
+.unlock-bar {
+  display: block;
+  width: 100%;
+  height: 4px;
+  margin-top: auto;
+  background: color-mix(in srgb, currentColor 18%, transparent);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.unlock-bar > span {
+  display: block;
+  height: 100%;
+  background: currentColor;
+  opacity: 0.85;
+}
+
+.course-tile.locked .course-time {
+  margin-top: 0;
+}
+
+.course-num {
+  font-size: calc(18px * var(--ui-scale));
+  line-height: 1;
+}
+
+.course-name {
+  font-size: calc(11px * var(--ui-scale));
+  letter-spacing: 0.06em;
+  line-height: 1.3;
+}
+
+.course-time {
+  font-size: calc(10px * var(--ui-scale));
+  opacity: 0.7;
+  margin-top: auto;
+}
+
+/* Service record. */
+.record-rank {
+  font-size: calc(20px * var(--ui-scale));
+  letter-spacing: 0.14em;
+  margin-top: 8px;
+}
+
+.xp-track {
+  position: relative;
+  height: 6px;
+  margin: 16px 0 6px;
+  border-radius: 3px;
+  background: color-mix(in srgb, currentColor 14%, transparent);
+  overflow: hidden;
+}
+
+.xp-fill {
+  position: absolute;
+  inset: 0;
+  background: var(--accent);
+  transform-origin: left center;
+  transform: scaleX(0);
+  transition: transform 600ms ease-out;
+}
+
+.ladder-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-height: 46px;
+  border-bottom: 1px solid color-mix(in srgb, currentColor 18%, transparent);
+}
+
+.ladder-row .ladder-name {
+  flex: 1;
+}
+
+.ladder-row.locked {
+  opacity: 0.38;
+}
+
+.ladder-row.current {
+  font-weight: 500;
+}

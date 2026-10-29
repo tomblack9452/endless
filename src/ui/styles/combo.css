@@ -1,0 +1,101 @@
+/* Near-miss chain: sits between the horizon and the ship. */
+.combo {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 58%;
+  text-align: center;
+  opacity: 0;
+  transition: opacity 300ms ease-out;
+  pointer-events: none;
+}
+
+.combo.on {
+  opacity: 1;
+  transition: opacity 80ms ease-out;
+}
+
+.combo-count {
+  font-size: calc(26px * var(--ui-scale));
+  font-weight: 400;
+  line-height: 1;
+  letter-spacing: 0.04em;
+}
+
+.combo.pop .combo-count {
+  animation: combo-pop 220ms ease-out;
+}
+
+@keyframes combo-pop {
+  0% {
+    transform: scale(1.25);
+  }
+  100% {
+    transform: none;
+  }
+}
+
+/* Level announcement: rises in, holds, fades out. Restarted from JS. */
+.banner {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 19%;
+  text-align: center;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.banner.show {
+  animation: banner 2000ms ease-out both;
+}
+
+.banner-num {
+  font-size: calc(64px * var(--ui-scale));
+  font-weight: 300;
+  line-height: 1;
+  letter-spacing: 0.02em;
+  margin-top: 6px;
+}
+
+.banner-theme {
+  margin-top: 10px;
+}
+
+@keyframes banner {
+  0% {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  11% {
+    opacity: 1;
+    transform: none;
+  }
+  78% {
+    opacity: 1;
+    transform: none;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+}
+
+.hud-side.right {
+  text-align: right;
+}
+
+/* Left-handed: the HUD's corners swap (pause top left, the level top right); the boost button's side is swapped in game.ts. */
+.left-handed .hud-top > .hud-side:first-child {
+  order: 3;
+  text-align: right;
+}
+
+.left-handed .hud-top > .hud-centre {
+  order: 2;
+}
+
+.left-handed .hud-top > .hud-side.right {
+  order: 1;
+  text-align: left;
+}

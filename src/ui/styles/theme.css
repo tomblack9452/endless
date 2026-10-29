@@ -1,0 +1,51 @@
+/* The rank colour on the title: the wordmark's second line, the bar's icons and the rank badge. */
+.title-word.sub,
+.bar-btn svg,
+#title-rank-icon {
+  color: var(--accent);
+  transition: color 600ms;
+}
+
+.title-rank:not(.title-league) {
+  border-color: color-mix(in srgb, var(--accent) 70%, transparent);
+}
+
+/* Dark mode: menus on dark panels with light text; the rank colours switch to
+   their light twins (ranks.ts). The live scene and the HUD are unchanged. */
+body.dark {
+  --ui-bg: #141518;
+  --ui-fg: #ebe9e3;
+  --on-accent: #141518;
+}
+
+/* The showroom's wallet line sits over the scene: the scene's own text colour reads there. */
+body.dark .showroom-note,
+body.dark .showroom .panel-head {
+  color: var(--text);
+}
+
+/* The title's wordmark sits over the light sky too, so the light twin would vanish there. */
+body.dark #screen-title .title-word.sub {
+  color: var(--text);
+}
+
+/* Numbers, buttons, tabs and small labels in the mono (last, so it wins over
+   the `font: inherit` the buttons use). */
+.score,
+.pill,
+.tab,
+.chip,
+.coin,
+.settings-group,
+.setting-row .value,
+.panel-title,
+.bar-btn,
+.kicker,
+.hud-mode,
+.level-num,
+.promo-kicker,
+.title-word.sub,
+.pts,
+.stat-value {
+  font-family: var(--font-mono);
+}
