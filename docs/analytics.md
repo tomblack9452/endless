@@ -89,7 +89,14 @@ In the Firebase console, under Analytics:
   `tutorial_complete`.
 - **How runs go:** `run_end` by `mode` and `outcome`.
 
-Custom dimensions worth making: `placement`, `source`, `mode`, `outcome`,
+**Offers (1.0.14):** `offer_shown` and `offer_tapped` with `offer` (the title's
+store card: `starter`, `pass`, `week:<pack>`, `sale:<product>`; the end screen's
+`vault`). A funnel per offer: `offer_shown` → `view_store` (its source:
+`starter_offer`, `week_pack`, `sale`, `pass_card`) → `begin_checkout` →
+`purchase`. `interstitial_shown` counts the ads between runs; watch retention
+(day 1, day 7) next to it.
+
+Custom dimensions worth making: `offer`, `placement`, `source`, `mode`, `outcome`,
 `item_id`, `step`, `virtual_currency_name`.
 
 **Accounts.** Firebase counts installs that agreed. To count every account,

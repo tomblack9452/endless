@@ -83,6 +83,14 @@ where these names may differ slightly):
 
 The first five are the best fit.
 
+## Release notes for 1.0.14
+
+425 characters (500 at most):
+
+<en-GB>
+Your first pack of credits or cores is now doubled. New pilots get a starter offer for 48 hours, and the title shows a deal each week, plus sales now and then. The store has free cores for watching an ad, once a day. Premium looks glow in the hangar: tap one to try it on. And after a new best, the month's vault look is a tap away. Ads now also show between runs, now and then, never after a new best and never with premium.
+</en-GB>
+
 ## Release notes for 1.0.13
 
 395 characters (500 at most):

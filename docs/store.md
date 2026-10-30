@@ -70,6 +70,25 @@ credits for the pound: +8%, +10% and +24% on the smallest. The cores swap gives 
 credits a core (25 before 1.0.13), so £1 of cores never swaps into more
 credits than £1 of credit packs buys (`swapCredits` in `CONFIG.economy.shop`).
 
+**First purchase doubled** (1.0.14): the webhook pays every pack of cores or
+credits through `store_pack_purchase` (0028), which pays double when the account
+has never bought a pack (bought and refunded counts as bought), under a lock on
+the wallet and in the same call that records the event, and marks the row
+`doubled`. `store_pack_refund` takes back what the pack really paid.
+
+### Running a sale
+
+1. **Play Console → Monetize with Play → Products → One-time products →** the
+   product → its purchase option → **Add offer** (or edit the price for the
+   dates; a "discount" offer with a start and end date is easiest). Note the dates.
+2. **Supabase → Table Editor → `store_sales` → Insert row:** `product` (the id,
+   e.g. `credits_10000`), `starts_at` and `ends_at` (the same dates, UTC), and
+   `label` if you want something other than "sale" (e.g. "weekend sale").
+3. The game reads running sales when it connects (`store_sales_now()`): the
+   product gets the tag in the store and leads the title's store card. Delete
+   the row, or let it end, to stop showing it. The price itself always comes
+   from Play, so the two must match.
+
 The webhook pays cores for `INITIAL_PURCHASE` and `NON_RENEWING_PURCHASE`
 events and takes them back on a `CANCELLATION` (a refund), keeping each event
 once by its id. Each purchase is kept with RevenueCat's `purchased_at_ms`

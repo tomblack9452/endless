@@ -4,6 +4,12 @@
 // The lines for each version live here, newest first.
 
 export const WHATS_NEW: Readonly<Record<string, readonly string[]>> = {
+  '1.0.14': [
+    'your first pack of credits or cores is doubled',
+    'a starter offer, and a deal each week',
+    'free cores for an ad, once a day in the store',
+    'try premium looks on: they glow in the hangar',
+  ],
   '1.0.13': [
     'a new look: one fly button, pick your mode',
     'the end screen shows what your credits buy',

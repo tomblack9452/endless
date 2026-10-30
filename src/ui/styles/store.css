@@ -125,10 +125,20 @@ body:not(.dark) .store-hero-img {
   line-height: 1.45;
 }
 
+/* A tag ("first purchase ×2", "best value", a sale) sits centred above the picture, clear of it. */
+.store-card:has(.store-tag) {
+  padding-top: 34px;
+}
+
 .store-tag {
   position: absolute;
-  top: 8px;
-  right: 8px;
+  top: 9px;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: calc(100% - 16px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   padding: 1px 7px;
   font-size: calc(10px * var(--ui-scale));
   letter-spacing: 0.06em;

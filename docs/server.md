@@ -155,7 +155,12 @@ server's balance in one call, so a resent event pays nothing; a pack bought
 before the device's first credit sync waits in `wallets.credits_owed`;
 `store_credit_refund()` takes them back, never below zero; `sync_credits()`
 again, adding what's owed on the first sync), `0027` (free cores for an ad, 1.0.14: `earn_cores` takes
-`adcores:<date>`, today's (a day either side), once a day, 5 at most).
+`adcores:<date>`, today's (a day either side), once a day, 5 at most), `0028` (store offers, 1.0.14:
+`store_pack_purchase()` and `store_pack_refund()` pay a player's first pack of
+cores or credits double, once, and take back what it paid; `store_events.doubled`;
+the `store_sales` table, written from the dashboard, and `store_sales_now()` for
+the game, the sales running now by the server's clock).
+Apply `0028` before deploying 1.0.14's webhook (it calls `store_pack_purchase`).
 Apply `0026` before deploying 1.0.13's webhook (it calls
 `store_credit_purchase` for the credit packs). Apply `0014` and `0016` before deploying the webhook again; 1.0.7's webhook
 (a constant-time secret check) wants a redeploy after `db:apply`:

@@ -136,6 +136,9 @@ export class TitleScreen {
       cards.push({ id: 'gift', kicker: 'free gift', title: this.g.ads.label(), hot: true });
       this.g.revives.adShown('dailyGift');
     }
+    // The store card next, where it's seen without scrolling the row.
+    const store = this.g.offers.card(now);
+    if (store) cards.push(store);
     if (this.open('daily')) {
       // Today's challenge: your best (or a new course), the time left, the streak in the kicker.
       const best = this.g.challenge.bestOn(this.g.today.day);
@@ -158,8 +161,6 @@ export class TitleScreen {
       fraction: quests.length ? done / quests.length : 0,
       hot: toClaim > 0,
     });
-    const store = this.g.offers.card(now);
-    if (store) cards.push(store);
     const P = CONFIG.economy.pass;
     const tier = this.g.pass.tier;
     cards.push({

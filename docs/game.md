@@ -570,6 +570,28 @@ store beside the core packs. The bigger packs give more for the price, and
 each row's best is marked "best value". They're paid on the server
 (docs/store.md).
 
+**Offers** (1.0.14; the app only, where the store answers; `src/screens/offers.ts`,
+rules in `src/economy/offers.ts`):
+- **First purchase doubled:** a player's first pack of credits or cores pays
+  double (the server decides, so it can't be had twice). Every pack carries a
+  "first purchase ×2" tag until then. The starter pack, premium and the pass
+  don't double.
+- **The store card:** one card in the title's row from a player's 3rd run,
+  showing the first that applies: a sale running now; the **starter offer**
+  ("pilot's starter pack · 47h left", from the 3rd run, for 48 hours from when
+  it first shows, by the server's clock and kept in the cloud save, once ever);
+  the pass's premium rewards waiting; then the week's best-value pack (credits
+  one week, cores the next, the same for everyone). A tap opens the store at it.
+  It's a card, not a prompt.
+- **The vault after a new best:** the end screen's line becomes "this month's
+  vault: <look> · N cores · try it on", opening the hangar with it on the ship.
+  It's the session's one unasked store prompt, so it shows only if that's unused.
+- **Premium looks glow** in the hangar (not owned, paid in cores or from the
+  vault), and the first time a slot with any opens, a note says "tap a look to
+  try it on".
+- **Sales:** the store tags a product "sale" (or the sale's own label) while a
+  sale Tom scheduled runs (docs/store.md), and the store card leads with it.
+
 **Credits** come mostly from runs (1 per 125 points in ranked, 1 per 250 in
 solo and endless, plus 1 for every pickup), and also from quests, goals,
 promotions, league rewards and set level stars. Spend them in

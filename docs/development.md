@@ -29,7 +29,7 @@ The folder map is in the [README](../README.md#project-layout). File by file:
 | `src/core/purchases.ts` | Store purchases, waiting for paid cores and credit packs, restore |
 | `src/core/connection.ts` | Signing in, syncing, the offline recheck and sharing a best |
 | `src/core/devTools.ts` | The dev panel's helpers (stats, unlock all, start at a level) |
-| `src/screens/*.ts` | One module per screen's logic: `title`, `settings`, `shop` (shop, store, pass), `hangar` (looks, upgrades), `goals`, `boards` (leaderboards, league), `record`, `solo`, `account` (names, Google, deleting), `onboarding` (welcome, practice, trial, dress), `results` (the end screen's line to what the run's credits buy), `shortOf` (the "N credits short" sheet) |
+| `src/screens/*.ts` | One module per screen's logic: `title`, `settings`, `shop` (shop, store, pass), `hangar` (looks, upgrades), `goals`, `boards` (leaderboards, league), `record`, `solo`, `account` (names, Google, deleting), `onboarding` (welcome, practice, trial, dress), `results` (the end screen's line to what the run's credits buy), `shortOf` (the "N credits short" sheet), `offers` (the title's store card, first purchase ×2, the try-on hint) |
 | `src/core/rng.ts` | Seeded random numbers (mulberry32): `rand()`, and `featureRand()`, a second stream from the same seed for risk lanes and gate runs |
 | `src/core/runBonus.ts` | Distance milestones and gate run bookkeeping (when one is ahead, clean or spoilt) |
 | `src/core/crashMoment.ts` | The crash moment: when it plays, its slowed clock, and when the revive offer or end screen may come |
@@ -79,6 +79,7 @@ The folder map is in the [README](../README.md#project-layout). File by file:
 | `src/ui/guide.ts`, `src/ui/controlArt.ts`, `src/ui/tutorialView.ts` | The pickup and power-up cards (from `CONFIG`), the control diagrams, the tutorial's indicators and recap |
 | `src/ui/hints.ts` | The first-run tips (walkthrough) |
 | `src/ui/hubMode.ts` | The title's mode chips: which modes there are, and the one remembered |
+| `src/economy/offers.ts` | 1.0.14's offers: the starter offer's window, the store card's pick, the week's pack, first purchase |
 | `src/economy/nudge.ts` | When the game points at something to buy: after a run, when the wallet is short, and the one unasked store prompt a session |
 | `src/ui/runSummary.ts` | The end screen's details: the speed line, where the run ended, near misses, best chain |
 | `src/ui/report.ts`, `src/ui/whatsNew.ts` | The report link on a pilot's card; the "what's new" lines for each version |
@@ -106,6 +107,7 @@ The folder map is in the [README](../README.md#project-layout). File by file:
 | `tests/pieces.test.ts`, `tests/pieces-pairs.test.ts` | Every ship section on paper, every route flown, every pair back to back |
 | `tests/determinism.test.ts` | No unseeded randomness or clock in course generation; risk lanes and gate runs the same however a run is flown |
 | `tests/depth.test.ts` | 1.0.9: the power-up weights, the second random stream, milestones, gate run bookkeeping, the crash moment's timing, the run summary, the rival's ghost |
+| `tests/offers.test.ts` | 1.0.14: the starter offer, the store card's pick, the week's pack, first purchase |
 | `tests/nudge.test.ts`, `tests/analytics.test.ts` | 1.0.13: the after-run line, short-of (the smallest pack, the swap), one store prompt a session; usage stats silent until consent and the setting, and what waited dropped on a no |
 | `tests/graphics.test.ts` | 1.0.10: the graphics setting (auto, high, low), performance mode carried over, and auto dropping to low once on sustained slow frames, never on stalls |
 | `tests/share.test.ts` | Sharing from the app: the cache file and the share sheet with the Play link |
