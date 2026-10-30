@@ -260,14 +260,12 @@ match what the app and its libraries actually do; Google checks.
 |---|---|---|---|---|---|
 | Personal info > **Email address** | Yes | No | No | **Optional** (only with Google sign-in) | Account management |
 | Personal info > **User IDs** | Yes | No | No | Required | App functionality, Account management |
-| Financial info > **Purchase history** | Yes | No | No | Required | App functionality |
-| App activity > **App interactions** | Yes | No | No | Required | App functionality |
+| Financial info > **Purchase history** | Yes | No | No | Required | App functionality; **Analytics** (1.0.13: Firebase logs purchases) |
+| App activity > **App interactions** | Yes | No | No | Required | App functionality; **Analytics** (1.0.13: usage stats) |
 | App activity > **Other user-generated content** (the pilot name) | Yes | No | No | Required | App functionality |
-| Device or other IDs | Yes | **Yes** (AdMob) | No | Required | Advertising or marketing |
+| Device or other IDs | Yes | **Yes** (AdMob) | No | Required | Collected: Advertising or marketing; **Analytics** (1.0.13: Firebase's app instance id). Shared: Advertising or marketing |
 | Location > **Approximate location** | Yes | Yes (AdMob, from the IP address) | No | Required | Advertising or marketing |
 | App info and performance > **Crash logs**, **Diagnostics** | Yes | Yes (AdMob only) | No | Required | App functionality, Analytics (the game's own error reports); Advertising or marketing (AdMob) |
-| App activity > **App interactions** (usage stats, 1.0.13) | Yes | No | No | **Optional** (consent form and settings > share usage stats) | Analytics |
-| Device or other IDs (Firebase's app instance id, 1.0.13) | Yes | No | No | Optional | Analytics |
 
 Notes:
 - The pilot name, ship and service record summary (rank, XP, runs, time
@@ -288,12 +286,13 @@ Notes:
   offers, store views and purchases, credits and cores. They're tied to
   Firebase's app instance id only, with the advertising id switched off
   (`google_analytics_adid_collection_enabled` false in the manifest), and sent
-  only with consent and the setting on, so they're **optional**. Firebase
+  only with consent and the setting on. The form has one entry per data
+  type, though, and app interactions, device ids and purchase history are
+  already required for other reasons (the leaderboards, AdMob, purchases), so
+  they stay **required** with **Analytics** added to their purposes. Firebase
   Analytics works for you under Google's data processing terms (turn off
   "data sharing with Google" for benchmarking and the rest in Firebase's
-  project settings), so it's **not shared**. App interactions is already
-  ticked as required for the leaderboards: add **Analytics** to its purposes
-  rather than ticking it twice, if the form only allows one row. If you later
+  project settings), so it's **not shared**. If you later
   link Firebase to Google Ads (docs/analytics.md), Google uses the events for
   advertising: then tick **Shared** and **Advertising or marketing** too.
 - "Shared" means sent to a **third party for its own use**. Supabase and
