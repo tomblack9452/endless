@@ -147,7 +147,7 @@ Quick retry: turn it on in settings and one tap after a crash flies again. Repor
 
 ## Screenshots
 
-In `docs/store-assets/screenshots/`, for Play Console > Main store listing >
+In `docs/store-assets/listing/screenshots/`, for Play Console > Main store listing >
 Graphics. All real captures of the game (Chromium, the dev build), with a
 caption in the game's own type (Host Grotesk and Geist Mono) and colours, on its
 paper background; no device frames.

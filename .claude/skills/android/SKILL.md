@@ -184,9 +184,11 @@ The web keeps the Web Share API (or saves the picture).
 
 - Products are fetched by ID; no entitlements or offerings are used.
 - The IDs are `cores_100`, `cores_550`, `cores_1200`, `cores_2500`,
+  `credits_1000`, `credits_2500`, `credits_5000`, `credits_10000`,
   `starter_pack`, `season_pass`, `premium`.
 - The store icons are in `public/store/` (160px) and `docs/store-assets/products/`
-  (512px, for Play).
+  (512px, for Play: an icon must be 512 to 1080 px square). The credit packs'
+  are drawn by `scripts/credit-icons.py`.
 - Testing:
   - The tester's Google account must be a license tester (Play Console >
     Settings > License testing).

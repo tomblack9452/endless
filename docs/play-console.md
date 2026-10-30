@@ -365,17 +365,17 @@ never at start-up) and, through the plugin, `RECEIVE_BOOT_COMPLETED` and
   names, no keyword lists.
 
 **Graphics**
-- **App icon:** 512 × 512 PNG, up to 1 MB. Use the 512 icon from `public/icons/`.
+- **App icon:** 512 × 512 PNG, up to 1 MB: `docs/store-assets/listing/icon-512.png`.
   It must be square and full-bleed; Play rounds the corners itself.
 - **Feature graphic:** **1024 × 500**, JPG or PNG with **no transparency**.
   It's the banner at the top of the store page and in some features. Keep the
   important part in the middle (it gets cropped on some screens). An idea: a
   screenshot of the ship flying through the canyon, with "Endless Space" in the
-  game's font.
+  game's font. Ready: `docs/store-assets/listing/feature-graphic.png`.
 - **Phone screenshots:** 2 to 8, PNG or JPG, each side between 320 and 3,840 px,
   portrait 9:16. For a game to be eligible for featuring, at least **4 at
   1080 × 1920 or more**. Six are ready, at 1080 × 1920, in
-  `docs/store-assets/screenshots/` (`phone-01.png` ... `phone-06.png`, in
+  `docs/store-assets/listing/screenshots/` (`phone-01.png` ... `phone-06.png`, in
   order; see `docs/store-listing.md`). Screenshots must show the real game; no
   device frames needed.
 - **7-inch / 10-inch tablet screenshots:** optional. The game is phone-first,
@@ -477,24 +477,28 @@ For each product, **Create one-time product**:
 1. **Product ID**: exactly as below. It can **never** be changed or reused,
    even after deleting. Typos mean a new ID.
 2. **Name** and **Description**: shown in Google's purchase sheet (name up to
-   55 characters, description up to 200).
-3. **Purchase option**: add one (Buy), with the **default price** in GBP.
+   55 characters, description 50 to 200: Play warns under 50).
+3. **Icon**: the product's file in `docs/store-assets/products/` (512 × 512,
+   32-bit PNG; Play takes 512 to 1080 px square only, so not the small ones in
+   `public/store/`).
+4. **Purchase option**: add one (Buy), with the **default price** in GBP.
    Play converts it to other currencies (you can adjust each country if you
    like). **Tax:** prices are tax-inclusive in the UK/EU.
-4. **Save**, then **Activate**.
+5. **Save**, then **Activate**.
 
-| Product ID | Name | Description | Price |
-|---|---|---|---|
-| `cores_100` | 100 cores | 100 cores to spend in the shop. | £0.99 |
-| `cores_550` | 550 cores | 550 cores to spend in the shop. | £4.99 |
-| `cores_1200` | 1,200 cores | 1,200 cores to spend in the shop. | £9.99 |
-| `cores_2500` | 2,500 cores | 2,500 cores to spend in the shop. | £19.99 |
-| `credits_5000` | 5,000 credits | 5,000 credits for upgrades and the daily shop. | £0.99 |
-| `credits_15000` | 15,000 credits | 15,000 credits for upgrades and the daily shop. | £2.49 |
-| `credits_40000` | 40,000 credits | 40,000 credits for upgrades and the daily shop. | £5.99 |
-| `starter_pack` | Starter pack | 500 cores and the nova hull. Once per account. | £2.99 |
-| `season_pass` | Season pass | The premium track of this season's pass. | £4.99 |
-| `premium` | Premium | No ads, ad rewards without the ad, the halo hull, regalia paint, crown flame, an extra free revive a day and a board badge. | £4.99 |
+| Product ID | Name | Description | Price | Icon |
+|---|---|---|---|---|
+| `cores_100` | 100 cores | 100 cores for premium looks, the vault, revives and the season pass, or to swap for credits. | £0.99 | `products/cores_100.png` |
+| `cores_550` | 550 cores | 550 cores for premium looks, the vault, revives and the season pass, or to swap for credits. | £4.99 | `products/cores_550.png` |
+| `cores_1200` | 1,200 cores | 1,200 cores for premium looks, the vault, revives and the season pass, or to swap for credits. | £9.99 | `products/cores_1200.png` |
+| `cores_2500` | 2,500 cores | 2,500 cores for premium looks, the vault, revives and the season pass, or to swap for credits. | £19.99 | `products/cores_2500.png` |
+| `credits_1000` | 1,000 credits | 1,000 credits to spend on ship upgrades and the looks in the daily shop. | £0.99 | `products/credits_1000.png` |
+| `credits_2500` | 2,500 credits | 2,500 credits to spend on ship upgrades and the looks in the daily shop. | £2.29 | `products/credits_2500.png` |
+| `credits_5000` | 5,000 credits | 5,000 credits to spend on ship upgrades and the looks in the daily shop. | £4.49 | `products/credits_5000.png` |
+| `credits_10000` | 10,000 credits | 10,000 credits to spend on ship upgrades and the looks in the daily shop. | £7.99 | `products/credits_10000.png` |
+| `starter_pack` | Starter pack | 500 cores and the nova hull, to get your ship going. Once per account. | £2.99 | `products/starter_pack.png` |
+| `season_pass` | Season pass | The premium track of this season's pass: more rewards at every tier, and the season's new looks. | £4.99 | `products/season_pass.png` |
+| `premium` | Premium | No ads, ad rewards without the ad, the halo hull, regalia paint, crown flame, an extra free revive a day and a board badge. | £4.99 | `products/premium.png` |
 
 - Play has no "consumable" switch: whether a product can be bought again is
   decided when it's **consumed**. In RevenueCat, set the cores, the credit packs and the season

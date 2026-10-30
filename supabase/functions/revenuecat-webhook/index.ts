@@ -24,9 +24,10 @@ const CORES: Record<string, number> = {
 
 // Credits per pack: keep in step with CONFIG.economy.store too.
 const CREDITS: Record<string, number> = {
+  credits_1000: 1000,
+  credits_2500: 2500,
   credits_5000: 5000,
-  credits_15000: 15000,
-  credits_40000: 40000,
+  credits_10000: 10000,
 };
 
 const PAID = new Set(['INITIAL_PURCHASE', 'NON_RENEWING_PURCHASE']);

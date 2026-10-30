@@ -565,7 +565,7 @@ covers it (at its store price), a swap of just enough cores (25 credits each,
 when you have them; it then buys the thing), or not now
 (`src/screens/shortOf.ts`). Cores work the same way with the core packs.
 
-**Credit packs** (1.0.13): 5,000, 15,000 and 40,000 credits for money, in the
+**Credit packs** (1.0.13): 1,000, 2,500, 5,000 and 10,000 credits for money, in the
 store beside the core packs. The bigger packs give more for the price, and
 each row's best is marked "best value". They're paid on the server
 (docs/store.md).

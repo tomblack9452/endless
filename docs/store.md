@@ -39,9 +39,10 @@ The short version is in [leaderboards.md](leaderboards.md). In full:
    | `cores_550` | consumable | 550 cores | 4.99 |
    | `cores_1200` | consumable | 1,200 cores | 9.99 |
    | `cores_2500` | consumable | 2,500 cores | 19.99 |
-   | `credits_5000` | consumable | 5,000 credits | 0.99 |
-   | `credits_15000` | consumable | 15,000 credits | 2.49 |
-   | `credits_40000` | consumable | 40,000 credits | 5.99 |
+   | `credits_1000` | consumable | 1,000 credits | 0.99 |
+   | `credits_2500` | consumable | 2,500 credits | 2.29 |
+   | `credits_5000` | consumable | 5,000 credits | 4.49 |
+   | `credits_10000` | consumable | 10,000 credits | 7.99 |
    | `starter_pack` | non-consumable | 500 cores and the nova hull | 2.99 |
    | `season_pass` | consumable (one per season) | the pass's premium track | 4.99 |
    | `premium` | non-consumable | no ads, ad rewards without the ad, the halo hull, regalia paint and crown flame, an extra free revive a day, a badge on the boards | 4.99 |
@@ -64,9 +65,8 @@ Credit packs (1.0.13) are paid on the server too: the webhook calls
 to the server's balance in one call, so a retried event pays nothing more.
 The game's next credit sync brings them to the device. A pack bought before the
 device ever synced waits in `credits_owed` until that first sync. A refund
-(`store_credit_refund`) takes the credits back, never below zero. The packs
-are priced so credits cost about half what cores swapped into credits would:
-cores do more, so they stay the dearer currency.
+(`store_credit_refund`) takes the credits back, never below zero. Bigger packs give more
+credits for the pound: +8%, +10% and +24% on the smallest.
 
 The webhook pays cores for `INITIAL_PURCHASE` and `NON_RENEWING_PURCHASE`
 events and takes them back on a `CANCELLATION` (a refund), keeping each event

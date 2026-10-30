@@ -14,7 +14,7 @@ guides, one line each.
 - [store.md](store.md): setting up Supabase, the stores, RevenueCat, AdMob, Google sign-in and the app builds.
 - [play-console.md](play-console.md): Google Play Console step by step, from an empty account to launch and every update.
 - [store-listing.md](store-listing.md): the Play store listing text, tags, release notes and screenshot list.
-- [store-assets/](store-assets/): the Play icon, feature graphic, product icons and screenshots.
+- [store-assets/](store-assets/README.md): every image for Play Console and ads, and where each one goes.
 
 ## Archive
 

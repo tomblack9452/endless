@@ -24,13 +24,15 @@ describe('after a run', () => {
 
 describe('short of', () => {
   const packs = [
-    { id: 'credits_40000', amount: 40000 },
+    { id: 'credits_10000', amount: 10000 },
+    { id: 'credits_1000', amount: 1000 },
     { id: 'credits_5000', amount: 5000 },
-    { id: 'credits_15000', amount: 15000 },
+    { id: 'credits_2500', amount: 2500 },
   ];
 
   it('offers the cores swap when there are enough cores, and the smallest pack that covers it', () => {
     expect(shortOf(1620, 1500, packs, { cores: 10, creditsPerCore: 25 })).toEqual({ short: 120, swap: 5, pack: packs[1] });
+    expect(shortOf(4000, 1000, packs).pack).toBe(packs[2]); // 3,000 short: the 5,000 pack, not the 2,500
   });
 
   it('leaves the swap out without enough cores, and the pack out when none is big enough', () => {

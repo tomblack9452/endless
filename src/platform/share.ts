@@ -26,7 +26,7 @@ export interface ShareCard {
 export const SHARE_W = 1080;
 export const SHARE_H = 1350;
 
-/** The store art's dusk (docs/store-assets/feature-graphic.png). */
+/** The store art's dusk (docs/store-assets/listing/feature-graphic.png). */
 const DUSK = {
   top: '#1f1d2e',
   mid: '#3a3350',

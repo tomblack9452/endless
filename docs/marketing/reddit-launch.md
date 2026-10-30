@@ -113,10 +113,10 @@ the sweet spot. Lead with the strongest one, because it's what shows in the feed
 
 **Testing communities:**
 
-1. `feature-graphic.png`
+1. `listing/feature-graphic.png`
 2. `ads/portrait-3.png` (one thumb. endless sky.)
 3. `ads/square-4.png` (six places to fly)
-4. `screenshots/phone-03.png` (the title screen)
+4. `listing/screenshots/phone-03.png` (the title screen)
 
 **Gaming subreddits:**
 
