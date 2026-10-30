@@ -61,7 +61,9 @@ need a line about it.
 | `earn_virtual_currency` | virtual_currency_name: credits / cores, value, source | the wallet gains (run, goal, gift, stars...) |
 | `spend_virtual_currency` | virtual_currency_name, value, item_name | the wallet pays (look, upgrade, revive, swap...) |
 
-Ad placements are `revive`, `double_credits`, `daily_gift` and `goal_swap`.
+Ad placements are `revive`, `double_credits`, `daily_gift`, `goal_swap` and
+(1.0.14) `free_cores`. `interstitial_shown` (with the player's run count) logs
+each interstitial, from 1.0.14.
 Premium players see no ads, so no ad events are sent for them.
 
 `purchase` carries **no price on purpose**. Firebase already records real

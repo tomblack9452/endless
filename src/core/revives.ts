@@ -12,6 +12,7 @@ const PLACEMENT: Record<RewardedPlacement, AdPlacement> = {
   doubleCredits: 'double_credits',
   dailyGift: 'daily_gift',
   rerollQuest: 'goal_swap',
+  freeCores: 'free_cores',
 };
 
 export class Revives {
@@ -22,7 +23,7 @@ export class Revives {
   /** An ad offer is on screen. The gift and goal swap sit there for a while, so they count once a session. */
   adShown(p: RewardedPlacement): void {
     if (!this.g.ads.showsAds) return;
-    if (p === 'dailyGift' || p === 'rerollQuest') {
+    if (p === 'dailyGift' || p === 'rerollQuest' || p === 'freeCores') {
       if (this.shownOnce.has(p)) return;
       this.shownOnce.add(p);
     }
@@ -121,6 +122,22 @@ export class Revives {
     const lines = this.g.grant(CONFIG.ads.dailyGift, `gift:${day}`);
     this.g.ui.celebrate([{ kicker: 'free gift', icon: GIFT_ICON, name: 'daily gift', lines }]);
     this.g.title.refreshTitle();
+  }
+
+  /** The store's free cores: only for a real ad (not premium, not the web), once a day. */
+  freeCoresOffered(): boolean {
+    return this.g.ads.showsAds && this.g.ads.offers('freeCores') && this.g.daily.freeCoresReady(dayKey(this.g.now()));
+  }
+
+  async claimFreeCores(): Promise<void> {
+    const day = dayKey(this.g.now());
+    if (!this.freeCoresOffered() || !(await this.watchAd('freeCores')) || !this.g.daily.freeCoresReady(day)) return;
+    this.g.daily.takeFreeCores(day);
+    const lines = this.g.grant({ cores: CONFIG.ads.freeCores }, `adcores:${day}`);
+    this.g.ui.showNotice(lines.join(' · '));
+    this.g.sound.pickup();
+    this.g.title.refreshTitle();
+    if (this.g.infoOpen === 'store') this.g.shop.openStore();
   }
 
   /** Swap an unfinished daily goal for another (a rewarded ad, or free with premium), once a day. */

@@ -4,8 +4,8 @@ import { reportError } from '../platform/errors';
 
 // Ads, behind one interface like the store. Rewarded ads are the free way to a
 // little convenience (a revive, doubled run credits, a daily gift, a new daily
-// goal); premium players get the same rewards without the ad. Interstitials are
-// off at launch (CONFIG.ads.interstitial). On the web, and in the apps without
+// goal, a few cores in the store); premium players get the same rewards without
+// the ad. Interstitials show between runs, capped (CONFIG.ads.interstitial). On the web, and in the apps without
 // ad unit ids, there are no ads at all, so rewarded offers aren't shown.
 //
 // The AdMob version asks for consent first (Google's form, for the UK and EU)
@@ -13,7 +13,7 @@ import { reportError } from '../platform/errors';
 // non-personalised. A rewarded ad is loaded ahead of time (after consent, and
 // again after each one), so tapping an offer usually shows one at once.
 
-export type RewardedPlacement = 'revive' | 'doubleCredits' | 'dailyGift' | 'rerollQuest';
+export type RewardedPlacement = 'revive' | 'doubleCredits' | 'dailyGift' | 'rerollQuest' | 'freeCores';
 export type AdResult = 'rewarded' | 'skipped' | 'unavailable';
 /** What a tap on an offer came to: 'busy' when an ad is already on its way. */
 export type WatchResult = AdResult | 'busy';
@@ -137,9 +137,19 @@ class AdMobAds implements AdNetwork {
 
   async interstitial(): Promise<void> {
     if (!this.m || !this.ids.interstitial) return;
+    const { AdMob, InterstitialAdPluginEvents: E } = this.m;
     try {
-      await this.m.AdMob.prepareInterstitial({ adId: this.ids.interstitial, npa: this.npa });
-      await this.m.AdMob.showInterstitial();
+      await AdMob.prepareInterstitial({ adId: this.ids.interstitial, npa: this.npa });
+      // showInterstitial settles as the ad opens: wait for it to close, so the next run starts after it.
+      const closed = new Promise<void>((resolve) => {
+        const handles = [AdMob.addListener(E.Dismissed, () => done()), AdMob.addListener(E.FailedToShow, () => done())];
+        function done(): void {
+          for (const h of handles) void h.then((x) => x.remove()).catch(() => {});
+          resolve();
+        }
+      });
+      await AdMob.showInterstitial();
+      await closed;
     } catch {
       // No ad to show: carry on.
     }
@@ -209,6 +219,7 @@ export const AD_TIMING = { tapWaitMs: 8_000, loadGiveUpMs: 30_000, retryMs: [5_0
 export class Ads {
   private runsSinceInterstitial = 0;
   private lastInterstitial = 0;
+  private interstitialDue = false;
   private started = false;
   private ready = false;
   private loading: Promise<boolean> | null = null;
@@ -300,7 +311,10 @@ export class Ads {
       this.preload();
     }, wait);
   }
-  /** Whether an interstitial would show now after a run (and counts the run). */
+  /**
+   * Whether an interstitial is due after this run (and counts the run). It
+   * shows when the player leaves the end screen (showDue), never over it.
+   */
   afterRun(now: number, newBest: boolean): boolean {
     const I = CONFIG.ads.interstitial;
     this.runsSinceInterstitial++;
@@ -309,7 +323,15 @@ export class Ads {
     if (this.runsSinceInterstitial < I.everyRuns || now - this.lastInterstitial < I.minSeconds * 1000) return false;
     this.runsSinceInterstitial = 0;
     this.lastInterstitial = now;
-    void this.network.interstitial();
+    this.interstitialDue = true;
+    return true;
+  }
+
+  /** Show the interstitial afterRun found due, settling once it's closed (at most a minute); true if one was due. */
+  async showDue(): Promise<boolean> {
+    if (!this.interstitialDue) return false;
+    this.interstitialDue = false;
+    await within(this.network.interstitial(), 60_000, undefined);
     return true;
   }
 

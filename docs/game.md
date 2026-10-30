@@ -686,6 +686,13 @@ they follow the phone's.
   the free ones are used, doubling a run's credits from the end screen, a free
   daily gift card on the title screen (150 credits and 2 cores), and swapping
   one daily goal a day for another (free on the web, where there are no ads).
+  Since 1.0.14 also **free cores**: a card first in the store's cores row,
+  "5 cores · free · once a day", for an ad (not for premium, whose rewards are
+  already free elsewhere, and not on the web).
+- **Interstitials** (1.0.14, the apps only, never for premium): a full-screen ad
+  between runs, as you leave the end screen (fly again, or main menu), never
+  over it. Not before your 3rd day, not in a session's first two runs, then at
+  most one every 3 runs and 3 minutes, and never after a new best.
 - **Shop:** a showroom, with the camera circling your ship above a sheet of
   cards; drag sideways over the ship to turn it yourself (a flick carries on,
   and the slow spin comes back a few seconds after you let go; with reduce

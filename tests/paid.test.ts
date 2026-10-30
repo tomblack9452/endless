@@ -244,48 +244,47 @@ describe('ads', () => {
     }
   });
 
-  it('keep interstitials off at launch', () => {
-    expect(CONFIG.ads.interstitial.enabled).toBe(false);
+  it('cap interstitials: not early, not often, not after a best, not for premium, and only between runs', async () => {
+    const I = CONFIG.ads.interstitial;
+    expect(I.enabled).toBe(true);
     const net = new FakeNetwork(true);
     const ads = new Ads(
       net,
       () => false,
       () => 0,
     );
-    for (let i = 0; i < 20; i++) ads.afterRun(30 * DAY + i * 600_000, false);
-    expect(net.interstitials).toBe(0);
+    for (let i = 0; i < 10; i++) ads.afterRun(DAY + i * 600_000, false); // before day 3
+    expect(await ads.showDue()).toBe(false);
+    const t = 10 * DAY;
+    expect(ads.afterRun(t, false)).toBe(true); // ten runs since: one is due
+    expect(net.interstitials).toBe(0); // not shown over the end screen...
+    expect(await ads.showDue()).toBe(true); // ...but as the player leaves it
+    expect(net.interstitials).toBe(1);
+    expect(await ads.showDue()).toBe(false); // once
+    expect(ads.afterRun(t + 1000, false)).toBe(false);
+    expect(ads.afterRun(t + 2000, false)).toBe(false);
+    expect(ads.afterRun(t + 3000, false)).toBe(false); // three runs, but too soon
+    expect(ads.afterRun(t + I.minSeconds * 1000 + 1, true)).toBe(false); // a new best
+    expect(ads.afterRun(t + I.minSeconds * 1000 + 2, false)).toBe(true);
+    const premiumNet = new FakeNetwork(true);
+    const premium = new Ads(
+      premiumNet,
+      () => true,
+      () => 0,
+    );
+    for (let i = 0; i < 10; i++) premium.afterRun(t + i * 600_000, false);
+    expect(await premium.showDue()).toBe(false);
+    expect(premiumNet.interstitials).toBe(0);
   });
 
-  it('cap interstitials when on: not early, not often, not after a best, not for premium', () => {
-    const I = CONFIG.ads.interstitial as { enabled: boolean; minSeconds: number };
-    const was = I.enabled;
-    I.enabled = true;
-    try {
-      const net = new FakeNetwork(true);
-      const ads = new Ads(
-        net,
-        () => false,
-        () => 0,
-      );
-      for (let i = 0; i < 10; i++) ads.afterRun(DAY + i * 600_000, false); // before day 3
-      expect(net.interstitials).toBe(0);
-      const t = 10 * DAY;
-      expect(ads.afterRun(t, false)).toBe(true); // ten runs since: one shows
-      expect(ads.afterRun(t + 1000, false)).toBe(false);
-      expect(ads.afterRun(t + 2000, false)).toBe(false);
-      expect(ads.afterRun(t + 3000, false)).toBe(false); // three runs, but too soon
-      expect(ads.afterRun(t + I.minSeconds * 1000 + 1, true)).toBe(false); // a new best
-      expect(ads.afterRun(t + I.minSeconds * 1000 + 2, false)).toBe(true);
-      const premiumNet = new FakeNetwork(true);
-      const premium = new Ads(
-        premiumNet,
-        () => true,
-        () => 0,
-      );
-      for (let i = 0; i < 10; i++) premium.afterRun(t + i * 600_000, false);
-      expect(premiumNet.interstitials).toBe(0);
-    } finally {
-      I.enabled = was;
-    }
+  it("never wants an interstitial in a session's first two runs", () => {
+    const ads = new Ads(
+      new FakeNetwork(true),
+      () => false,
+      () => 0,
+    );
+    expect(ads.afterRun(10 * DAY, false)).toBe(false);
+    expect(ads.afterRun(10 * DAY + 600_000, false)).toBe(false);
+    expect(ads.afterRun(10 * DAY + 1_200_000, false)).toBe(true);
   });
 });

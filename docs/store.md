@@ -80,16 +80,20 @@ it already paid.
 
 ## 4. Ads (AdMob)
 
-Rewarded ads only at launch (a revive, doubled run credits, a daily gift, a new
-daily goal); interstitials are off in `CONFIG.ads.interstitial`. Premium players
-never see an ad and get those rewards free. The web build has no ads.
+Rewarded ads (a revive, doubled run credits, a daily gift, a new daily goal,
+and from 1.0.14 a few free cores in the store once a day). Since 1.0.14
+interstitials show too, gently (`CONFIG.ads.interstitial`): between runs, as
+the player leaves the end screen (fly again or main menu), never over it; not
+before the player's 3rd day, not in a session's first two runs, then at most
+one every 3 runs and 3 minutes, never after a new best. Premium players never
+see an ad and get the rewarded ones' rewards free. The web build has no ads.
 
 1. Create an AdMob account and add the two apps.
-2. Make a **rewarded** ad unit in each (and an interstitial one, for later).
+2. Make a **rewarded** ad unit and an **interstitial** one in each.
 3. Put the ad unit ids in `.env` (and the repository secrets, for builds):
-   `VITE_ADMOB_REWARDED_IOS`, `VITE_ADMOB_REWARDED_ANDROID`, and, for later,
+   `VITE_ADMOB_REWARDED_IOS`, `VITE_ADMOB_REWARDED_ANDROID`,
    `VITE_ADMOB_INTERSTITIAL_IOS`, `VITE_ADMOB_INTERSTITIAL_ANDROID`. Without
-   them the apps run with no ads.
+   them the apps run with no ads (without the interstitial ones, no interstitials).
 4. Put the AdMob **app** ids in the native projects (Android's is already in
    the manifest; iOS's goes in after `npx cap add ios`):
    `GADApplicationIdentifier` in `ios/App/App/Info.plist`, and the

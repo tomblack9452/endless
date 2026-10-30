@@ -6,7 +6,7 @@ import { Capacitor } from '@capacitor/core';
 // has agreed on Google's consent form (the one the ads use), and "share usage
 // stats" is on in settings. No names or emails are ever sent.
 
-export type AdPlacement = 'revive' | 'double_credits' | 'daily_gift' | 'goal_swap';
+export type AdPlacement = 'revive' | 'double_credits' | 'daily_gift' | 'goal_swap' | 'free_cores';
 export type Currency = 'credits' | 'cores';
 
 /** Every event the game logs, with its parameters (Firebase's names: snake_case, 40 characters at most). */
@@ -22,6 +22,7 @@ export interface Events {
   ad_rewarded: { placement: AdPlacement };
   ad_skipped: { placement: AdPlacement };
   ad_unavailable: { placement: AdPlacement };
+  interstitial_shown: { runs: number };
   view_store: { source: string };
   view_item: { item_id: string; source: string };
   begin_checkout: { item_id: string };

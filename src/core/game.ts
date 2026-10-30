@@ -277,6 +277,10 @@ export class Game {
   recorded = false; // this run's stats are saved
   /** What this run counts as in usage stats; null for the practice course, which isn't counted. */
   private runKind: string | null = null;
+  /** An interstitial is showing between runs: taps wait for it. */
+  private betweenAd = false;
+  /** This run set a new best (no interstitial after it). */
+  private runNewBest = false;
   assisted = false; // assist mode was on at some point this run
   /** Which info screen is open from the title (stats, goals, hangar), if any. */
   infoOpen: InfoScreen | null = null;
@@ -582,6 +586,7 @@ export class Game {
     this.econ.setCountdown(0);
     this.econ.setOverRewards([]);
     this.revived = this.revivePending = this.reviveAsked = false;
+    this.runNewBest = false;
     this.preRevive = null;
     this.path = [];
     this.pathTimes = [];
@@ -757,6 +762,12 @@ export class Game {
    * environment, each set level, and endless. Assisted runs never count.
    */
   recordBest(finished: boolean): { best: number; isNew: boolean } {
+    const r = this.bestOf(finished);
+    if (r.isNew) this.runNewBest = true;
+    return r;
+  }
+
+  private bestOf(finished: boolean): { best: number; isNew: boolean } {
     const p = this.progress;
     const score = this.assisted ? 0 : this.score;
     if (this.mode === 'ranked') {
@@ -817,7 +828,7 @@ export class Game {
     const double = credits > 0 && this.ads.offers('doubleCredits');
     this.ui.showDouble(double ? `double +${formatScore(credits)} credits · ${this.ads.label()}` : null);
     if (double) this.revives.adShown('doubleCredits');
-    this.ads.afterRun(Date.now(), false); // the device clock, like the first-played time it is measured from
+    this.ads.afterRun(Date.now(), this.runNewBest); // the device clock, like the first-played time it is measured from
     this.ads.preload(); // an ad ready for the offers after a run (none for premium)
     const from = [
       fromPickups > 0 ? `${formatScore(fromPickups)} from pickups` : '',
@@ -1238,8 +1249,23 @@ export class Game {
     this.ui.showNotice(`racing ${r.name}'s ghost · ${formatScore(r.score)}`);
   }
 
-  /** Retry in the same mode (and environment, or level) as the run that just ended. */
+  /** Leave the end screen: an interstitial first if one is due (Ads.afterRun), then `next`. */
+  leaveResults(next: () => void): void {
+    if (this.betweenAd) return;
+    this.betweenAd = true;
+    void this.ads.showDue().then((shown) => {
+      this.betweenAd = false;
+      if (shown) analytics.log('interstitial_shown', { runs: this.progress.stats.runs });
+      next();
+    });
+  }
+
+  /** Retry in the same mode (and environment, or level) as the run that just ended, after any interstitial due. */
   private retry(): void {
+    this.leaveResults(() => this.flyAgain());
+  }
+
+  private flyAgain(): void {
     if (this.mode === 'ranked') this.startRanked();
     else if (this.dailyRunNow) this.courseRuns.startDaily();
     else if (this.course) this.courseRuns.startCourse(COURSES.indexOf(this.course));

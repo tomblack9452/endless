@@ -139,6 +139,8 @@ export class Navigation {
     else if (action === 'whats-new') this.g.settingsScreen.showWhatsNew();
     else if (action === 'menu') {
       const practising = this.g.practice;
+      // From the end screen, a due interstitial shows first (not from the pause menu).
+      if (!practising && (this.g.state === 'crashed' || this.g.state === 'finished')) return this.g.leaveResults(() => this.toMainMenu());
       this.toMainMenu();
       if (practising) {
         // Left the practice run: back to the start of onboarding (a trial: back to "how did that feel?").

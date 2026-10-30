@@ -506,6 +506,17 @@ describe('the daily challenge', () => {
     expect(Math.max(...CONFIG.daily.streak.map((s) => ('cores' in s ? s.cores : 0)))).toBeLessThanOrEqual(3);
   });
 
+  it('pays the free cores for an ad once a day, 5 at most, for today only (0027)', async () => {
+    const a = await newUser();
+    const day = await today();
+    await as(a);
+    expect(await earn(50, `adcores:${day}`)).toBe(5);
+    expect(await earn(5, `adcores:${day}`)).toBe(0);
+    expect(await earn(5, 'adcores:2020-01-01')).toBe(0);
+    expect(await earn(5, 'adcores:nonsense')).toBe(0);
+    expect(CONFIG.ads.freeCores).toBeLessThanOrEqual(5);
+  });
+
   it("keeps the course's length in step with the game", () => {
     const sql = migrations.map(([, text]) => text).join('\n');
     const m = /c_daily_length constant numeric := ([0-9.]+)/.exec(sql);

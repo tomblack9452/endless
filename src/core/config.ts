@@ -747,12 +747,16 @@ export const CONFIG = {
   // never before day afterDays, at most one per everyRuns runs and minSeconds,
   // never after a new best, never for premium.
   ads: {
-    rewarded: { revive: true, doubleCredits: true, dailyGift: true, rerollQuest: true } as Record<
-      'revive' | 'doubleCredits' | 'dailyGift' | 'rerollQuest',
+    rewarded: { revive: true, doubleCredits: true, dailyGift: true, rerollQuest: true, freeCores: true } as Record<
+      'revive' | 'doubleCredits' | 'dailyGift' | 'rerollQuest' | 'freeCores',
       boolean
     >,
     dailyGift: { credits: 150, cores: 2 },
-    interstitial: { enabled: false, afterDays: 3, everyRuns: 3, minSeconds: 180 },
+    // The store's free cores for an ad, once a day (earn_cores pays 5 at most: 0027_ad_cores.sql).
+    freeCores: 5,
+    // Between runs, as the player leaves the end screen: from the 3rd day, the 3rd run of a session at the
+    // earliest, then every 3 runs and 3 minutes at most, never after a new best, never for premium.
+    interstitial: { enabled: true, afterDays: 3, everyRuns: 3, minSeconds: 180 },
   },
   // Premium (a one-off purchase): extra free revives a day on top of the one everyone gets.
   premium: { extraFreeRevives: 1 },

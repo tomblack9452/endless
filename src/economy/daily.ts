@@ -147,6 +147,7 @@ interface Saved {
   reviveUsed?: number; // how many that day (older saves: 1)
   rerollDay?: string; // the day a quest was last swapped (once a day)
   giftDay?: string; // the day the free gift was last taken
+  freeCoresDay?: string; // the day the store's free cores for an ad were last taken
 }
 
 const KEY = 'endless.daily';
@@ -288,6 +289,16 @@ export class Daily {
 
   takeGift(day: string): void {
     this.s.giftDay = day;
+    this.save();
+  }
+
+  /** The store's free cores for an ad: once a day. */
+  freeCoresReady(day: string): boolean {
+    return this.s.freeCoresDay !== day;
+  }
+
+  takeFreeCores(day: string): void {
+    this.s.freeCoresDay = day;
     this.save();
   }
 

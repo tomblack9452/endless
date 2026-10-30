@@ -316,6 +316,18 @@ export class ShopScreens {
           owned: false,
         });
     }
+    // Once a day, a few cores for an ad: first in the row, so a free taste sits beside the packs.
+    if (this.g.revives.freeCoresOffered()) {
+      packs.unshift({
+        img: 'store/cores_100.png',
+        name: `${CONFIG.ads.freeCores} cores`,
+        sub: 'free · once a day',
+        tag: 'free',
+        button: { act: 'free-cores', text: 'watch an ad', enabled: true, primary: true },
+        owned: false,
+      });
+      this.g.revives.adShown('freeCores');
+    }
     const packsNote = !app
       ? 'packs of credits and cores, the starter pack and premium are in the android app'
       : this.g.storeProducts.length === 0
@@ -500,6 +512,7 @@ export class ShopScreens {
     } else if (act === 'pass-cores') this.onPassPremium();
     else if (act === 'pass-open') this.openPass('store');
     else if (act === 'restore') void this.g.purchases.restorePurchases();
+    else if (act === 'free-cores') void this.g.revives.claimFreeCores();
     else if (act.startsWith('swap-')) this.swapCores(Number(act.slice(5)));
     else if (CONFIG.economy.store.products.some((p) => p.id === act)) void this.g.purchases.buyProduct(act as ProductId);
   };

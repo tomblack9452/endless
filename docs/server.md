@@ -154,7 +154,8 @@ only; docs/analytics.md), `0026` (credit packs, 1.0.13: the webhook's
 server's balance in one call, so a resent event pays nothing; a pack bought
 before the device's first credit sync waits in `wallets.credits_owed`;
 `store_credit_refund()` takes them back, never below zero; `sync_credits()`
-again, adding what's owed on the first sync).
+again, adding what's owed on the first sync), `0027` (free cores for an ad, 1.0.14: `earn_cores` takes
+`adcores:<date>`, today's (a day either side), once a day, 5 at most).
 Apply `0026` before deploying 1.0.13's webhook (it calls
 `store_credit_purchase` for the credit packs). Apply `0014` and `0016` before deploying the webhook again; 1.0.7's webhook
 (a constant-time secret check) wants a redeploy after `db:apply`:
