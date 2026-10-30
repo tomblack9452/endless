@@ -131,6 +131,7 @@ describe('supabase/setup.sql', () => {
       'runs',
       'saves',
       'store_events',
+      'store_sales',
       'wallets',
     ]);
   });
@@ -217,6 +218,7 @@ describe('db:apply (the migrations from a terminal)', () => {
       'runs',
       'saves',
       'store_events',
+      'store_sales',
       'wallets',
     ]);
     // Every table has row-level security on (Supabase's advisor flags any that don't).
@@ -325,7 +327,7 @@ describe('the 1.0.11 audit', () => {
       .filter((f) => f.anon)
       .map((f) => f.sig.replace(/\(.*/, ''))
       .sort();
-    expect(anon).toEqual(['daily_period', 'pass_season', 'server_now']); // the clock, and two pure date helpers
+    expect(anon).toEqual(['daily_period', 'pass_season', 'server_now', 'store_sales_now']); // the clock, two pure date helpers, and the sales running now
     expect(fns.rows.find((f) => f.sig === 'on_new_user()')).toMatchObject({ anon: false, auth: false });
     // Every function has its own search_path (Supabase's linter), the security definer ones above all.
     for (const f of fns.rows) expect(f.config ?? [], f.sig).toContain('search_path=public');
@@ -647,6 +649,84 @@ describe('credits on the server', () => {
     await rejects(db.query('select public.sync_credits(-5, null)'), /not a balance/);
     await as(null);
     await rejects(db.query('select public.sync_credits(5, null)'), /permission denied|not signed in/);
+  });
+});
+
+describe('store offers (0028)', () => {
+  const sync = async (credits: number, last: number | null) =>
+    Number((await db.query<{ sync_credits: string }>('select public.sync_credits($1, $2)', [credits, last])).rows[0].sync_credits);
+  const pack = async (id: string, user: string, product: string, cores: number, credits: number) => {
+    await admin();
+    return (
+      await db.query<{ r: string }>("select public.store_pack_purchase($1, $2, $3, 'NON_RENEWING_PURCHASE', $4, $5, $6, now()) as r", [
+        id,
+        user,
+        product,
+        `tx-${id}`,
+        cores,
+        credits,
+      ])
+    ).rows[0].r;
+  };
+  const coresOf = async (u: string) => {
+    await admin();
+    return (await db.query<{ cores: number }>('select cores from public.wallets where user_id = $1', [u])).rows[0].cores;
+  };
+
+  it("doubles a player's first pack, once, however often the webhook sends it", async () => {
+    const a = await newUser();
+    expect(await pack('fp-1', a, 'cores_100', 100, 0)).toBe('paid');
+    expect(await pack('fp-1', a, 'cores_100', 100, 0)).toBe('duplicate');
+    expect(await coresOf(a)).toBe(200);
+    expect(await pack('fp-2', a, 'cores_100', 100, 0)).toBe('paid'); // the second pays as it is
+    expect(await coresOf(a)).toBe(300);
+  });
+
+  it('doubles a first credit pack too, and not the starter pack', async () => {
+    const a = await newUser();
+    await as(a);
+    await sync(0, null);
+    expect(await pack('fp-s', a, 'starter_pack', 500, 0)).toBe('paid'); // not a pack that doubles...
+    expect(await pack('fp-c', a, 'credits_1000', 0, 1000)).toBe('paid'); // ...so this is still the first
+    await as(a);
+    expect(await sync(0, 0)).toBe(2000);
+  });
+
+  it("takes back what a doubled pack paid, and a refunded first pack doesn't make the next one first", async () => {
+    const a = await newUser();
+    await pack('fp-r', a, 'cores_550', 550, 0);
+    expect(await coresOf(a)).toBe(1100);
+    await admin();
+    await db.query("select public.store_pack_refund('rf-fp', $1, 'cores_550', 'tx-fp-r', 550, 0)", [a]);
+    expect(await coresOf(a)).toBe(0);
+    await pack('fp-r2', a, 'cores_550', 550, 0);
+    expect(await coresOf(a)).toBe(550);
+  });
+
+  it("isn't changed by another player's purchase", async () => {
+    const a = await newUser();
+    const b = await newUser();
+    await pack('fp-a', a, 'cores_100', 100, 0);
+    await pack('fp-b', b, 'cores_100', 100, 0);
+    expect(await coresOf(b)).toBe(200);
+  });
+
+  it('returns only the sales running now, and players can only read them', async () => {
+    await admin();
+    await db.query(
+      "insert into public.store_sales (product, starts_at, ends_at) values ('credits_10000', now() - interval '1 hour', now() + interval '1 day'), ('cores_100', now() - interval '3 days', now() - interval '1 day'), ('cores_550', now() + interval '1 day', now() + interval '2 days')",
+    );
+    const a = await newUser();
+    await as(a);
+    const rows = (await db.query<{ product: string; label: string }>('select * from public.store_sales_now()')).rows;
+    expect(rows.map((r) => r.product)).toEqual(['credits_10000']);
+    expect(rows[0].label).toBe('sale');
+    await rejects(db.query("insert into public.store_sales (product, starts_at, ends_at) values ('x', now(), now() + interval '1 day')"), /permission denied/);
+    await as(null);
+    expect((await db.query('select * from public.store_sales_now()')).rows.length).toBe(1);
+    await as(a);
+    await rejects(db.query(`select public.store_pack_purchase('x', '${a}', 'cores_100', 'INITIAL_PURCHASE', 'x', 100, 0, now())`), /permission denied/);
+    await admin();
   });
 });
 

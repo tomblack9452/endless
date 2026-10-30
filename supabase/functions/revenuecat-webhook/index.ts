@@ -5,7 +5,7 @@
 // event's app_user_id is the account to pay.
 //
 // Set up (the database first: npm run db:apply, for 0014's purchase time,
-// 0016's pass refunds and 0026's credit packs):
+// 0016's pass refunds, 0026's credit packs and 0028's first purchase doubled):
 //   supabase secrets set REVENUECAT_WEBHOOK_SECRET=<any long random string>
 //   supabase functions deploy revenuecat-webhook --no-verify-jwt
 //   RevenueCat > Project > Integrations > Webhooks: the function's URL, with
@@ -72,12 +72,23 @@ Deno.serve(async (req) => {
   // One database call each: keeping the event and paying (or taking back) its
   // cores happen together, so an error leaves nothing half done and the retry
   // RevenueCat makes after a 500 does the whole thing (0011_store_purchases.sql, 0014).
-  // A credit pack pays its credits in the same call, once (0026_credit_packs.sql).
-  const credits = CREDITS[event.product_id];
-  const { data, error } = credits
+  // A pack of cores or credits pays through store_pack_*, which doubles a player's first (0028_store_offers.sql);
+  // the starter pack, premium and the pass as before. Each pays once, in the call that records the event.
+  const credits = CREDITS[event.product_id] ?? 0;
+  const pack = /^(cores|credits)_\d+$/.test(event.product_id);
+  const { data, error } = pack
     ? PAID.has(event.type)
-      ? await admin.rpc('store_credit_purchase', { p_id: event.id, p_user: user, p_product: event.product_id, p_type: event.type, p_transaction: transaction, p_credits: credits, p_at: at })
-      : await admin.rpc('store_credit_refund', { p_id: event.id, p_user: user, p_product: event.product_id, p_transaction: transaction, p_credits: credits })
+      ? await admin.rpc('store_pack_purchase', {
+          p_id: event.id,
+          p_user: user,
+          p_product: event.product_id,
+          p_type: event.type,
+          p_transaction: transaction,
+          p_cores: cores,
+          p_credits: credits,
+          p_at: at,
+        })
+      : await admin.rpc('store_pack_refund', { p_id: event.id, p_user: user, p_product: event.product_id, p_transaction: transaction, p_cores: cores, p_credits: credits })
     : PAID.has(event.type)
       ? await admin.rpc('store_purchase_at', { p_id: event.id, p_user: user, p_product: event.product_id, p_type: event.type, p_transaction: transaction, p_cores: cores, p_at: at })
       : await admin.rpc('store_refund', { p_id: event.id, p_user: user, p_product: event.product_id, p_transaction: transaction, p_cores: cores });

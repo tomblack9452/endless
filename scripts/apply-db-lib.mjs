@@ -36,6 +36,7 @@ const MADE = {
   '0024_spend_once.sql': 'spend_cores_once(integer,text,text)',
   '0025_account_counts.sql': 'account_counts()',
   '0026_credit_packs.sql': 'store_credit_purchase(text,uuid,text,text,text,integer,timestamp with time zone)',
+  '0028_store_offers.sql': 'store_pack_purchase(text,uuid,text,text,text,integer,integer,timestamp with time zone)',
   '0027_ad_cores.sql': "select position('adcores' in pg_get_functiondef('public.earn_cores(integer,text)'::regprocedure)) > 0 as there",
 };
 
