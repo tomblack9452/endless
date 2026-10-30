@@ -66,7 +66,9 @@ to the server's balance in one call, so a retried event pays nothing more.
 The game's next credit sync brings them to the device. A pack bought before the
 device ever synced waits in `credits_owed` until that first sync. A refund
 (`store_credit_refund`) takes the credits back, never below zero. Bigger packs give more
-credits for the pound: +8%, +10% and +24% on the smallest.
+credits for the pound: +8%, +10% and +24% on the smallest. The cores swap gives 10
+credits a core (25 before 1.0.13), so £1 of cores never swaps into more
+credits than £1 of credit packs buys (`swapCredits` in `CONFIG.economy.shop`).
 
 The webhook pays cores for `INITIAL_PURCHASE` and `NON_RENEWING_PURCHASE`
 events and takes them back on a `CANCELLATION` (a refund), keeping each event

@@ -561,7 +561,7 @@ countdown or the revive offer.
 
 **Short of credits or cores.** Tapping an upgrade or look the wallet can't
 cover opens a sheet: "N credits short", with the smallest credit pack that
-covers it (at its store price), a swap of just enough cores (25 credits each,
+covers it (at its store price), a swap of just enough cores (10 credits each,
 when you have them; it then buys the thing), or not now
 (`src/screens/shortOf.ts`). Cores work the same way with the core packs.
 
@@ -655,7 +655,7 @@ they follow the phone's.
 - **Cores** are the premium currency. They come slowly from play (login
   rewards, quests, the season pass) and, in the apps, from the store. They buy
   premium looks, revives and the pass's premium track, and swap for credits
-  in the store (1 core for 25 credits). Since 1.0.11 spending 100 cores or
+  in the store (1 core for 10 credits; 25 before 1.0.13). Since 1.0.11 spending 100 cores or
   more at once asks first ("spend 550 cores?", **buy** or **not now**:
   `CONFIG.economy.confirmCores`): the weekly set, the vault, the pass, dearer
   looks and swaps; a revive (50) never asks, its offer being the question

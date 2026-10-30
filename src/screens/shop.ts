@@ -343,10 +343,10 @@ export class ShopScreens {
       creditPacks,
       packsNote,
       extras,
-      swapNote: `${formatScore(S.creditsPerCore)} credits for every core`,
+      swapNote: `${formatScore(S.swapCredits)} credits for every core`,
       swaps: S.swaps.map((n) => ({
         act: `swap-${n}`,
-        text: `${formatScore(n)} cores → ${formatScore(n * S.creditsPerCore)} credits`,
+        text: `${formatScore(n)} cores → ${formatScore(n * S.swapCredits)} credits`,
         enabled: this.g.wallet.cores >= n,
       })),
       foot,
@@ -510,9 +510,9 @@ export class ShopScreens {
       this.g.ui.showNotice('not enough cores');
       return;
     }
-    this.confirmCores(n, `for ${formatScore(n * CONFIG.economy.shop.creditsPerCore)} credits`, () => {
+    this.confirmCores(n, `for ${formatScore(n * CONFIG.economy.shop.swapCredits)} credits`, () => {
       if (!this.g.wallet.spendCores(n, 'swap')) return;
-      const lines = this.g.grant({ credits: n * CONFIG.economy.shop.creditsPerCore });
+      const lines = this.g.grant({ credits: n * CONFIG.economy.shop.swapCredits });
       this.g.ui.showNotice(lines.join(' · '));
       this.g.sound.pickup();
       this.g.title.refreshTitle();

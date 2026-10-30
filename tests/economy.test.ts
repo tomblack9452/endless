@@ -17,7 +17,7 @@ describe('cores to credits', () => {
   it('swaps whole cores at the shop rate, from small to large', () => {
     const S = CONFIG.economy.shop;
     expect(S.swaps.length).toBeGreaterThan(0);
-    for (const n of S.swaps) expect(Number.isInteger(n * S.creditsPerCore) && n > 0).toBe(true);
+    for (const n of S.swaps) expect(Number.isInteger(n * S.swapCredits) && n > 0).toBe(true);
     expect([...S.swaps].sort((a, b) => a - b)).toEqual([...S.swaps]);
   });
 });

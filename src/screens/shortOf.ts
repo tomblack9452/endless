@@ -28,7 +28,7 @@ export class ShortOfSheet {
   show(currency: 'credits' | 'cores', need: number, what: string, go: () => void): void {
     const w = this.g.wallet;
     const have = currency === 'credits' ? w.credits : w.cores;
-    const rate = CONFIG.economy.shop.creditsPerCore;
+    const rate = CONFIG.economy.shop.swapCredits;
     const s = shortOf(need, have, packs(currency), currency === 'credits' ? { cores: w.cores, creditsPerCore: rate } : undefined);
     if (s.short <= 0) return go();
     const price = s.pack ? this.g.storeProducts.find((p) => p.id === s.pack!.id)?.price : undefined;
