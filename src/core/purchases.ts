@@ -1,3 +1,4 @@
+import { PACK_ID } from '../economy/offers';
 import { analytics } from '../platform/analytics';
 import { CONFIG } from './config';
 import { entitlementFor } from '../store/entitlements';
@@ -27,6 +28,8 @@ export class Purchases {
     }
     analytics.log('begin_checkout', { item_id: id });
     const creditsBefore = this.g.wallet.credits;
+    // A first pack of cores or credits pays double (the server's rule, 0028; the device's own without one).
+    const times = PACK_ID.test(id) && this.g.offers.firstDouble ? 2 : 1;
     const result = await this.g.store.buy(id);
     if (result !== 'failed') analytics.log(result === 'cancelled' ? 'purchase_cancelled' : 'purchase', { item_id: id });
     if (result === 'cancelled') return;
@@ -36,21 +39,25 @@ export class Purchases {
     }
     const p = CONFIG.economy.store.products.find((x) => x.id === id)!;
     const lines: string[] = [];
+    if (PACK_ID.test(id)) this.g.offers.markPackBought();
     if ('cores' in p) {
+      const cores = p.cores * times;
       // With the server, the store's webhook pays the cores there: take its balance.
       if (this.g.backend.online) {
-        const coresTarget = this.g.wallet.cores + p.cores;
-        lines.push(`+${formatScore(p.cores)} cores`);
+        const coresTarget = this.g.wallet.cores + cores;
+        lines.push(`+${formatScore(cores)} cores`);
         void this.awaitPaid(() => this.g.wallet.cores >= coresTarget);
-      } else lines.push(...this.g.grant({ cores: p.cores }));
+      } else lines.push(...this.g.grant({ cores }));
     }
     if ('credits' in p) {
+      const credits = p.credits * times;
       // With the server, the webhook pays the credits there and the next sync brings them here.
       if (this.g.backend.online) {
-        lines.push(`+${formatScore(p.credits)} credits`);
-        void this.awaitPaid(() => this.g.wallet.credits >= creditsBefore + p.credits);
-      } else lines.push(...this.g.grant({ credits: p.credits }, `purchase:${id}`));
+        lines.push(`+${formatScore(credits)} credits`);
+        void this.awaitPaid(() => this.g.wallet.credits >= creditsBefore + credits);
+      } else lines.push(...this.g.grant({ credits }, `purchase:${id}`));
     }
+    if (times === 2) lines.push('first purchase: doubled');
     if ('look' in p) lines.push(...this.g.grant({ look: p.look }));
     if ('pass' in p && !this.g.pass.premium) lines.push(...this.g.pass.unlockPremium('money').flatMap((r) => this.g.grant(r)), 'season pass premium');
     if ('premium' in p) lines.push('premium: no ads, ad rewards free, the halo hull, regalia paint and crown flame, an extra free revive a day');

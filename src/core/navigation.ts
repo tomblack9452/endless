@@ -45,6 +45,7 @@ export class Navigation {
     else if (name === 'daily') this.g.goals.openGoals('daily');
     else if (name === 'claim') this.g.claimLogin();
     else if (name === 'gift') void this.g.revives.claimGift();
+    else if (name === 'store-card') this.g.offers.open();
   };
 
   /**

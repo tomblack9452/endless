@@ -1,3 +1,4 @@
+import type { Sale } from '../economy/offers';
 import { storage } from '../core/storage';
 import { analytics } from '../platform/analytics';
 import { reportError } from '../platform/errors';
@@ -337,6 +338,11 @@ export class SupabaseBackend implements Backend {
   async purchases(): Promise<Purchase[] | null> {
     const rows = await this.call<{ product: string; at: string }[]>(`/rest/v1/store_events?select=product,at&user_id=eq.${this.session?.user}`);
     return rows ? rows.map((r) => ({ product: r.product, at: Date.parse(r.at) || 0 })) : null;
+  }
+
+  async sales(): Promise<Sale[]> {
+    const rows = await this.call<{ product: string; label: string; ends_at: string }[]>('/rest/v1/rpc/store_sales_now', { method: 'POST', body: '{}' });
+    return (rows ?? []).map((r) => ({ product: r.product, label: r.label, endsAt: Date.parse(r.ends_at) || 0 }));
   }
 
   async pilotName(): Promise<string | null> {

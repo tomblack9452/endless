@@ -1,3 +1,4 @@
+import type { Sale } from '../economy/offers';
 import type { ShipLook } from '../ship/portrait';
 import { LocalBackend } from './local';
 import { SupabaseBackend } from './supabase';
@@ -147,6 +148,8 @@ export interface Backend {
   board(query: BoardQuery): Promise<BoardRow[] | null>;
   /** What this account has bought (the purchase webhook's records), or null if unknown. */
   purchases(): Promise<Purchase[] | null>;
+  /** The store sales running now (store_sales_now), or none. */
+  sales(): Promise<Sale[]>;
   /** Your pilot name on the boards, or null. */
   pilotName(): Promise<string | null>;
   /** Change it; says why not when the server turns it down. */

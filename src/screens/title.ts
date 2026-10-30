@@ -158,6 +158,8 @@ export class TitleScreen {
       fraction: quests.length ? done / quests.length : 0,
       hot: toClaim > 0,
     });
+    const store = this.g.offers.card(now);
+    if (store) cards.push(store);
     const P = CONFIG.economy.pass;
     const tier = this.g.pass.tier;
     cards.push({

@@ -24,7 +24,7 @@ type ShopTab = 'today' | 'set' | 'vault';
 const WALLET_EXPLAINED_KEY = 'endless.walletExplained';
 
 /** Where the store was opened from, for the analytics funnel. */
-export type StoreSource = 'dock' | 'wallet' | 'shop' | 'short' | 'results' | 'hub';
+export type StoreSource = 'dock' | 'wallet' | 'shop' | 'short' | 'results' | 'hub' | 'sale' | 'starter_offer' | 'pass_card' | 'week_pack' | 'vault';
 
 export class ShopScreens {
   constructor(private readonly g: Game) {}
@@ -280,8 +280,15 @@ export class ShopScreens {
     const extras: StoreCard[] = [];
     // Each row's biggest bonus is its best value.
     const bestOf = (kind: 'cores' | 'credits'): number => Math.max(0, ...CONFIG.economy.store.products.map((p) => (kind in p && 'bonus' in p ? p.bonus : 0)));
-    const tag = (bonus: number, kind: 'cores' | 'credits'): string => (bonus > 0 && bonus === bestOf(kind) ? 'best value' : '');
-    const more = (bonus: number): string => (bonus > 0 ? `+${bonus}% more for the price` : '');
+    // A pack's tag: a sale first, then "first purchase ×2" (until the first pack), then best value. What the tag can't say goes under the name.
+    const first = this.g.offers.firstDouble;
+    const best = (bonus: number, kind: 'cores' | 'credits'): boolean => bonus > 0 && bonus === bestOf(kind);
+    const tag = (id: string, bonus: number, kind: 'cores' | 'credits'): string =>
+      this.g.offers.saleOn(id)?.label ?? (first ? 'first purchase ×2' : best(bonus, kind) ? 'best value' : '');
+    const more = (id: string, bonus: number, kind: 'cores' | 'credits'): string =>
+      [best(bonus, kind) && tag(id, bonus, kind) !== 'best value' ? 'best value' : '', bonus > 0 ? `+${bonus}% more for the price` : '']
+        .filter(Boolean)
+        .join(' · ');
     for (const p of CONFIG.economy.store.products) {
       const img = `store/${p.id}.png`;
       if ('look' in p) {
@@ -290,7 +297,7 @@ export class ShopScreens {
           img,
           name: 'starter pack',
           sub: `${formatScore(p.cores)} cores and ${rewardText({ look: p.look })}`,
-          tag: 'once',
+          tag: this.g.offers.saleOn(p.id)?.label ?? 'once',
           button: mine ? owned('owned') : money(p.id),
           owned: mine,
         });
@@ -305,13 +312,20 @@ export class ShopScreens {
           owned: mine,
         });
       } else if ('cores' in p)
-        packs.push({ img, name: `${formatScore(p.cores)} cores`, sub: more(p.bonus), tag: tag(p.bonus, 'cores'), button: money(p.id), owned: false });
+        packs.push({
+          img,
+          name: `${formatScore(p.cores)} cores`,
+          sub: more(p.id, p.bonus, 'cores'),
+          tag: tag(p.id, p.bonus, 'cores'),
+          button: money(p.id),
+          owned: false,
+        });
       else if ('credits' in p)
         creditPacks.push({
           img,
           name: `${formatScore(p.credits)} credits`,
-          sub: more(p.bonus),
-          tag: tag(p.bonus, 'credits'),
+          sub: more(p.id, p.bonus, 'credits'),
+          tag: tag(p.id, p.bonus, 'credits'),
           button: money(p.id),
           owned: false,
         });

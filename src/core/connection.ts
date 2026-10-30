@@ -32,6 +32,7 @@ export class Connection {
     // What the account has bought, as the server's purchase records have it.
     const records = (await this.g.backend.purchases()) ?? [];
     const bought = [...new Set(records.map((r) => r.product))];
+    this.g.offers.notePurchases(bought);
     for (const id of bought) this.g.purchases.grantProduct(id);
     const pass = this.g.purchases.restorePass(records);
     if (pass) this.g.ui.celebrate([{ kicker: 'season pass', icon: PASS_ICON, name: 'premium restored', lines: pass }]);
@@ -48,6 +49,8 @@ export class Connection {
       void analytics.setConsent(this.g.ads.consented);
     });
     this.g.storeProducts = await this.g.store.products();
+    this.g.offers.sales = await this.g.backend.sales().catch(() => []);
+    this.g.title.refreshTitle();
     if (this.g.infoOpen === 'store') this.g.shop.openStore();
   }
 

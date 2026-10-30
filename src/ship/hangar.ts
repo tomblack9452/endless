@@ -25,6 +25,8 @@ interface CardView {
   id: string;
   name: string;
   state: 'equipped' | 'owned' | 'locked';
+  /** Not owned, and paid for with cores (the vault's too): it glows, to try on. */
+  premium: boolean;
   /** Under the name: what it costs or takes, for the ones you don't have. */
   sub: string;
   /** CSS background for a colour swatch, or an svg for a picture. */
@@ -133,6 +135,7 @@ export function buildHangar(st: HangarState, d: HangarDeps): HangarView {
       id: item.id,
       name: item.name,
       state: !own ? 'locked' : d.looks.equipped[st.slot] === item.id ? 'equipped' : 'owned',
+      premium: !own && (item.unlock.by === 'cores' || item.unlock.by === 'vault'),
       sub: own ? '' : shortUnlock(item),
       swatch: lookSwatch(item),
       icon: lookIcon(item),

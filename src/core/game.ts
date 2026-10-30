@@ -80,6 +80,7 @@ import { RecordScreen } from '../screens/record';
 import { RankKeeper } from '../progression/rankKeeper';
 import { Revives } from './revives';
 import { ShortOfSheet } from '../screens/shortOf';
+import { Offers } from '../screens/offers';
 import { ResultsScreen } from '../screens/results';
 import { StorePrompts } from '../economy/nudge';
 import { TitleScreen } from '../screens/title';
@@ -279,8 +280,8 @@ export class Game {
   private runKind: string | null = null;
   /** An interstitial is showing between runs: taps wait for it. */
   private betweenAd = false;
-  /** This run set a new best (no interstitial after it). */
-  private runNewBest = false;
+  /** This run set a new best (no interstitial after it; the end screen may show the vault's look). */
+  newBest = false;
   assisted = false; // assist mode was on at some point this run
   /** Which info screen is open from the title (stats, goals, hangar), if any. */
   infoOpen: InfoScreen | null = null;
@@ -363,6 +364,7 @@ export class Game {
 
   readonly revives = new Revives(this);
   readonly shortOf = new ShortOfSheet(this);
+  readonly offers = new Offers(this);
 
   readonly title = new TitleScreen(this);
   readonly results = new ResultsScreen(this);
@@ -489,6 +491,7 @@ export class Game {
       else void storage.set(FIRST_PLAYED_KEY, String(this.firstPlayed));
     });
     void Promise.all([
+      this.offers.load(),
       this.progress.load(),
       this.ranked.load(),
       this.wallet.load(),
@@ -586,7 +589,7 @@ export class Game {
     this.econ.setCountdown(0);
     this.econ.setOverRewards([]);
     this.revived = this.revivePending = this.reviveAsked = false;
-    this.runNewBest = false;
+    this.newBest = false;
     this.preRevive = null;
     this.path = [];
     this.pathTimes = [];
@@ -763,7 +766,7 @@ export class Game {
    */
   recordBest(finished: boolean): { best: number; isNew: boolean } {
     const r = this.bestOf(finished);
-    if (r.isNew) this.runNewBest = true;
+    if (r.isNew) this.newBest = true;
     return r;
   }
 
@@ -828,7 +831,7 @@ export class Game {
     const double = credits > 0 && this.ads.offers('doubleCredits');
     this.ui.showDouble(double ? `double +${formatScore(credits)} credits · ${this.ads.label()}` : null);
     if (double) this.revives.adShown('doubleCredits');
-    this.ads.afterRun(Date.now(), this.runNewBest); // the device clock, like the first-played time it is measured from
+    this.ads.afterRun(Date.now(), this.newBest); // the device clock, like the first-played time it is measured from
     this.ads.preload(); // an ad ready for the offers after a run (none for premium)
     const from = [
       fromPickups > 0 ? `${formatScore(fromPickups)} from pickups` : '',

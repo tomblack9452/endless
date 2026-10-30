@@ -269,3 +269,13 @@ body.contrast .pill.small.primary {
   border-color: color-mix(in srgb, currentColor 55%, transparent);
   box-shadow: none;
 }
+
+/* A premium look not owned yet (cores or the vault): a soft accent glow, to try on. */
+.hangar-card.premium {
+  border-color: color-mix(in srgb, var(--accent) 55%, transparent);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--accent) 28%, transparent);
+}
+
+body.contrast .hangar-card.premium {
+  box-shadow: none;
+}

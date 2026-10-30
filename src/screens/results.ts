@@ -1,6 +1,8 @@
 import { dayKey } from '../economy/time';
 import { type Buyable, type RunNudge, runNudge } from '../economy/nudge';
-import { byKey } from '../ship/looks';
+import { vaultAt } from '../economy/shop';
+import { analytics } from '../platform/analytics';
+import { byKey, type LookItem } from '../ship/looks';
 import { MAX_TIER, SYSTEMS, TIER_COST } from '../ship/upgrades';
 import { formatScore } from '../ui/ui';
 import type { Game } from '../core/game';
@@ -10,6 +12,8 @@ export class ResultsScreen {
   constructor(private readonly g: Game) {}
 
   private shown: RunNudge = null;
+  /** This month's vault look, offered after a new best. */
+  private vault: LookItem | null = null;
 
   /** What credits can buy right now: each upgrade's next tier (where the league allows it) and today's looks. */
   private buyables(): Buyable[] {
@@ -32,6 +36,16 @@ export class ResultsScreen {
 
   /** After the run's credits are in: fill the line (the "close" one at most once a session, as it's a store prompt). */
   afterRun(earned: number): void {
+    // A new best is a proud moment: this month's vault look, to try on (the session's one store prompt).
+    const v = vaultAt(this.g.now());
+    this.vault = null;
+    if (this.g.newBest && this.g.store.available && !this.g.looks.owns(v.item, this.g.owner()) && this.g.storePrompts.take()) {
+      this.vault = v.item;
+      this.shown = null;
+      analytics.log('offer_shown', { offer: 'vault' });
+      this.g.ui.setOverNext(`this month's vault: ${v.item.name} · ${formatScore(v.price)} cores · try it on`);
+      return;
+    }
     const after = this.g.wallet.credits;
     let n = runNudge(after - earned, after, this.buyables());
     if (n?.kind === 'close' && !this.g.storePrompts.take()) n = null;
@@ -43,6 +57,14 @@ export class ResultsScreen {
 
   /** The line tapped: to the hangar or shop it names, or the store to top up. */
   onNext(): void {
+    const v = this.vault;
+    if (v) {
+      analytics.log('offer_tapped', { offer: 'vault' });
+      this.g.nav.toMainMenu();
+      this.g.hangarScreen.openHangar({ slot: v.slot });
+      this.g.hangarScreen.onHangarPick(v.id);
+      return;
+    }
     const n = this.shown;
     if (!n) return;
     this.g.nav.toMainMenu();

@@ -82,7 +82,7 @@ export class HangarScreen {
     const top = grid.scrollTop;
     grid.replaceChildren(
       ...v.cards.map((c) => {
-        const card = el('button', `hangar-card ${c.state}${c.picked ? ' picked' : ''}`) as HTMLButtonElement;
+        const card = el('button', `hangar-card ${c.state}${c.picked ? ' picked' : ''}${c.premium ? ' premium' : ''}`) as HTMLButtonElement;
         card.type = 'button';
         card.dataset.item = c.id;
         const sw = el('span', 'card-swatch');

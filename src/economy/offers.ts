@@ -11,6 +11,8 @@ export const STORE_CARD_AFTER_RUNS = 2;
 export interface OfferState {
   starterAt?: number;
   packBought?: boolean;
+  /** Hangar slots whose "try it on" hint has shown. */
+  tryOn?: string[];
 }
 
 /** The starter offer's time left (ms), or null when it isn't on: too early, owned, or run out. */

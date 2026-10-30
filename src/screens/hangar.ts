@@ -41,6 +41,11 @@ export class HangarScreens {
       vault: { key: keyOf(v.item), monthsUntil: (key) => monthsUntilVault(key, VAULT_ORDER, month) },
     });
     this.renderUpgrades();
+    if (!this.hangarUpgrades && !keepScroll)
+      this.g.offers.tryOnHint(
+        this.hangar.slot,
+        view.cards.some((c) => c.premium),
+      );
     const credits = `${formatScore(this.g.wallet.credits)} credits`;
     this.g.hangarUi.renderHangar(view, keepScroll, {
       upgrades: this.hangarUpgrades,
