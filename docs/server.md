@@ -160,7 +160,11 @@ again, adding what's owed on the first sync), `0027` (free cores for an ad, 1.0.
 cores or credits double, once, and take back what it paid; `store_events.doubled`;
 the `store_sales` table, written from the dashboard, and `store_sales_now()` for
 the game, the sales running now by the server's clock).
-Apply `0028` before deploying 1.0.14's webhook (it calls `store_pack_purchase`).
+`0029` (the pilot's club, 1.0.15: `club_members`, the end date of each
+member's subscription, kept by the webhook through `store_club()`; `earn_cores`
+pays `club:<date>`, 10 at most, only while it runs).
+Apply `0028` before deploying 1.0.14's webhook (it calls `store_pack_purchase`),
+and `0029` before 1.0.15's (it calls `store_club`).
 Apply `0026` before deploying 1.0.13's webhook (it calls
 `store_credit_purchase` for the credit packs). Apply `0014` and `0016` before deploying the webhook again; 1.0.7's webhook
 (a constant-time secret check) wants a redeploy after `db:apply`:

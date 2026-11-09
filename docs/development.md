@@ -29,7 +29,7 @@ The folder map is in the [README](../README.md#project-layout). File by file:
 | `src/core/purchases.ts` | Store purchases, waiting for paid cores and credit packs, restore |
 | `src/core/connection.ts` | Signing in, syncing, the offline recheck and sharing a best |
 | `src/core/devTools.ts` | The dev panel's helpers (stats, unlock all, start at a level) |
-| `src/screens/*.ts` | One module per screen's logic: `title`, `settings`, `shop` (shop, store, pass), `hangar` (looks, upgrades), `goals`, `boards` (leaderboards, league), `record`, `solo`, `account` (names, Google, deleting), `onboarding` (welcome, practice, trial, dress), `results` (the end screen's line to what the run's credits buy), `shortOf` (the "N credits short" sheet), `offers` (the title's store card, first purchase ×2, the try-on hint) |
+| `src/screens/*.ts` | One module per screen's logic: `title`, `settings`, `shop` (shop, store, pass), `hangar` (looks, upgrades), `goals`, `boards` (leaderboards, league), `record`, `solo`, `account` (names, Google, deleting), `onboarding` (welcome, practice, trial, dress), `results` (the end screen's line to what the run's credits buy), `shortOf` (the "N credits short" sheet), `offers` (the title's store card, first purchase ×2, the try-on hint), `club` (the pilot's club subscription) |
 | `src/core/rng.ts` | Seeded random numbers (mulberry32): `rand()`, and `featureRand()`, a second stream from the same seed for risk lanes and gate runs |
 | `src/core/runBonus.ts` | Distance milestones and gate run bookkeeping (when one is ahead, clean or spoilt) |
 | `src/core/crashMoment.ts` | The crash moment: when it plays, its slowed clock, and when the revive offer or end screen may come |
@@ -94,6 +94,7 @@ The folder map is in the [README](../README.md#project-layout). File by file:
 | `src/platform/exit.ts`, `src/platform/feedback.ts` | Android back on the title screen (ask before closing); the feedback mail |
 | `src/platform/errors.ts` | Error reports: caught on the device, scrubbed, kept and sent a batch at a time (`log_errors`) |
 | `src/platform/input.ts` | Drag, side taps, tilt, keyboard, boost control |
+| `src/platform/review.ts` | 1.0.15: when to ask for a Play rating (Google's in-app review sheet) |
 | `src/platform/haptics.ts` | Vibration at the strength the settings pick (off, light, full) |
 | `src/platform/analytics.ts`, `src/platform/stubs/` | Usage stats through Firebase Analytics (Android, with consent and the setting): the typed events; a stand-in for the Firebase JS SDK the web build doesn't ship (docs/analytics.md) |
 | `src/platform/nameFilter.ts`, `src/platform/nameWords.json` | The pilot-name profanity check and its word list (`npm run names:build`) |
@@ -107,6 +108,7 @@ The folder map is in the [README](../README.md#project-layout). File by file:
 | `tests/pieces.test.ts`, `tests/pieces-pairs.test.ts` | Every ship section on paper, every route flown, every pair back to back |
 | `tests/determinism.test.ts` | No unseeded randomness or clock in course generation; risk lanes and gate runs the same however a run is flown |
 | `tests/depth.test.ts` | 1.0.9: the power-up weights, the second random stream, milestones, gate run bookkeeping, the crash moment's timing, the run summary, the rival's ghost |
+| `tests/club.test.ts` | 1.0.15: the rating prompt's rules, the club's end date from the store, what premium would have given |
 | `tests/offers.test.ts` | 1.0.14: the starter offer, the store card's pick, the week's pack, first purchase |
 | `tests/nudge.test.ts`, `tests/analytics.test.ts` | 1.0.13: the after-run line, short-of (the smallest pack, the swap), one store prompt a session; usage stats silent until consent and the setting, and what waited dropped on a no |
 | `tests/graphics.test.ts` | 1.0.10: the graphics setting (auto, high, low), performance mode carried over, and auto dropping to low once on sustained slow frames, never on stalls |

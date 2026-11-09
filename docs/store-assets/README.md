@@ -29,6 +29,7 @@ One per product, named by its product ID, 512 × 512 32-bit PNG. Play takes
 |---|---|
 | `cores_100.png`, `cores_550.png`, `cores_1200.png`, `cores_2500.png` | Cores packs (violet hexagons) |
 | `credits_1000.png`, `credits_2500.png`, `credits_5000.png`, `credits_10000.png` | Credit packs (gold coin stacks; drawn by `scripts/credit-icons.py`, which also writes the game's copies) |
+| `pilots_club.png` | The pilot's club subscription (Play doesn't take an icon for subscriptions; the game's store uses the 160 px copy) |
 | `starter_pack.png` | Starter pack |
 | `season_pass.png` | Season pass |
 | `premium.png` | Premium |

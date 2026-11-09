@@ -83,6 +83,14 @@ where these names may differ slightly):
 
 The first five are the best fit.
 
+## Release notes for 1.0.15
+
+405 characters (500 at most):
+
+<en-GB>
+New: the pilot's club, a monthly membership. No ads (and ad rewards free), 10 cores to claim every day, and the season pass premium track while you're a member. Cancel any time in Google Play. The season pass now shows what premium would have given you so far. Plus small touches: after an ad between runs, the end screen says how to go ad-free, and after a new best the game may ask what you think of it.
+</en-GB>
+
 ## Release notes for 1.0.14
 
 425 characters (500 at most):

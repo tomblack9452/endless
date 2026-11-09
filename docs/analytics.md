@@ -89,6 +89,11 @@ In the Firebase console, under Analytics:
   `tutorial_complete`.
 - **How runs go:** `run_end` by `mode` and `outcome`.
 
+**1.0.15:** `review_asked` (with the run count) when the game asks Google
+for the rating sheet; `offer_shown` / `offer_tapped` with `no_ads` for the
+end screen's going-ad-free line; the club's purchase is `begin_checkout` /
+`purchase` / `purchase_cancelled` with `item_id` `pilots_club`.
+
 **Offers (1.0.14):** `offer_shown` and `offer_tapped` with `offer` (the title's
 store card: `starter`, `pass`, `week:<pack>`, `sale:<product>`; the end screen's
 `vault`). A funnel per offer: `offer_shown` → `view_store` (its source:

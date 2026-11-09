@@ -508,6 +508,26 @@ For each product, **Create one-time product**:
 
 ---
 
+### 8b. The pilot's club (a subscription, 1.0.15)
+
+**Monetize with Play > Products > Subscriptions > Create subscription**:
+1. **Product ID:** `pilots_club`. **Name:** Pilot's club.
+2. **Add a base plan:** ID `monthly`, **Auto-renewing**, billing period
+   **1 month**, grace period 3 days (the default is fine). Set the price
+   (suggested **£2.99**). Save, then **Activate** the base plan.
+3. **Benefits** (shown on Google's sheet): "No ads, and ad rewards free",
+   "10 cores every day", "The season pass premium track".
+4. No free trial for now; you can add an offer (a free week) later.
+
+In RevenueCat, import the subscription (it shows as `pilots_club:monthly`)
+under the same app; no entitlement or offering is needed, the game asks for it
+by id. The webhook already handles its renewals and expiries (part 3 of
+docs/store.md), so redeploy it once `npm run db:apply` has added 0029.
+
+Google requires the price, the period and how to cancel to be clear before
+buying: the store card says "£2.99 a month, renews until you cancel", and a
+member's card has **manage**, which opens Google Play's subscriptions page.
+
 ## 9. Apply for production
 
 When the Dashboard shows 12+ testers opted in for 14 days, **Apply for

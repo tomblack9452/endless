@@ -76,6 +76,19 @@ has never bought a pack (bought and refunded counts as bought), under a lock on
 the wallet and in the same call that records the event, and marks the row
 `doubled`. `store_pack_refund` takes back what the pack really paid.
 
+### The pilot's club (1.0.15)
+
+A monthly subscription (`CONFIG.economy.store.club`, `src/screens/club.ts`):
+no ads and ad rewards free, 10 cores to claim every day from a title card, and
+each season's premium pass track that starts while it runs (the tiers it has
+paid stay paid if the membership ends). The game asks RevenueCat whether the
+account is a member (`Store.club()`, at start and on restore) and keeps the end
+date, so it holds offline. The webhook keeps each member's end date on the
+server (`store_club`, 0029, from RevenueCat's `expiration_at_ms`: purchases,
+renewals and uncancellations move it later, cancellations and expiries only
+nearer), and `earn_cores` pays the daily cores (`club:<date>`, 10 at most) only
+while it runs. Setting it up: docs/play-console.md part 8b.
+
 ### Running a sale
 
 1. **Play Console → Monetize with Play → Products → One-time products →** the

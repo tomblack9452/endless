@@ -570,6 +570,21 @@ store beside the core packs. The bigger packs give more for the price, and
 each row's best is marked "best value". They're paid on the server
 (docs/store.md).
 
+**The pilot's club** (1.0.15, the app only): a monthly subscription in the
+store's extras, with its price, "a month, renews until you cancel" and, for a
+member, the date it runs until and **manage** (Google Play's subscriptions
+page). Members get no ads (ad rewards free, as with premium), a title card
+"10 cores ready" once a day (UTC), and the season's premium pass track. Also
+in 1.0.15:
+- **Rating prompt:** after a new best, from the 8th run, at most once every
+  60 days, the game asks Google's in-app review sheet to show (Google decides
+  whether it does; `src/platform/review.ts`).
+- **Going ad-free:** after an interstitial, the next end screen's line says
+  "no ads, ever: premium or the pilot's club · see the store" (the session's
+  one unasked store prompt; the vault line after a new best comes first).
+- **The pass** shows what premium would have given so far ("premium would have
+  given you 1,840 credits, 65 cores and a look so far"), in the store and on the pass screen.
+
 **Offers** (1.0.14; the app only, where the store answers; `src/screens/offers.ts`,
 rules in `src/economy/offers.ts`):
 - **First purchase doubled:** a player's first pack of credits or cores pays
