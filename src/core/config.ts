@@ -319,6 +319,7 @@ export const CONFIG = {
       // Dressing (alien ground and title screen).
       tuftsPerRow: 12, // grass tufts scattered per row (scenery)
       mesaChance: 0.035, // per row: a mesa on the horizon
+      mesaOff: [45, 72], // how far from the lane (scenery: never solid)
       rockFaceSpacing: [160, 320], // between rock faces running alongside the path
       rockFaceLength: [40, 90],
       rockFaceGap: [6, 11], // distance from the lane to the face

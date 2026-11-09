@@ -12,7 +12,8 @@ export type Currency = 'credits' | 'cores';
 /** Every event the game logs, with its parameters (Firebase's names: snake_case, 40 characters at most). */
 export interface Events {
   run_start: { mode: string };
-  run_end: { mode: string; score: number; distance: number; seconds: number; level: number; outcome: 'crashed' | 'finished' | 'quit' };
+  /** `hit`: what ended the run ("a boulder", "fell"), or "none". */
+  run_end: { mode: string; score: number; distance: number; seconds: number; level: number; outcome: 'crashed' | 'finished' | 'quit'; hit: string };
   tutorial_complete: { controls: string };
   tutorial_skip: { step: string };
   sign_up: { method: 'anonymous' | 'google' };

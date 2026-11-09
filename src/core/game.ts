@@ -808,6 +808,7 @@ export class Game {
         seconds: Math.round(this.runTime),
         level: this.level,
         outcome,
+        hit: outcome !== 'crashed' ? 'none' : this.fell ? 'fell' : this.hitWhat || 'unknown',
       });
       this.runKind = null;
     }

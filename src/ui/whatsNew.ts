@@ -4,7 +4,12 @@
 // The lines for each version live here, newest first.
 
 export const WHATS_NEW: Readonly<Record<string, readonly string[]>> = {
-  '1.0.15': ["the pilot's club: no ads, cores every day", 'and the season pass, all for one monthly price', 'the pass shows what premium would have paid'],
+  '1.0.15': [
+    "the pilot's club: no ads, cores every day",
+    'and the season pass, all for one monthly price',
+    'the pass shows what premium would have paid',
+    'mountains on the horizon never end a run now',
+  ],
   '1.0.14': [
     'your first pack of credits or cores is doubled',
     'a starter offer, and a deal each week',

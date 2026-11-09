@@ -45,7 +45,7 @@ need a line about it.
 |---|---|---|
 | `screen_view` (Firebase's own) | screen name | a menu screen opens (`ui.show`) |
 | `run_start` | mode: ranked, solo, endless, daily, level, zen | a run starts (not the tutorial course) |
-| `run_end` | mode, score, distance, seconds, level, outcome: crashed / finished / quit | the run ends or is left from pause |
+| `run_end` | mode, score, distance, seconds, level, outcome: crashed / finished / quit, hit (what ended it: "a boulder", "fell", or none; 1.0.15 on) | the run ends or is left from pause |
 | `tutorial_complete` | controls | the last lesson is done |
 | `tutorial_skip` | step ("lesson 3") | "skip" during the practice run |
 | `sign_up` | method: anonymous / google | a new account is made / kept with Google |
@@ -87,7 +87,7 @@ In the Firebase console, under Analytics:
   saw Google Play's price sheet and backed out.
 - **Where the tutorial loses people:** `tutorial_skip` by `step`, against
   `tutorial_complete`.
-- **How runs go:** `run_end` by `mode` and `outcome`.
+- **How runs go:** `run_end` by `mode` and `outcome`; by `hit` for what players crash into most (make `hit` a custom dimension).
 
 **1.0.15:** `review_asked` (with the run count) when the game asks Google
 for the rating sheet; `offer_shown` / `offer_tapped` with `no_ads` for the

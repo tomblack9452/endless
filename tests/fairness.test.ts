@@ -345,3 +345,30 @@ describe('gate runs', () => {
     expect(drive(7, 2).gates).toBe(0);
   });
 });
+
+// Mesas stand on the horizon of open ground. Players took them for distant
+// mountains and flew into them ("please solve mountain crash problem"): they're
+// scenery now, never solid, and further out.
+describe('mesas', () => {
+  it('are scenery far off the lane, never something to crash into', () => {
+    const world = new World(new Scene(), new LivePalette());
+    const parts = world as unknown as { mesas: { spawn: (...a: unknown[]) => void }; lane: number; shipX: number };
+    const placed: { solid: boolean; off: number }[] = [];
+    const spawn = parts.mesas.spawn.bind(parts.mesas);
+    parts.mesas.spawn = (...a: unknown[]) => {
+      const x = (a[0] as number) + parts.shipX;
+      const w = CONFIG.field.halfWidth;
+      let off = Math.abs(x - parts.lane) % (2 * w);
+      if (off > w) off = 2 * w - off;
+      placed.push({ solid: a[7] as boolean, off });
+      spawn(...a);
+    };
+    world.reset(CONFIG.field.startClearance, true, 0, 42);
+    for (let t = 0; t < 30; t += 1 / 30) world.advance(1 / 30, 45, 0);
+    expect(placed.length).toBeGreaterThan(3);
+    for (const m of placed) {
+      expect(m.solid).toBe(false);
+      expect(m.off).toBeGreaterThan(40);
+    }
+  });
+});

@@ -96,7 +96,8 @@ a winding, clear path. Around them:
 - grass tufts, and patches of greener grass and bare dirt in the ground
 - rock faces running alongside the path for a stretch
 - natural rock arches over the path
-- flat-topped mesas on the horizon
+- flat-topped mesas on the horizon (scenery: since 1.0.15 they never end a run;
+  players took them for distant mountains and flew into them)
 
 - *Ice field:* pale ground and sky, mostly crystals and spires, and denser
   and harder than other open ground.

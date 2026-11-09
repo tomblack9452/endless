@@ -26,7 +26,7 @@ import { type Block, type Parsed, parse, type Piece, routeX } from './pieces/for
 import { FAMILIES, pickPiece, pieceById } from './pieces';
 import { ceilingFan } from './props';
 import { alienCactus, ARCH_PILLAR_X, basaltColumns, bush, deadTree, grassTuft, mesa, rockArch, rockSpire, tumbleweed } from './props';
-import { BOULDER_HEIGHT, boulder, MESA_RADIUS, canister, crystalCluster, greebleBox, mushroomTree, pipeSegment, powerGem, shuttle, spireTree } from './props';
+import { BOULDER_HEIGHT, boulder, canister, crystalCluster, greebleBox, mushroomTree, pipeSegment, powerGem, shuttle, spireTree } from './props';
 
 // The world ahead of the ship: obstacle pools plus the generator that lays
 // out each theme row by row.
@@ -109,8 +109,6 @@ const CHASM_INSET = 1.4; // the drop starts this far in from the bridge ends
 const BRIDGE_JUMP = 0.8;
 /** Rocks and boulders collide out to this many times their size (about where the shape is). */
 export const ROCK_HIT = 0.88;
-/** Mesas are round: a box this fraction of the radius fits them closely. */
-export const MESA_HIT = 0.92;
 /** A tumbleweed is a ring of wire loops about half a unit in radius; its box is a little inside that. */
 const TUMBLEWEED_HIT = 0.45;
 /** Room families in the order of CONFIG.themes.interior.familyLooks. */
@@ -1365,12 +1363,26 @@ export class World {
     }
     // Tumbleweeds rolling across (not on the ice).
     if (biome !== 'ice' && this.runStart !== null && rand() < lt.tumbleweedChance) this.rollTumbleweed(d, laneRel + this.shipX, 14, true, this.riskNear(d));
-    // Mesas on the horizon. Solid: on open ground you can fly out to them.
+    // Mesas on the horizon: scenery, so they never end a run. Players took them for distant
+    // mountains and flew into them; now they stand further out, and a ship that does reach one
+    // passes through.
     if (rand() < lt.mesaChance) {
       const side = rand() < 0.5 ? -1 : 1;
       const s = 0.8 + rand() * 1.0;
-      const hit = MESA_RADIUS * s * MESA_HIT;
-      this.mesas.spawn(wrap(laneRel + side * (30 + rand() * 40)), 0, d, s, s * (0.7 + rand() * 0.6), s, rand() * 6.28, true, true, hit, hit, false);
+      this.mesas.spawn(
+        wrap(laneRel + side * (lt.mesaOff[0] + rand() * (lt.mesaOff[1] - lt.mesaOff[0]))),
+        0,
+        d,
+        s,
+        s * (0.7 + rand() * 0.6),
+        s,
+        rand() * 6.28,
+        false,
+        true,
+        0,
+        0,
+        false,
+      );
     }
     if (this.runStart === null) return; // the title keeps to scenery
     // Rock faces: a wall of tall rock alongside the path for a stretch.
