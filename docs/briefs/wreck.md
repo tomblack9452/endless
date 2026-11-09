@@ -35,6 +35,12 @@ wrecked hulls over Installation 04, frigates breaking up). Take from them:
 
 Use original designs only: no Halo ships, shapes, logos, names or sounds.
 
+**Concept renders** (made in Three.js, in the game's low-poly style, so they
+show what's buildable): `docs/art/wreck-breach.png` (the hangar wall blasted
+open onto the debris field) and `docs/art/wreck-descent.png` (diving down the
+broken spine, blasts rippling along the hull, the planet below). The final
+art should be brighter and busier than these, at the same frame cost.
+
 **Pillars**
 1. **Spectacle.** The most dramatic thing in the game: always something
    exploding, falling or burning in view.

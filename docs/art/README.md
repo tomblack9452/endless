@@ -62,3 +62,13 @@ panels with cyan edges, hex icons, segmented meters, one bright button per scree
 | [Hangar and shop](scifi-hangar.png) | hangar upgrades, shop today, cores, results with a way to the hangar |
 | [Flow](scifi-flow.png) | the navigation: hub as home, a dock to every place, fly again in one tap |
 | [Minimal dark](scifi-minimal.png) | the same flow in black and white with thin lines |
+
+## The wreck (concept renders)
+
+Two renders for the key-gated ship-debris environment (`docs/briefs/wreck.md`),
+made in Three.js in the game's low-poly style:
+
+| Render | Shows |
+|---|---|
+| [The breach](wreck-breach.png) | the hangar on red alert, its far wall blasted open onto the debris field |
+| [The descent](wreck-descent.png) | diving down the broken spine, blasts rippling along the hull, the planet below |
