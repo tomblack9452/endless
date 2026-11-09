@@ -24,7 +24,7 @@ import { fxMaterial, Liquid, LIQUID_COLOURS, Sparks } from './fx';
 import { SAFE, SAFE_SHAPES } from './itemColours';
 import { type Block, type Parsed, parse, type Piece, routeX } from './pieces/format';
 import { FAMILIES, pickPiece, pieceById } from './pieces';
-import { ceilingFan } from './props';
+import { ceilingFan, wreckChunk, wreckGirder, wreckRib, wreckSlab } from './props';
 import { alienCactus, ARCH_PILLAR_X, basaltColumns, bush, deadTree, grassTuft, mesa, rockArch, rockSpire, tumbleweed } from './props';
 import { BOULDER_HEIGHT, boulder, MESA_RADIUS, canister, crystalCluster, greebleBox, mushroomTree, pipeSegment, powerGem, shuttle, spireTree } from './props';
 
@@ -87,6 +87,8 @@ interface ElevationConfig {
   drop: readonly number[];
   dropLength: readonly number[];
   dropChance: number;
+  /** Going up rather than down, when neither limit decides (half and half if not given). */
+  upChance?: number;
   min: number;
   max: number;
   returnSlope: number;
@@ -231,6 +233,12 @@ export class World {
   private readonly lavaSheets: InstancedField;
   private readonly lavaBombs: InstancedField;
   private readonly marks: InstancedField; // where lava bombs will land
+  // The wreckage (a space biome like the belt): broken ship instead of rocks.
+  private readonly wreckChunks: InstancedField; // fragments to dodge (asteroids' place)
+  private readonly wreckSlabs: InstancedField; // hull slabs walling the field (the belt's big rocks)
+  private readonly wreckGirders: InstancedField; // loose girders beyond the field: scenery
+  private readonly wreckRibs: InstancedField; // the spine's ribs over the way: scenery
+  private nextRibAt = 0;
   private iceLakes: Lake[] = [];
   private lavaLakes: Lake[] = [];
   private nextIceAt = Infinity;
@@ -475,6 +483,10 @@ export class World {
     this.iceSheets.setColorTable([new Color(CONFIG.biomes.iceLake)]);
     this.lavaBombs = new InstancedField(scene, rock, new MeshBasicMaterial({ color: CONFIG.biomes.lavaBomb, fog: false }), F.maxLavaBombs);
     this.marks = new InstancedField(scene, new RingGeometry(0.75, 1, 24).rotateX(-Math.PI / 2), fxMaterial('blink'), F.maxMarks);
+    this.wreckChunks = new InstancedField(scene, wreckChunk(), this.obstacleMat, F.maxWreckChunks);
+    this.wreckSlabs = new InstancedField(scene, wreckSlab(), this.rockMat, F.maxWreckSlabs);
+    this.wreckGirders = new InstancedField(scene, wreckGirder(), this.rockMat, F.maxWreckGirders);
+    this.wreckRibs = new InstancedField(scene, wreckRib(), this.rockMat, F.maxWreckRibs);
     this.marks.setColorTable([this.markColour]);
     this.arches = new InstancedField(scene, rockArch(), this.propMat, F.maxArches);
     this.stripMat = new MeshBasicMaterial();
@@ -552,6 +564,8 @@ export class World {
       this.pours,
       this.vents,
       this.tanks,
+      this.wreckChunks,
+      this.wreckSlabs,
     ];
     this.fields = [
       ...this.solids,
@@ -572,6 +586,8 @@ export class World {
       this.iceSheets,
       this.lavaSheets,
       this.marks,
+      this.wreckGirders,
+      this.wreckRibs,
     ];
     this.applyPalette();
   }
@@ -732,6 +748,7 @@ export class World {
     this.tumbleweeds.animate(this.distance); // rolling across
     this.lavaBombs.animate(this.distance); // falling
     this.obstacleRocks.animate(this.distance); // drifting asteroids
+    this.wreckChunks.animate(this.distance); // and drifting wreckage
     this.greebles.animate(this.distance); // hook chains, engine pistons
     this.updateMix(dt);
   }
@@ -769,9 +786,12 @@ export class World {
       'a shuttle',
       'a laser beam',
       'a falling curtain',
-      this.biome === 'volcanic' ? 'a lava geyser' : 'a steam vent',
+      this.biome === 'volcanic' ? 'a lava geyser' : this.biome === 'wreck' ? 'a fire vent' : 'a steam vent',
       'a tank',
+      'a piece of the wreck',
+      'a slab of hull',
     ];
+    if (this.biome === 'wreck' && names[this.lastHit] === 'a lava bomb') return 'burning debris';
     if (this.asteroidMix > 0.5 && this.lastHit === 3) return 'an asteroid';
     return names[this.lastHit] ?? '';
   }
@@ -1178,7 +1198,7 @@ export class World {
     }
     if (theme !== 'interior') this.deckMix = 0;
     this.biomeMix = k;
-    if (this.biome === 'asteroids') this.asteroidMix = k;
+    if (this.biome === 'asteroids' || this.biome === 'wreck') this.asteroidMix = k;
     if (theme === 'canyon') this.canyonMix = k;
     else if (theme === 'interior') {
       const room = this.roomAtShip();
@@ -1608,7 +1628,7 @@ export class World {
     const canyon = this.theme === 'canyon';
     if (this.quiet(d) || this.inChasm(d) || this.inChasm(d + 6) || this.riverAt(d) || this.onLake(this.iceLakes, this.lane, d, 2, CONFIG.hazards.ice.runoff))
       return;
-    if (canyon && (this.splitStart !== Infinity || d >= this.splitAt - 40 || (this.genBiome !== 'asteroids' && d >= this.chasmAt - 20))) return;
+    if (canyon && (this.splitStart !== Infinity || d >= this.splitAt - 40 || (!this.inSpace() && d >= this.chasmAt - 20))) return;
     const land = !canyon;
     const gap = G.gap + maxSlope * STEP * 0.5;
     const span = land ? 9 : 30;
@@ -1702,21 +1722,26 @@ export class World {
       const spacing = H.bombs.spacing[lv];
       if (spacing[1] > 0 && d >= this.nextBombAt && !this.riverAt(d + 20)) {
         this.nextBombAt = d + range(spacing);
-        // A salvo: a few bombs a few units apart, landing either side of the lane in turn.
-        let side = rand() < 0.5 ? -1 : 1;
-        for (let i = 0; i < H.bombs.salvo[lv]; i++) {
-          const at = d + i * range(H.bombs.salvoGap);
-          const r = range(H.bombs.radius);
-          // Off the lane by its size, how far the lane can drift by the time it lands, and a gap.
-          const x = this.lane + side * (LANE + r * ROCK_HIT + jitter + maxSlope * STEP + maxSlope * (at - d) + range(H.bombs.gap));
-          const hit = r * ROCK_HIT;
-          // It falls as you approach and is down well before you reach it.
-          this.lavaBombs.setNextRamp(H.bombs.height, H.bombs.fallOver, range(H.bombs.landAhead), true);
-          this.lavaBombs.spawn(wrap(x - this.shipX), 0, at, r, (r * 1.1) / BOULDER_HEIGHT, r, rand() * 6.28, true, true, hit, hit);
-          this.marks.spawn(wrap(x - this.shipX), 0.03, at, r * 1.3, 1, r * 1.3, 0, false, true, 0, 0, false);
-          side = -side;
-        }
+        this.bombSalvo(d, maxSlope, jitter, H.bombs.salvo[lv]);
       }
+    }
+  }
+
+  /** A salvo of lava bombs (or the wreckage's burning debris): a few, a few units apart, landing either side of the lane in turn. */
+  private bombSalvo(d: number, maxSlope: number, jitter: number, count: number): void {
+    const H = CONFIG.hazards;
+    let side = rand() < 0.5 ? -1 : 1;
+    for (let i = 0; i < count; i++) {
+      const at = d + i * range(H.bombs.salvoGap);
+      const r = range(H.bombs.radius);
+      // Off the lane by its size, how far the lane can drift by the time it lands, and a gap.
+      const x = this.lane + side * (LANE + r * ROCK_HIT + jitter + maxSlope * STEP + maxSlope * (at - d) + range(H.bombs.gap));
+      const hit = r * ROCK_HIT;
+      // It falls as you approach and is down well before you reach it.
+      this.lavaBombs.setNextRamp(H.bombs.height, H.bombs.fallOver, range(H.bombs.landAhead), true);
+      this.lavaBombs.spawn(wrap(x - this.shipX), 0, at, r, (r * 1.1) / BOULDER_HEIGHT, r, rand() * 6.28, true, true, hit, hit);
+      this.marks.spawn(wrap(x - this.shipX), 0.03, at, r * 1.3, 1, r * 1.3, 0, false, true, 0, 0, false);
+      side = -side;
     }
   }
 
@@ -1934,7 +1959,8 @@ export class World {
     this.altNow = null;
     this.floorN = -1;
     // The asteroid belt is this same frame in open space: wider, no floor, its own rocks.
-    const space = this.genBiome === 'asteroids';
+    const space = this.inSpace();
+    const wreck = this.genBiome === 'wreck';
     const A = TH.asteroids;
     let hw = space
       ? (A.halfWidthStart - A.halfWidthMin) * Math.exp(-score / A.widthRampPoints) + A.halfWidthMin
@@ -1969,7 +1995,7 @@ export class World {
     this.moveLane(maxSlope, this.laneTarget, maxOffset);
     hw = hwAll;
     this.recordWalls(d, this.cx - hw, this.cx + hw);
-    this.elevate(d, left, c.elevation, c.exit + 130, !chasm);
+    this.elevate(d, left, wreck ? TH.wreck.elevation : c.elevation, c.exit + 130, !chasm);
     // Upper and lower routes: once the island is up, one branch climbs and the other dips.
     if (this.liftPending && d >= this.splitStart) {
       this.liftPending = false;
@@ -2017,7 +2043,7 @@ export class World {
     this.recordFloor(d);
 
     // Alien cacti by the walls (not in the asteroid belt), and tumbleweeds across the floor.
-    if (this.genBiome !== 'asteroids') {
+    if (!space) {
       for (const s of [-1, 1]) {
         if (this.splitStart !== Infinity || chasm) break;
         if (rand() >= c.wallCacti) continue;
@@ -2033,6 +2059,7 @@ export class World {
     if (space) {
       this.spaceDebris(d, hw);
       this.spaceDust(d, hw);
+      if (wreck) this.spineRib(d, sub, hw);
     }
     // Pebbles on the floor: scenery.
     for (let i = 0; !space && i < c.pebblesPerRow; i++) {
@@ -2061,7 +2088,10 @@ export class World {
       // Before a split the way to the other branch has to be clear too, from where a pilot starts crossing.
       const plannable = left - c.exit - 120 > 0 && d - this.themeStart > c.mouth + 30 && this.splitStart === Infinity;
       if (plannable && d > this.splitAt - A.splitClear) this.nextFeatureAt = d + STEP;
-      else this.spaceFeature(d, sub, hw, jitter, score);
+      else {
+        if (wreck) this.wreckHazards(d, sub, maxSlope, jitter);
+        this.spaceFeature(d, sub, hw, jitter, score);
+      }
       return;
     }
     if (sub === 0) {
@@ -2098,16 +2128,66 @@ export class World {
   /** One side's boundary of the field: big asteroids packed tight enough to hold the ship in. */
   private asteroidWall(d: number, side: number, hw: number): void {
     const c = TH.canyon;
+    const put = this.genBiome === 'wreck' ? this.slab.bind(this) : this.rock.bind(this);
     for (let k = 0; k < 2; k++) {
       const r = 1.5 + rand() * 1.2;
-      this.rock(this.cx + side * (hw + r * 0.65), d + k * STEP * 0.5, r, r * (2 + rand() * 1.8));
+      put(this.cx + side * (hw + r * 0.65), d + k * STEP * 0.5, r, r * (2 + rand() * 1.8));
     }
     const r = 2 + rand() * 2;
-    this.rock(this.cx + side * (hw + 3 + rand() * 9), d + (rand() - 0.5) * STEP, r, r * (2 + rand() * 2));
-    // Now and then a huge asteroid looms over the edge of the field.
+    put(this.cx + side * (hw + 3 + rand() * 9), d + (rand() - 0.5) * STEP, r, r * (2 + rand() * 2));
+    // Now and then a huge asteroid (or a section of hull) looms over the edge of the field.
     if (rand() < c.cliffChance) {
       const big = 4 + rand() * 3.5;
-      this.rock(this.cx + side * (hw + 3 + big), d, big, big * (2.2 + rand() * 1.6));
+      put(this.cx + side * (hw + 3 + big), d, big, big * (2.2 + rand() * 1.6));
+    }
+  }
+
+  /** Open space: the asteroid belt and the wreckage share its frame (no floor, wide field, set pieces). */
+  private inSpace(): boolean {
+    return this.genBiome === 'asteroids' || this.genBiome === 'wreck';
+  }
+
+  /** A slab of hull at the edge of the wreckage (the belt's wall rock). */
+  private slab(x: number, d: number, r: number, height: number): void {
+    const hit = r * ROCK_HIT;
+    this.wreckSlabs.spawn(x - this.shipX, 0, d, r, height / BOULDER_HEIGHT, r * 0.6, rand() * Math.PI * 2, true, false, hit, hit, false);
+  }
+
+  /** The obstacle field of open space: rocks in the belt, fragments of ship in the wreckage. */
+  private spaceField(): InstancedField {
+    return this.genBiome === 'wreck' ? this.wreckChunks : this.obstacleRocks;
+  }
+
+  /**
+   * The wreckage's spine (its third stretch on): ribs arch over the way, legs at the field's
+   * edges and the beam high above, so it reads as a tunnel down the keel. Scenery.
+   */
+  private spineRib(d: number, sub: number, hw: number): void {
+    const W = TH.wreck;
+    if (sub < 2 || d < this.nextRibAt) return;
+    this.nextRibAt = d + range(W.ribSpacing);
+    const width = (hw + 1.2) * 2;
+    this.wreckRibs.spawn(this.cx - this.shipX, -2, d, width / 1.24, range(W.ribHeight), 1, 0, false, false, 0, 0, false);
+  }
+
+  /**
+   * The wreckage's hazards, on top of the belt's set pieces: burning debris thrown across
+   * (the lava bombs, with their landing rings) and fire venting from torn pipes on a cycle
+   * (the geysers: one on the lane is always out when you reach it). Calm in the first
+   * stretch, busier deeper in.
+   */
+  private wreckHazards(d: number, sub: number, maxSlope: number, jitter: number): void {
+    if (this.runStart === null || this.quiet(d)) return;
+    const W = TH.wreck;
+    const lv = Math.min(2, sub);
+    if (d >= this.nextGeyserAt) {
+      this.geysers(d, lv, maxSlope, jitter);
+      this.nextGeyserAt = d + range(W.ventSpacing[lv]); // the wreckage's own rhythm
+    }
+    const spacing = W.debrisSpacing[lv];
+    if (spacing[1] > 0 && d >= this.nextBombAt) {
+      this.nextBombAt = d + range(spacing);
+      this.bombSalvo(d, maxSlope, jitter, W.debrisSalvo[lv]);
     }
   }
 
@@ -2118,6 +2198,12 @@ export class World {
     const r = 0.15 + rand() * 0.5;
     const side = rand() < 0.5 ? -1 : 1;
     const x = this.cx + (rand() * 2 - 1) * (hw + 2) + side * (rand() < 0.5 ? 0 : hw * 0.8 + rand() * 10);
+    if (this.genBiome === 'wreck') {
+      // Loose girders tumbling well beyond the way (never in the field, so never in the way).
+      const gx = this.cx + side * (hw + 3 + rand() * 14);
+      this.wreckGirders.spawn(gx - this.shipX, -3 + rand() * 12, d, 0.6 + rand() * 1.4, 1, 1, rand() * 6.28, false, false, 0, 0, false);
+      return;
+    }
     this.rocks.spawn(x - this.shipX, 0.6 + rand() * 7, d, r * 1.5, (r * 0.9) / BOULDER_HEIGHT, r, rand() * 6.28, false, false, 0, 0, false);
   }
 
@@ -2152,7 +2238,7 @@ export class World {
   /** A spaceborne rock: round, sized freely, a little proud of the (invisible) ground. */
   private asteroid(x: number, d: number, r: number): void {
     const hit = r * ROCK_HIT;
-    this.obstacleRocks.spawn(x - this.shipX, 0, d, r, (r * (1.45 + rand() * 0.5)) / BOULDER_HEIGHT, r, rand() * Math.PI * 2, true, false, hit, hit);
+    this.spaceField().spawn(x - this.shipX, 0, d, r, (r * (1.45 + rand() * 0.5)) / BOULDER_HEIGHT, r, rand() * Math.PI * 2, true, false, hit, hit);
   }
 
   /**
@@ -2163,8 +2249,9 @@ export class World {
    */
   private swayingAsteroid(arrive: number, d: number, r: number, amp: number, freq: number, phase: number): void {
     const hit = r * ROCK_HIT;
-    this.obstacleRocks.setNextMotion(amp, freq, phase);
-    this.obstacleRocks.spawn(
+    const field = this.spaceField();
+    field.setNextMotion(amp, freq, phase);
+    field.spawn(
       arrive - amp * Math.sin(phase) - this.shipX,
       0,
       d,
@@ -2314,7 +2401,7 @@ export class World {
     if (this.splitStart === Infinity) return { active: false, wall: 0, island: 0 };
     const open = this.splitStart - c.splitWiden - 6;
     // After the island, a clear stretch long enough to cross back from the other branch.
-    const close = this.splitEnd + c.splitWiden + c.splitRejoin + (this.genBiome === 'asteroids' ? TH.asteroids.rejoinExtra : 0);
+    const close = this.splitEnd + c.splitWiden + c.splitRejoin + (this.inSpace() ? TH.asteroids.rejoinExtra : 0);
     if (d > close + c.splitWiden) {
       // Done: plan the next one.
       this.splitStart = Infinity;
@@ -2344,7 +2431,7 @@ export class World {
         this.rock(wx, d + (rand() - 0.5) * STEP, r, 1.1 + rand() * 1.6);
       }
       // Crystals along the island's spine mark it out as a fork, not a wall.
-      if (island > this.splitHalf * 0.6 && rand() < 0.35 && this.genBiome !== 'asteroids') {
+      if (island > this.splitHalf * 0.6 && rand() < 0.35 && !this.inSpace()) {
         const s = 0.9 + rand() * 0.8;
         const wx = this.cx + (rand() - 0.5) * island;
         if (Math.abs(wx - this.lane) > LANE + s + jitter)
@@ -2371,7 +2458,7 @@ export class World {
     if (d < this.splitStart || d > this.splitEnd) return;
     // In the belt the branches are far apart: leave the first stretch of the other branch open
     // so whoever crosses over has room to settle onto its line before the rocks start.
-    const settled = d >= this.splitStart + (this.genBiome === 'asteroids' ? TH.asteroids.altLeadIn : 0);
+    const settled = d >= this.splitStart + (this.inSpace() ? TH.asteroids.altLeadIn : 0);
     if (rand() < c.splitAltRocks && settled) {
       const r = 0.55 + rand() * 0.45;
       const lo = this.cx - this.splitSide * (island + 0.4);
@@ -2408,7 +2495,7 @@ export class World {
     }
     if (d < this.nextStepAt || !allowed) return;
     const lvl = terrain.level - this.themeLevel;
-    const up = lvl < E.min + 1 ? true : lvl > E.max - 1.5 ? false : rand() < 0.5;
+    const up = lvl < E.min + 1 ? true : lvl > E.max - 1.5 ? false : rand() < (E.upChance ?? 0.5);
     let delta: number;
     let len: number;
     if (up) {

@@ -1,4 +1,18 @@
-import { BufferAttribute, BufferGeometry, Color, LineBasicMaterial, LineSegments, Points, PointsMaterial, type Scene } from 'three';
+import {
+  AdditiveBlending,
+  BufferAttribute,
+  BufferGeometry,
+  Color,
+  IcosahedronGeometry,
+  LineBasicMaterial,
+  LineSegments,
+  Mesh,
+  MeshBasicMaterial,
+  Points,
+  PointsMaterial,
+  type Scene,
+  TorusGeometry,
+} from 'three';
 import { CONFIG } from '../core/config';
 import type { LivePalette } from './palette';
 import type { Biome } from './biomes';
@@ -7,9 +21,10 @@ import type { Biome } from './biomes';
 //   meteors   - open ground: meteors streak down to the horizon and thud
 //   sandstorm - canyon: the air turns to sand, visibility drops, grit blows across
 //   redAlert  - ship interior: power failure, red emergency lighting and an alarm
+//   explosions - the wreckage: secondary blasts going off around the course, off the lane
 // They change the look and sound only; the course itself is generated as normal.
 
-export type EventKind = 'none' | 'meteors' | 'sandstorm' | 'redAlert';
+export type EventKind = 'none' | 'meteors' | 'sandstorm' | 'redAlert' | 'explosions';
 
 const E = CONFIG.events;
 const WHITE = new Color(1, 1, 1);
@@ -20,13 +35,28 @@ const EVENT_FOR: Record<Biome, EventKind> = {
   canyon: 'sandstorm',
   asteroids: 'meteors',
   interior: 'redAlert',
+  wreck: 'explosions',
 };
 export const EVENT_NOTICE: Record<EventKind, string> = {
   none: '',
   meteors: 'meteor shower',
   sandstorm: 'sandstorm',
   redAlert: 'red alert. power failure',
+  explosions: 'secondary explosions',
 };
+
+/** One blast: a hot core, a smoke cloud and a shockwave ring, growing and fading over its life. */
+interface Blast {
+  core: Mesh;
+  smoke: Mesh;
+  ring: Mesh;
+  x: number;
+  y: number;
+  z: number;
+  size: number;
+  age: number;
+  live: boolean;
+}
 
 interface Meteor {
   x: number;
@@ -66,6 +96,11 @@ export class Events {
   private readonly headMat = new PointsMaterial({ color: E.meteors.color, size: 5, sizeAttenuation: false, transparent: true, depthWrite: false, fog: false });
   private readonly heads: Points;
   private readonly sandLines: LineSegments;
+  private readonly blasts: Blast[] = [];
+  private nextBlast = 0;
+  private readonly fire = new Color(E.explosions.flash);
+  /** A brief warm flash on the sky, after a big blast. */
+  private flash = 0;
   private readonly sand = new Color(E.sandstorm.color);
   private readonly red = new Color(E.redAlert.color);
   private readonly dark = new Color(E.redAlert.dark);
@@ -89,6 +124,25 @@ export class Events {
     this.sandLines.visible = false;
     scene.add(this.sandLines);
     for (let i = 0; i < E.sandstorm.streaks; i++) this.respawnSand(i, true);
+    const coreGeo = new IcosahedronGeometry(1, 1);
+    const ringGeo = new TorusGeometry(1, 0.035, 4, 32);
+    for (let i = 0; i < E.explosions.pool; i++) {
+      const core = new Mesh(
+        coreGeo,
+        new MeshBasicMaterial({ color: E.explosions.core, transparent: true, depthWrite: false, blending: AdditiveBlending, fog: false }),
+      );
+      const smoke = new Mesh(coreGeo, new MeshBasicMaterial({ color: E.explosions.smoke, transparent: true, depthWrite: false, fog: false }));
+      const ring = new Mesh(
+        ringGeo,
+        new MeshBasicMaterial({ color: E.explosions.ring, transparent: true, depthWrite: false, blending: AdditiveBlending, fog: false }),
+      );
+      for (const m of [smoke, core, ring]) {
+        m.visible = false;
+        m.frustumCulled = false;
+        scene.add(m);
+      }
+      this.blasts.push({ core, smoke, ring, x: 0, y: 0, z: 0, size: 1, age: 0, live: false });
+    }
   }
 
   /** The event that belongs to a biome. */
@@ -102,6 +156,7 @@ export class Events {
     this.timeLeft = seconds;
     this.nextMeteor = 0.5;
     this.nextAlarm = 0;
+    this.nextBlast = 0.3;
   }
 
   /** Stop at once (new run, main menu). */
@@ -110,6 +165,8 @@ export class Events {
     this.amount = 0;
     this.timeLeft = 0;
     for (const m of this.meteors) m.live = false;
+    for (const b of this.blasts) this.hideBlast(b);
+    this.flash = 0;
     this.meteorLines.visible = this.sandLines.visible = false;
   }
 
@@ -129,6 +186,7 @@ export class Events {
     }
     if (this.kind === 'meteors') this.updateMeteors(dt, on);
     else if (this.kind === 'sandstorm') this.updateSand(dt, dz);
+    else if (this.kind === 'explosions') this.updateBlasts(dt, dz, on);
     else if (this.kind === 'redAlert' && on) {
       this.nextAlarm -= dt;
       if (this.nextAlarm <= 0) {
@@ -162,7 +220,68 @@ export class Events {
       p.alert.lerpColors(WHITE, p.alert, k);
     } else if (this.kind === 'meteors') {
       p.sky.lerp(this.sand, 0.12 * k); // a faint warm haze
+    } else if (this.kind === 'explosions' && this.flash > 0.001) {
+      p.sky.lerp(this.fire, Math.min(0.35, this.flash) * k);
+      p.fog.lerp(this.fire, Math.min(0.2, this.flash * 0.6) * k);
     }
+  }
+
+  /**
+   * Secondary blasts off to the sides and ahead, never near the lane: a flash,
+   * a fireball that cools to smoke, and a ring. The world scrolls them past
+   * (`dz`). Still, so reduce motion needs nothing more. A big one thuds (impact).
+   */
+  private updateBlasts(dt: number, dz: number, spawning: boolean): void {
+    const X = E.explosions;
+    this.nextBlast -= dt;
+    this.flash = Math.max(0, this.flash - dt * 1.6);
+    if (spawning && this.nextBlast <= 0) {
+      this.nextBlast = X.every[0] + Math.random() * (X.every[1] - X.every[0]);
+      const b = this.blasts.find((x) => !x.live);
+      if (b) {
+        const side = Math.random() < 0.5 ? -1 : 1;
+        b.z = -X.distance[0] - Math.random() * (X.distance[1] - X.distance[0]);
+        b.x = side * (X.side[0] + Math.random() * (X.side[1] - X.side[0]));
+        b.y = X.height[0] + Math.random() * (X.height[1] - X.height[0]);
+        b.size = X.size[0] + Math.random() * (X.size[1] - X.size[0]);
+        b.age = 0;
+        b.live = true;
+        if (b.size > X.size[1] * 0.75) {
+          this.flash = 0.5;
+          this.impact = Math.max(-1, Math.min(1, b.x / 30));
+        }
+      }
+    }
+    for (const b of this.blasts) {
+      if (!b.live) continue;
+      b.age += dt;
+      b.z += dz;
+      const t = b.age / X.life;
+      if (t >= 1 || b.z > CONFIG.camera.distanceBehind) {
+        this.hideBlast(b);
+        continue;
+      }
+      const grow = 1 - (1 - Math.min(1, t * 3)) ** 3; // fast out, then hangs
+      const fade = this.amount * (1 - t);
+      b.core.visible = b.smoke.visible = b.ring.visible = true;
+      b.core.position.set(b.x, b.y, b.z);
+      b.core.scale.setScalar(b.size * (0.3 + 0.9 * grow));
+      const cm = b.core.material as MeshBasicMaterial;
+      cm.opacity = fade * (1 - t) * 1.4;
+      cm.color.set(X.core).lerp(this.fire, Math.min(1, t * 2)); // white-hot, cooling to orange
+      b.smoke.position.set(b.x + b.size * 0.2, b.y + b.size * 0.3 * t, b.z - b.size * 0.2);
+      b.smoke.scale.setScalar(b.size * (0.5 + 1.2 * grow));
+      (b.smoke.material as MeshBasicMaterial).opacity = fade * 0.55 * Math.min(1, t * 4);
+      b.ring.position.set(b.x, b.y, b.z);
+      b.ring.rotation.set(1.2, 0.3, 0);
+      b.ring.scale.setScalar(b.size * (0.6 + 2.6 * t));
+      (b.ring.material as MeshBasicMaterial).opacity = fade * 0.8 * (1 - t);
+    }
+  }
+
+  private hideBlast(b: Blast): void {
+    b.live = false;
+    b.core.visible = b.smoke.visible = b.ring.visible = false;
   }
 
   private updateMeteors(dt: number, spawning: boolean): void {

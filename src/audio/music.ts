@@ -27,7 +27,7 @@ interface ThemeMusic {
 }
 
 /** A theme, or one of the biomes that has its own music. */
-export type MusicId = ThemeId | 'ice' | 'volcanic' | 'asteroids';
+export type MusicId = ThemeId | 'ice' | 'volcanic' | 'asteroids' | 'wreck';
 
 const THEME_MUSIC: Record<MusicId, ThemeMusic> = {
   // D major pentatonic: open and airy.
@@ -93,6 +93,17 @@ const THEME_MUSIC: Record<MusicId, ThemeMusic> = {
       [-2, 5, 12, 16],
       [-5, 2, 9, 14],
       [3, 10, 15, 19],
+    ],
+    bell: true,
+  },
+  // Locrian, low and grinding, with the metallic lead: the wreckage, tense all the way to the reactor.
+  wreck: {
+    scale: [0, 1, 3, 5, 6],
+    chords: [
+      [0, 6, 12, 15],
+      [1, 8, 13, 17],
+      [-2, 5, 10, 13],
+      [-4, 3, 6, 12],
     ],
     bell: true,
   },

@@ -327,3 +327,33 @@ export function dailyRun(day: string): DailyRun {
   const label = new Date(`${day}T00:00:00Z`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' }).toLowerCase();
   return { id: `daily-${day}`, day, name: label, course: { id: `daily-${day}`, name: `daily · ${label}`, blurb: '', seed, target: 0, sections } };
 }
+
+// --- hunt through the wreckage -----------------------------------------------------
+// The key-gated run (docs/game.md): out of a burning hangar through a hull breach,
+// across the debris field, diving down the descent and the spine, to the reactor.
+// A finish line like a set level; the same course for everyone in a week (its relic
+// week), so its board is fair, and new each Monday.
+
+export const WRECK_ID = 'wreck';
+
+export function wreckRun(monday: string): Course {
+  let h = 0x811c9dc5;
+  for (const ch of `endless-wreck-${monday}`) {
+    h ^= ch.charCodeAt(0);
+    h = Math.imul(h, 0x01000193);
+  }
+  return {
+    id: WRECK_ID,
+    name: 'hunt through the wreckage',
+    blurb: 'out through the breach, down through the broken ship, to the reactor',
+    seed: h >>> 0,
+    target: 0,
+    sections: [
+      ship('the hangar', ['hangar-1', 'breach-1'], 520, 11000, { event: 'redAlert' }),
+      canyon('the debris field', 1600, 0, 13000, { biome: 'wreck' }),
+      canyon('the descent', 2000, 1, 16000, { biome: 'wreck', event: 'explosions' }),
+      canyon('the spine', 1500, 2, 20000, { biome: 'wreck' }),
+      canyon('the reactor', 1200, 2, 25000, { biome: 'wreck', event: 'explosions' }),
+    ],
+  };
+}

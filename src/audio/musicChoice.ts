@@ -3,7 +3,7 @@ import type { MusicId } from './music';
 
 /** Music for an area of a set level. */
 export function musicForArea(theme: 'land' | 'canyon' | 'interior', biome?: string): MusicId {
-  if (biome === 'ice' || biome === 'volcanic' || biome === 'asteroids') return biome;
+  if (biome === 'ice' || biome === 'volcanic' || biome === 'asteroids' || biome === 'wreck') return biome;
   return theme;
 }
 

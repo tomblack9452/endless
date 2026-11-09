@@ -8,9 +8,11 @@ import type { LivePalette } from './palette';
 //   loop 3: volcanic plain    -> canyon      -> interior   (then repeats)
 // The generators are the open-ground and canyon ones; a biome changes which
 // props they use and recolours the scene. The asteroid belt also drops the
-// ground away and opens the sky to space.
+// ground away and opens the sky to space; the wreckage (hunt through the
+// wreckage, a key-gated run: docs/game.md) is the same open space, full of a
+// broken ship instead of rocks.
 
-export type Biome = 'alien' | 'ice' | 'volcanic' | 'canyon' | 'asteroids' | 'interior';
+export type Biome = 'alien' | 'ice' | 'volcanic' | 'canyon' | 'asteroids' | 'interior' | 'wreck';
 
 export const BIOME_NAMES: Record<Biome, string> = {
   alien: 'open ground',
@@ -19,6 +21,7 @@ export const BIOME_NAMES: Record<Biome, string> = {
   canyon: 'canyon',
   asteroids: 'asteroid belt',
   interior: 'interior',
+  wreck: 'the wreckage',
 };
 
 interface Look {

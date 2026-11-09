@@ -1,4 +1,5 @@
 import {
+  BoxGeometry,
   type BufferGeometry,
   Color,
   ConeGeometry,
@@ -353,4 +354,53 @@ export function ceilingFan(): BufferGeometry {
     parts.push(part(new CylinderGeometry(0.5, 0.5, 0.03, 3), '#8a9097', scale(1.9, 1, 0.42), move(0.55, 0, 0), (m) => m.makeRotationY(a)));
   }
   return build(parts);
+}
+
+// --- the wreckage ------------------------------------------------------------------
+
+/**
+ * A fragment of the broken ship, in the boulder's envelope (about radius 1,
+ * BOULDER_HEIGHT tall) so it scales and collides like an asteroid: a chunk of
+ * hull plating with ribs on top, a glowing torn edge and a running light.
+ */
+export function wreckChunk(): BufferGeometry {
+  return build([
+    part(new BoxGeometry(1.5, 0.55, 1.15), '#7a8392', tiltZ(0.18), move(0, 0.5, 0)),
+    part(new BoxGeometry(1.25, 0.45, 0.9), '#5a616d', tiltX(-0.25), move(-0.08, 0.95, 0.05)),
+    part(new BoxGeometry(0.12, 0.18, 1.1), '#3d434d', move(-0.4, 1.25, 0)),
+    part(new BoxGeometry(0.12, 0.18, 1.1), '#3d434d', move(0.25, 1.22, 0)),
+    part(new BoxGeometry(1.1, 0.1, 0.08), '#ff7a1a', tiltZ(0.18), move(0, 0.52, 0.6)), // the torn edge, still hot
+    part(new BoxGeometry(0.1, 0.1, 0.1), '#bfe0ff', move(0.55, 1.18, -0.3)), // a running light
+  ]);
+}
+
+/** A big slab of hull for the field's edges (scaled like a boulder): plating, ribs and a red light. */
+export function wreckSlab(): BufferGeometry {
+  return build([
+    part(new BoxGeometry(1.7, 1.6, 0.5), '#6a7180', move(0, 0.8, 0)),
+    part(new BoxGeometry(1.8, 0.14, 0.62), '#454b56', move(0, 0.4, 0)),
+    part(new BoxGeometry(1.8, 0.14, 0.62), '#454b56', move(0, 1.15, 0)),
+    part(new BoxGeometry(0.14, 1.7, 0.62), '#3b414b', move(-0.55, 0.8, 0)),
+    part(new BoxGeometry(0.14, 1.7, 0.62), '#3b414b', move(0.55, 0.8, 0)),
+    part(new BoxGeometry(0.12, 0.12, 0.12), '#ff3a30', move(0.75, 1.5, 0.3)),
+  ]);
+}
+
+/** A loose girder: two rails and cross-bracing, 3 long, for scenery. */
+export function wreckGirder(): BufferGeometry {
+  const parts: Part[] = [];
+  for (const z of [-0.12, 0.12]) parts.push(part(new BoxGeometry(3, 0.08, 0.08), '#59606b', move(0, 0.2, z)));
+  for (let i = 0; i < 6; i++) parts.push(part(new BoxGeometry(0.06, 0.06, 0.34), '#4a505a', tiltX(i % 2 ? 0.6 : -0.6), move(-1.25 + i * 0.5, 0.2, 0)));
+  return build(parts);
+}
+
+/** One rib of the ship's spine: two legs and a beam overhead, 1 across inside (scaled to the field), 1 tall. */
+export function wreckRib(): BufferGeometry {
+  return build([
+    part(new BoxGeometry(0.12, 1, 0.3), '#4c535e', move(-0.56, 0.5, 0)),
+    part(new BoxGeometry(0.12, 1, 0.3), '#4c535e', move(0.56, 0.5, 0)),
+    part(new BoxGeometry(1.24, 0.08, 0.3), '#424852', move(0, 1, 0)),
+    part(new BoxGeometry(0.06, 0.06, 0.06), '#bfe0ff', move(-0.48, 0.96, 0.16)),
+    part(new BoxGeometry(0.06, 0.06, 0.06), '#bfe0ff', move(0.48, 0.96, 0.16)),
+  ]);
 }

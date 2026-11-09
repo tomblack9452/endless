@@ -201,6 +201,10 @@ export const CONFIG = {
     maxIceSheets: 260,
     maxLavaBombs: 60,
     maxMarks: 60,
+    maxWreckChunks: 900,
+    maxWreckSlabs: 1400,
+    maxWreckGirders: 260,
+    maxWreckRibs: 40,
     maxTufts: 2600,
     maxMesas: 60,
     maxArches: 12,
@@ -430,6 +434,37 @@ export const CONFIG = {
       orbiterAmp: [2.4, 4.4],
       debrisPerRow: 0.7, // scenery chips floating about (look only)
       dustPerRow: 2, // dust motes streaming past (look only: the belt has no floor to show speed)
+    },
+    // The wreckage (hunt through the wreckage): the belt's open space and set pieces, built of
+    // the broken ship, diving down through it, with fire vents and burning debris on top.
+    wreck: {
+      // Mostly down: dives along the way, short climbs over debris, deep by the reactor.
+      elevation: {
+        spacing: [26, 60],
+        rise: [1.2, 2.4],
+        riseLength: [16, 26],
+        drop: [4, 7.5],
+        dropLength: [20, 32], // steep, but a dive you can see coming
+        dropChance: 0.85,
+        upChance: 0.25,
+        min: -70,
+        max: 3,
+        returnSlope: 14,
+      },
+      ribSpacing: [9, 15], // the spine: a rib over the way this often
+      ribHeight: [7, 10],
+      // By stretch (debris field, descent, spine and reactor): fire vents and burning debris.
+      ventSpacing: [
+        [140, 200],
+        [80, 130],
+        [60, 100],
+      ],
+      debrisSpacing: [
+        [0, 0],
+        [90, 140],
+        [60, 100],
+      ],
+      debrisSalvo: [0, 2, 3],
     },
     // The ship interior is a chain of rooms joined by short corridors (see
     // interior.ts). Each room is a reusable template; which ones can appear
@@ -907,6 +942,15 @@ export const CONFIG = {
         light: [0.8, 0.8, 0.85] as [number, number, number],
         amount: 0.85,
       },
+      wreck: {
+        ground: '#07090f',
+        sky: '#0b0f1c',
+        fog: '#121a2c',
+        rock: '#6a7180',
+        obstacle: '#4a515e',
+        light: [0.85, 0.88, 1] as [number, number, number],
+        amount: 0.92,
+      },
     },
   },
 
@@ -915,6 +959,20 @@ export const CONFIG = {
     chance: 0.6,
     seconds: 22,
     meteors: { count: 6, every: [0.5, 1.6], distance: [140, 240], tail: 1.4, color: '#e2763f' },
+    // The wreckage's secondary blasts: off to the sides (never near the lane), ahead, at every height.
+    explosions: {
+      pool: 10,
+      every: [0.35, 1.1], // seconds between blasts
+      distance: [50, 170], // how far ahead
+      side: [9, 38], // how far to the side
+      height: [-6, 14],
+      size: [1.6, 6],
+      life: 2.6, // seconds from flash to fading smoke
+      core: '#fff2d6',
+      flash: '#ff8a3a',
+      smoke: '#2a2628',
+      ring: '#ffb070',
+    },
     sandstorm: { color: '#c9a57a', fog: 0.8, streaks: 70, width: 9, wind: 26, length: 1.4, opacity: 0.8 },
     redAlert: { color: '#d8433a', dark: '#2a0e10', pulseHz: 0.7, alarmEvery: 2.4 },
   },
