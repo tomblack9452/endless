@@ -5,7 +5,8 @@
 // event's app_user_id is the account to pay.
 //
 // Set up (the database first: npm run db:apply, for 0014's purchase time,
-// 0016's pass refunds, 0026's credit packs and 0028's first purchase doubled):
+// 0016's pass refunds, 0026's credit packs, 0028's first purchase doubled and
+// 0029's pilot's club):
 //   supabase secrets set REVENUECAT_WEBHOOK_SECRET=<any long random string>
 //   supabase functions deploy revenuecat-webhook --no-verify-jwt
 //   RevenueCat > Project > Integrations > Webhooks: the function's URL, with
@@ -43,7 +44,13 @@ interface RcEvent {
   original_transaction_id?: string;
   /** When it was bought (ms): kept as the purchase's time, rather than when this arrived. */
   purchased_at_ms?: number;
+  /** A subscription's end, as this event leaves it (ms). */
+  expiration_at_ms?: number | null;
 }
+
+// The pilot's club (a subscription; "pilots_club:monthly" on Google Play): every event that moves its end date.
+const CLUB = 'pilots_club';
+const CLUB_EVENTS = new Set(['INITIAL_PURCHASE', 'RENEWAL', 'UNCANCELLATION', 'PRODUCT_CHANGE', 'CANCELLATION', 'EXPIRATION']);
 
 /**
  * The Authorization header against the secret, in constant time: both are
@@ -62,10 +69,19 @@ Deno.serve(async (req) => {
   const secret = Deno.env.get('REVENUECAT_WEBHOOK_SECRET');
   if (!secret || !(await sameSecret(req.headers.get('Authorization'), secret))) return new Response('no', { status: 401 });
   const { event } = (await req.json()) as { event: RcEvent };
-  if (!PAID.has(event.type) && !REFUNDED.has(event.type)) return new Response('ignored');
+  const isClub = event.product_id.split(':')[0] === CLUB;
+  if (isClub ? !CLUB_EVENTS.has(event.type) : !PAID.has(event.type) && !REFUNDED.has(event.type)) return new Response('ignored');
   const admin = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
   // Anonymous RevenueCat ids ($RCAnonymousID:...) aren't accounts: nothing to pay on the server.
   const user = /^[0-9a-f-]{36}$/.test(event.app_user_id) ? event.app_user_id : null;
+  if (isClub) {
+    // How long the membership runs (0029_pilots_club.sql); the daily cores are checked against it.
+    const ms = event.expiration_at_ms;
+    const until = typeof ms === 'number' && Number.isFinite(ms) ? new Date(ms).toISOString() : null;
+    const { data, error } = await admin.rpc('store_club', { p_id: event.id, p_user: user, p_product: event.product_id, p_type: event.type, p_until: until });
+    if (error) return new Response(error.message, { status: 500 });
+    return new Response(String(data));
+  }
   const cores = CORES[event.product_id] ?? 0;
   const transaction = event.transaction_id ?? event.original_transaction_id ?? null;
   const at = typeof event.purchased_at_ms === 'number' && Number.isFinite(event.purchased_at_ms) ? new Date(event.purchased_at_ms).toISOString() : null;

@@ -129,6 +129,8 @@ export class TitleScreen {
   /** The live cards above the big button: the pass, today's goals, a reward waiting. */
   titleCards(now: number): TitleCard[] {
     const cards: TitleCard[] = [];
+    const club = this.g.club.card();
+    if (club) cards.push(club);
     const day = dayKey(now);
     const due = this.g.daily.loginDue(day);
     if (due >= 0) cards.push({ id: 'claim', kicker: 'daily reward', title: `day ${due + 1} ready to claim`, hot: true });

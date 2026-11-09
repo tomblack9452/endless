@@ -25,6 +25,18 @@ export function freeReward(tier: number, season = 1): Reward {
   return { credits: 50 + 5 * tier };
 }
 
+/** What the premium track's tiers 1..`tier` pay in all, for "premium would have given you". */
+export function premiumUpTo(tier: number, season = 1): { credits: number; cores: number; looks: number } {
+  const out = { credits: 0, cores: 0, looks: 0 };
+  for (let t = 1; t <= tier; t++) {
+    const r = premiumReward(t, season);
+    out.credits += r.credits ?? 0;
+    out.cores += r.cores ?? 0;
+    if (r.look) out.looks++;
+  }
+  return out;
+}
+
 /** The premium track's reward at a tier (1-based) in `season`. Season 1's looks were hand-made; later ones are generated. */
 export function premiumReward(tier: number, season = 1): Reward {
   if (season >= 2) {
@@ -50,7 +62,7 @@ interface Saved {
   paidFree: number; // tiers paid on each track
   paidPremium: number;
   /** How premium was unlocked: with cores, or bought for money (a refund takes the money one back). Older saves don't say. */
-  via?: 'cores' | 'money';
+  via?: 'cores' | 'money' | 'club';
   /** 2 since tiers took 600 XP (they took 120): older saves are scaled up once to keep their tier. */
   v?: number;
 }
@@ -96,7 +108,7 @@ export class Pass {
   get premium(): boolean {
     return this.s.premium;
   }
-  get via(): 'cores' | 'money' | undefined {
+  get via(): 'cores' | 'money' | 'club' | undefined {
     return this.s.premium ? this.s.via : undefined;
   }
 
@@ -120,7 +132,7 @@ export class Pass {
   }
 
   /** Unlock the premium track (with cores, or bought); returns the premium rewards already reached. */
-  unlockPremium(via: 'cores' | 'money'): Reward[] {
+  unlockPremium(via: 'cores' | 'money' | 'club'): Reward[] {
     this.s.premium = true;
     this.s.via = via;
     return this.pay();
@@ -132,7 +144,7 @@ export class Pass {
    * unlocked with cores is never touched. Returns true if it closed.
    */
   refund(): boolean {
-    if (!this.s.premium || this.s.via === 'cores') return false;
+    if (!this.s.premium || this.s.via === 'cores' || this.s.via === 'club') return false;
     this.s.premium = false;
     delete this.s.via;
     this.save();

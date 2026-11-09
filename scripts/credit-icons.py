@@ -1,4 +1,4 @@
-# The credit packs' icons: gold coin stacks, in the cores icons' line style.
+# The credit packs' icons (gold coin stacks, in the cores icons' line style) and the pilot's club's.
 # Writes public/store/<id>.png (160 px, the game's store) and
 # docs/store-assets/products/<id>.png (512 px, Play Console's product icon).
 #
@@ -56,3 +56,36 @@ for pack, stacks in PACKS.items():
     draw(stacks, 160).save(ROOT / 'public' / 'store' / f'{pack}.png')
     draw(stacks, 512).save(ROOT / 'docs' / 'store-assets' / 'products' / f'{pack}.png')
     print(pack)
+
+
+# The pilot's club: a ring with a star and two small wings, gold and violet (both currencies, every day).
+VIOLET = (127, 83, 208, 255)
+
+
+def club(size):
+    sup = 4
+    k = size / 160 * sup
+    im = Image.new('RGBA', (size * sup, size * sup), BG)
+    d = ImageDraw.Draw(im)
+    lw = max(1, round(LINE * k))
+    cx, cy, r = 80 * k, 80 * k, 30 * k
+    d.ellipse([cx - r, cy - r, cx + r, cy + r], outline=INK, width=lw)
+    import math
+
+    pts = []
+    for i in range(10):
+        a = -math.pi / 2 + i * math.pi / 5
+        rr = (17 if i % 2 == 0 else 7.5) * k
+        pts.append((cx + rr * math.cos(a), cy + rr * math.sin(a)))
+    d.line([*pts, pts[0], pts[1]], fill=VIOLET, width=lw, joint='curve')
+    for side in (-1, 1):
+        for j, (dx, dy, ln) in enumerate([(36, -6, 22), (37, 3, 18), (35, 12, 13)]):
+            x0 = cx + side * dx * k
+            y0 = cy + dy * k
+            d.line([x0, y0, x0 + side * ln * k, y0 - (8 - j * 3) * k], fill=INK, width=lw)
+    return im.resize((size, size), Image.LANCZOS)
+
+
+club(160).save(ROOT / 'public' / 'store' / 'pilots_club.png')
+club(512).save(ROOT / 'docs' / 'store-assets' / 'products' / 'pilots_club.png')
+print('pilots_club')

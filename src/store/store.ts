@@ -27,6 +27,23 @@ export interface Store {
   buy(id: ProductId): Promise<BuyResult>;
   /** One-time products this account owns (restoring on a new device). */
   restore(): Promise<ProductId[]>;
+  /** The pilot's club subscription: its price (null if the store doesn't offer it), and until when this account has it (null: not subscribed). */
+  club(): Promise<{ price: string | null; until: number | null }>;
+  buyClub(): Promise<BuyResult>;
+}
+
+/** When a subscription runs until, from RevenueCat's customer info: the latest expiry among the club's ids ("pilots_club", or "pilots_club:monthly" on Google Play). */
+export function clubUntil(info: { activeSubscriptions: string[]; allExpirationDates: Record<string, string | null> }, now: number): number | null {
+  const id = CONFIG.economy.store.club.id;
+  let until: number | null = null;
+  for (const [key, date] of Object.entries(info.allExpirationDates)) {
+    if (key.split(':')[0] !== id || !date) continue;
+    const t = Date.parse(date);
+    if (t > now && (until === null || t > until)) until = t;
+  }
+  // Active with no expiry given (a store that doesn't say): a day at a time.
+  if (until === null && info.activeSubscriptions.some((s) => s.split(':')[0] === id)) until = now + 86_400_000;
+  return until;
 }
 
 class WebStore implements Store {
@@ -43,6 +60,12 @@ class WebStore implements Store {
   }
   async restore(): Promise<ProductId[]> {
     return [];
+  }
+  async club(): Promise<{ price: null; until: null }> {
+    return { price: null, until: null };
+  }
+  async buyClub(): Promise<BuyResult> {
+    return 'failed';
   }
 }
 
@@ -112,6 +135,35 @@ class AppStore implements Store {
       return customerInfo.nonSubscriptionTransactions.map((t) => t.productIdentifier as ProductId);
     } catch {
       return [];
+    }
+  }
+
+  private clubProduct: unknown = null;
+
+  async club(): Promise<{ price: string | null; until: number | null }> {
+    if (!this.rc) return { price: null, until: null };
+    try {
+      const { products } = await this.rc.Purchases.getProducts({
+        productIdentifiers: [CONFIG.economy.store.club.id],
+        type: this.rc.PRODUCT_CATEGORY.SUBSCRIPTION,
+      });
+      this.clubProduct = products[0] ?? null;
+      const { customerInfo } = await this.rc.Purchases.getCustomerInfo();
+      return { price: products[0]?.priceString ?? null, until: clubUntil(customerInfo, Date.now()) };
+    } catch {
+      return { price: null, until: null };
+    }
+  }
+
+  async buyClub(): Promise<BuyResult> {
+    if (!this.rc || !this.clubProduct) return 'failed';
+    try {
+      await this.rc.Purchases.purchaseStoreProduct({ product: this.clubProduct as Parameters<RevenueCat['Purchases']['purchaseStoreProduct']>[0]['product'] });
+      return 'ok';
+    } catch (e) {
+      if ((e as { userCancelled?: boolean }).userCancelled) return 'cancelled';
+      reportError('purchase club', e);
+      return 'failed';
     }
   }
 }

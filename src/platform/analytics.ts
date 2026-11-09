@@ -26,6 +26,7 @@ export interface Events {
   view_store: { source: string };
   offer_shown: { offer: string };
   offer_tapped: { offer: string };
+  review_asked: { runs: number };
   view_item: { item_id: string; source: string };
   begin_checkout: { item_id: string };
   /** No value: Firebase already counts the money from Google Play (in_app_purchase), so a value here would count it twice. */

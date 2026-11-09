@@ -2,6 +2,7 @@ import { dayKey } from '../economy/time';
 import { type Buyable, type RunNudge, runNudge } from '../economy/nudge';
 import { vaultAt } from '../economy/shop';
 import { analytics } from '../platform/analytics';
+import { maybeAskReview } from '../platform/review';
 import { byKey, type LookItem } from '../ship/looks';
 import { MAX_TIER, SYSTEMS, TIER_COST } from '../ship/upgrades';
 import { formatScore } from '../ui/ui';
@@ -14,6 +15,8 @@ export class ResultsScreen {
   private shown: RunNudge = null;
   /** This month's vault look, offered after a new best. */
   private vault: LookItem | null = null;
+  /** The line offers going ad-free (after an interstitial). */
+  private noAds = false;
 
   /** What credits can buy right now: each upgrade's next tier (where the league allows it) and today's looks. */
   private buyables(): Buyable[] {
@@ -37,13 +40,25 @@ export class ResultsScreen {
   /** After the run's credits are in: fill the line (the "close" one at most once a session, as it's a store prompt). */
   afterRun(earned: number): void {
     // A new best is a proud moment: this month's vault look, to try on (the session's one store prompt).
-    const v = vaultAt(this.g.now());
+    const now = this.g.now();
+    if (this.g.newBest) void maybeAskReview(true, this.g.progress.stats.validRuns, now);
+    const v = vaultAt(now);
     this.vault = null;
+    this.noAds = false;
     if (this.g.newBest && this.g.store.available && !this.g.looks.owns(v.item, this.g.owner()) && this.g.storePrompts.take()) {
       this.vault = v.item;
       this.shown = null;
       analytics.log('offer_shown', { offer: 'vault' });
       this.g.ui.setOverNext(`this month's vault: ${v.item.name} · ${formatScore(v.price)} cores · try it on`);
+      return;
+    }
+    // An interstitial played since the last end screen: once, say how to be rid of them.
+    if (this.g.adSeen && this.g.store.available && !this.g.ads.adFree && this.g.storePrompts.take()) {
+      this.g.adSeen = false;
+      this.noAds = true;
+      this.shown = null;
+      analytics.log('offer_shown', { offer: 'no_ads' });
+      this.g.ui.setOverNext("no ads, ever: premium or the pilot's club · see the store");
       return;
     }
     const after = this.g.wallet.credits;
@@ -57,6 +72,13 @@ export class ResultsScreen {
 
   /** The line tapped: to the hangar or shop it names, or the store to top up. */
   onNext(): void {
+    if (this.noAds) {
+      analytics.log('offer_tapped', { offer: 'no_ads' });
+      this.g.nav.toMainMenu();
+      this.g.shop.openStore(null, 'no_ads');
+      requestAnimationFrame(() => document.querySelector('[data-act="club"]')?.closest('.store-card')?.scrollIntoView({ block: 'center' }));
+      return;
+    }
     const v = this.vault;
     if (v) {
       analytics.log('offer_tapped', { offer: 'vault' });

@@ -239,9 +239,14 @@ export class Ads {
     return CONFIG.ads.rewarded[p] && (this.premium() || this.network.available || p === 'rerollQuest');
   }
 
+  /** No ads for this player (premium, or the pilot's club). */
+  get adFree(): boolean {
+    return this.premium();
+  }
+
   /** What the offer's button says. */
   label(): string {
-    return this.premium() ? 'free with premium' : this.network.available ? 'watch an ad' : 'free';
+    return this.premium() ? 'free' : this.network.available ? 'watch an ad' : 'free';
   }
 
   /** Earn the reward: premium (or no ad network) at once, everyone else by watching to the end. */

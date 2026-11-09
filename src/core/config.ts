@@ -739,6 +739,10 @@ export const CONFIG = {
         // One-off: no ads, ad rewards without the ad, the premium looks, +1 free revive a day, a badge on the boards.
         { id: 'premium', premium: true, once: true },
       ],
+      // The pilot's club: a monthly subscription (a Play subscription with a monthly base plan). No ads and ad
+      // rewards free, cores every day (earn_cores 'club:<date>', checked against the subscription on the server:
+      // 0029_pilots_club.sql), and each season's premium pass track while it runs.
+      club: { id: 'pilots_club', dailyCores: 10 },
     },
   },
 

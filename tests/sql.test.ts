@@ -124,6 +124,7 @@ describe('supabase/setup.sql', () => {
     expect(t.rows.map((r) => r.table_name)).toEqual([
       'bests',
       'client_errors',
+      'club_members',
       'core_log',
       'name_words',
       'players',
@@ -210,6 +211,7 @@ describe('db:apply (the migrations from a terminal)', () => {
     expect(t.rows.map((r) => r.n)).toEqual([
       'bests',
       'client_errors',
+      'club_members',
       'core_log',
       'endless_migrations',
       'name_words',
@@ -649,6 +651,61 @@ describe('credits on the server', () => {
     await rejects(db.query('select public.sync_credits(-5, null)'), /not a balance/);
     await as(null);
     await rejects(db.query('select public.sync_credits(5, null)'), /permission denied|not signed in/);
+  });
+});
+
+describe("the pilot's club (0029)", () => {
+  const club = async (id: string, user: string, type: string, days: number) => {
+    await admin();
+    return (
+      await db.query<{ r: string }>("select public.store_club($1, $2, 'pilots_club:monthly', $3, now() + make_interval(days => $4)) as r", [
+        id,
+        user,
+        type,
+        days,
+      ])
+    ).rows[0].r;
+  };
+  const earnAs = async (user: string, reason: string) => {
+    await as(user);
+    const n = (await db.query<{ earn_cores: number }>('select public.earn_cores(50, $1)', [reason])).rows[0].earn_cores;
+    await admin();
+    return n;
+  };
+  const today = async () => (await db.query<{ d: string }>("select ((now() at time zone 'utc')::date)::text as d")).rows[0].d;
+
+  it('pays the daily cores only while the subscription runs, once a day, 10 at most', async () => {
+    const a = await newUser();
+    const b = await newUser();
+    await admin();
+    const day = await today();
+    expect(await club('cl-1', a, 'INITIAL_PURCHASE', 30)).toBe('kept');
+    expect(await club('cl-1', a, 'INITIAL_PURCHASE', 30)).toBe('duplicate');
+    expect(await earnAs(a, `club:${day}`)).toBe(10);
+    expect(await earnAs(a, `club:${day}`)).toBe(0);
+    expect(await earnAs(b, `club:${day}`)).toBe(0); // not a member
+  });
+
+  it("can't be ended early or lengthened by an event that arrives late, and ends on expiry", async () => {
+    const a = await newUser();
+    await admin();
+    const day = await today();
+    await club('cl-a1', a, 'RENEWAL', 30);
+    await club('cl-a0', a, 'INITIAL_PURCHASE', 2); // older, arriving late: still 30 days
+    await club('cl-c', a, 'CANCELLATION', 30); // auto-renew off: runs to the end
+    expect(await earnAs(a, `club:${day}`)).toBe(10);
+    const c = await newUser();
+    await club('cl-c1', c, 'INITIAL_PURCHASE', 30);
+    await club('cl-c2', c, 'EXPIRATION', -1);
+    expect(await earnAs(c, `club:${day}`)).toBe(0);
+  });
+
+  it("can't be called by a player", async () => {
+    const a = await newUser();
+    await as(a);
+    await rejects(db.query(`select public.store_club('x', '${a}', 'pilots_club', 'INITIAL_PURCHASE', now() + interval '30 days')`), /permission denied/);
+    await rejects(db.query('select * from public.club_members'), /permission denied/);
+    await admin();
   });
 });
 

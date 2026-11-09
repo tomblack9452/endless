@@ -81,6 +81,7 @@ import { RankKeeper } from '../progression/rankKeeper';
 import { Revives } from './revives';
 import { ShortOfSheet } from '../screens/shortOf';
 import { Offers } from '../screens/offers';
+import { Club } from '../screens/club';
 import { ResultsScreen } from '../screens/results';
 import { StorePrompts } from '../economy/nudge';
 import { TitleScreen } from '../screens/title';
@@ -227,7 +228,7 @@ export class Game {
   revealSeen: number | null = null;
   readonly ads = new Ads(
     createAdNetwork(),
-    () => this.entitlements.has('premium'),
+    () => this.entitlements.has('premium') || this.club.active,
     () => this.firstPlayed,
   );
   /** The shop card tapped (on the ship to try), or -1. */
@@ -278,6 +279,8 @@ export class Game {
   recorded = false; // this run's stats are saved
   /** What this run counts as in usage stats; null for the practice course, which isn't counted. */
   private runKind: string | null = null;
+  /** An interstitial played since the last end screen (that one may offer going ad-free). */
+  adSeen = false;
   /** An interstitial is showing between runs: taps wait for it. */
   private betweenAd = false;
   /** This run set a new best (no interstitial after it; the end screen may show the vault's look). */
@@ -365,6 +368,7 @@ export class Game {
   readonly revives = new Revives(this);
   readonly shortOf = new ShortOfSheet(this);
   readonly offers = new Offers(this);
+  readonly club = new Club(this);
 
   readonly title = new TitleScreen(this);
   readonly results = new ResultsScreen(this);
@@ -492,6 +496,7 @@ export class Game {
     });
     void Promise.all([
       this.offers.load(),
+      this.club.load(),
       this.progress.load(),
       this.ranked.load(),
       this.wallet.load(),
@@ -1258,7 +1263,10 @@ export class Game {
     this.betweenAd = true;
     void this.ads.showDue().then((shown) => {
       this.betweenAd = false;
-      if (shown) analytics.log('interstitial_shown', { runs: this.progress.stats.runs });
+      if (shown) {
+        analytics.log('interstitial_shown', { runs: this.progress.stats.runs });
+        this.adSeen = true;
+      }
       next();
     });
   }

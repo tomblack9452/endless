@@ -50,6 +50,7 @@ export class Connection {
     });
     this.g.storeProducts = await this.g.store.products();
     this.g.offers.sales = await this.g.backend.sales().catch(() => []);
+    await this.g.club.refresh();
     this.g.title.refreshTitle();
     if (this.g.infoOpen === 'store') this.g.shop.openStore();
   }

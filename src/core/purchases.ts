@@ -135,7 +135,7 @@ export class Purchases {
     // Google Play's records for the Google account on this phone, and the server's for this game account.
     // At least two seconds, so the answer doesn't flash past the "checking" note.
     const wait = new Promise((r) => window.setTimeout(r, 2000));
-    const [fromStore, fromServer] = await Promise.all([this.g.store.restore(), this.g.backend.purchases(), wait]);
+    const [fromStore, fromServer] = await Promise.all([this.g.store.restore(), this.g.backend.purchases(), wait, this.g.club.refresh()]);
     const ids = [...new Set([...fromStore, ...(fromServer ?? []).map((r) => r.product)])].filter((id) => !id.startsWith('refunded:'));
     let n = 0;
     for (const id of ids) if (this.grantProduct(id)) n++;

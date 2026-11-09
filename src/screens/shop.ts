@@ -1,6 +1,6 @@
 import { analytics } from '../platform/analytics';
 import { CONFIG } from '../core/config';
-import { premiumReward, freeReward, seasonAt } from '../economy/pass';
+import { premiumReward, premiumUpTo, freeReward, seasonAt } from '../economy/pass';
 import { rewardText } from '../economy/reward';
 import { asksBeforeSpending, setOffer, vaultAt } from '../economy/shop';
 import { dayKey, formatWait, untilTomorrow } from '../economy/time';
@@ -24,7 +24,19 @@ type ShopTab = 'today' | 'set' | 'vault';
 const WALLET_EXPLAINED_KEY = 'endless.walletExplained';
 
 /** Where the store was opened from, for the analytics funnel. */
-export type StoreSource = 'dock' | 'wallet' | 'shop' | 'short' | 'results' | 'hub' | 'sale' | 'starter_offer' | 'pass_card' | 'week_pack' | 'vault';
+export type StoreSource = 'dock' | 'wallet' | 'shop' | 'short' | 'results' | 'hub' | 'sale' | 'starter_offer' | 'pass_card' | 'week_pack' | 'vault' | 'no_ads';
+
+/** "premium would have given you 1,840 credits, 35 cores and a look so far": the premium tiers already reached, added up. */
+export function wouldHave(tier: number, season: number): string {
+  const w = premiumUpTo(tier, season);
+  const parts = [
+    w.credits > 0 ? `${formatScore(w.credits)} credits` : '',
+    w.cores > 0 ? `${formatScore(w.cores)} cores` : '',
+    w.looks > 0 ? (w.looks === 1 ? 'a look' : `${w.looks} looks`) : '',
+  ].filter(Boolean);
+  const list = parts.length > 1 ? `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}` : parts[0];
+  return `premium would have given you ${list} so far`;
+}
 
 export class ShopScreens {
   constructor(private readonly g: Game) {}
@@ -263,7 +275,7 @@ export class ShopScreens {
         "the season's new looks",
         `next up: ${rewardText(premiumReward(next, s.season))} at tier ${next}`,
       );
-      if (tier > 0) perks.push(`the ${tier} tier${tier === 1 ? '' : 's'} you've reached pay out as you unlock`);
+      if (tier > 0) perks.push(`${wouldHave(tier, s.season)}, paid the moment you unlock`);
       passButtons.push({
         act: 'pass-cores',
         text: `unlock · ${formatScore(P.premiumCores)} cores`,
@@ -293,6 +305,20 @@ export class ShopScreens {
       const img = `store/${p.id}.png`;
       if ('look' in p) {
         const mine = this.g.purchases.ownsProduct(p.id);
+        if (p.id === 'starter_pack' && this.g.club.price) {
+          // The pilot's club first among the extras: a subscription, so its terms are on the card.
+          const member = this.g.club.until;
+          extras.push({
+            img: 'store/pilots_club.png',
+            name: "pilot's club",
+            sub: member
+              ? `member until ${new Date(member).toLocaleDateString()} · renews unless you cancel in google play`
+              : `no ads · ${CONFIG.economy.store.club.dailyCores} cores a day · the season pass · ${this.g.club.price} a month, renews until you cancel`,
+            tag: member ? 'member' : 'monthly',
+            button: { act: 'club', text: member ? 'manage' : `${this.g.club.price} / month`, enabled: true, primary: !member },
+            owned: false,
+          });
+        }
         extras.push({
           img,
           name: 'starter pack',
@@ -527,6 +553,7 @@ export class ShopScreens {
     else if (act === 'pass-open') this.openPass('store');
     else if (act === 'restore') void this.g.purchases.restorePurchases();
     else if (act === 'free-cores') void this.g.revives.claimFreeCores();
+    else if (act === 'club') void this.g.club.buy();
     else if (act.startsWith('swap-')) this.swapCores(Number(act.slice(5)));
     else if (CONFIG.economy.store.products.some((p) => p.id === act)) void this.g.purchases.buyProduct(act as ProductId);
   };
@@ -564,7 +591,7 @@ export class ShopScreens {
       big: maxed ? 'complete' : String(P.xpPerTier - (this.g.pass.xp % P.xpPerTier)),
       goal: maxed ? `all ${P.tiers} tiers` : `xp to tier ${tier + 1}`,
       fraction: this.g.pass.tierFraction,
-      detail: `season ${s.season} · tier ${tier} of ${P.tiers} · ends in ${formatWait(s.end - now)}`,
+      detail: `season ${s.season} · tier ${tier} of ${P.tiers} · ends in ${formatWait(s.end - now)}${!this.g.pass.premium && tier > 0 ? ` · ${wouldHave(tier, s.season)}` : ''}`,
       premium: this.g.pass.premium ? null : { text: `unlock premium · ${formatScore(P.premiumCores)} cores`, enabled: this.g.wallet.cores >= P.premiumCores },
       buy: passPrice ? `or unlock for ${passPrice}` : null,
       premiumOwned: this.g.pass.premium,
