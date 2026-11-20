@@ -8,7 +8,7 @@ play", web only).
 |---|---|
 | `cover-630x500.png` | Cover image (itch's 630 × 500) |
 | `banner-960x320.png` | The page's banner (Edit theme → Images → Banner) |
-| `background-2560x900.png` | The page's background: the banner's dusk carried out to the sides, fading to the page colour (no repeat, top centre) |
+| `background-2560x1600.png` | The page's background: the banner's dusk carried out to the sides, with the game's own trees, crystals, cacti and rocks down both edges (rendered from `src/world/props.ts`), fading to the page colour (no repeat, top centre, not fixed) |
 | `../listing/screenshots/phone-01.png` … `phone-06.png` | Screenshots |
 
 ## Settings
