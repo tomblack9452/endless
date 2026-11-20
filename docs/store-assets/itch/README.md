@@ -7,6 +7,7 @@ play", web only).
 | File | Use |
 |---|---|
 | `cover-630x500.png` | Cover image (itch's 630 × 500) |
+| `banner-960x240.png` | The page's banner (Edit theme → Images → Banner) |
 | `../listing/screenshots/phone-01.png` … `phone-06.png` | Screenshots |
 
 ## Settings
@@ -22,6 +23,12 @@ play", web only).
   casual, one-button, singleplayer, mobile, leaderboard.
 - **Links:** the Google Play page,
   https://play.google.com/store/apps/details?id=com.tomblack.endlessspace
+
+## Theme (Edit theme)
+
+The store art's dusk: BG `#1c1a26`, BG 2 `#26222f`, text `#ece4d8`, links
+`#e8a060`; font Work Sans (or Lato), size Large; the banner above; embed BG
+`#1c1a26`.
 
 ## Short description (tagline)
 
