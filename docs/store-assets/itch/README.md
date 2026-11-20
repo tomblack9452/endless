@@ -7,7 +7,7 @@ play", web only).
 | File | Use |
 |---|---|
 | `cover-630x500.png` | Cover image (itch's 630 × 500) |
-| `banner-960x240.png` | The page's banner (Edit theme → Images → Banner) |
+| `banner-960x320.png` | The page's banner (Edit theme → Images → Banner) |
 | `../listing/screenshots/phone-01.png` … `phone-06.png` | Screenshots |
 
 ## Settings
