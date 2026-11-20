@@ -7,7 +7,8 @@ copies of the product icons (160 px) are in `public/store/`.
 store-assets/
 ├── listing/      the Play store page
 ├── products/     one icon per in-app product
-└── ads/          AdMob and Google Ads images and videos
+├── ads/          AdMob and Google Ads images and videos
+└── itch/         the itch.io page: cover and text (its own README)
 ```
 
 ## listing/: Play Console > Grow users > Store presence > Main store listing
