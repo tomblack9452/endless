@@ -145,3 +145,21 @@
   letter-spacing: 0.2em;
   margin-top: 4px;
 }
+
+/* The web build's link to the Android app, above the bar. */
+.get-app {
+  display: block;
+  margin: 6px auto 0;
+  min-height: 32px;
+  padding: 8px 4px 0;
+  font-size: calc(11px * var(--ui-scale));
+  text-align: center;
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  pointer-events: auto;
+}
+
+.get-app[hidden] {
+  display: none;
+}
