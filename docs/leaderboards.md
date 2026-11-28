@@ -90,7 +90,11 @@ Every submission, in `supabase/migrations/0003_leaderboards.sql`:
   promotion is one league at a time after 12 ranked runs), the week is the server's own week (the
   game reads the week's board by the server's clock too, `server_now` in 0012)
 - the score can come from the distance (distance points plus the most the
-  bonuses could add) and the time (no faster than a full-boost flight)
+  bonuses could add) and the time (no faster than a full-boost flight). The
+  bonus room was 2.5 times the distance points until `0030` (1.0.16): near-miss
+  chains (up to 250 a link) took close fliers' record runs past it, and those
+  runs never reached a board. It is now 21 times, plus 2,000. Turned-down runs
+  are logged as `run_rejected` in Firebase, with the server's reason
 - ranked and daily runs carry the ship's path: one sample per 4 units of
   distance, never jumping sideways faster than the ship can; a daily run is no
   longer than the day's course, and goes on the board for the server's day
@@ -108,7 +112,8 @@ the run. If that starts to matter, the next steps in order of effort:
 
 1. **Hide and ban.** `update players set hidden = true where name = '...'` takes
    a player off every board immediately (rows stay, so it's reversible).
-2. **Tighten the checks.** Smaller `c_bonus_share`, per-level score ceilings.
+2. **Tighten the checks.** Per-level score ceilings, or a bound on near misses
+   per distance; never a smaller `c_bonus_share` without the near-miss chains in mind (`0030`).
 3. **Re-fly ranked runs.** The weekly run is deterministic from its seed (a test
    enforces this), so the server could replay a ranked run from its inputs. It
    needs the run simulation pulled out of `game.ts` first, then a worker running

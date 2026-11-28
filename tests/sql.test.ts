@@ -346,6 +346,17 @@ describe('submit_run', () => {
     expect(rows.find((x) => x.you)?.score).toBe(1500);
   });
 
+  it("takes a close flier's run: near-miss chains score well past the distance (0030)", async () => {
+    const a = await newUser();
+    await as(a);
+    // 31,000 over 9,000 units: the report that started it, at about 3.4 points a unit.
+    const r = await submit({ score: 31000, seconds: 160, distance: 9000 });
+    expect(r.best).toBe(31000);
+    await age();
+    await as(a);
+    await rejects(submit({ score: 200000, seconds: 160, distance: 9000 }), /score too high/);
+  });
+
   it('only keeps the best run per player on a board', async () => {
     const a = await newUser();
     await as(a);
@@ -1442,8 +1453,9 @@ describe('ghost rivals (rival_path)', () => {
 
 describe('the checks match the game', () => {
   const sql = migrations.map(([, text]) => text).join('\n');
+  // The newest migration's value: a later one may redefine the function.
   const constant = (name: string): number => {
-    const m = new RegExp(`${name} constant \\w+ := ([0-9.]+)`).exec(sql);
+    const m = [...sql.matchAll(new RegExp(`${name} constant \\w+ := ([0-9.]+)`, 'g'))].at(-1);
     if (!m) throw new Error(`no ${name} in the migrations`);
     return Number(m[1]);
   };
@@ -1462,6 +1474,12 @@ describe('the checks match the game', () => {
     const unitsPerDouble = P.spacing[0] / 1.4 / share;
     const doubled = Math.min(1, (P.double.seconds * CONFIG.speed.max * CONFIG.boost.speedMultiplier) / unitsPerDouble);
     const perUnit = CONFIG.score.pointsPerUnit * (1 + CONFIG.score.boostBonus) * (1 + doubled * (P.double.factor - 1));
+    expect(perUnit).toBeLessThan(constant('c_points_per_unit') * (1 + constant('c_bonus_share')));
+  });
+
+  it('leave room for near misses (1.0.16): a full chain link every 40 units, boosting and doubled all the way, stays under the score limit', () => {
+    const nm = CONFIG.score.nearMiss;
+    const perUnit = (CONFIG.score.pointsPerUnit * (1 + CONFIG.score.boostBonus) + (nm.points * nm.maxCombo) / 40) * CONFIG.powers.double.factor;
     expect(perUnit).toBeLessThan(constant('c_points_per_unit') * (1 + constant('c_bonus_share')));
   });
 });

@@ -4,6 +4,7 @@
 // The lines for each version live here, newest first.
 
 export const WHATS_NEW: Readonly<Record<string, readonly string[]>> = {
+  '1.0.16': ['close fliers: records reach the boards now', 'after a revive, bests count your first crash', 'as the boards always have'],
   '1.0.15': [
     "the pilot's club: no ads, cores every day",
     'and the season pass, all for one monthly price',

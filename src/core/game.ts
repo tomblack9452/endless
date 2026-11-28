@@ -789,11 +789,13 @@ export class Game {
       if (!finished) p.recordCourse(this.course.id, 0, this.runTime, score);
       return { best: Math.max(before, Math.floor(score)), isNew: score > before };
     }
+    // As on the boards, a revive never adds to a best: the run counts as it stood at the first crash.
+    const counted = this.assisted ? 0 : (this.preRevive?.score ?? this.score);
     if (this.environment) {
-      const isNew = p.recordEnv(this.environment.id, score);
+      const isNew = p.recordEnv(this.environment.id, counted);
       return { best: p.envBest[this.environment.id] ?? 0, isNew };
     }
-    const isNew = p.recordEndless(score);
+    const isNew = p.recordEndless(counted);
     return { best: p.endlessBest, isNew };
   }
 
@@ -831,6 +833,7 @@ export class Game {
     let credits = creditsFor(score, this.mode === 'ranked') + fromPickups + this.bonusCredits;
     credits += this.ranks.recordRank(this.state === 'finished');
     if (this.assisted) lines.push('assist mode. not counted as a best');
+    else if (this.preRevive && !this.course) lines.push(`revived: bests count ${formatScore(this.preRevive.score)}, your score at the first crash`);
     this.wallet.add(credits, 'run');
     this.lastRunCredits = credits;
     this.results.afterRun(credits);

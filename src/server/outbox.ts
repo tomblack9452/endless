@@ -1,5 +1,6 @@
 import { storage } from '../core/storage';
 import { dayKey } from '../economy/time';
+import { analytics } from '../platform/analytics';
 import { weekKey } from '../progression/leagues';
 import type { Backend, RunSubmission, SubmitResult } from './backend';
 
@@ -109,6 +110,14 @@ export class Outbox {
         this.save();
         break;
       }
+      // A run the server turns down never reaches a board, and the player can't tell: say why where it can be seen.
+      if (res.status === 'rejected')
+        analytics.log('run_rejected', {
+          board: next.run.board,
+          reason: (res.message ?? '').slice(0, 100),
+          score: Math.floor(next.run.score),
+          distance: Math.round(next.run.distance),
+        });
       this.items.shift(); // taken, or turned down for good
       this.save();
     }

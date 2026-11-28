@@ -14,6 +14,8 @@ export interface Events {
   run_start: { mode: string };
   /** `hit`: what ended the run ("a boulder", "fell"), or "none". */
   run_end: { mode: string; score: number; distance: number; seconds: number; level: number; outcome: 'crashed' | 'finished' | 'quit'; hit: string };
+  /** A run the leaderboard server turned down (`reason`: its message), so it never reached a board. */
+  run_rejected: { board: string; reason: string; score: number; distance: number };
   tutorial_complete: { controls: string };
   tutorial_skip: { step: string };
   sign_up: { method: 'anonymous' | 'google' };

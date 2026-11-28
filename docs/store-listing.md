@@ -83,6 +83,14 @@ where these names may differ slightly):
 
 The first five are the best fit.
 
+## Release notes for 1.0.16
+
+367 characters (500 at most):
+
+<en-GB>
+Fixed: record scores from pilots who fly close now reach the leaderboards. A run with long near-miss chains could score past an old check on the server, and the boards quietly turned it down. Your bests now count the same way the boards do: after a revive, a run counts as it stood at your first crash, and the end screen says so. Thanks to the pilot who reported it.
+</en-GB>
+
 ## Release notes for 1.0.15
 
 462 characters (500 at most):
